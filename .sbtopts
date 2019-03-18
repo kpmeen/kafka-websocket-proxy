@@ -1,0 +1,2 @@
+-mem 2048
+#-mem 2048 -J-XX:+UnlockExperimentalVMOptions -J-XX:+EnableJVMCI -J-XX:+UseJVMCICompiler

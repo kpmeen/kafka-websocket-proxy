@@ -1,0 +1,93 @@
+---
+version: '3'
+
+services:
+
+  # The ZooKeeper node
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    hostname: zookeeper
+    container_name: zookeeper
+    ports:
+      - "22181:2181"
+    environment:
+      ZOOKEEPER_SERVER_ID: 1
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_SERVERS: zookeeper:2888:3888
+    extra_hosts:
+      - "moby:127.0.0.1"
+    labels:
+      no.itera.cryptex.container.type: "zookeeper"
+
+  # The Kafka broker
+  kafka:
+    # image: confluentinc/cp-kafka:latest
+    image: confluentinc/cp-enterprise-kafka:latest
+    hostname: kafka
+    container_name: kafka
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092, PLAINTEXT_HOST://localhost:29092 #PLAINTEXT_HOST://${HOST_IP}:29092
+      CONFLUENT_METRICS_ENABLE: 'true'
+      KAFKA_METRIC_REPORTERS: io.confluent.metrics.reporter.ConfluentMetricsReporter
+      CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: kafka:9092
+      CONFLUENT_METRICS_REPORTER_ZOOKEEPER_CONNECT: zookeeper:2181
+      CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
+      CONFLUENT_SUPPORT_CUSTOMER_ID: 'anonymous'
+    extra_hosts:
+      - "moby:127.0.0.1"
+    labels:
+      no.itera.cryptex.container.type: "kafka"
+
+  # Confluent Schema Registry
+  schema-registry:
+    image: confluentinc/cp-schema-registry:latest
+    hostname: schema-registry
+    container_name: schema-registry
+    depends_on:
+      - zookeeper
+      - kafka
+    ports:
+      - "28081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: zookeeper:2181
+    extra_hosts:
+      - "moby:127.0.0.1"
+    labels:
+      no.itera.cryptex.container.type: "schema-registry"
+
+#  # Confluent Control Center
+#  control-center:
+#    image: confluentinc/cp-enterprise-control-center:latest
+#    hostname: control-center
+#    container_name: control-center
+#    depends_on:
+#      - zookeeper
+#      - kafka
+#      - schema-registry
+#    ports:
+#      - "29021:9021"
+#    environment:
+#      CONTROL_CENTER_BOOTSTRAP_SERVERS: kafka:9092
+#      CONTROL_CENTER_ZOOKEEPER_CONNECT: zookeeper:2181
+#      CONTROL_CENTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+#      CONTROL_CENTER_REPLICATION_FACTOR: 1
+#      CONTROL_CENTER_INTERNAL_TOPICS_PARTITIONS: 1
+#      CONTROL_CENTER_MONITORING_INTERCEPTOR_TOPIC_PARTITIONS: 1
+#      CONFLUENT_METRICS_TOPIC_REPLICATION: 1
+#      PORT: 9021
+#    extra_hosts:
+#      - "moby:127.0.0.1"
+#    labels:
+#      no.itera.cryptex.container.type: "control-center"
