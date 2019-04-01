@@ -55,18 +55,11 @@ function createTopic() {
 }
 
 function createTopics() {
-  # Main topic for trade details. Retains data for 2 days
-  createTopic "foo" "delete" 172800000;
-#  # Compacted topic to keep code and name of both crypto and fiat currencies.
-#  createTopic "currencies" "compact";
-#  # Topic for average HOURY currency rates. Retains data for 2 hours.
-#  createTopic "average-hourly-rates" "delete" 7200000;
-#  # Topic for average DAILY currency rates. Retains data for 6 months.
-#  createTopic "average-daily-rates" "delete" 15778800000;
-#  # Topic for average WEEKLY currency rates. Retains data for 2 years.
-#  createTopic "average-weekly-rates" "delete" 63115200000;
-#  # Topic for average MONTHLY currency rates. Retains data for 2 years.
-#  createTopic "average-monthly-rates" "delete" 63115200000;
+  # Regular topics that retains data for 30 minutes.
+  createTopic "test1" "delete" 1800000;
+  createTopic "test2" "delete" 1800000;
+  # Compacted topic
+  createTopic "baz" "compact";
 }
 
 # Start containers defined in docker-compose file
