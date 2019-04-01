@@ -1,6 +1,5 @@
 package net.scalytica.sbt.plugin
 
-import sbt.Keys._
 import sbt._
 
 import scala.sys.process._
