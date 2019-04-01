@@ -3,8 +3,6 @@ package net.scalytica.kafka.wsproxy
 import net.scalytica.kafka.wsproxy.Formats.FormatType
 import org.apache.kafka.clients.consumer.OffsetResetStrategy
 
-import scala.util.Try
-
 /**
  * Wrapper class for query parameters describing properties for both inbound and
  * outbound traffic through the WebSocket.
@@ -13,8 +11,8 @@ import scala.util.Try
  * @param in optional parameters describing the props for the inbound socket.
  */
 case class SocketParams(
-    out: OutSocketParams,
-    in: Option[InSocketParams] = None
+    out: OutSocketArgs,
+    in: Option[InSocketArgs] = None
 )
 
 /**
@@ -25,32 +23,46 @@ case class SocketParams(
  * @param topic the Kafka topic to subscribe to.
  * @param keyType optional type for the message keys in the topic.
  * @param valType the type for the message values in the topic.
+ * @param offsetResetStrategy the offset strategy to use. Defaults to EARLIEST
+ * @param rateLimit max number of messages per second to pass through.
+ * @param batchSize the number messages to include per batch.
+ * @param autoCommit enable kafka consumer auto-commit interval.
  */
-case class OutSocketParams(
+case class OutSocketArgs(
     clientId: String,
     groupId: Option[String],
     topic: String,
     keyType: Option[Formats.FormatType] = None,
-    valType: Formats.FormatType = Formats.String,
-    offsetResetStrategy: OffsetResetStrategy
+    valType: Formats.FormatType = Formats.StringType,
+    offsetResetStrategy: OffsetResetStrategy = OffsetResetStrategy.EARLIEST,
+    rateLimit: Option[Int] = None,
+    batchSize: Option[Int] = None,
+    autoCommit: Boolean = true
 )
 
-object OutSocketParams {
+object OutSocketArgs {
 
   def fromQueryParams(
-      cid: String,
-      gid: Option[String],
-      t: String,
-      kt: Option[String],
-      vt: String,
-      ors: String
-  ): OutSocketParams = {
-    val keyTpe = kt.flatMap(FormatType.fromString)
-    val valTpe = FormatType.unsafeFromString(vt)
-    val offReset = Try(OffsetResetStrategy.valueOf(ors.toUpperCase)).toOption
-      .getOrElse(OffsetResetStrategy.EARLIEST)
-    OutSocketParams(cid, gid, t, keyTpe, valTpe, offReset)
-  }
+      clientId: String,
+      groupId: Option[String],
+      topicName: String,
+      keyTpe: Option[Formats.FormatType],
+      valTpe: Formats.FormatType,
+      offsetResetStrategy: OffsetResetStrategy,
+      rateLimit: Option[Int],
+      batchSize: Option[Int],
+      autoCommit: Boolean
+  ): OutSocketArgs = OutSocketArgs(
+    clientId = clientId,
+    groupId = groupId,
+    topic = topicName,
+    keyType = keyTpe,
+    valType = valTpe,
+    offsetResetStrategy = offsetResetStrategy,
+    rateLimit = rateLimit,
+    batchSize = batchSize,
+    autoCommit = autoCommit
+  )
 
 }
 
@@ -61,34 +73,25 @@ object OutSocketParams {
  * @param keyType optional type for the message keys in the topic.
  * @param valType the type for the message values in the topic.
  */
-case class InSocketParams(
+case class InSocketArgs(
     topic: String,
     keyType: Option[Formats.FormatType] = None,
-    valType: Formats.FormatType = Formats.String
+    valType: Formats.FormatType = Formats.StringType
 )
 
-object InSocketParams {
+object InSocketArgs {
 
   def fromOptQueryParams(
       t: Option[String],
-      kt: Option[String],
-      vt: Option[String]
-  ): Option[InSocketParams] = {
-    t.map { t =>
-      val keyTpe = kt.flatMap(FormatType.fromString)
-      val valTpe = vt.flatMap(FormatType.fromString).getOrElse(Formats.String)
-      InSocketParams(t, keyTpe, valTpe)
-    }
-  }
+      kt: Option[FormatType],
+      vt: Option[FormatType]
+  ): Option[InSocketArgs] =
+    t.map(t => InSocketArgs(t, kt, vt.getOrElse(Formats.StringType)))
 
   def fromQueryParams(
       t: String,
-      kt: Option[String],
-      vt: String
-  ): InSocketParams = {
-    val keyTpe = kt.flatMap(FormatType.fromString)
-    val valTpe = FormatType.unsafeFromString(vt)
-    InSocketParams(t, keyTpe, valTpe)
-  }
+      kt: Option[FormatType],
+      vt: FormatType
+  ): InSocketArgs = InSocketArgs(t, kt, vt)
 
 }

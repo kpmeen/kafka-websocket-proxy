@@ -3,22 +3,29 @@ package net.scalytica.kafka.wsproxy.producer
 import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
-import akka.kafka.{ProducerMessage, ProducerSettings}
 import akka.kafka.scaladsl.Producer
+import akka.kafka.{ProducerMessage, ProducerSettings}
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{Flow, Sink}
+import akka.stream.scaladsl.Flow
 import akka.util.ByteString
 import com.typesafe.scalalogging.Logger
-import net.scalytica.kafka.wsproxy.ProducerInterceptorClass
-import net.scalytica.kafka.wsproxy.Formats
+import io.circe.Decoder
 import net.scalytica.kafka.wsproxy.records._
+import net.scalytica.kafka.wsproxy.{
+  Formats,
+  InSocketArgs,
+  ProducerInterceptorClass
+}
 import org.apache.kafka.clients.producer.ProducerConfig._
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.serialization.Serializer
 
-import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
 
+/**
+ * Functions for initialising Kafka producer sinks and flows.
+ */
 object WsProducer {
 
   private[this] val logger = Logger(getClass)
@@ -26,37 +33,24 @@ object WsProducer {
   // TODO: Read from config
   private[this] val kafkaUrl = "localhost:29092"
 
-  /**
-   *
-   * @param as
-   * @param ks
-   * @param vs
-   * @tparam K
-   * @tparam V
-   * @return
-   */
+  /** Create producer settings to use for the Kafka producer. */
   private[this] def baseProducerSettings[K, V](
       as: ActorSystem,
       ks: Option[Serializer[K]],
       vs: Option[Serializer[V]]
-  ) =
+  ) = {
     ProducerSettings(as, ks, vs)
       .withBootstrapServers(kafkaUrl)
       .withProperties(
-        // Enables stream monitoring in confluent control center
         // scalastyle:off
+        // Enables stream monitoring in confluent control center
         INTERCEPTOR_CLASSES_CONFIG -> ProducerInterceptorClass
         // scalastyle:on
       )
+  }
 
   /**
-   *
-   * @param as
-   * @param ks
-   * @param vs
-   * @tparam K
-   * @tparam V
-   * @return
+   * Creates an instance of producer settings with key and value serializers.
    */
   private[this] def producerSettingsWithKey[K, V](
       implicit
@@ -66,64 +60,57 @@ object WsProducer {
   ) = baseProducerSettings(as, Option(ks), Option(vs))
 
   /**
+   * Parses an input message, in the form of a JSON String, into an instance of
+   * [[WsProducerRecord]], which will be passed on to Kafka down-stream.
    *
-   * @param as
-   * @param vs
-   * @tparam V
-   * @return
+   * @param jsonStr the String containing the JSON formatted message
+   * @param keyDec  the JSON decoder to use for the message key
+   * @param valDec  the JSON decoder to use for the message value
+   * @tparam K      the message key type
+   * @tparam V      the message value type
+   * @return an instance of [[WsProducerRecord]]
    */
-  private[this] def producerSettingsNoKey[V](
+  private[this] def parseInput[K, V](jsonStr: String)(
       implicit
-      as: ActorSystem,
-      vs: Serializer[V]
-  ) = baseProducerSettings(as, None, Some(vs))
+      keyDec: Decoder[K],
+      valDec: Decoder[V]
+  ): WsProducerRecord[K, V] = {
+    import io.circe._
+    import io.circe.parser._
+    import net.scalytica.kafka.wsproxy.Decoders._
 
-  /**
-   *
-   * @param str
-   * @return
-   */
-  private[this] def stringKeyValueParser(
-      str: String
-  ): WsProducerRecord[String, String] = {
-    // FIXME: This must be changed to parse the String as a JSON representing
-    //        a WsProducerRecord type. This will also take care of messages
-    //        without any keys.
-    str.split("->", 2).map(_.trim).toList match {
-      case k :: v :: Nil =>
-        ProducerKeyValueRecord(
-          key = InValueDetails[String](k, Formats.String),
-          value = InValueDetails[String](v, Formats.String)
-        )
-      case invalid =>
-        logger.error(s"Malformed message: $invalid")
-        ProducerEmtpyMessage
+    parse(jsonStr) match {
+      case Left(ParsingFailure(message, err)) =>
+        logger.error(s"Error parsing JSON string $message")
+        logger.debug(s"JSON was: $jsonStr")
+        throw err
+
+      case Right(json) =>
+        json.as[WsProducerRecord[K, V]] match {
+          case Left(err)  => throw err
+          case Right(wpr) => wpr
+        }
     }
   }
 
   /**
+   * Converts a [[WsProducerRecord]] into a Kafka [[ProducerRecord]].
    *
-   * @param topic
-   * @param msg
-   * @tparam K
-   * @tparam V
-   * @return
+   * @param topic the topic name the record is to be written to.
+   * @param msg   the message to send to the Kafka topic.
+   * @tparam K    the message key type
+   * @tparam V    the message value type
+   * @return an instance of [[ProducerRecord]]
    */
   private[this] def asProducerRecord[K, V](
       topic: String,
       msg: WsProducerRecord[K, V]
-  ): ProducerMessage.Message[K, V, WsProducerRecord[K, V]] = msg match {
+  ): ProducerRecord[K, V] = msg match {
     case kvm: ProducerKeyValueRecord[K, V] =>
-      ProducerMessage.Message[K, V, WsProducerRecord[K, V]](
-        new ProducerRecord[K, V](topic, kvm.key.value, kvm.value.value),
-        kvm
-      )
+      new ProducerRecord[K, V](topic, kvm.key.value, kvm.value.value)
 
     case vm: ProducerValueRecord[V] =>
-      ProducerMessage.Message[K, V, WsProducerRecord[K, V]](
-        new ProducerRecord[K, V](topic, vm.value.value),
-        vm
-      )
+      new ProducerRecord[K, V](topic, vm.value.value)
 
     case ProducerEmtpyMessage =>
       throw new IllegalStateException(
@@ -132,13 +119,30 @@ object WsProducer {
       )
   }
 
-  def sink[K, V](topic: String)(
+  /**
+   *
+   * @param args input arguments defining the base configs for the producer.
+   * @param as   actor system to use
+   * @param mat  actor materializer to use
+   * @param ks   the message key serializer to use
+   * @param vs   the message value serializer to use
+   * @param kd   the JSON decoder to use for the message key
+   * @param vd   the JSON decoder to use for the message value
+   * @tparam K   the message key type
+   * @tparam V   the message value type
+   * @return a [[Flow]] that sends messages to Kafka and passes on the result
+   *         down-stream for further processing. For example sending the
+   *         metadata to the external web client for it to process locally.
+   */
+  def produce[K, V](args: InSocketArgs)(
       implicit
       as: ActorSystem,
       mat: ActorMaterializer,
       ks: Serializer[K],
-      vs: Serializer[V]
-  ): Sink[Message, NotUsed] = {
+      vs: Serializer[V],
+      kd: Decoder[K],
+      vd: Decoder[V]
+  ): Flow[Message, WsProducerResult, NotUsed] = {
     implicit val ec: ExecutionContext = as.dispatcher
 
     Flow[Message]
@@ -147,25 +151,22 @@ object WsProducer {
         case bin: BinaryMessage => bin.toStrict(2 seconds).map(_.data)
       }
       .map {
-        case s: String =>
-          stringKeyValueParser(s)
-
+        case s: String => parseInput[K, V](s)
         case b: ByteString =>
-          ProducerValueRecord[Array[Byte]](
-            InValueDetails(b.asByteBuffer.array(), Formats.ByteArray)
+          ProducerValueRecord(
+            InValueDetails(b.asByteBuffer.array(), Formats.ByteArrayType)
           )
       }
       .filter(_.nonEmpty)
       .filterNot(_ == ProducerEmtpyMessage)
       .map {
         case wsm: WsProducerRecord[K, V] =>
-          asProducerRecord[K, V](topic, wsm)
+          val record = asProducerRecord[K, V](args.topic, wsm)
+          ProducerMessage.Message(record, record)
       }
       .via(Producer.flexiFlow(producerSettingsWithKey[K, V]))
-      .map(_.passThrough)
-      .to(Sink.foreach { msg =>
-        logger.debug(s"Wrote message $msg to topic $topic")
-      })
+      .map(r => WsProducerResult.fromProducerResults(r))
+      .flatMapConcat(seqToSource)
   }
 
 }

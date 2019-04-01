@@ -1,58 +1,163 @@
 package net.scalytica.kafka.wsproxy
 
+import io.circe.{Decoder, Encoder}
+import org.apache.kafka.common.serialization.{Deserializer, Serializer}
+
 object Formats {
 
   sealed trait FormatType { self =>
 
-    lazy val name: String =
-      self.getClass.getSimpleName.stripSuffix("$").toLowerCase()
+    type Aux
 
+    lazy val name: String = self.getClass.getSimpleName
+      .stripSuffix("$")
+      .toLowerCase()
+      .stripSuffix("type")
+
+    val serializer: Serializer[Aux]
+    val deserializer: Deserializer[Aux]
+
+    val encoder: Encoder[Aux]
+    val decoder: Decoder[Aux]
+  }
+
+  case object NoType extends FormatType {
+    type Aux = Unit
+
+    override val serializer   = BasicSerdes.EmptySerializer
+    override val deserializer = BasicSerdes.EmptyDeserializer
+
+    override val encoder = Encoder.encodeUnit
+    override val decoder = Decoder.decodeUnit
   }
 
   // Complex types
-  case object Json     extends FormatType
-  case object Avro     extends FormatType
-  case object Protobuf extends FormatType
+  case object JsonType extends FormatType {
+    type Aux = io.circe.Json
+
+    override val serializer   = BasicSerdes.JsonSerializer
+    override val deserializer = BasicSerdes.JsonDeserializer
+
+    override val encoder = Encoder.encodeJson
+    override val decoder = Decoder.decodeJson
+  }
+
+  case object AvroType extends FormatType {
+    type Aux = Array[Byte]
+
+    override val serializer   = BasicSerdes.ByteArrSerializer
+    override val deserializer = BasicSerdes.ByteArrDeserializer
+
+    override val encoder = Encoders.byteArrEncoder
+    override val decoder = Decoders.byteArrDecoder
+  }
+
+  case object ProtobufType extends FormatType {
+    type Aux = Array[Byte]
+
+    override val serializer   = BasicSerdes.ByteArrSerializer
+    override val deserializer = BasicSerdes.ByteArrDeserializer
+
+    override val encoder = Encoders.byteArrEncoder
+    override val decoder = Decoders.byteArrDecoder
+  }
 
   // "Primitives"
-  case object ByteArray extends FormatType
-  case object String    extends FormatType
-  case object Char      extends FormatType
-  case object Int       extends FormatType
-  case object Short     extends FormatType
-  case object Long      extends FormatType
-  case object Double    extends FormatType
-  case object Float     extends FormatType
+  case object ByteArrayType extends FormatType {
+    type Aux = Array[Byte]
+
+    override val serializer   = BasicSerdes.ByteArrSerializer
+    override val deserializer = BasicSerdes.ByteArrDeserializer
+
+    override val encoder = Encoders.byteArrEncoder
+    override val decoder = Decoders.byteArrDecoder
+  }
+
+  case object StringType extends FormatType {
+    type Aux = String
+
+    override val serializer   = BasicSerdes.StringSerializer
+    override val deserializer = BasicSerdes.StringDeserializer
+
+    override val encoder = Encoder.encodeString
+    override val decoder = Decoder.decodeString
+  }
+
+  case object IntType extends FormatType {
+    type Aux = Int
+
+    override val serializer   = BasicSerdes.IntSerializer
+    override val deserializer = BasicSerdes.IntDeserializer
+
+    override val encoder = Encoder.encodeInt
+    override val decoder = Decoder.decodeInt
+  }
+
+  case object ShortType extends FormatType {
+    type Aux = Short
+
+    override val serializer   = BasicSerdes.ShortSerializer
+    override val deserializer = BasicSerdes.ShortDeserializer
+
+    override val encoder = Encoder.encodeShort
+    override val decoder = Decoder.decodeShort
+  }
+
+  case object LongType extends FormatType {
+    type Aux = Long
+
+    override val serializer   = BasicSerdes.LongSerializer
+    override val deserializer = BasicSerdes.LongDeserializer
+
+    override val encoder = Encoder.encodeLong
+    override val decoder = Decoder.decodeLong
+  }
+  case object DoubleType extends FormatType {
+    type Aux = Double
+
+    override val serializer   = BasicSerdes.DoubleSerializer
+    override val deserializer = BasicSerdes.DoubleDeserializer
+
+    override val encoder = Encoder.encodeDouble
+    override val decoder = Decoder.decodeDouble
+  }
+  case object FloatType extends FormatType {
+    type Aux = Float
+
+    override val serializer   = BasicSerdes.FloatSerializer
+    override val deserializer = BasicSerdes.FloatDeserializer
+
+    override val encoder = Encoder.encodeFloat
+    override val decoder = Decoder.decodeFloat
+  }
 
   object FormatType {
 
     val All = List(
-      Json,
-      Avro,
-      Protobuf,
-      ByteArray,
-      String,
-      Char,
-      Int,
-      Short,
-      Long,
-      Double,
-      Float
+      JsonType,
+      AvroType,
+      ProtobufType,
+      ByteArrayType,
+      StringType,
+      IntType,
+      ShortType,
+      LongType,
+      DoubleType,
+      FloatType
     )
 
     // scalastyle:off cyclomatic.complexity
-    def fromString(s: String): Option[FormatType] = s match {
-      case str: String if str == Json.name      => Some(Json)
-      case str: String if str == Avro.name      => Some(Avro)
-      case str: String if str == ByteArray.name => Some(ByteArray)
-      case str: String if str == String.name    => Some(String)
-      case str: String if str == Char.name      => Some(Char)
-      case str: String if str == Int.name       => Some(Int)
-      case str: String if str == Short.name     => Some(Short)
-      case str: String if str == Long.name      => Some(Long)
-      case str: String if str == Double.name    => Some(Double)
-      case str: String if str == Float.name     => Some(Float)
-      case unsupported                          => None
+    def fromString(s: String): Option[FormatType] = Option(s).flatMap {
+      case str: String if str == JsonType.name      => Some(JsonType)
+      case str: String if str == AvroType.name      => Some(AvroType)
+      case str: String if str == ByteArrayType.name => Some(ByteArrayType)
+      case str: String if str == StringType.name    => Some(StringType)
+      case str: String if str == IntType.name       => Some(IntType)
+      case str: String if str == ShortType.name     => Some(ShortType)
+      case str: String if str == LongType.name      => Some(LongType)
+      case str: String if str == DoubleType.name    => Some(DoubleType)
+      case str: String if str == FloatType.name     => Some(FloatType)
+      case unsupported                              => None
     }
     // scalastyle:on cyclomatic.complexity
 

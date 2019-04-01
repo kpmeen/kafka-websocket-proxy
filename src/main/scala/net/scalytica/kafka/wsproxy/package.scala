@@ -1,4 +1,5 @@
 package net.scalytica.kafka
+
 import io.confluent.monitoring.clients.interceptor.{
   MonitoringConsumerInterceptor,
   MonitoringProducerInterceptor

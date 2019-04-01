@@ -2,44 +2,42 @@ package net.scalytica.kafka.wsproxy
 
 import io.circe._
 import io.circe.generic.extras.Configuration
-import io.circe.syntax._
 import io.circe.generic.extras.semiauto._
+import io.circe.syntax._
 import net.scalytica.kafka.wsproxy.Formats.FormatType
 import net.scalytica.kafka.wsproxy.records._
+import net.scalytica.kafka.wsproxy.utils.Binary
+
+import scala.util.{Failure, Success}
 
 object Encoders {
 
   implicit val cfg: Configuration = Configuration.default
 
+  implicit val byteArrEncoder: Encoder[Array[Byte]] = { arr =>
+    Json.fromString(Binary.encodeBase64(arr))
+  }
+
   implicit val formatTypeEncoder: Encoder[FormatType] = { a: FormatType =>
     Json.fromString(a.name)
   }
 
-  implicit val outValStrEncoder: Encoder[OutValueDetails[String]] =
-    deriveEncoder
-  implicit val outValByteArrEncoder: Encoder[OutValueDetails[Array[Byte]]] =
-    deriveEncoder
+  implicit val prodResEncoder: Encoder[WsProducerResult] = deriveEncoder
 
-  implicit val consRecStrStrEnc: Encoder[WsConsumerRecord[String, String]] = {
-    cr =>
-      wsConsumerRecordToJson[String, String](cr)
+  implicit def outValEncoder[T](
+      implicit enc: Encoder[T]
+  ): Encoder[OutValueDetails[T]] = { ovd =>
+    Json.obj(
+      "value"  -> ovd.value.asJson,
+      "format" -> ovd.format.asJson
+    )
   }
 
-  implicit val consRecStrByteArrEnc
-    : Encoder[WsConsumerRecord[String, Array[Byte]]] = { cr =>
-    wsConsumerRecordToJson[String, Array[Byte]](cr)
-  }
-
-  implicit val consRecArrByteEnc
-    : Encoder[WsConsumerRecord[Array[Byte], Array[Byte]]] = { cr =>
-    wsConsumerRecordToJson[Array[Byte], Array[Byte]](cr)
-  }
-
-  private[this] def wsConsumerRecordToJson[K, V](cr: WsConsumerRecord[K, V])(
+  implicit def wsConsumerRecordToJson[K, V](
       implicit
       keyEnc: Encoder[OutValueDetails[K]],
       valEnc: Encoder[OutValueDetails[V]]
-  ): Json = cr match {
+  ): Encoder[WsConsumerRecord[K, V]] = {
     case ckvr: ConsumerKeyValueRecord[K, V] =>
       Json.obj(
         "partition" -> Json.fromInt(ckvr.partition),
@@ -62,14 +60,50 @@ object Decoders {
 
   implicit val cfg: Configuration = Configuration.default
 
+  implicit val byteArrDecoder: Decoder[Array[Byte]] = { json =>
+    json.as[String].flatMap { s =>
+      Binary.decodeBase64(s) match {
+        case Success(a) => Right(a)
+        case Failure(e) => Left(DecodingFailure.fromThrowable(e, List.empty))
+      }
+    }
+  }
+
   implicit val formatTypeDecoder: Decoder[FormatType] = { c: io.circe.HCursor =>
     c.value.asString.flatMap(FormatType.fromString).map(Right.apply).getOrElse {
       Left(DecodingFailure("Bad format type", List.empty))
     }
   }
 
-  implicit val inValStrDecoder: Decoder[InValueDetails[String]] = deriveDecoder
-  implicit val inValByteArrDecoder: Decoder[InValueDetails[Array[Byte]]] =
-    deriveDecoder
+  implicit def inValDecoder[T](
+      implicit dec: Decoder[T]
+  ): Decoder[InValueDetails[T]] = { json =>
+    for {
+      v <- json.downField("value").as[T]
+      f <- json.downField("format").as[FormatType]
+      s <- json.downField("schema").as[Option[String]]
+    } yield {
+      InValueDetails(v, f, s)
+    }
+  }
 
+  implicit def jsonToWsProducerRecord[K, V](
+      implicit
+      keyDec: Decoder[K],
+      valDec: Decoder[V]
+  ): Decoder[WsProducerRecord[K, V]] = { cursor =>
+    val key   = cursor.downField("key").as[InValueDetails[K]]
+    val value = cursor.downField("value").as[InValueDetails[V]]
+
+    value match {
+      case Right(v) =>
+        key match {
+          case Right(k) => Right(ProducerKeyValueRecord[K, V](k, v))
+          case Left(_)  => Right(ProducerValueRecord[V](v))
+        }
+
+      case Left(fail) =>
+        Left(fail)
+    }
+  }
 }
