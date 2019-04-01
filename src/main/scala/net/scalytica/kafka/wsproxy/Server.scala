@@ -100,6 +100,7 @@ object Server extends App {
           args.groupId
         )
         .map(cr => cr -> TextMessage(cr.asJson.pretty(noSpaces)))
+        // FIXME: See below FIXME comment...
         .mapAsync(1) { case (rec, msg) => rec.commit().map(_ => msg) }
     }
   }
@@ -107,18 +108,25 @@ object Server extends App {
   /**
    * Request handler for the outbound Kafka WebSocket connection.
    *
-   * @param source The Source for outbound traffic. Consuming messages.
+   * @param args the output arguments to pass on to the consumer.
    * @return a [[Route]] for accessing the outbound WebSocket functionality.
    */
   private[this] def outboundWebSocket(
-      source: Source[TextMessage, Consumer.Control]
+      args: OutSocketArgs
   ): Route = {
     logger.debug("Initialising outbound websocket")
     // FIXME: This must be changed to allow for reading inbound messages that
-    //        may contain offset commit messages!
+    //        may contain offset commit messages! The following may be an option
+    //        to explore:
+    //        ---
+    //        Committer.sink(CommitterSettings(as))
+    //        ---
+    //        The challenge is to keep track of the Committable messages that
+    //        knows the actual consumer ActorRef, and hence knows how to call
+    //        the commit function.
     handleWebSocketMessages {
       Flow
-        .fromSinkAndSourceCoupledMat(Sink.ignore, source)(Keep.both)
+        .fromSinkAndSourceCoupledMat(Sink.ignore, kafkaSource(args))(Keep.both)
         .watchTermination() { (m, f) =>
           f.onComplete {
             case scala.util.Success(_) =>
@@ -135,16 +143,15 @@ object Server extends App {
   /**
    * Request handler for the inbound Kafka WebSocket connection.
    *
-   * @param flow The Sink for inbound traffic. Producing messages.
+   * @param args the input arguments to pass on to the producer.
    * @return a [[Route]] for accessing the inbound WebSocket functionality.
    */
   private[this] def inboundWebSocket(
-      flow: Flow[Message, WsProducerResult, NotUsed]
+      args: InSocketArgs
   ): Route = handleWebSocketMessages {
     logger.debug("Initialising inbound websocket")
-    // FIXME: This must be changed to allow for sending outbound messages for
-    //        kafka message ACKs etc!
-    flow.map(res => TextMessage.Strict(res.asJson.pretty(noSpaces)))
+
+    kafkaSink(args).map(res => TextMessage.Strict(res.asJson.pretty(noSpaces)))
   }
 
   // Unmarshaller for FormatType query params
@@ -212,14 +219,10 @@ object Server extends App {
   private[this] val route =
     pathPrefix("socket") {
       path("in") {
-        inParams { in =>
-          inboundWebSocket(kafkaSink(in))
-        }
+        inParams(inboundWebSocket)
       } ~
         path("out") {
-          outParams { out =>
-            outboundWebSocket(kafkaSource(out))
-          }
+          outParams(outboundWebSocket)
         }
     }
 
