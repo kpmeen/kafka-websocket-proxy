@@ -31,12 +31,12 @@ lazy val root = (project in file("."))
       Kafka.Clients,
       Kafka.MonitoringInterceptors,
       Logging.Logback,
-      Logging.Log4jOverSlf4j               % Test,
-      Logging.JulToSlf4j                   % Test,
-      Testing.ScalaTest                    % Test,
-      Testing.ScalaTestKafka               % Test,
-      Testing.ScalaTestKafkaSchemaRegistry % Test,
-      Testing.AkkaTestkit                  % Test,
-      Testing.Scalactic                    % Test
+      Logging.Log4jOverSlf4j         % Test,
+      Logging.JulToSlf4j             % Test,
+      Testing.ScalaTest              % Test,
+      Testing.EmbeddedKafka          % Test,
+      Testing.EmbeddedSchemaRegistry % Test,
+      Testing.AkkaTestkit            % Test,
+      Testing.Scalactic              % Test
     )
   )

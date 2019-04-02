@@ -6,14 +6,15 @@ object Versions {
   val ConfigVersion     = "1.3.3"
   val PureConfigVersion = "0.10.2"
 
-  val Avro4sVersion            = "2.0.4"
-  val ConfluentPlatformVersion = "5.1.2"
-  val KafkaVersion             = "2.1.1"
-  val EmbeddedKafkaVersion     = "2.0.0"
-  val KafkaStreamsQueryVersion = "0.1.1"
+  val Avro4sVersion                 = "2.0.4"
+  val ConfluentPlatformVersion      = "5.2.0"
+  val KafkaVersion                  = "2.2.0"
+  val EmbeddedKafkaVersion          = "2.2.0"
+  val EmbeddedSchemaRegistryVersion = "5.2.0"
+  val KafkaStreamsQueryVersion      = "0.1.1"
 
   val AkkaVersion            = "2.5.21"
-  val AkkaHttpVersion        = "10.1.7"
+  val AkkaHttpVersion        = "10.1.8"
   val AkkaStreamKafkaVersion = "1.0.1"
 
   val AlpakkaVersion = "0.20"
@@ -26,7 +27,7 @@ object Versions {
   val Slf4JVersion        = "1.7.26"
   val LogbackVersion      = "1.2.3"
 
-  val ScalaTestVersion         = "3.0.6"
+  val ScalaTestVersion         = "3.0.7"
   val ScalaTestPlusPlayVersion = "4.0.1"
 }
 
@@ -81,6 +82,7 @@ object Dependencies {
     val StreamsQuery = "com.lightbend"    %% "kafka-streams-query" % KafkaStreamsQueryVersion excludeAll (LoggerExclusions: _*)
 
     val AvroSerializer   = "io.confluent" % "kafka-avro-serializer"    % ConfluentPlatformVersion excludeAll (LoggerExclusions: _*)
+    val JsonSerializer   = "io.confluent" % "kafka-json-serializer"    % ConfluentPlatformVersion excludeAll (LoggerExclusions: _*)
     val StreamsAvroSerde = "io.confluent" % "kafka-streams-avro-serde" % ConfluentPlatformVersion excludeAll (LoggerExclusions: _*)
 
     val MonitoringInterceptors = "io.confluent" % "monitoring-interceptors" % ConfluentPlatformVersion excludeAll (LoggerExclusions: _*)
@@ -118,9 +120,9 @@ object Dependencies {
 
     val ScalaTestDeps = Seq(ScalaTest % Test, Scalactic)
 
-    val ScalaTestKafka               = "net.manub" %% "scalatest-embedded-kafka"           % EmbeddedKafkaVersion excludeAll (LoggerExclusions: _*)
-    val ScalaTestKafkaStreams        = "net.manub" %% "scalatest-embedded-kafka-streams"   % EmbeddedKafkaVersion excludeAll (LoggerExclusions: _*)
-    val ScalaTestKafkaSchemaRegistry = "net.manub" %% "scalatest-embedded-schema-registry" % EmbeddedKafkaVersion excludeAll (LoggerExclusions: _*)
+    val EmbeddedKafka          = "io.github.embeddedkafka" %% "embedded-kafka"                 % EmbeddedKafkaVersion excludeAll (LoggerExclusions: _*)
+    val EmbeddedKafkaStreams   = "io.github.embeddedkafka" %% "embedded-kafka-streams"         % EmbeddedKafkaVersion excludeAll (LoggerExclusions: _*)
+    val EmbeddedSchemaRegistry = "io.github.embeddedkafka" %% "embedded-kafka-schema-registry" % EmbeddedSchemaRegistryVersion excludeAll (LoggerExclusions: _*)
 
     val AkkaTestkit       = "com.typesafe.akka" %% "akka-testkit"        % AkkaVersion
     val AkkaHttpTestKit   = "com.typesafe.akka" %% "akka-http-testkit"   % AkkaHttpVersion
