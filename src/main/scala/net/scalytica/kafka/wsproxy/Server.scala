@@ -105,6 +105,20 @@ object Server extends App {
     }
   }
 
+  /*
+    FIXME: This must be changed to allow for reading inbound messages that
+           may contain offset commit messages! The following may be an option
+           to explore:
+           ---
+           Committer.sink(CommitterSettings(as))
+           ---
+           The challenge is to keep track of the Committable messages that
+           knows the actual consumer ActorRef, and hence knows how to call
+           the commit function.
+           One solution may be to keep a dedicated Actor per outbound connection
+           with manual commits, that keeps track of the actual Committable to
+           be able to call the commit function.
+   */
   /**
    * Request handler for the outbound Kafka WebSocket connection.
    *
@@ -115,18 +129,13 @@ object Server extends App {
       args: OutSocketArgs
   ): Route = {
     logger.debug("Initialising outbound websocket")
-    // FIXME: This must be changed to allow for reading inbound messages that
-    //        may contain offset commit messages! The following may be an option
-    //        to explore:
-    //        ---
-    //        Committer.sink(CommitterSettings(as))
-    //        ---
-    //        The challenge is to keep track of the Committable messages that
-    //        knows the actual consumer ActorRef, and hence knows how to call
-    //        the commit function.
+
+    val sink   = Sink.ignore
+    val source = kafkaSource(args)
+
     handleWebSocketMessages {
       Flow
-        .fromSinkAndSourceCoupledMat(Sink.ignore, kafkaSource(args))(Keep.both)
+        .fromSinkAndSourceCoupledMat(sink, source)(Keep.both)
         .watchTermination() { (m, f) =>
           f.onComplete {
             case scala.util.Success(_) =>
@@ -178,16 +187,18 @@ object Server extends App {
    */
   private[this] def outParams: Directive[Tuple1[OutSocketArgs]] =
     parameters(
-      'clientId,
-      'groupId ?,
-      'outTopic,
-      'outKeyType.as[FormatType] ?,
-      'outValType.as[FormatType],
-      'offsetResetStrategy
-        .as[OffsetResetStrategy] ? OffsetResetStrategy.EARLIEST,
-      'rate.as[Int] ?,
-      'batchSize.as[Int] ?,
-      'autoCommit.as[Boolean] ? true
+      (
+        'clientId,
+        'groupId ?,
+        'outTopic,
+        'outKeyType.as[FormatType] ?,
+        'outValType.as[FormatType],
+        'offsetResetStrategy
+          .as[OffsetResetStrategy] ? OffsetResetStrategy.EARLIEST,
+        'rate.as[Int] ?,
+        'batchSize.as[Int] ?,
+        'autoCommit.as[Boolean] ? true
+      )
     ).tmap { t =>
       OutSocketArgs.fromQueryParams(
         clientId = t._1,
@@ -208,14 +219,16 @@ object Server extends App {
    */
   private[this] def inParams: Directive[Tuple1[InSocketArgs]] =
     parameters(
-      'inTopic,
-      'inKeyType.as[FormatType] ?,
-      'inValType.as[FormatType]
+      (
+        'inTopic,
+        'inKeyType.as[FormatType] ?,
+        'inValType.as[FormatType]
+      )
     ).tmap { t =>
       InSocketArgs.fromQueryParams(t._1, t._2, t._3)
     }
 
-  // Endpoint route(s) providing access to the Kafka WebSocket
+  /** Endpoint route(s) providing access to the Kafka WebSocket */
   private[this] val route =
     pathPrefix("socket") {
       path("in") {
@@ -226,6 +239,7 @@ object Server extends App {
         }
     }
 
+  /** Bind to network interface and port, starting the server */
   private[this] val bindingFuture = Http().bindAndHandle(
     handler = route,
     interface = "localhost",
@@ -240,6 +254,6 @@ object Server extends App {
   StdIn.readLine()
   // scalastyle:on
 
-  // Unbind from the network port and shutdown the server.
+  /** Unbind from the network interface and port, shutting down the server. */
   bindingFuture.flatMap(_.unbind()).onComplete(_ => sys.terminate())
 }

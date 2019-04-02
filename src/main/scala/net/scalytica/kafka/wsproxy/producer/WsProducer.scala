@@ -6,16 +6,11 @@ import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.kafka.scaladsl.Producer
 import akka.kafka.{ProducerMessage, ProducerSettings}
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.Flow
-import akka.util.ByteString
+import akka.stream.scaladsl.{Flow, Sink}
 import com.typesafe.scalalogging.Logger
 import io.circe.Decoder
 import net.scalytica.kafka.wsproxy.records._
-import net.scalytica.kafka.wsproxy.{
-  Formats,
-  InSocketArgs,
-  ProducerInterceptorClass
-}
+import net.scalytica.kafka.wsproxy.{InSocketArgs, ProducerInterceptorClass}
 import org.apache.kafka.clients.producer.ProducerConfig._
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.serialization.Serializer
@@ -102,7 +97,7 @@ object WsProducer {
    * @tparam V    the message value type
    * @return an instance of [[ProducerRecord]]
    */
-  private[this] def asProducerRecord[K, V](
+  private[this] def asKafkaProducerRecord[K, V](
       topic: String,
       msg: WsProducerRecord[K, V]
   ): ProducerRecord[K, V] = msg match {
@@ -146,23 +141,16 @@ object WsProducer {
     implicit val ec: ExecutionContext = as.dispatcher
 
     Flow[Message]
-      .mapAsync(1) {
-        case tm: TextMessage    => tm.toStrict(2 seconds).map(_.text)
-        case bin: BinaryMessage => bin.toStrict(2 seconds).map(_.data)
+      .mapConcat {
+        case tm: TextMessage   => TextMessage(tm.textStream) :: Nil
+        case bm: BinaryMessage => bm.dataStream.runWith(Sink.ignore); Nil
       }
-      .map {
-        case s: String => parseInput[K, V](s)
-        case b: ByteString =>
-          ProducerValueRecord(
-            InValueDetails(b.asByteBuffer.array(), Formats.ByteArrayType)
-          )
-      }
+      .mapAsync(1)(_.toStrict(2 seconds).map(_.text))
+      .map(str => parseInput[K, V](str))
       .filter(_.nonEmpty)
-      .filterNot(_ == ProducerEmtpyMessage)
-      .map {
-        case wsm: WsProducerRecord[K, V] =>
-          val record = asProducerRecord[K, V](args.topic, wsm)
-          ProducerMessage.Message(record, record)
+      .map { wsm =>
+        val record = asKafkaProducerRecord(args.topic, wsm)
+        ProducerMessage.Message(record, record)
       }
       .via(Producer.flexiFlow(producerSettingsWithKey[K, V]))
       .map(r => WsProducerResult.fromProducerResults(r))
