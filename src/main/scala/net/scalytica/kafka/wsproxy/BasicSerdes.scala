@@ -11,6 +11,10 @@ import org.apache.kafka.common.serialization.{
   Serdes => KSerdes
 }
 
+/**
+ * Definitions of most common primitive serializers and deserializers, plus a
+ * couple of custom ones for special scenarios.
+ */
 object BasicSerdes {
 
   implicit val EmptySerializer   = EmptySerde.serializer()
@@ -61,6 +65,10 @@ object BasicSerdes {
 
 }
 
+/**
+ * Serde definition for cases where the incoming type is not defined. For
+ * example when messages have no key, this serde will be used.
+ */
 object EmptySerde
     extends Serde[Unit]
     with Serializer[Unit]
@@ -79,6 +87,11 @@ object EmptySerde
   override def close(): Unit = {}
 }
 
+/**
+ * Serde for handling JSON messages. Currently built on top of the String serde.
+ *
+ * Fixme: Build upon the standard Kafka JSON serde?
+ */
 object JsonSerde
     extends Serde[Json]
     with Serializer[Json]
