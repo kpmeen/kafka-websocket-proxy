@@ -46,10 +46,12 @@ object Dependencies {
 
   object Akka {
 
-    val AkkaHttp   = "com.typesafe.akka" %% "akka-http"   % AkkaHttpVersion
-    val AkkaActor  = "com.typesafe.akka" %% "akka-actor"  % AkkaVersion
-    val AkkaStream = "com.typesafe.akka" %% "akka-stream" % AkkaVersion
-    val AkkaSlf4j  = "com.typesafe.akka" %% "akka-slf4j"  % AkkaVersion
+    val AkkaActor       = "com.typesafe.akka" %% "akka-actor"        % AkkaVersion
+    val AkkaStream      = "com.typesafe.akka" %% "akka-stream"       % AkkaVersion
+    val AkkaTyped       = "com.typesafe.akka" %% "akka-actor-typed"  % AkkaVersion
+    val AkkaStreamTyped = "com.typesafe.akka" %% "akka-stream-typed" % AkkaVersion
+    val AkkaSlf4j       = "com.typesafe.akka" %% "akka-slf4j"        % AkkaVersion
+    val AkkaHttp        = "com.typesafe.akka" %% "akka-http"         % AkkaHttpVersion
 
     val AkkaStreamKafka = "com.typesafe.akka" %% "akka-stream-kafka" % AkkaStreamKafkaVersion
 

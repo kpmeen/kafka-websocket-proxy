@@ -14,6 +14,10 @@ object Encoders {
 
   implicit val cfg: Configuration = Configuration.default
 
+  implicit val msgIdEncoder: Encoder[WsMessageId] = { msgId =>
+    Json.fromString(msgId.value)
+  }
+
   implicit val byteArrEncoder: Encoder[Array[Byte]] = { arr =>
     Json.fromString(Binary.encodeBase64(arr))
   }
@@ -40,17 +44,19 @@ object Encoders {
   ): Encoder[WsConsumerRecord[K, V]] = {
     case ckvr: ConsumerKeyValueRecord[K, V] =>
       Json.obj(
-        "partition" -> Json.fromInt(ckvr.partition),
-        "offset"    -> Json.fromLong(ckvr.offset),
-        "key"       -> ckvr.key.asJson,
-        "value"     -> ckvr.value.asJson
+        "wsProxyMessageId" -> ckvr.wsProxyMessageId.asJson,
+        "partition"        -> Json.fromInt(ckvr.partition),
+        "offset"           -> Json.fromLong(ckvr.offset),
+        "key"              -> ckvr.key.asJson,
+        "value"            -> ckvr.value.asJson
       )
 
     case cvr: ConsumerValueRecord[V] =>
       Json.obj(
-        "partition" -> Json.fromInt(cvr.partition),
-        "offset"    -> Json.fromLong(cvr.offset),
-        "value"     -> cvr.value.asJson
+        "wsProxyMessageId" -> cvr.wsProxyMessageId.asJson,
+        "partition"        -> Json.fromInt(cvr.partition),
+        "offset"           -> Json.fromLong(cvr.offset),
+        "value"            -> cvr.value.asJson
       )
   }
 
@@ -59,6 +65,12 @@ object Encoders {
 object Decoders {
 
   implicit val cfg: Configuration = Configuration.default
+
+  implicit val wsMessageIdDecoder: Decoder[WsMessageId] = { json =>
+    json.as[String].map(WsMessageId.apply)
+  }
+
+  implicit val wsCommitDecoder: Decoder[WsCommit] = deriveDecoder
 
   implicit val byteArrDecoder: Decoder[Array[Byte]] = { json =>
     json.as[String].flatMap { s =>

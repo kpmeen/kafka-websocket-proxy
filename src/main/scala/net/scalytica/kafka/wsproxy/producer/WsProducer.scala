@@ -25,7 +25,6 @@ object WsProducer {
 
   private[this] val logger = Logger(getClass)
 
-  // TODO: Read from config
   private[this] val kafkaUrl = "localhost:29092"
 
   /** Create producer settings to use for the Kafka producer. */

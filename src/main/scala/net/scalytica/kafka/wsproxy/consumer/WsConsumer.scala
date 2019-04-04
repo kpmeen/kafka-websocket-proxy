@@ -37,7 +37,7 @@ object WsConsumer {
       id: String,
       gid: Option[String],
       offsetReset: OffsetResetStrategy = EARLIEST,
-      autoCommit: Boolean = true
+      autoCommit: Boolean
   )(
       implicit
       as: ActorSystem,
@@ -93,6 +93,7 @@ object WsConsumer {
       ks: Deserializer[K],
       vs: Deserializer[V]
   ): Source[WsConsumerRecord[K, V], Consumer.Control] = {
+    logger.debug("Setting up consumer with auto-commit ENABLED")
     val settings =
       consumerSettings[K, V](id = clientId, gid = groupId, autoCommit = true)
     val subscription = Subscriptions.topics(Set(topic))
@@ -131,6 +132,7 @@ object WsConsumer {
       ks: Deserializer[K],
       vs: Deserializer[V]
   ): Source[WsConsumerRecord[K, V], Consumer.Control] = {
+    logger.debug("Setting up consumer with auto-commit DISABLED")
     val settings =
       consumerSettings[K, V](id = clientId, gid = groupId, autoCommit = false)
     val subscription = Subscriptions.topics(Set(topic))
@@ -151,8 +153,10 @@ object WsConsumer {
     Option(rec.key)
       .map { k =>
         ConsumerKeyValueRecord[K, V](
+          topic = rec.topic,
           partition = rec.partition,
           offset = rec.offset,
+          timestamp = rec.timestamp(),
           key = OutValueDetails[K](k),
           value = OutValueDetails[V](rec.value),
           committableOffset = coffset
@@ -160,8 +164,10 @@ object WsConsumer {
       }
       .getOrElse {
         ConsumerValueRecord[V](
+          topic = rec.topic,
           partition = rec.partition,
           offset = rec.offset,
+          timestamp = rec.timestamp(),
           value = OutValueDetails[V](rec.value),
           committableOffset = coffset
         )

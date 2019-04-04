@@ -1,28 +1,38 @@
 package net.scalytica.kafka.wsproxy
 
 import akka.actor.ActorSystem
+import akka.actor.typed.ActorRef
+import akka.actor.typed.scaladsl.adapter._
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.model.ws.{Message, TextMessage}
+import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.unmarshalling.Unmarshaller
 import akka.kafka.scaladsl.Consumer
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
+import akka.stream.typed.scaladsl.ActorSink
 import akka.{Done, NotUsed}
 import com.typesafe.scalalogging.Logger
 import io.circe.Encoder
 import io.circe.Printer.noSpaces
+import io.circe.parser._
 import io.circe.syntax._
+import net.scalytica.kafka.wsproxy.Decoders._
 import net.scalytica.kafka.wsproxy.Encoders._
 import net.scalytica.kafka.wsproxy.Formats.FormatType
-import net.scalytica.kafka.wsproxy.consumer.WsConsumer
+import net.scalytica.kafka.wsproxy.consumer.{CommitHandler, WsConsumer}
 import net.scalytica.kafka.wsproxy.producer.WsProducer
-import net.scalytica.kafka.wsproxy.records.WsProducerResult
+import net.scalytica.kafka.wsproxy.records.{
+  WsCommit,
+  WsConsumerRecord,
+  WsProducerResult
+}
 import org.apache.kafka.clients.consumer.OffsetResetStrategy
 
+import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.io.StdIn
 import scala.util.Try
@@ -71,54 +81,71 @@ object Server extends App {
    * @return a [[Source]] producing [[TextMessage]]s for the outbound WebSocket.
    */
   private[this] def kafkaSource(
-      args: OutSocketArgs
+      args: OutSocketArgs,
+      commitHandlerRef: Option[ActorRef[CommitHandler.Protocol]]
   ): Source[TextMessage, Consumer.Control] = {
-    val ktpe = args.keyType.getOrElse(Formats.NoType)
+    val keyTpe = args.keyType.getOrElse(Formats.NoType)
+    val valTpe = args.valType
+
+    // Lifting the FormatType types into aliases for ease of use.
+    type Key   = keyTpe.Aux
+    type Value = valTpe.Aux
 
     // Kafka deserializers
-    implicit val keySer = ktpe.deserializer
-    implicit val valSer = args.valType.deserializer
+    implicit val keySer = keyTpe.deserializer
+    implicit val valSer = valTpe.deserializer
     // JSON encoders
-    implicit val keyEnc: Encoder[ktpe.Aux]         = ktpe.encoder
-    implicit val valEnc: Encoder[args.valType.Aux] = args.valType.encoder
-
-    implicit val recEnc = wsConsumerRecordToJson[ktpe.Aux, args.valType.Aux]
+    implicit val keyEnc: Encoder[Key]   = keyTpe.encoder
+    implicit val valEnc: Encoder[Value] = valTpe.encoder
+    implicit val recEnc: Encoder[WsConsumerRecord[Key, Value]] =
+      wsConsumerRecordToJson[Key, Value]
 
     if (args.autoCommit) {
+      // if auto-commit is enabled, we don't need to handle manual commits.
       WsConsumer
-        .consumeAutoCommit[ktpe.Aux, args.valType.Aux](
-          args.topic,
-          args.clientId,
-          args.groupId
-        )
+        .consumeAutoCommit[Key, Value](args.topic, args.clientId, args.groupId)
         .map(cr => TextMessage(cr.asJson.pretty(noSpaces)))
     } else {
+      // if auto-commit is disabled, we need to ensure messages are sent to a
+      // commit handler so its offset can be committed manually by the client.
+      val commitSink =
+        commitHandlerRef.map(manualCommitSink).getOrElse(Sink.ignore)
+
       WsConsumer
-        .consumeManualCommit[ktpe.Aux, args.valType.Aux](
+        .consumeManualCommit[Key, Value](
           args.topic,
           args.clientId,
           args.groupId
         )
-        .map(cr => cr -> TextMessage(cr.asJson.pretty(noSpaces)))
-        // FIXME: See below FIXME comment...
-        .mapAsync(1) { case (rec, msg) => rec.commit().map(_ => msg) }
+        .alsoTo(commitSink) // also send each message to the commit handler sink
+        .map(cr => TextMessage(cr.asJson.pretty(noSpaces)))
     }
   }
 
-  /*
-    FIXME: This must be changed to allow for reading inbound messages that
-           may contain offset commit messages! The following may be an option
-           to explore:
-           ---
-           Committer.sink(CommitterSettings(as))
-           ---
-           The challenge is to keep track of the Committable messages that
-           knows the actual consumer ActorRef, and hence knows how to call
-           the commit function.
-           One solution may be to keep a dedicated Actor per outbound connection
-           with manual commits, that keeps track of the actual Committable to
-           be able to call the commit function.
+  /**
+   * Builds a Flow that sends consumed [[WsConsumerRecord]]s to the relevant
+   * instance of [[CommitHandler]] actor Sink, which stashed the record so that
+   * its offset can be committed later.
+   *
+   * @param ref the [[ActorRef]] for the [[CommitHandler]]
+   * @tparam K the type of the record key
+   * @tparam V the type of the record value
+   * @return a commit [[Sink]] for [[WsConsumerRecord]] messages
    */
+  private[this] def manualCommitSink[K, V](
+      ref: ActorRef[CommitHandler.Protocol]
+  ): Sink[WsConsumerRecord[K, V], NotUsed] = {
+    Flow[WsConsumerRecord[K, V]]
+      .map(rec => CommitHandler.Stash(rec))
+      .to(
+        ActorSink.actorRef[CommitHandler.Protocol](
+          ref = ref,
+          onCompleteMessage = CommitHandler.Continue,
+          onFailureMessage = _ => CommitHandler.Continue
+        )
+      )
+  }
+
   /**
    * Request handler for the outbound Kafka WebSocket connection.
    *
@@ -130,8 +157,35 @@ object Server extends App {
   ): Route = {
     logger.debug("Initialising outbound websocket")
 
-    val sink   = Sink.ignore
-    val source = kafkaSource(args)
+    val aref =
+      if (args.autoCommit) None
+      else Some(sys.spawn(CommitHandler.commitStack, args.clientId))
+
+    val sink = aref
+      .map { ar =>
+        Flow[Message]
+          .mapConcat {
+            case tm: TextMessage   => TextMessage(tm.textStream) :: Nil
+            case bm: BinaryMessage => bm.dataStream.runWith(Sink.ignore); Nil
+          }
+          .mapAsync(1)(_.toStrict(2 seconds).map(_.text))
+          .map(msg => parse(msg).flatMap(_.as[WsCommit]))
+          .collect { case Right(res) => res }
+          .map(wc => CommitHandler.Commit(wc))
+          .to(
+            ActorSink.actorRef[CommitHandler.Protocol](
+              ref = ar,
+              onCompleteMessage = CommitHandler.Stop,
+              onFailureMessage = { t: Throwable =>
+                logger.error("An error occurred processing commit message", t)
+                CommitHandler.Continue
+              }
+            )
+          )
+      }
+      .getOrElse(Sink.ignore)
+
+    val source = kafkaSource(args, aref)
 
     handleWebSocketMessages {
       Flow

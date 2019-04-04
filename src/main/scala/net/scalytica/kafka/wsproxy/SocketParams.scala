@@ -42,6 +42,7 @@ case class OutSocketArgs(
 
 object OutSocketArgs {
 
+  // scalastyle:off
   def fromQueryParams(
       clientId: String,
       groupId: Option[String],
@@ -63,7 +64,7 @@ object OutSocketArgs {
     batchSize = batchSize,
     autoCommit = autoCommit
   )
-
+  // scalastyle:on
 }
 
 /**

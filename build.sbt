@@ -21,10 +21,12 @@ lazy val root = (project in file("."))
   .settings(libraryDependencies ++= Circe.All)
   .settings(
     libraryDependencies ++= Seq(
-      Akka.AkkaHttp,
-      Akka.AkkaSlf4j,
       Akka.AkkaActor,
+      Akka.AkkaTyped,
+      Akka.AkkaSlf4j,
       Akka.AkkaStream,
+      Akka.AkkaStreamTyped,
+      Akka.AkkaHttp,
       Akka.AkkaStreamKafka,
       Avro.Avro4sKafka,
       Kafka.Kafka,

@@ -12,8 +12,8 @@
     <appender-ref ref="STDOUT"/>
   </appender>
 
-  <logger name="akka" level="INFO"/>
-  <logger name="net.scalytica" level="DEBUG"/>
+  <logger name="akka" level="ERROR"/>
+  <logger name="net.scalytica.kafka.wsproxy" level="DEBUG"/>
 
   <!-- Root loggers catch all other events that are not explicitly handled-->
   <root level="ERROR">
