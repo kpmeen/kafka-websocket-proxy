@@ -244,9 +244,9 @@ object Server extends App {
       (
         'clientId,
         'groupId ?,
-        'outTopic,
-        'outKeyType.as[FormatType] ?,
-        'outValType.as[FormatType],
+        'topic,
+        'keyType.as[FormatType] ?,
+        'valType.as[FormatType],
         'offsetResetStrategy
           .as[OffsetResetStrategy] ? OffsetResetStrategy.EARLIEST,
         'rate.as[Int] ?,
@@ -274,9 +274,9 @@ object Server extends App {
   private[this] def inParams: Directive[Tuple1[InSocketArgs]] =
     parameters(
       (
-        'inTopic,
-        'inKeyType.as[FormatType] ?,
-        'inValType.as[FormatType]
+        'topic,
+        'keyType.as[FormatType] ?,
+        'valType.as[FormatType]
       )
     ).tmap { t =>
       InSocketArgs.fromQueryParams(t._1, t._2, t._3)
