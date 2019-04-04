@@ -1,4 +1,4 @@
-package net.scalytica.kafka.wsproxy.records
+package net.scalytica.kafka.wsproxy.models
 
 import akka.kafka.ProducerMessage
 

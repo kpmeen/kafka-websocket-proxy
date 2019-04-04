@@ -1,6 +1,6 @@
-package net.scalytica.kafka.wsproxy
+package net.scalytica.kafka.wsproxy.models
 
-import net.scalytica.kafka.wsproxy.Formats.FormatType
+import net.scalytica.kafka.wsproxy.models.Formats.FormatType
 import org.apache.kafka.clients.consumer.OffsetResetStrategy
 
 /**

@@ -1,6 +1,7 @@
-package net.scalytica.kafka.wsproxy
+package net.scalytica.kafka.wsproxy.models
 
 import io.circe.{Decoder, Encoder}
+import net.scalytica.kafka.wsproxy.codecs.{BasicSerdes, Decoders, Encoders}
 import org.apache.kafka.common.serialization.{Deserializer, Serializer}
 
 object Formats {
@@ -157,7 +158,7 @@ object Formats {
       case str: String if str == LongType.name      => Some(LongType)
       case str: String if str == DoubleType.name    => Some(DoubleType)
       case str: String if str == FloatType.name     => Some(FloatType)
-      case unsupported                              => None
+      case _                                        => None
     }
     // scalastyle:on cyclomatic.complexity
 

@@ -1,4 +1,6 @@
-package net.scalytica.kafka.wsproxy.records
+package net.scalytica.kafka.wsproxy.models
+
+import net.scalytica.kafka.wsproxy.models.ValueDetails.InValueDetails
 
 /**
  * ADT describing any record that can come in to the service through the

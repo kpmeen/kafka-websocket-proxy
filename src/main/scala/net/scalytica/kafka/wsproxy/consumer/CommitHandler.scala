@@ -4,7 +4,7 @@ import akka.actor.typed.Behavior
 import akka.actor.typed.scaladsl.Behaviors
 import akka.kafka.ConsumerMessage.Committable
 import com.typesafe.scalalogging.Logger
-import net.scalytica.kafka.wsproxy.records.{
+import net.scalytica.kafka.wsproxy.models.{
   WsCommit,
   WsConsumerRecord,
   WsMessageId

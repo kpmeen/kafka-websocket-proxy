@@ -9,8 +9,8 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Flow, Sink}
 import com.typesafe.scalalogging.Logger
 import io.circe.Decoder
-import net.scalytica.kafka.wsproxy.records._
-import net.scalytica.kafka.wsproxy.{InSocketArgs, ProducerInterceptorClass}
+import net.scalytica.kafka.wsproxy.models._
+import net.scalytica.kafka.wsproxy.ProducerInterceptorClass
 import org.apache.kafka.clients.producer.ProducerConfig._
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.serialization.Serializer
@@ -71,7 +71,7 @@ object WsProducer {
   ): WsProducerRecord[K, V] = {
     import io.circe._
     import io.circe.parser._
-    import net.scalytica.kafka.wsproxy.Decoders._
+    import net.scalytica.kafka.wsproxy.codecs.Decoders._
 
     parse(jsonStr) match {
       case Left(ParsingFailure(message, err)) =>

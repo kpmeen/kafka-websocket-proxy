@@ -7,10 +7,10 @@ import akka.kafka.{ConsumerSettings, Subscriptions}
 import akka.stream.scaladsl.Source
 import com.typesafe.scalalogging.Logger
 import net.scalytica.kafka.wsproxy.ConsumerInterceptorClass
-import net.scalytica.kafka.wsproxy.records.{
+import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails
+import net.scalytica.kafka.wsproxy.models.{
   ConsumerKeyValueRecord,
   ConsumerValueRecord,
-  OutValueDetails,
   WsConsumerRecord
 }
 import org.apache.kafka.clients.consumer.ConsumerConfig._

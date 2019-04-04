@@ -1,7 +1,9 @@
-package net.scalytica.kafka.wsproxy.records
+package net.scalytica.kafka.wsproxy.models
 
 import akka.Done
 import akka.kafka.ConsumerMessage
+
+import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails
 
 import scala.concurrent.Future
 
