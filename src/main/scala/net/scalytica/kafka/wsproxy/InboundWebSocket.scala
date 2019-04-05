@@ -10,6 +10,7 @@ import akka.stream.scaladsl.Flow
 import com.typesafe.scalalogging.Logger
 import io.circe.syntax._
 import io.circe.Printer.noSpaces
+import net.scalytica.kafka.wsproxy.Configuration.AppConfig
 import net.scalytica.kafka.wsproxy.codecs.Encoders._
 import net.scalytica.kafka.wsproxy.models.{
   Formats,
@@ -32,6 +33,7 @@ trait InboundWebSocket {
       args: InSocketArgs
   )(
       implicit
+      cfg: AppConfig,
       as: ActorSystem,
       mat: ActorMaterializer
   ): Route = handleWebSocketMessages {
@@ -50,6 +52,7 @@ trait InboundWebSocket {
       args: InSocketArgs
   )(
       implicit
+      cfg: AppConfig,
       as: ActorSystem,
       mat: ActorMaterializer
   ): Flow[Message, WsProducerResult, NotUsed] = {

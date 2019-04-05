@@ -8,6 +8,7 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server._
 import akka.stream.ActorMaterializer
 import com.typesafe.scalalogging.Logger
+import net.scalytica.kafka.wsproxy.Configuration.AppConfig
 
 import scala.concurrent.ExecutionContext
 import scala.io.StdIn
@@ -20,6 +21,7 @@ object Server
 
   private[this] val logger = Logger(this.getClass)
 
+  implicit private[this] val cfg: AppConfig         = Configuration.load()
   implicit private[this] val sys: ActorSystem       = ActorSystem()
   implicit private[this] val mat: ActorMaterializer = ActorMaterializer()
   implicit private[this] val ctx: ExecutionContext  = sys.dispatcher

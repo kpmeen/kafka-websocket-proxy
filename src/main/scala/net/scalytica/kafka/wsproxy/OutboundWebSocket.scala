@@ -16,6 +16,7 @@ import io.circe.Encoder
 import io.circe.Printer.noSpaces
 import io.circe.parser.parse
 import io.circe.syntax._
+import net.scalytica.kafka.wsproxy.Configuration.AppConfig
 import net.scalytica.kafka.wsproxy.codecs.Decoders._
 import net.scalytica.kafka.wsproxy.codecs.Encoders._
 import net.scalytica.kafka.wsproxy.consumer.{CommitHandler, WsConsumer}
@@ -43,6 +44,7 @@ trait OutboundWebSocket {
       args: OutSocketArgs
   )(
       implicit
+      cfg: AppConfig,
       as: ActorSystem,
       mat: ActorMaterializer,
       ec: ExecutionContext

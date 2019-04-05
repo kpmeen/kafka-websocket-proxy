@@ -6,6 +6,7 @@ import akka.kafka.scaladsl.Consumer
 import akka.kafka.{ConsumerSettings, Subscriptions}
 import akka.stream.scaladsl.Source
 import com.typesafe.scalalogging.Logger
+import net.scalytica.kafka.wsproxy.Configuration.AppConfig
 import net.scalytica.kafka.wsproxy.ConsumerInterceptorClass
 import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails
 import net.scalytica.kafka.wsproxy.models.{
@@ -27,8 +28,6 @@ object WsConsumer {
 
   private[this] val logger = Logger(getClass)
 
-  private[this] val kafkaUrl = "localhost:29092"
-
   /**
    * Instantiates an instance of [[ConsumerSettings]] to be used when creating
    * the Kafka consumer [[Source]].
@@ -40,10 +39,13 @@ object WsConsumer {
       autoCommit: Boolean
   )(
       implicit
+      cfg: AppConfig,
       as: ActorSystem,
       ks: Deserializer[K],
       vs: Deserializer[V]
-  ) =
+  ) = {
+    val kafkaUrl = cfg.kafkaBootstrapUrls.mkString(",")
+
     ConsumerSettings(as, ks, vs)
       .withBootstrapServers(kafkaUrl)
       .withProperties(
@@ -55,6 +57,7 @@ object WsConsumer {
       )
       .withClientId(s"$id-client")
       .withGroupId(gid.getOrElse(s"$id-group"))
+  }
 
   /** Convenience function for logging a [[ConsumerRecord]]. */
   private[this] def logMessage[K, V](record: ConsumerRecord[K, V]): String = {
@@ -76,6 +79,7 @@ object WsConsumer {
    * @param topic    the topic to subscribe to.
    * @param clientId the clientId to give the Kafka consumer
    * @param groupId  the groupId to start a socket for.
+   * @param cfg      the [[AppConfig]] containing application configurations.
    * @param as       an implicit ActorSystem
    * @param ks       the Deserializer to use for the message key
    * @param vs       the Deserializer to use for the message value
@@ -89,6 +93,7 @@ object WsConsumer {
       groupId: Option[String]
   )(
       implicit
+      cfg: AppConfig,
       as: ActorSystem,
       ks: Deserializer[K],
       vs: Deserializer[V]
@@ -115,6 +120,7 @@ object WsConsumer {
    * @param topic    the topic to subscribe to.
    * @param clientId the clientId to give the Kafka consumer
    * @param groupId  the groupId to start a socket for.
+   * @param cfg      the [[AppConfig]] containing application configurations.
    * @param as       an implicit ActorSystem
    * @param ks       the Deserializer to use for the message key
    * @param vs       the Deserializer to use for the message value
@@ -128,6 +134,7 @@ object WsConsumer {
       groupId: Option[String]
   )(
       implicit
+      cfg: AppConfig,
       as: ActorSystem,
       ks: Deserializer[K],
       vs: Deserializer[V]

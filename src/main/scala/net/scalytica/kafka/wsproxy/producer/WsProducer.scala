@@ -9,8 +9,9 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Flow, Sink}
 import com.typesafe.scalalogging.Logger
 import io.circe.Decoder
-import net.scalytica.kafka.wsproxy.models._
+import net.scalytica.kafka.wsproxy.Configuration.AppConfig
 import net.scalytica.kafka.wsproxy.ProducerInterceptorClass
+import net.scalytica.kafka.wsproxy.models._
 import org.apache.kafka.clients.producer.ProducerConfig._
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.serialization.Serializer
@@ -25,14 +26,15 @@ object WsProducer {
 
   private[this] val logger = Logger(getClass)
 
-  private[this] val kafkaUrl = "localhost:29092"
-
   /** Create producer settings to use for the Kafka producer. */
   private[this] def baseProducerSettings[K, V](
+      cfg: AppConfig,
       as: ActorSystem,
       ks: Option[Serializer[K]],
       vs: Option[Serializer[V]]
   ) = {
+    val kafkaUrl = cfg.kafkaBootstrapUrls.mkString(",")
+
     ProducerSettings(as, ks, vs)
       .withBootstrapServers(kafkaUrl)
       .withProperties(
@@ -48,10 +50,11 @@ object WsProducer {
    */
   private[this] def producerSettingsWithKey[K, V](
       implicit
+      cfg: AppConfig,
       as: ActorSystem,
       ks: Serializer[K],
       vs: Serializer[V]
-  ) = baseProducerSettings(as, Option(ks), Option(vs))
+  ) = baseProducerSettings(cfg, as, Option(ks), Option(vs))
 
   /**
    * Parses an input message, in the form of a JSON String, into an instance of
@@ -116,6 +119,7 @@ object WsProducer {
   /**
    *
    * @param args input arguments defining the base configs for the producer.
+   * @param cfg  the [[AppConfig]] containing application configurations.
    * @param as   actor system to use
    * @param mat  actor materializer to use
    * @param ks   the message key serializer to use
@@ -130,6 +134,7 @@ object WsProducer {
    */
   def produce[K, V](args: InSocketArgs)(
       implicit
+      cfg: AppConfig,
       as: ActorSystem,
       mat: ActorMaterializer,
       ks: Serializer[K],
