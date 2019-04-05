@@ -74,6 +74,22 @@ trait OutboundWebSocket {
     }
   }
 
+  /**
+   * Prepares the appropriate Sink to use for incoming messages on the outbound
+   * socket. The Sink is set up based on the desire to auto-commit or not.
+   *
+   * - If the client requests auto-commit, all incoming messages are ignored.
+   * - If the client disables auto-commit, the Sink accepts JSON representation
+   *   of [[WsCommit]] messages. These are then passed on to an Actor with
+   *   [[CommitHandler]] behaviour.
+   *
+   * @param aref an optional [[ActorRef]] to a [[CommitHandler]].
+   * @param as   the [[ActorSystem]] to use
+   * @param mat  the [[ActorMaterializer]] to use
+   * @param ec   the [[ExecutionContext]] to use
+   * @return a [[Sink]] for consuming [[Message]]s
+   * @see [[CommitHandler.commitStack]]
+   */
   private[this] def prepareSink(aref: Option[ActorRef[CommitHandler.Protocol]])(
       implicit
       as: ActorSystem,
@@ -82,6 +98,7 @@ trait OutboundWebSocket {
   ): Sink[Message, _] =
     aref
       .map { ar =>
+        // A commit handler is defined, so we should accept commit messages.
         Flow[Message]
           .mapConcat {
             case tm: TextMessage   => TextMessage(tm.textStream) :: Nil
@@ -102,6 +119,7 @@ trait OutboundWebSocket {
             )
           )
       }
+      // If no commit handler is defined, incoming messages are ignored.
       .getOrElse(Sink.ignore)
 
   /**
@@ -114,7 +132,9 @@ trait OutboundWebSocket {
       args: OutSocketArgs,
       commitHandlerRef: Option[ActorRef[CommitHandler.Protocol]]
   )(
-      implicit as: ActorSystem
+      implicit
+      cfg: AppConfig,
+      as: ActorSystem
   ): Source[TextMessage, Consumer.Control] = {
     val keyTpe = args.keyType.getOrElse(Formats.NoType)
     val valTpe = args.valType
