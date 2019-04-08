@@ -16,7 +16,7 @@ import io.circe.Encoder
 import io.circe.Printer.noSpaces
 import io.circe.parser.parse
 import io.circe.syntax._
-import net.scalytica.kafka.wsproxy.Configuration.AppConfig
+import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.codecs.Decoders._
 import net.scalytica.kafka.wsproxy.codecs.Encoders._
 import net.scalytica.kafka.wsproxy.consumer.{CommitHandler, WsConsumer}
@@ -44,19 +44,19 @@ trait OutboundWebSocket {
       args: OutSocketArgs
   )(
       implicit
-      cfg: AppConfig,
+      cfg: AppCfg,
       as: ActorSystem,
       mat: ActorMaterializer,
       ec: ExecutionContext
   ): Route = {
     logger.debug("Initialising outbound websocket")
 
-    val aref =
+    val commitHandlerRef =
       if (args.autoCommit) None
       else Some(as.spawn(CommitHandler.commitStack, args.clientId))
 
-    val sink   = prepareSink(aref)
-    val source = kafkaSource(args, aref)
+    val sink   = prepareSink(commitHandlerRef)
+    val source = kafkaSource(args, commitHandlerRef)
 
     handleWebSocketMessages {
       Flow
@@ -66,6 +66,7 @@ trait OutboundWebSocket {
             case scala.util.Success(_) =>
               m._2.drainAndShutdown(Future.successful(Done))
               logger.info(s"Consumer client has disconnected.")
+
             case scala.util.Failure(e) =>
               m._2.drainAndShutdown(Future.successful(Done))
               logger.error("Disconnection failure", e)
@@ -84,7 +85,6 @@ trait OutboundWebSocket {
    *   [[CommitHandler]] behaviour.
    *
    * @param aref an optional [[ActorRef]] to a [[CommitHandler]].
-   * @param as   the [[ActorSystem]] to use
    * @param mat  the [[ActorMaterializer]] to use
    * @param ec   the [[ExecutionContext]] to use
    * @return a [[Sink]] for consuming [[Message]]s
@@ -92,19 +92,13 @@ trait OutboundWebSocket {
    */
   private[this] def prepareSink(aref: Option[ActorRef[CommitHandler.Protocol]])(
       implicit
-      as: ActorSystem,
       mat: ActorMaterializer,
       ec: ExecutionContext
   ): Sink[Message, _] =
     aref
       .map { ar =>
         // A commit handler is defined, so we should accept commit messages.
-        Flow[Message]
-          .mapConcat {
-            case tm: TextMessage   => TextMessage(tm.textStream) :: Nil
-            case bm: BinaryMessage => bm.dataStream.runWith(Sink.ignore); Nil
-          }
-          .mapAsync(1)(_.toStrict(2 seconds).map(_.text))
+        messageToString
           .map(msg => parse(msg).flatMap(_.as[WsCommit]))
           .collect { case Right(res) => res }
           .map(wc => CommitHandler.Commit(wc))
@@ -123,6 +117,25 @@ trait OutboundWebSocket {
       .getOrElse(Sink.ignore)
 
   /**
+   * Converts a WebSocket [[Message]] into a String for down-stream processing.
+   *
+   * @param mat the Materializer to use
+   * @param ec  the ExecutionContext to use
+   * @return a [[Flow]] converting [[Message]] to String
+   */
+  private[this] def messageToString(
+      implicit
+      mat: ActorMaterializer,
+      ec: ExecutionContext
+  ): Flow[Message, String, NotUsed] =
+    Flow[Message]
+      .mapConcat {
+        case tm: TextMessage   => TextMessage(tm.textStream) :: Nil
+        case bm: BinaryMessage => bm.dataStream.runWith(Sink.ignore); Nil
+      }
+      .mapAsync(1)(_.toStrict(2 seconds).map(_.text))
+
+  /**
    * The Kafka Source where messages are consumed.
    *
    * @param args the output arguments to pass on to the consumer.
@@ -133,7 +146,7 @@ trait OutboundWebSocket {
       commitHandlerRef: Option[ActorRef[CommitHandler.Protocol]]
   )(
       implicit
-      cfg: AppConfig,
+      cfg: AppCfg,
       as: ActorSystem
   ): Source[TextMessage, Consumer.Control] = {
     val keyTpe = args.keyType.getOrElse(Formats.NoType)
@@ -150,7 +163,7 @@ trait OutboundWebSocket {
     implicit val keyEnc: Encoder[Key]   = keyTpe.encoder
     implicit val valEnc: Encoder[Value] = valTpe.encoder
     implicit val recEnc: Encoder[WsConsumerRecord[Key, Value]] =
-      wsConsumerRecordToJson[Key, Value]
+      wsConsumerRecordEncoder[Key, Value]
 
     if (args.autoCommit) {
       // if auto-commit is enabled, we don't need to handle manual commits.

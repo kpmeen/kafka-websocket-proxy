@@ -1,6 +1,7 @@
 package net.scalytica.kafka.wsproxy.models
 
 import io.circe.{Decoder, Encoder}
+import net.scalytica.kafka.wsproxy.StringExtensions
 import net.scalytica.kafka.wsproxy.codecs.{BasicSerdes, Decoders, Encoders}
 import org.apache.kafka.common.serialization.{Deserializer, Serializer}
 
@@ -12,12 +13,18 @@ object Formats {
 
     lazy val name: String = self.getClass.getSimpleName
       .stripSuffix("$")
-      .toLowerCase()
-      .stripSuffix("type")
+      .stripSuffix("Type")
+      .toSnakeCase
 
+    def isSameName(s: String): Boolean = name.equalsIgnoreCase(s)
+
+    // Convenience access to the relevant Kafka SerDes for the actual type this
+    // FormatType describes.
     val serializer: Serializer[Aux]
     val deserializer: Deserializer[Aux]
 
+    // Convenience access to the relevant Circe codecs for the actual type this
+    // FormatType describes.
     val encoder: Encoder[Aux]
     val decoder: Decoder[Aux]
   }
@@ -148,18 +155,19 @@ object Formats {
     )
 
     // scalastyle:off cyclomatic.complexity
-    def fromString(s: String): Option[FormatType] = Option(s).flatMap {
-      case str: String if str == JsonType.name      => Some(JsonType)
-      case str: String if str == AvroType.name      => Some(AvroType)
-      case str: String if str == ByteArrayType.name => Some(ByteArrayType)
-      case str: String if str == StringType.name    => Some(StringType)
-      case str: String if str == IntType.name       => Some(IntType)
-      case str: String if str == ShortType.name     => Some(ShortType)
-      case str: String if str == LongType.name      => Some(LongType)
-      case str: String if str == DoubleType.name    => Some(DoubleType)
-      case str: String if str == FloatType.name     => Some(FloatType)
-      case _                                        => None
-    }
+    def fromString(string: String): Option[FormatType] =
+      Option(string).flatMap {
+        case s: String if JsonType.isSameName(s)      => Some(JsonType)
+        case s: String if AvroType.isSameName(s)      => Some(AvroType)
+        case s: String if ByteArrayType.isSameName(s) => Some(ByteArrayType)
+        case s: String if StringType.isSameName(s)    => Some(StringType)
+        case s: String if IntType.isSameName(s)       => Some(IntType)
+        case s: String if ShortType.isSameName(s)     => Some(ShortType)
+        case s: String if LongType.isSameName(s)      => Some(LongType)
+        case s: String if DoubleType.isSameName(s)    => Some(DoubleType)
+        case s: String if FloatType.isSameName(s)     => Some(FloatType)
+        case _                                        => None
+      }
     // scalastyle:on cyclomatic.complexity
 
     def unsafeFromString(s: String): FormatType = fromString(s).getOrElse {

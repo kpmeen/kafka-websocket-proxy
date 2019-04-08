@@ -4,7 +4,10 @@ import io.circe._
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.semiauto._
 import net.scalytica.kafka.wsproxy.models.Formats.FormatType
-import net.scalytica.kafka.wsproxy.models.ValueDetails.InValueDetails
+import net.scalytica.kafka.wsproxy.models.ValueDetails.{
+  InValueDetails,
+  OutValueDetails
+}
 import net.scalytica.kafka.wsproxy.models._
 import net.scalytica.kafka.wsproxy.utils.Binary
 
@@ -35,6 +38,8 @@ object Decoders {
     }
   }
 
+  implicit val prodResDecoder: Decoder[WsProducerResult] = deriveDecoder
+
   implicit def inValDecoder[T](
       implicit dec: Decoder[T]
   ): Decoder[InValueDetails[T]] = { json =>
@@ -47,7 +52,18 @@ object Decoders {
     }
   }
 
-  implicit def jsonToWsProducerRecord[K, V](
+  implicit def outValDecoder[T](
+      implicit dec: Decoder[T]
+  ): Decoder[OutValueDetails[T]] = { json =>
+    for {
+      v <- json.downField("value").as[T]
+      f <- json.downField("format").as[Option[FormatType]]
+    } yield {
+      OutValueDetails(v, f)
+    }
+  }
+
+  implicit def wsProducerRecordDecoder[K, V](
       implicit
       keyDec: Decoder[K],
       valDec: Decoder[V]
@@ -64,6 +80,45 @@ object Decoders {
 
       case Left(fail) =>
         Left(fail)
+    }
+  }
+
+  implicit def wsConsumerRecordDecoder[K, V](
+      implicit
+      keyDec: Decoder[K],
+      valDec: Decoder[V]
+  ): Decoder[WsConsumerRecord[K, V]] = { cursor =>
+    for {
+      msgId     <- cursor.downField("wsProxyMessageId").as[WsMessageId]
+      topic     <- cursor.downField("topic").as[String]
+      partition <- cursor.downField("partition").as[Int]
+      offset    <- cursor.downField("offset").as[Long]
+      timestamp <- cursor.downField("timestamp").as[Long]
+      key       <- cursor.downField("key").as[Option[OutValueDetails[K]]]
+      value     <- cursor.downField("value").as[OutValueDetails[V]]
+    } yield {
+      key
+        .map { k =>
+          ConsumerKeyValueRecord(
+            topic = topic,
+            partition = partition,
+            offset = offset,
+            timestamp = timestamp,
+            key = k,
+            value = value,
+            committableOffset = None
+          )
+        }
+        .getOrElse {
+          ConsumerValueRecord(
+            topic = topic,
+            partition = partition,
+            offset = offset,
+            timestamp,
+            value = value,
+            committableOffset = None
+          )
+        }
     }
   }
 }

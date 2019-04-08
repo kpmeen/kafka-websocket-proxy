@@ -9,7 +9,7 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Flow, Sink}
 import com.typesafe.scalalogging.Logger
 import io.circe.Decoder
-import net.scalytica.kafka.wsproxy.Configuration.AppConfig
+import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.ProducerInterceptorClass
 import net.scalytica.kafka.wsproxy.models._
 import org.apache.kafka.clients.producer.ProducerConfig._
@@ -28,12 +28,12 @@ object WsProducer {
 
   /** Create producer settings to use for the Kafka producer. */
   private[this] def baseProducerSettings[K, V](
-      cfg: AppConfig,
+      cfg: AppCfg,
       as: ActorSystem,
       ks: Option[Serializer[K]],
       vs: Option[Serializer[V]]
   ) = {
-    val kafkaUrl = cfg.kafkaBootstrapUrls.mkString(",")
+    val kafkaUrl = cfg.server.kafkaBootstrapUrls.mkString(",")
 
     ProducerSettings(as, ks, vs)
       .withBootstrapServers(kafkaUrl)
@@ -50,7 +50,7 @@ object WsProducer {
    */
   private[this] def producerSettingsWithKey[K, V](
       implicit
-      cfg: AppConfig,
+      cfg: AppCfg,
       as: ActorSystem,
       ks: Serializer[K],
       vs: Serializer[V]
@@ -119,7 +119,7 @@ object WsProducer {
   /**
    *
    * @param args input arguments defining the base configs for the producer.
-   * @param cfg  the [[AppConfig]] containing application configurations.
+   * @param cfg  the [[AppCfg]] containing application configurations.
    * @param as   actor system to use
    * @param mat  actor materializer to use
    * @param ks   the message key serializer to use
@@ -134,7 +134,7 @@ object WsProducer {
    */
   def produce[K, V](args: InSocketArgs)(
       implicit
-      cfg: AppConfig,
+      cfg: AppCfg,
       as: ActorSystem,
       mat: ActorMaterializer,
       ks: Serializer[K],

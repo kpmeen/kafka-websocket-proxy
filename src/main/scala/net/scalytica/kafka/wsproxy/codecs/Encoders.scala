@@ -36,7 +36,7 @@ object Encoders {
     )
   }
 
-  implicit def wsConsumerRecordToJson[K, V](
+  implicit def wsConsumerRecordEncoder[K, V](
       implicit
       keyEnc: Encoder[OutValueDetails[K]],
       valEnc: Encoder[OutValueDetails[V]]
@@ -44,8 +44,10 @@ object Encoders {
     case ckvr: ConsumerKeyValueRecord[K, V] =>
       Json.obj(
         "wsProxyMessageId" -> ckvr.wsProxyMessageId.asJson,
-        "partition"        -> Json.fromInt(ckvr.partition),
-        "offset"           -> Json.fromLong(ckvr.offset),
+        "topic"            -> ckvr.topic.asJson,
+        "partition"        -> ckvr.partition.asJson,
+        "offset"           -> ckvr.offset.asJson,
+        "timestamp"        -> ckvr.timestamp.asJson,
         "key"              -> ckvr.key.asJson,
         "value"            -> ckvr.value.asJson
       )
@@ -53,8 +55,10 @@ object Encoders {
     case cvr: ConsumerValueRecord[V] =>
       Json.obj(
         "wsProxyMessageId" -> cvr.wsProxyMessageId.asJson,
-        "partition"        -> Json.fromInt(cvr.partition),
-        "offset"           -> Json.fromLong(cvr.offset),
+        "topic"            -> cvr.topic.asJson,
+        "partition"        -> cvr.partition.asJson,
+        "offset"           -> cvr.offset.asJson,
+        "timestamp"        -> cvr.timestamp.asJson,
         "value"            -> cvr.value.asJson
       )
   }

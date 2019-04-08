@@ -2,54 +2,52 @@ package net.scalytica.kafka.wsproxy
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.HttpResponse
-import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server._
 import akka.stream.ActorMaterializer
-import com.typesafe.scalalogging.Logger
-import net.scalytica.kafka.wsproxy.Configuration.AppConfig
+import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 
 import scala.concurrent.ExecutionContext
 import scala.io.StdIn
 
-object Server
-    extends App
-    with QueryParamParsers
-    with OutboundWebSocket
-    with InboundWebSocket {
+object Server extends App with ServerRoutes {
 
-  private[this] val logger = Logger(this.getClass)
+  // scalastyle:off
+  println(
+    """
+      |               _   __         __  _
+      |              | | / /        / _|| |
+      |              | |/ /   __ _ | |_ | | __ __ _
+      |              |    \  / _` ||  _|| |/ // _` |
+      |              | |\  \| (_| || |  |   <| (_| |
+      |              \_| \_/ \__,_||_|_____\_\\__,_|
+      | _    _        _      _____               _          _
+      || |  | |      | |    /  ___|             | |        | |
+      || |  | |  ___ | |__  \ `--.   ___    ___ | | __ ___ | |_
+      || |/\| | / _ \| '_ \  `--. \ / _ \  / __|| |/ // _ \| __|
+      |\  /\  /|  __/| |_) |/\__/ /| (_) || (__ |   <|  __/| |_
+      | \/  \/  \___||_.__/ \____/  \___/  \___||_|\_\\___| \__|
+      |               _____
+      |              | ___ \
+      |              | |_/ /_ __  ___ __  __ _   _
+      |              |  __/| '__|/ _ \\ \/ /| | | |
+      |              | |   | |  | (_) |>  < | |_| |
+      |              \_|   |_|   \___//_/\_\ \__, |
+      |                                       __/ |
+      |                                      |___/
+      |
+      |""".stripMargin
+    // scalastyle:on
+  )
 
-  implicit private[this] val cfg: AppConfig         = Configuration.load()
-  implicit private[this] val sys: ActorSystem       = ActorSystem()
-  implicit private[this] val mat: ActorMaterializer = ActorMaterializer()
-  implicit private[this] val ctx: ExecutionContext  = sys.dispatcher
+  implicit val cfg: AppCfg            = Configuration.load()
+  implicit val sys: ActorSystem       = ActorSystem()
+  implicit val mat: ActorMaterializer = ActorMaterializer()
+  implicit val ctx: ExecutionContext  = sys.dispatcher
 
-  private[this] val port = 8080
-
-  implicit private[this] def errorHandler: ExceptionHandler = ExceptionHandler {
-    case t: Throwable =>
-      extractUri { uri =>
-        logger.warn(s"Request to $uri could not be handled normally", t)
-        complete(HttpResponse(InternalServerError, entity = t.getMessage))
-      }
-  }
-
-  /** Endpoint route(s) providing access to the Kafka WebSocket */
-  private[this] val route =
-    pathPrefix("socket") {
-      path("in") {
-        inParams(inboundWebSocket)
-      } ~
-        path("out") {
-          outParams(outboundWebSocket)
-        }
-    }
+  private[this] val port = cfg.server.port
 
   /** Bind to network interface and port, starting the server */
   private[this] val bindingFuture = Http().bindAndHandle(
-    handler = route,
+    handler = routes,
     interface = "localhost",
     port = port
   )

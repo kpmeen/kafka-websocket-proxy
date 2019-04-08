@@ -1,7 +1,7 @@
 package net.scalytica.kafka.wsproxy
 
 import com.typesafe.config.ConfigFactory
-import net.scalytica.kafka.wsproxy.Configuration.AppConfig
+import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import org.scalatest.{MustMatchers, WordSpec}
 import pureconfig.error.ConfigReaderException
 
@@ -9,17 +9,43 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
 
   val invalidCfg1 = ConfigFactory.parseString(
     """kafka.websocket.proxy {
-      |  kafka-bootstrap-urls = ["localhost:29092"]
-      |  default-rate-limit = unlimited
-      |  default-batch-size = 0
+      |  server {
+      |    port = 8078
+      |    kafka-bootstrap-urls = ["localhost:29092"]
+      |  }
+      |
+      |  consumer {
+      |    default-rate-limit = unlimited
+      |    default-batch-size = 0
+      |  }
+      |
+      |  commit-handler {
+      |    max-stack-size: 200
+      |    auto-commit-enabled: false
+      |    auto-commit-interval: 1 seconds
+      |    auto-commit-max-age: 20 seconds
+      |  }
       |}""".stripMargin
   )
 
   val invalidCfg2 = ConfigFactory.parseString(
     """kafka.websocket.proxy {
-      |  kafka-bootstrap-urls = "localhost:29092"
-      |  default-rate-limit = 0
-      |  default-batch-size = 0
+      |  server {
+      |    port = 8078
+      |    kafka-bootstrap-urls = "localhost:29092"
+      |  }
+      |
+      |  consumer {
+      |    default-rate-limit = 0
+      |    default-batch-size = 0
+      |  }
+      |
+      |  commit-handler {
+      |    max-stack-size: 200
+      |    auto-commit-enabled: false
+      |    auto-commit-interval: 1 seconds
+      |    auto-commit-max-age: 20 seconds
+      |  }
       |}""".stripMargin
   )
 
@@ -28,16 +54,16 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
     "successfully load the default configuration" in {
       val cfg = Configuration.load()
 
-      cfg.defaultBatchSize mustBe 0
-      cfg.defaultRateLimit mustBe 0
-      cfg.kafkaBootstrapUrls mustBe Seq("localhost:29092")
+      cfg.consumer.defaultBatchSize mustBe 0
+      cfg.consumer.defaultRateLimit mustBe 0
+      cfg.server.kafkaBootstrapUrls mustBe Seq("localhost:29092")
     }
 
     "fail when trying to load an invalid configuration" in {
-      a[ConfigReaderException[AppConfig]] should be thrownBy Configuration
+      a[ConfigReaderException[AppCfg]] should be thrownBy Configuration
         .loadConfig(invalidCfg1)
 
-      a[ConfigReaderException[AppConfig]] should be thrownBy Configuration
+      a[ConfigReaderException[AppCfg]] should be thrownBy Configuration
         .loadConfig(invalidCfg2)
     }
 

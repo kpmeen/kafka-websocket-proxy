@@ -22,6 +22,19 @@ package object wsproxy {
         )
       }
     }
+  }
 
+  implicit class StringExtensions(val underlying: String) extends AnyVal {
+
+    def toSnakeCase: String = {
+      underlying.foldLeft("") { (str, c) =>
+        if (c.isUpper) {
+          if (str.isEmpty) str + c.toLower
+          else str + "_" + c.toLower
+        } else {
+          str + c
+        }
+      }
+    }
   }
 }
