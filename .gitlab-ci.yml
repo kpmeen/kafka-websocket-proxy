@@ -1,0 +1,54 @@
+######################################################################
+# GitLab CI build script for the Kafka WebSocket Proxy               #
+######################################################################
+image: registry.gitlab.com/kpmeen/docker-scala-sbt:scala_2.12
+
+variables:
+  CI: "true"
+  DOCKER_DRIVER: overlay
+  # Setting specific folder for sbt-coursier to cache artifacts
+  COURSIER_CACHE: "/root/cache/coursier"
+
+cache:
+  untracked: true
+  paths:
+    - cache
+
+stages:
+  - test
+  - publishDocker
+
+check style and formatting:
+  stage: test
+  tags:
+    - docker
+  script:
+    # Ensure that the pipeline fails fast if there are issues with the
+    # style or formatting
+    - sbt clean scalastyle scalafmt
+    - git diff --exit-code || (echo "ERROR Code formatting check failed, see differences above."; false)
+
+run test suites:
+  stage: test
+  tags:
+    - docker
+  script:
+    - sbt coverage test coverageReport
+    - sbt coverageAggregate
+  artifacts:
+    paths:
+      - target/scala-2.12/scoverage-report/
+    reports:
+      junit: target/test-reports/TEST-*.xml
+
+publish docker containers:
+  stage: publishDocker
+  tags:
+    - docker
+  services:
+    - docker:dind
+  script:
+    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN registry.gitlab.com
+    - sbt docker:publish
+  only:
+    - master@kpmeen/kafka-websocket-proxy
