@@ -37,8 +37,8 @@ file. Where the following parameters can be adjusted:
 > NOTE:
 > Some parameters are configurable through specific environment variables. 
 
-| Config key                                                  | Type            | Environment                                 | Default      | Description |
-|:----------                                                  |:-----------     |:-----------                                 |:--------:    |:----------- |
+| Config key                                                  | Type            | Environment                                 | Default      | Description                |
+|:---                                                         |:---             |:----                                        |:------------:|:-------------------------- |
 | `kafka.websocket.proxy.server.port`                         | int             | `WSPROXY_PORT`                              | `8078`       | Port where the server endpoints will be exposed |
 | `kafka.websocket.proxy.server.kafka-bootstrap-urls`         | array\[string\] | `KAFKA_BOOTSTRAP_URLS`                      |              | An array of strings with URLs to the Kafka brokers in the form `<host>:<port>` |
 | `kafka.websocket.proxy.consumer.default-rate-limit`         | long            | `WSPROXY_DEFAULT_RATE_LIMIT`                | `0`          | The maximum allowed throughput of data through a socket in bytes/second. A value of `0` means unlimited throughput. |
@@ -47,7 +47,7 @@ file. Where the following parameters can be adjusted:
 | `kafka.websocket.proxy.commit-handler.auto-commit-enabled`  | boolean         | `WSPROXY_COMMITHANDLER_AUTOCOMMIT_ENABLED`  | `false`      | Whether or not to allow the proxy to perform automatic offset commits of uncommitted messages. |
 | `kafka.websocket.proxy.commit-handler.auto-commit-interval` | finite duration | `WSPROXY_COMMITHANDLER_AUTOCOMMIT_INTERVAL` | `1 second`   | The interval to execute the jobo for auto-committing messages of a given age. |
 | `kafka.websocket.proxy.commit-handler.auto-commit-max-age`  | finite duration | `WSPROXY_COMMITHANDLER_AUTOCOMMIT_MAX_AGE`  | `20 seconds` | The max allowed age of uncommitted messages in the commit handler stack. |
-|                                                             |                 |                                             |              |             |
+|                                                             |                 |                                             |              |                            |
 
 
 ## Endpoints and API
