@@ -1,7 +1,7 @@
 package net.scalytica.kafka.wsproxy.consumer
 
-import akka.actor.typed.Behavior
-import akka.actor.typed.scaladsl.Behaviors
+import akka.actor.typed.{ActorRef, Behavior}
+import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.kafka.ConsumerMessage.Committable
 import com.typesafe.scalalogging.Logger
 import net.scalytica.kafka.wsproxy.models.{
@@ -19,7 +19,7 @@ object CommitHandler {
   /**
    * Carries necessary metadata for messages in the stack.
    */
-  private case class Uncommitted(
+  private[consumer] case class Uncommitted(
       wsProxyMsgId: WsMessageId,
       committable: Committable
   )
@@ -33,7 +33,7 @@ object CommitHandler {
    * list. If the WsMessageId is NOT found, the stack is left as-is and no
    * commit is executed.
    */
-  private[this] type Stack = List[Uncommitted]
+  private[consumer] type Stack = List[Uncommitted]
 
   /** ADT defining the valid protocol for the [[CommitHandler]] */
   sealed trait Protocol
@@ -42,6 +42,7 @@ object CommitHandler {
   case class Commit(commit: WsCommit)              extends Protocol
   case object Continue                             extends Protocol
   case object Stop                                 extends Protocol
+  case class GetStack(sender: ActorRef[Stack])     extends Protocol
 
   /** Behaviour initialising the message commit stack */
   val commitStack: Behavior[Protocol] = committableStack(List.empty)
@@ -56,11 +57,11 @@ object CommitHandler {
   private[this] def stash(
       stack: Stack,
       rec: WsConsumerRecord[_, _]
-  ): Option[Stack] = {
+  )(implicit ctx: ActorContext[Protocol]): Option[Stack] = {
     rec.committableOffset.map { co =>
       // Append the uncommitted message at the END of the stack
       val next = stack :+ Uncommitted(rec.wsProxyMessageId, co)
-      logger.debug(s"STASHED ${rec.wsProxyMessageId} to stack")
+      ctx.log.debug(s"STASHED ${rec.wsProxyMessageId} to stack")
       next
     }
   }
@@ -75,12 +76,14 @@ object CommitHandler {
    * @return An option with an updated stack or empty if message wasn't found.
    */
   private[this] def commit(stack: Stack, msgId: WsMessageId)(
-      implicit ec: ExecutionContext
+      implicit
+      ec: ExecutionContext,
+      ctx: ActorContext[Protocol]
   ): Option[Stack] = {
     val reduced = stack.dropWhile(_.wsProxyMsgId != msgId)
     reduced.headOption.map { u =>
       u.committable.commitScaladsl().foreach { _ =>
-        logger.debug(s"COMMITTED $msgId and cleaned up stack")
+        ctx.log.debug(s"COMMITTED $msgId and cleaned up stack")
       }
       reduced.tail
     }
@@ -97,8 +100,8 @@ object CommitHandler {
    * @return a Behavior describing the [[CommitHandler]].
    */
   private[this] def committableStack(stack: Stack): Behavior[Protocol] =
-    Behaviors.setup { ctx =>
-      implicit val ec = ctx.executionContext
+    Behaviors.setup { implicit ctx =>
+      implicit val ec = implicitly(ctx.executionContext)
       Behaviors.receiveMessage {
         case Stash(record) =>
           stash(stack, record).map(committableStack).getOrElse(Behaviors.same)
@@ -109,6 +112,10 @@ object CommitHandler {
             .getOrElse(Behaviors.same)
 
         case Continue =>
+          Behaviors.same
+
+        case GetStack(to) =>
+          to ! stack
           Behaviors.same
 
         case Stop =>
