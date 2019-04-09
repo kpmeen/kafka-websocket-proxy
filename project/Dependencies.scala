@@ -126,10 +126,11 @@ object Dependencies {
     val EmbeddedKafkaStreams   = "io.github.embeddedkafka" %% "embedded-kafka-streams"         % EmbeddedKafkaVersion excludeAll (LoggerExclusions: _*)
     val EmbeddedSchemaRegistry = "io.github.embeddedkafka" %% "embedded-kafka-schema-registry" % EmbeddedSchemaRegistryVersion excludeAll (LoggerExclusions: _*)
 
-    val AkkaTestKit       = "com.typesafe.akka" %% "akka-testkit"             % AkkaVersion
-    val AkkaTypedTestKit  = "com.typesafe.akka" %% "akka-actor-testkit-typed" % AkkaVersion
-    val AkkaHttpTestKit   = "com.typesafe.akka" %% "akka-http-testkit"        % AkkaHttpVersion
-    val AkkaStreamTestKit = "com.typesafe.akka" %% "akka-stream-testkit"      % AkkaVersion
+    val AkkaTestKit            = "com.typesafe.akka" %% "akka-testkit"              % AkkaVersion
+    val AkkaTypedTestKit       = "com.typesafe.akka" %% "akka-actor-testkit-typed"  % AkkaVersion
+    val AkkaHttpTestKit        = "com.typesafe.akka" %% "akka-http-testkit"         % AkkaHttpVersion
+    val AkkaStreamTestKit      = "com.typesafe.akka" %% "akka-stream-testkit"       % AkkaVersion
+    val AkkaStreamKafkaTestKit = "com.typesafe.akka" %% "akka-stream-kafka-testkit" % AkkaStreamKafkaVersion
   }
 
   object Logging {

@@ -42,6 +42,7 @@ lazy val root = (project in file("."))
       Testing.AkkaTypedTestKit       % Test,
       Testing.AkkaHttpTestKit        % Test,
       Testing.AkkaStreamTestKit      % Test,
+      Testing.AkkaStreamKafkaTestKit % Test,
       Testing.Scalactic              % Test
     )
   )
