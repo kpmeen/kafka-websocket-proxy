@@ -100,14 +100,14 @@ object WsProducer {
    * @return an instance of [[ProducerRecord]]
    */
   private[this] def asKafkaProducerRecord[K, V](
-      topic: String,
+      topic: TopicName,
       msg: WsProducerRecord[K, V]
   ): ProducerRecord[K, V] = msg match {
     case kvm: ProducerKeyValueRecord[K, V] =>
-      new ProducerRecord[K, V](topic, kvm.key.value, kvm.value.value)
+      new ProducerRecord[K, V](topic.value, kvm.key.value, kvm.value.value)
 
     case vm: ProducerValueRecord[V] =>
-      new ProducerRecord[K, V](topic, vm.value.value)
+      new ProducerRecord[K, V](topic.value, vm.value.value)
 
     case ProducerEmtpyMessage =>
       throw new IllegalStateException(

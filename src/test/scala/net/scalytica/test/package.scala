@@ -93,9 +93,9 @@ package object test {
               js.as[WsConsumerRecord[K, V]] match {
                 case Left(err) => throw err
                 case Right(actual) =>
-                  actual.topic mustBe expectedTopic
-                  actual.offset mustBe >=(0L)
-                  actual.partition mustBe >=(0)
+                  actual.topic.value mustBe expectedTopic
+                  actual.offset.value mustBe >=(0L)
+                  actual.partition.value mustBe >=(0)
 
                   actual match {
                     case kvr: ConsumerKeyValueRecord[K, V] =>

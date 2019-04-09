@@ -5,6 +5,7 @@ import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.kafka.ConsumerMessage.Committable
 import com.typesafe.scalalogging.Logger
 import net.scalytica.kafka.wsproxy.models.{
+  Partition,
   WsCommit,
   WsConsumerRecord,
   WsMessageId
@@ -24,16 +25,19 @@ object CommitHandler {
       committable: Committable
   )
 
-  /**
-   * Type alias intended to make clear that the CommitHandler behaviour is
-   * using a kind of Stack to keep track of uncommitted messages. The stack is
-   * in effect a regular list, where new messages are appended at the end.
-   * And, whenever a commit message comes along, the list is drained from the
-   * beginning until the WsMessageId of the incoming message is found in the
-   * list. If the WsMessageId is NOT found, the stack is left as-is and no
-   * commit is executed.
+  /*
+     Type aliases intended to make clear that the CommitHandler behaviour is
+     using a kind of Stack to keep track of uncommitted messages. The stack is
+     in effect a regular list, where new messages are appended at the end.
+     And, whenever a commit message comes along, the list is drained from the
+     beginning until the WsMessageId of the incoming message is found in the
+     list. If the WsMessageId is NOT found, the stack is left as-is and no
+     commit is executed.
    */
-  private[consumer] type Stack = List[Uncommitted]
+  private[consumer] type SubStack = List[Uncommitted]
+  private[consumer] type Stack    = Map[Partition, SubStack]
+
+  private[this] val EmptyStack: Stack = Map.empty
 
   /** ADT defining the valid protocol for the [[CommitHandler]] */
   sealed trait Protocol
@@ -45,7 +49,7 @@ object CommitHandler {
   case class GetStack(sender: ActorRef[Stack])     extends Protocol
 
   /** Behaviour initialising the message commit stack */
-  val commitStack: Behavior[Protocol] = committableStack(List.empty)
+  val commitStack: Behavior[Protocol] = committableStack()
 
   /**
    * Adds a new [[Uncommitted]] entry to the [[Stack]]
@@ -58,9 +62,22 @@ object CommitHandler {
       stack: Stack,
       rec: WsConsumerRecord[_, _]
   )(implicit ctx: ActorContext[Protocol]): Option[Stack] = {
+    def addToStack(partition: Partition, uncommitted: Uncommitted): Stack = {
+      stack
+        .find(_._1 == partition)
+        .map { _ =>
+          stack
+            .get(partition)
+            .map(pStack => stack.updated(partition, pStack :+ uncommitted))
+            .getOrElse(stack)
+        }
+        .getOrElse(stack + (partition -> List(uncommitted)))
+    }
+
     rec.committableOffset.map { co =>
       // Append the uncommitted message at the END of the stack
-      val next = stack :+ Uncommitted(rec.wsProxyMessageId, co)
+      val next =
+        addToStack(rec.partition, Uncommitted(rec.wsProxyMessageId, co))
       ctx.log.debug(s"STASHED ${rec.wsProxyMessageId} to stack")
       next
     }
@@ -80,13 +97,22 @@ object CommitHandler {
       ec: ExecutionContext,
       ctx: ActorContext[Protocol]
   ): Option[Stack] = {
-    val reduced = stack.dropWhile(_.wsProxyMsgId != msgId)
-    reduced.headOption.map { u =>
-      u.committable.commitScaladsl().foreach { _ =>
-        ctx.log.debug(s"COMMITTED $msgId and cleaned up stack")
+    stack
+      .find(_._2.exists(_.wsProxyMsgId == msgId))
+      .map {
+        case (p, s) =>
+          val reduced = s.dropWhile(_.wsProxyMsgId != msgId).tail
+          stack.updated(p, reduced) -> reduced
       }
-      reduced.tail
-    }
+      .flatMap {
+        case (nextStack, reducedStack) =>
+          reducedStack.headOption.map { u =>
+            u.committable.commitScaladsl().foreach { _ =>
+              ctx.log.debug(s"COMMITTED $msgId and cleaned up stack")
+            }
+            nextStack
+          }
+      }
   }
 
   /**
@@ -99,7 +125,9 @@ object CommitHandler {
    * @param stack the message stack of [[Uncommitted]] messages
    * @return a Behavior describing the [[CommitHandler]].
    */
-  private[this] def committableStack(stack: Stack): Behavior[Protocol] =
+  private[this] def committableStack(
+      stack: Stack = EmptyStack
+  ): Behavior[Protocol] =
     Behaviors.setup { implicit ctx =>
       implicit val ec = implicitly(ctx.executionContext)
       Behaviors.receiveMessage {

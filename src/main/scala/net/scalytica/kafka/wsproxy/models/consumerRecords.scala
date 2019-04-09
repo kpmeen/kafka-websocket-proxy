@@ -23,10 +23,10 @@ sealed abstract class WsConsumerRecord[+K, +V](
     value: OutValueDetails[V]
 ) {
 
-  val topic: String
-  val partition: Int
-  val offset: Long
-  val timestamp: Long
+  val topic: TopicName
+  val partition: Partition
+  val offset: Offset
+  val timestamp: Timestamp
   val committableOffset: Option[ConsumerMessage.CommittableOffset]
 
   lazy val wsProxyMessageId: WsMessageId =
@@ -52,10 +52,10 @@ sealed abstract class WsConsumerRecord[+K, +V](
  * @tparam V the type of the value
  */
 case class ConsumerKeyValueRecord[K, V](
-    topic: String,
-    partition: Int,
-    offset: Long,
-    timestamp: Long,
+    topic: TopicName,
+    partition: Partition,
+    offset: Offset,
+    timestamp: Timestamp,
     key: OutValueDetails[K],
     value: OutValueDetails[V],
     committableOffset: Option[ConsumerMessage.CommittableOffset]
@@ -74,10 +74,10 @@ case class ConsumerKeyValueRecord[K, V](
  * @tparam V the type of the value
  */
 case class ConsumerValueRecord[V](
-    topic: String,
-    partition: Int,
-    offset: Long,
-    timestamp: Long,
+    topic: TopicName,
+    partition: Partition,
+    offset: Offset,
+    timestamp: Timestamp,
     value: OutValueDetails[V],
     committableOffset: Option[ConsumerMessage.CommittableOffset]
 ) extends WsConsumerRecord[Nothing, V](None, value)

@@ -10,7 +10,11 @@ import akka.event.Logging
 import akka.kafka.testkit.ConsumerResultFactory
 import org.scalatest.{BeforeAndAfter, MustMatchers, WordSpec}
 import net.scalytica.kafka.wsproxy.consumer.CommitHandler._
-import net.scalytica.kafka.wsproxy.models.{ConsumerKeyValueRecord, Formats}
+import net.scalytica.kafka.wsproxy.models.{
+  ConsumerKeyValueRecord,
+  Formats,
+  Partition
+}
 import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails
 
 class CommitHandlerSpec extends WordSpec with MustMatchers with BeforeAndAfter {
@@ -61,7 +65,11 @@ class CommitHandlerSpec extends WordSpec with MustMatchers with BeforeAndAfter {
       // ask for updated stack
       tk.run(GetStack(inbox.ref))
       inbox.expectMessage(
-        List(Uncommitted(rec.wsProxyMessageId, rec.committableOffset.get))
+        Map(
+          Partition(0) -> List(
+            Uncommitted(rec.wsProxyMessageId, rec.committableOffset.get)
+          )
+        )
       )
     }
 

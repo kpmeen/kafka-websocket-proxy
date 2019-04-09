@@ -21,6 +21,22 @@ object Decoders {
     json.as[String].map(WsMessageId.apply)
   }
 
+  implicit val topicNameDecoder: Decoder[TopicName] = { json =>
+    json.as[String].map(TopicName.apply)
+  }
+
+  implicit val partitionDecoder: Decoder[Partition] = { json =>
+    json.as[Int].map(Partition.apply)
+  }
+
+  implicit val offsetDecoder: Decoder[Offset] = { json =>
+    json.as[Long].map(Offset.apply)
+  }
+
+  implicit val timestampDecoder: Decoder[Timestamp] = { json =>
+    json.as[Long].map(Timestamp.apply)
+  }
+
   implicit val wsCommitDecoder: Decoder[WsCommit] = deriveDecoder
 
   implicit val byteArrDecoder: Decoder[Array[Byte]] = { json =>
@@ -90,10 +106,10 @@ object Decoders {
   ): Decoder[WsConsumerRecord[K, V]] = { cursor =>
     for {
       msgId     <- cursor.downField("wsProxyMessageId").as[WsMessageId]
-      topic     <- cursor.downField("topic").as[String]
-      partition <- cursor.downField("partition").as[Int]
-      offset    <- cursor.downField("offset").as[Long]
-      timestamp <- cursor.downField("timestamp").as[Long]
+      topic     <- cursor.downField("topic").as[TopicName]
+      partition <- cursor.downField("partition").as[Partition]
+      offset    <- cursor.downField("offset").as[Offset]
+      timestamp <- cursor.downField("timestamp").as[Timestamp]
       key       <- cursor.downField("key").as[Option[OutValueDetails[K]]]
       value     <- cursor.downField("value").as[OutValueDetails[V]]
     } yield {

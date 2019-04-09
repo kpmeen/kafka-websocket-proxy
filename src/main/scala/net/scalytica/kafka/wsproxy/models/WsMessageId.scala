@@ -11,10 +11,12 @@ case class WsMessageId private (value: String)
 object WsMessageId {
 
   def apply(
-      topic: String,
-      partition: Int,
-      offset: Long,
-      timestamp: Long
-  ): WsMessageId = WsMessageId(s"$topic-$partition-$offset-$timestamp")
+      topic: TopicName,
+      partition: Partition,
+      offset: Offset,
+      timestamp: Timestamp
+  ): WsMessageId = WsMessageId(
+    s"${topic.value}-${partition.value}-${offset.value}-${timestamp.value}"
+  )
 
 }

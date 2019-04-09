@@ -9,11 +9,7 @@ import com.typesafe.scalalogging.Logger
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.ConsumerInterceptorClass
 import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails
-import net.scalytica.kafka.wsproxy.models.{
-  ConsumerKeyValueRecord,
-  ConsumerValueRecord,
-  WsConsumerRecord
-}
+import net.scalytica.kafka.wsproxy.models._
 import org.apache.kafka.clients.consumer.ConsumerConfig._
 import org.apache.kafka.clients.consumer.OffsetResetStrategy.EARLIEST
 import org.apache.kafka.clients.consumer.{ConsumerRecord, OffsetResetStrategy}
@@ -88,7 +84,7 @@ object WsConsumer {
    * @return a [[Source]] containing [[WsConsumerRecord]]s.
    */
   def consumeAutoCommit[K, V](
-      topic: String,
+      topic: TopicName,
       clientId: String,
       groupId: Option[String]
   )(
@@ -101,7 +97,7 @@ object WsConsumer {
     logger.debug("Setting up consumer with auto-commit ENABLED")
     val settings =
       consumerSettings[K, V](id = clientId, gid = groupId, autoCommit = true)
-    val subscription = Subscriptions.topics(Set(topic))
+    val subscription = Subscriptions.topics(Set(topic.value))
 
     Consumer
       .plainSource[K, V](settings, subscription)
@@ -129,7 +125,7 @@ object WsConsumer {
    * @return a [[Source]] containing [[WsConsumerRecord]]s.
    */
   def consumeManualCommit[K, V](
-      topic: String,
+      topic: TopicName,
       clientId: String,
       groupId: Option[String]
   )(
@@ -142,7 +138,7 @@ object WsConsumer {
     logger.debug("Setting up consumer with auto-commit DISABLED")
     val settings =
       consumerSettings[K, V](id = clientId, gid = groupId, autoCommit = false)
-    val subscription = Subscriptions.topics(Set(topic))
+    val subscription = Subscriptions.topics(Set(topic.value))
 
     Consumer
       .committableSource[K, V](settings, subscription)

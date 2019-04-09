@@ -17,6 +17,22 @@ object Encoders {
     Json.fromString(msgId.value)
   }
 
+  implicit val topicNameEncoder: Encoder[TopicName] = { tn =>
+    Json.fromString(tn.value)
+  }
+
+  implicit val partitionEncoder: Encoder[Partition] = { partition =>
+    Json.fromInt(partition.value)
+  }
+
+  implicit val offsetEncoder: Encoder[Offset] = { offset =>
+    Json.fromLong(offset.value)
+  }
+
+  implicit val timestampEncoder: Encoder[Timestamp] = { ts =>
+    Json.fromLong(ts.value)
+  }
+
   implicit val byteArrEncoder: Encoder[Array[Byte]] = { arr =>
     Json.fromString(Binary.encodeBase64(arr))
   }

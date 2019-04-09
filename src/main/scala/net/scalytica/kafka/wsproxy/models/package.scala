@@ -12,4 +12,9 @@ package object models {
     Source(it)
   }
 
+  implicit def stringToTopicName(s: String): TopicName = TopicName(s)
+  implicit def intToPartition(i: Int): Partition       = Partition(i)
+  implicit def longToOffset(l: Long): Offset           = Offset(l)
+  implicit def longToTimestamp(l: Long): Timestamp     = Timestamp(l)
+
 }
