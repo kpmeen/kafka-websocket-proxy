@@ -89,12 +89,29 @@ both inbound and outbound messages.
 
 ##### Input
 
-TBD...
+```json
+{
+  "key": {
+    "value":"foo",
+    "format":"string"
+  },
+  "value": {
+    "value":"bar",
+    "format":"string"
+  }
+}
+```
 
 ##### Output
 
-TBD...
-
+```json
+{
+  "topic": "foo",
+  "partition": 2,
+  "offset": 4,
+  "timestamp": 1554896731782
+}
+```
 
 #### `/out`                                   
 
@@ -112,13 +129,15 @@ TBD...
 | batchSize           | integer     |    n     |               |
 | autoCommit          | boolean     |    n     | true          |
 
-##### Input
-
-TBD...
-
 ##### Output
 
-TBD...
+tbd...
+
+##### Input
+
+```json
+{"wsProxyMessageId":"foo-0-1-1554402266846"}
+```
 
 # Development
 

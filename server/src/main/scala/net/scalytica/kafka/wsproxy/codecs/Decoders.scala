@@ -62,9 +62,8 @@ object Decoders {
     for {
       v <- json.downField("value").as[T]
       f <- json.downField("format").as[FormatType]
-      s <- json.downField("schema").as[Option[String]]
     } yield {
-      InValueDetails(v, f, s)
+      InValueDetails(v, f)
     }
   }
 

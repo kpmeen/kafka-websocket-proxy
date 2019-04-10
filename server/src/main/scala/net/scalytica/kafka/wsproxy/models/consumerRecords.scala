@@ -2,7 +2,6 @@ package net.scalytica.kafka.wsproxy.models
 
 import akka.Done
 import akka.kafka.ConsumerMessage
-
 import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails
 
 import scala.concurrent.Future
@@ -13,8 +12,8 @@ import scala.concurrent.Future
  * a defined key of type {{{K}}} _and_ a value of type {{{V}}}. And records that
  * only contain a value of type {{{V}}}.
  *
- * @param key               The [[OutValueDetails]] describing the message key
- * @param value             The [[OutValueDetails]] describing the message value
+ * @param key   The [[OutValueDetails]] describing the message key
+ * @param value The [[OutValueDetails]] describing the message value
  * @tparam K the type of the key
  * @tparam V the type of the value
  */

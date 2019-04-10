@@ -109,7 +109,7 @@ object WsProducer {
     case vm: ProducerValueRecord[V] =>
       new ProducerRecord[K, V](topic.value, vm.value.value)
 
-    case ProducerEmtpyMessage =>
+    case ProducerEmptyMessage =>
       throw new IllegalStateException(
         "EmptyMessage passed through stream pipeline, but should have" +
           " been filtered out."
