@@ -10,6 +10,23 @@ name := "kafka-websocket-proxy"
 version := "0.1"
 
 lazy val root = (project in file("."))
+  .settings(BaseSettings: _*)
+  .settings(NoPublish)
+  .settings(scalaVersion := Versions.ScalaVersion)
+  .aggregate(avro, server)
+
+lazy val avro = (project in file("avro"))
+  .settings(BaseSettings: _*)
+  .settings(NoPublish)
+  .settings(resolvers ++= Dependencies.Resolvers)
+  .settings(scalaVersion := Versions.ScalaVersion)
+  .settings(scalastyleFailOnWarning := true)
+  .settings(
+    coverageExcludedPackages := "<empty>;net.scalytica.kafka.wsproxy.avro.*;"
+  )
+  .settings(libraryDependencies ++= Avro.All)
+
+lazy val server = (project in file("server"))
   .enablePlugins(DockerPlugin, DockerTasksPlugin)
   .settings(BaseSettings: _*)
   .settings(NoPublish)
@@ -46,3 +63,5 @@ lazy val root = (project in file("."))
       Testing.Scalactic              % Test
     )
   )
+  .dependsOn(avro)
+  .aggregate(avro)

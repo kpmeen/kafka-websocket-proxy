@@ -57,7 +57,7 @@ object Settings {
   )
 
   val BaseSettings = Seq(
-    organization := "no.itera",
+    organization := "net.scalytica",
     licenses += ("Apache-2.0", url(
       "http://opensource.org/licenses/https://opensource.org/licenses/Apache-2.0"
     )),
