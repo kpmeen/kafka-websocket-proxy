@@ -30,16 +30,18 @@ class ServerRoutesSpec
     with ScalatestRouteTest
     with EitherValues {
 
+  // scalastyle:off
   implicit val cfg = Configuration.loadFrom(
-    "kafka.websocket.proxy.server.port"                         -> 8078,
-    "kafka.websocket.proxy.server.kafka-bootstrap-urls"         -> """["localhost:29092"]""",
-    "kafka.websocket.proxy.consumer.default-rate-limit"         -> 0,
-    "kafka.websocket.proxy.consumer.default-batch-size"         -> 0,
-    "kafka.websocket.proxy.commit-handler.max-stack-size"       -> 200,
-    "kafka.websocket.proxy.commit-handler.auto-commit-enabled"  -> false,
-    "kafka.websocket.proxy.commit-handler.auto-commit-interval" -> 1.second,
-    "kafka.websocket.proxy.commit-handler.auto-commit-max-age"  -> 20.seconds
+    "kafka.ws.proxy.server.port"                         -> 8078,
+    "kafka.ws.proxy.server.kafka-bootstrap-urls"         -> """["localhost:29092"]""",
+    "kafka.ws.proxy.consumer.default-rate-limit"         -> 0,
+    "kafka.ws.proxy.consumer.default-batch-size"         -> 0,
+    "kafka.ws.proxy.commit-handler.max-stack-size"       -> 200,
+    "kafka.ws.proxy.commit-handler.auto-commit-enabled"  -> false,
+    "kafka.ws.proxy.commit-handler.auto-commit-interval" -> 1.second,
+    "kafka.ws.proxy.commit-handler.auto-commit-max-age"  -> 20.seconds
   )
+  // scalastyle:on
 
   case object TestRoutes extends ServerRoutes
 

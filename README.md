@@ -36,18 +36,19 @@ file. Where the following parameters can be adjusted:
 
 > NOTE:
 > Some parameters are configurable through specific environment variables. 
+> For a complete overview of all the configuration parameters, please refer to
+> the `application.conf` file in `src/main/resources`.
 
-| Config key                                                | Type            | Environment                               | Default      | Description                |
-|:---                                                       |:---             |:----                                      |:------------:|:-------------------------- |
-| kafka.websocket.proxy.server.port                         | int             | WSPROXY_PORT                              | `8078`       | Port where the server endpoints will be exposed |
-| kafka.websocket.proxy.server.kafka-bootstrap-urls         | array\[string\] | KAFKA_BOOTSTRAP_URLS                      |              | An array of strings with URLs to the Kafka brokers in the form `<host>:<port>` |
-| kafka.websocket.proxy.consumer.default-rate-limit         | long            | WSPROXY_DEFAULT_RATE_LIMIT                | `0`          | The maximum allowed throughput of data through a socket in bytes/second. A value of `0` means unlimited throughput. |
-| kafka.websocket.proxy.consumer.default-batch-size         | int             | WSPROXY_DEFAULT_BATCH_SIZE                | `0`          | The number of messages to include per batch when consuming data. This property has no meaning without rate limiting turned on. A value of `0` means there will be no batching. |
-| kafka.websocket.proxy.commit-handler.max-stack-size       | int             | WSPROXY_COMMITHANDLER_MAX_STACK_SIZE      | `200`        | The maximum number of uncommitted messages, per partition, that will be kept track of in the commit handler stack. |
-| kafka.websocket.proxy.commit-handler.auto-commit-enabled  | boolean         | WSPROXY_COMMITHANDLER_AUTOCOMMIT_ENABLED  | `false`      | Whether or not to allow the proxy to perform automatic offset commits of uncommitted messages. |
-| kafka.websocket.proxy.commit-handler.auto-commit-interval | finite duration | WSPROXY_COMMITHANDLER_AUTOCOMMIT_INTERVAL | `1 second`   | The interval to execute the jobo for auto-committing messages of a given age. |
-| kafka.websocket.proxy.commit-handler.auto-commit-max-age  | finite duration | WSPROXY_COMMITHANDLER_AUTOCOMMIT_MAX_AGE  | `20 seconds` | The max allowed age of uncommitted messages in the commit handler stack. |
-|                                                           |                 |                                           |              |                            |
+| Config key                                         | Environment                    | Default      | Description   |
+|:---                                                |:----                           |:------------:|:-----         |
+| kafka.ws.proxy.server.port                         | WSPROXY_PORT                   | `8078`       | Port where the server endpoints will be exposed |
+| kafka.ws.proxy.server.kafka-bootstrap-urls         | WSPROXY_KAFKA_BOOTSTRAP_URLS   |              | An array of strings with URLs to the Kafka brokers in the form `<host>:<port>` |
+| kafka.ws.proxy.consumer.default-rate-limit         | WSPROXY_DEFAULT_RATE_LIMIT     | `0`          | The maximum allowed throughput of data through a socket in bytes/second. A value of `0` means unlimited throughput. |
+| kafka.ws.proxy.consumer.default-batch-size         | WSPROXY_DEFAULT_BATCH_SIZE     | `0`          | The number of messages to include per batch when consuming data. This property has no meaning without rate limiting turned on. A value of `0` means there will be no batching. |
+| kafka.ws.proxy.commit-handler.max-stack-size       | WSPROXY_CH_MAX_STACK_SIZE      | `200`        | The maximum number of uncommitted messages, per partition, that will be kept track of in the commit handler stack. |
+| kafka.ws.proxy.commit-handler.auto-commit-enabled  | WSPROXY_CH_AUTOCOMMIT_ENABLED  | `false`      | Whether or not to allow the proxy to perform automatic offset commits of uncommitted messages. |
+| kafka.ws.proxy.commit-handler.auto-commit-interval | WSPROXY_CH_AUTOCOMMIT_INTERVAL | `1 second`   | The interval to execute the jobo for auto-committing messages of a given age. |
+| kafka.ws.proxy.commit-handler.auto-commit-max-age  | WSPROXY_CH_AUTOCOMMIT_MAX_AGE  | `20 seconds` | The max allowed age of uncommitted messages in the commit handler stack. |
 
 
 ## Endpoints and API

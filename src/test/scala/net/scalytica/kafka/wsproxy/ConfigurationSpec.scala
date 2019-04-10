@@ -8,7 +8,7 @@ import pureconfig.error.ConfigReaderException
 class ConfigurationSpec extends WordSpec with MustMatchers {
 
   val invalidCfg1 = ConfigFactory.parseString(
-    """kafka.websocket.proxy {
+    """kafka.ws.proxy {
       |  server {
       |    port = 8078
       |    kafka-bootstrap-urls = ["localhost:29092"]
@@ -29,7 +29,7 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
   )
 
   val invalidCfg2 = ConfigFactory.parseString(
-    """kafka.websocket.proxy {
+    """kafka.ws.proxy {
       |  server {
       |    port = 8078
       |    kafka-bootstrap-urls = "localhost:29092"

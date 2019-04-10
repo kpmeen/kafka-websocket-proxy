@@ -10,7 +10,7 @@ import scala.concurrent.duration.FiniteDuration
 
 object Configuration {
 
-  private[this] val CfgRootKey = "kafka.websocket.proxy"
+  private[this] val CfgRootKey = "kafka.ws.proxy"
 
   final case class AppCfg(
       server: ServerCfg,

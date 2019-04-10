@@ -3,7 +3,6 @@ package net.scalytica.kafka.wsproxy.consumer
 import akka.actor.typed.{ActorRef, Behavior}
 import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.kafka.ConsumerMessage.Committable
-import com.typesafe.scalalogging.Logger
 import net.scalytica.kafka.wsproxy.models.{
   Partition,
   WsCommit,
@@ -14,8 +13,6 @@ import net.scalytica.kafka.wsproxy.models.{
 import scala.concurrent.ExecutionContext
 
 object CommitHandler {
-
-  private[this] val logger = Logger(getClass)
 
   /**
    * Carries necessary metadata for messages in the stack.

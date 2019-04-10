@@ -13,7 +13,7 @@
   </appender>
 
   <logger name="akka" level="ERROR"/>
-  <logger name="net.scalytica.kafka.wsproxy" level="DEBUG"/>
+  <logger name="net.scalytica.kafka.wsproxy" level="OFF"/>
 
   <!-- Root loggers catch all other events that are not explicitly handled-->
   <root level="ERROR">
