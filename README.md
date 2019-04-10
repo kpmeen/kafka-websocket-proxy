@@ -131,7 +131,23 @@ both inbound and outbound messages.
 
 ##### Output
 
-tbd...
+```json
+{
+  "wsProxyMessageId": "foo-0-1-1554402266846",
+  "topic": "foobar",
+  "partition": 0,
+  "offset": 1,
+  "timestamp": 1554402266846,
+  "key": { // optional
+    "value": "foo",
+    "format": "string" // optional
+  },
+  "value": {
+    "value": "bar",
+    "format": "string" // optional
+  }
+}
+```
 
 ##### Input
 
