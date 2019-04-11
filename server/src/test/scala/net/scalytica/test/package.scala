@@ -79,7 +79,7 @@ package object test {
         kdec: Decoder[K],
         vdec: Decoder[V]
     ): Assertion = {
-      probe.expectMessage() match {
+      probe.inProbe.requestNext(20 seconds) match {
         case tm: TextMessage =>
           val collected = tm.textStream
             .grouped(1000) // scalastyle:ignore

@@ -1,47 +1,25 @@
 package net.scalytica.kafka.wsproxy
 
-import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
-import akka.http.scaladsl.server._
-import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.model.ws.TextMessage
-import akka.stream.scaladsl.Sink
-import io.circe._
-import io.circe.parser._
-import net.scalytica.kafka.wsproxy.models.{
-  ConsumerKeyValueRecord,
-  Formats,
-  ProducerKeyValueRecord,
-  WsProducerResult
-}
-import net.scalytica.kafka.wsproxy.models.ValueDetails.{
-  InValueDetails,
-  OutValueDetails
-}
-import net.scalytica.kafka.wsproxy.codecs.Decoders._
+import akka.http.scaladsl.server._
+import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
+import net.manub.embeddedkafka.schemaregistry._
 import net.scalytica.test._
+import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.time.{Minutes, Span}
 import org.scalatest.{EitherValues, MustMatchers, WordSpec}
-
-import scala.concurrent.duration._
 
 class ServerRoutesSpec
     extends WordSpec
     with MustMatchers
+    with EitherValues
+    with ScalaFutures
     with ScalatestRouteTest
-    with EitherValues {
+    with WSProxySpecLike
+    with EmbeddedKafka {
 
-  // scalastyle:off
-  implicit val cfg = Configuration.loadFrom(
-    "kafka.ws.proxy.server.port"                         -> 8078,
-    "kafka.ws.proxy.server.kafka-bootstrap-urls"         -> """["localhost:29092"]""",
-    "kafka.ws.proxy.consumer.default-rate-limit"         -> 0,
-    "kafka.ws.proxy.consumer.default-batch-size"         -> 0,
-    "kafka.ws.proxy.commit-handler.max-stack-size"       -> 200,
-    "kafka.ws.proxy.commit-handler.auto-commit-enabled"  -> false,
-    "kafka.ws.proxy.commit-handler.auto-commit-interval" -> 1.second,
-    "kafka.ws.proxy.commit-handler.auto-commit-max-age"  -> 20.seconds
-  )
-  // scalastyle:on
+  implicit override val patienceConfig: PatienceConfig =
+    PatienceConfig(timeout = Span(2, Minutes))
 
   case object TestRoutes extends ServerRoutes
 
@@ -77,7 +55,8 @@ class ServerRoutesSpec
 
   "The server routes" should {
     "return a 404 NotFound when requesting an invalid resource" in {
-      val routes = Route.seal(TestRoutes.routes)
+      implicit val cfg = defaultApplicationTestConfig
+      val routes       = Route.seal(TestRoutes.routes)
 
       Get() ~> routes ~> check {
         status mustBe NotFound
@@ -85,32 +64,44 @@ class ServerRoutesSpec
       }
     }
 
-    "set up a WebSocket connection for producing messages" in {
-      val routes            = Route.seal(TestRoutes.routes)
-      implicit val wsClient = WSProbe()
+    "set up a WebSocket connection for producing messages" in
+      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
+        implicit val wsCfg = applicationTestConfig(kcfg.kafkaPort)
 
-      produce("/socket/in?topic=foobar&keyType=string&valType=string", routes)
-    }
+        val routes            = Route.seal(TestRoutes.routes)
+        implicit val wsClient = WSProbe()
 
-    "set up a WebSocket connection for consuming messages" in {
-      val routes                   = Route.seal(TestRoutes.routes)
-      val producerProbe            = WSProbe()
-      implicit val wsConsumerProbe = WSProbe()
+        produce(
+          "/socket/in?topic=foobar&keyType=string&valType=string",
+          routes
+        )
+      }
 
-      produce("/socket/in?topic=foobar&keyType=string&valType=string", routes)(
-        producerProbe
-      )
+    "set up a WebSocket connection for consuming messages" in
+      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
+        implicit val wsCfg = applicationTestConfig(kcfg.kafkaPort)
 
-      val outPath = "/socket/out?" +
-        "clientId=test" +
-        "&groupId=test-group" +
-        "&topic=foobar" +
-        "&keyType=string" +
-        "&valType=string" +
-        "&autoCommit=false"
+        val routes                   = Route.seal(TestRoutes.routes)
+        val producerProbe            = WSProbe()
+        implicit val wsConsumerProbe = WSProbe()
 
-      val record =
-        """{
+        produce(
+          "/socket/in?topic=foobar&keyType=string&valType=string",
+          routes
+        )(
+          producerProbe
+        )
+
+        val outPath = "/socket/out?" +
+          "clientId=test" +
+          "&groupId=test-group" +
+          "&topic=foobar" +
+          "&keyType=string" +
+          "&valType=string" +
+          "&autoCommit=false"
+
+        val record =
+          """{
           |  "wsProxyMessageId": "foobar-2-12-1554402266846",
           |  "partition": 2,
           |  "offset": 12L,
@@ -124,17 +115,23 @@ class ServerRoutesSpec
           |  }
           |}""".stripMargin
 
-      WS(outPath, wsConsumerProbe.flow) ~> routes ~> check {
-        isWebSocketUpgrade mustBe true
+        import net.manub.embeddedkafka.Codecs.stringDeserializer
 
-        wsConsumerProbe.expectWsConsumerKeyValueResult[String, String](
-          expectedTopic = "foobar",
-          expectedKey = "foo",
-          expectedValue = "bar"
-        )
+        val (rk, rv) = consumeFirstKeyedMessageFrom[String, String]("foobar")
+        rk mustBe "foo"
+        rv mustBe "bar"
 
+        WS(outPath, wsConsumerProbe.flow) ~> routes ~> check {
+          isWebSocketUpgrade mustBe true
+
+          wsConsumerProbe.expectWsConsumerKeyValueResult[String, String](
+            expectedTopic = "foobar",
+            expectedKey = "foo",
+            expectedValue = "bar"
+          )
+
+        }
       }
-    }
   }
 
 }
