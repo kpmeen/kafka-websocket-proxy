@@ -8,7 +8,9 @@ import net.scalytica.test._
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Minutes, Span}
 import org.scalatest.{EitherValues, MustMatchers, WordSpec}
+import org.scalatest.Inspectors.forAll
 
+// scalastyle:off magic.number
 class ServerRoutesSpec
     extends WordSpec
     with MustMatchers
@@ -25,29 +27,35 @@ class ServerRoutesSpec
 
   import TestRoutes.{serverErrorHandler, serverRejectionHandler}
 
-  private[this] def newProducerKeyValueRecord() = {
-    """{
-      |  "key": {
-      |    "value": "foo",
-      |    "format": "string"
-      |  },
-      |  "value": {
-      |    "value": "bar",
-      |    "format": "string"
-      |  }
-      |}""".stripMargin
+  private[this] def newProducerKeyValueRecords(num: Int): Seq[String] = {
+    (1 to num).map { i =>
+      s"""{
+         |  "key": {
+         |    "value": "foo-$i",
+         |    "format": "string"
+         |  },
+         |  "value": {
+         |    "value": "bar-$i",
+         |    "format": "string"
+         |  }
+         |}""".stripMargin
+    }
   }
 
   def produce(
       inPath: String,
-      routes: Route
+      routes: Route,
+      numMessages: Int = 1
   )(implicit wsClient: WSProbe): Unit = {
     WS(inPath, wsClient.flow) ~> routes ~> check {
       isWebSocketUpgrade mustBe true
 
-      wsClient.sendMessage(newProducerKeyValueRecord())
-      wsClient.expectWsProducerResult("foobar")
+      val msgs = newProducerKeyValueRecords(numMessages)
 
+      forAll(msgs) { msg =>
+        wsClient.sendMessage(msg)
+        wsClient.expectWsProducerResult("foobar")
+      }
       wsClient.sendCompletion()
       wsClient.expectCompletion()
     }
@@ -86,8 +94,9 @@ class ServerRoutesSpec
         implicit val wsConsumerProbe = WSProbe()
 
         produce(
-          "/socket/in?topic=foobar&keyType=string&valType=string",
-          routes
+          inPath = "/socket/in?topic=foobar&keyType=string&valType=string",
+          routes = routes,
+          numMessages = 10
         )(
           producerProbe
         )
@@ -100,35 +109,22 @@ class ServerRoutesSpec
           "&valType=string" +
           "&autoCommit=false"
 
-        val record =
-          """{
-          |  "wsProxyMessageId": "foobar-2-12-1554402266846",
-          |  "partition": 2,
-          |  "offset": 12L,
-          |  "key": {
-          |    "value": "foo",
-          |    "format": "string"
-          |  },
-          |  "value": {
-          |    "value": "bar",
-          |    "format": "string"
-          |  }
-          |}""".stripMargin
-
         import net.manub.embeddedkafka.Codecs.stringDeserializer
 
         val (rk, rv) = consumeFirstKeyedMessageFrom[String, String]("foobar")
-        rk mustBe "foo"
-        rv mustBe "bar"
+        rk mustBe "foo-1"
+        rv mustBe "bar-1"
 
         WS(outPath, wsConsumerProbe.flow) ~> routes ~> check {
           isWebSocketUpgrade mustBe true
 
-          wsConsumerProbe.expectWsConsumerKeyValueResult[String, String](
-            expectedTopic = "foobar",
-            expectedKey = "foo",
-            expectedValue = "bar"
-          )
+          forAll(1 to 10) { i =>
+            wsConsumerProbe.expectWsConsumerKeyValueResult[String, String](
+              expectedTopic = "foobar",
+              expectedKey = s"foo-$i",
+              expectedValue = s"bar-$i"
+            )
+          }
 
         }
       }
