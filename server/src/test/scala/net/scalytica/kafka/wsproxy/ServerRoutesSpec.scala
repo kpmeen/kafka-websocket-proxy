@@ -4,6 +4,11 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
 import net.manub.embeddedkafka.schemaregistry._
+import net.scalytica.kafka.wsproxy.models.Formats.{
+  FormatType,
+  NoType,
+  StringType
+}
 import net.scalytica.test._
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Minutes, Span}
@@ -18,6 +23,7 @@ class ServerRoutesSpec
     with ScalaFutures
     with ScalatestRouteTest
     with WSProxySpecLike
+    with TestDataGenerators
     with EmbeddedKafka {
 
   implicit override val patienceConfig: PatienceConfig =
@@ -27,34 +33,25 @@ class ServerRoutesSpec
 
   import TestRoutes.{serverErrorHandler, serverRejectionHandler}
 
-  private[this] def newProducerKeyValueRecords(num: Int): Seq[String] = {
-    (1 to num).map { i =>
-      s"""{
-         |  "key": {
-         |    "value": "foo-$i",
-         |    "format": "string"
-         |  },
-         |  "value": {
-         |    "value": "bar-$i",
-         |    "format": "string"
-         |  }
-         |}""".stripMargin
-    }
-  }
-
   def produce(
-      inPath: String,
+      topic: String,
+      keyType: FormatType,
+      valType: FormatType,
       routes: Route,
-      numMessages: Int = 1
+      messages: Seq[String]
   )(implicit wsClient: WSProbe): Unit = {
-    WS(inPath, wsClient.flow) ~> routes ~> check {
+    val baseUri =
+      s"/socket/in?topic=$topic&valType=${valType.name}"
+
+    val uri =
+      if (keyType != NoType) baseUri + s"&keyType=${keyType.name}" else baseUri
+
+    WS(uri, wsClient.flow) ~> routes ~> check {
       isWebSocketUpgrade mustBe true
 
-      val msgs = newProducerKeyValueRecords(numMessages)
-
-      forAll(msgs) { msg =>
+      forAll(messages) { msg =>
         wsClient.sendMessage(msg)
-        wsClient.expectWsProducerResult("foobar")
+        wsClient.expectWsProducerResult(topic)
       }
       wsClient.sendCompletion()
       wsClient.expectCompletion()
@@ -72,46 +69,56 @@ class ServerRoutesSpec
       }
     }
 
-    "set up a WebSocket connection for producing messages" in
+    "set up a WebSocket connection for producing key value messages" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val wsCfg = applicationTestConfig(kcfg.kafkaPort)
 
-        val routes            = Route.seal(TestRoutes.routes)
         implicit val wsClient = WSProbe()
+        val routes            = Route.seal(TestRoutes.routes)
+        val messages          = producerKeyValueJson(1)
 
-        produce(
-          "/socket/in?topic=foobar&keyType=string&valType=string",
-          routes
-        )
+        produce("test-topic-1", StringType, StringType, routes, messages)
       }
 
-    "set up a WebSocket connection for consuming messages" in
+    "set up a WebSocket connection for producing value messages" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val wsCfg = applicationTestConfig(kcfg.kafkaPort)
 
-        val routes                   = Route.seal(TestRoutes.routes)
-        val producerProbe            = WSProbe()
+        implicit val wsClient = WSProbe()
+        val routes            = Route.seal(TestRoutes.routes)
+        val messages          = producerValueJson(1)
+
+        produce("test-topic-2", NoType, StringType, routes, messages)
+      }
+
+    "set up a WebSocket connection for consuming key value messages" in
+      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
+        implicit val wsCfg = applicationTestConfig(kcfg.kafkaPort)
+
         implicit val wsConsumerProbe = WSProbe()
+        val producerProbe            = WSProbe()
+        val routes                   = Route.seal(TestRoutes.routes)
+        val topic                    = "test-topic-3"
 
         produce(
-          inPath = "/socket/in?topic=foobar&keyType=string&valType=string",
+          topic = topic,
+          keyType = StringType,
+          valType = StringType,
           routes = routes,
-          numMessages = 10
-        )(
-          producerProbe
-        )
+          messages = producerKeyValueJson(10)
+        )(producerProbe)
 
         val outPath = "/socket/out?" +
-          "clientId=test" +
-          "&groupId=test-group" +
-          "&topic=foobar" +
+          "clientId=test-3" +
+          "&groupId=test-group-3" +
+          s"&topic=$topic" +
           "&keyType=string" +
           "&valType=string" +
           "&autoCommit=false"
 
         import net.manub.embeddedkafka.Codecs.stringDeserializer
 
-        val (rk, rv) = consumeFirstKeyedMessageFrom[String, String]("foobar")
+        val (rk, rv) = consumeFirstKeyedMessageFrom[String, String](topic)
         rk mustBe "foo-1"
         rv mustBe "bar-1"
 
@@ -120,8 +127,49 @@ class ServerRoutesSpec
 
           forAll(1 to 10) { i =>
             wsConsumerProbe.expectWsConsumerKeyValueResult[String, String](
-              expectedTopic = "foobar",
+              expectedTopic = topic,
               expectedKey = s"foo-$i",
+              expectedValue = s"bar-$i"
+            )
+          }
+
+        }
+      }
+
+    "set up a WebSocket connection for consuming value messages" in
+      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
+        implicit val wsCfg = applicationTestConfig(kcfg.kafkaPort)
+
+        implicit val wsConsumerProbe = WSProbe()
+        val producerProbe            = WSProbe()
+        val routes                   = Route.seal(TestRoutes.routes)
+        val topic                    = "test-topic-4"
+
+        produce(
+          topic = topic,
+          keyType = NoType,
+          valType = StringType,
+          routes = routes,
+          messages = producerValueJson(10)
+        )(producerProbe)
+
+        val outPath = "/socket/out?" +
+          "clientId=test-4" +
+          "&groupId=test-group-4" +
+          s"&topic=$topic" +
+          "&valType=string" +
+          "&autoCommit=false"
+
+        import net.manub.embeddedkafka.Codecs.stringDeserializer
+
+        consumeFirstMessageFrom[String](topic) mustBe "bar-1"
+
+        WS(outPath, wsConsumerProbe.flow) ~> routes ~> check {
+          isWebSocketUpgrade mustBe true
+
+          forAll(1 to 10) { i =>
+            wsConsumerProbe.expectWsConsumerValueResult[String](
+              expectedTopic = topic,
               expectedValue = s"bar-$i"
             )
           }

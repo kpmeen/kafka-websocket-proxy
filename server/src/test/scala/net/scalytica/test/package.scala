@@ -30,7 +30,8 @@ package object test {
         case Success(t) ⇒ t
         case Failure(ex) ⇒
           throw new RuntimeException(
-            "Trying to await result of failed Future, see the cause for the original problem.",
+            "Trying to await result of failed Future, " +
+              "see the cause for the original problem.",
             ex
           )
       }
@@ -56,7 +57,7 @@ package object test {
               js.as[WsProducerResult] match {
                 case Left(err) => throw err
                 case Right(actual) =>
-                  actual.topic mustBe "foobar"
+                  actual.topic mustBe expectedTopic
                   actual.offset mustBe >=(0L)
                   actual.partition mustBe >=(0)
               }
@@ -113,6 +114,17 @@ package object test {
             s"""Expected TextMessage but got BinaryMessage"""
           )
       }
+    }
+
+    def expectWsConsumerValueResult[V](
+        expectedTopic: String,
+        expectedValue: V
+    )(
+        implicit
+        mat: Materializer,
+        vdec: Decoder[V]
+    ): Assertion = {
+      expectWsConsumerKeyValueResult[Unit, V](expectedTopic, (), expectedValue)
     }
 
   }

@@ -3,6 +3,7 @@ package net.scalytica.kafka.wsproxy.consumer
 import akka.actor.typed.{ActorRef, Behavior}
 import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.kafka.ConsumerMessage.Committable
+import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.models.{
   Partition,
   WsCommit,
@@ -46,36 +47,47 @@ object CommitHandler {
   case class GetStack(sender: ActorRef[Stack])     extends Protocol
 
   /** Behaviour initialising the message commit stack */
-  val commitStack: Behavior[Protocol] = committableStack()
+  def commitStack(implicit cfg: AppCfg): Behavior[Protocol] = committableStack()
 
   /**
    * Adds a new [[Uncommitted]] entry to the [[Stack]]
    *
    * @param stack the stack to add the [[Uncommitted]] data to
-   * @param rec the [[WsConsumerRecord]] to derive an [[Uncommitted]] from.
+   * @param record the [[WsConsumerRecord]] to derive an [[Uncommitted]] from.
    * @return An option with the new stack or empty if no offset was found.
    */
   private[this] def stash(
       stack: Stack,
-      rec: WsConsumerRecord[_, _]
-  )(implicit ctx: ActorContext[Protocol]): Option[Stack] = {
+      record: WsConsumerRecord[_, _]
+  )(
+      implicit
+      cfg: AppCfg,
+      ctx: ActorContext[Protocol]
+  ): Option[Stack] = {
     def addToStack(partition: Partition, uncommitted: Uncommitted): Stack = {
       stack
         .find(_._1 == partition)
         .map { _ =>
           stack
             .get(partition)
-            .map(pStack => stack.updated(partition, pStack :+ uncommitted))
+            .map { pStack =>
+              val subStack =
+                pStack.drop(
+                  Math.abs(cfg.commitHandler.maxStackSize - pStack.size)
+                ) :+ uncommitted
+
+              stack.updated(partition, subStack)
+            }
             .getOrElse(stack)
         }
         .getOrElse(stack + (partition -> List(uncommitted)))
     }
 
-    rec.committableOffset.map { co =>
+    record.committableOffset.map { co =>
       // Append the uncommitted message at the END of the stack
       val next =
-        addToStack(rec.partition, Uncommitted(rec.wsProxyMessageId, co))
-      ctx.log.debug(s"STASHED ${rec.wsProxyMessageId} to stack")
+        addToStack(record.partition, Uncommitted(record.wsProxyMessageId, co))
+      ctx.log.debug(s"STASHED ${record.wsProxyMessageId} to stack")
       next
     }
   }
@@ -91,6 +103,7 @@ object CommitHandler {
    */
   private[this] def commit(stack: Stack, msgId: WsMessageId)(
       implicit
+      cfg: AppCfg,
       ec: ExecutionContext,
       ctx: ActorContext[Protocol]
   ): Option[Stack] = {
@@ -98,12 +111,12 @@ object CommitHandler {
       .find(_._2.exists(_.wsProxyMsgId == msgId))
       .map {
         case (p, s) =>
-          val reduced = s.dropWhile(_.wsProxyMsgId != msgId).tail
-          stack.updated(p, reduced) -> reduced
+          val reduced = s.dropWhile(_.wsProxyMsgId != msgId)
+          stack.updated(p, reduced.tail) -> reduced.headOption
       }
       .flatMap {
-        case (nextStack, reducedStack) =>
-          reducedStack.headOption.map { u =>
+        case (nextStack, maybeCommittable) =>
+          maybeCommittable.map { u =>
             u.committable.commitScaladsl().foreach { _ =>
               ctx.log.debug(s"COMMITTED $msgId and cleaned up stack")
             }
@@ -124,7 +137,7 @@ object CommitHandler {
    */
   private[this] def committableStack(
       stack: Stack = EmptyStack
-  ): Behavior[Protocol] =
+  )(implicit cfg: AppCfg): Behavior[Protocol] =
     Behaviors.setup { implicit ctx =>
       implicit val ec = implicitly(ctx.executionContext)
       Behaviors.receiveMessage {
@@ -140,6 +153,7 @@ object CommitHandler {
           Behaviors.same
 
         case GetStack(to) =>
+          ctx.log.debug(stack.mkString("\n"))
           to ! stack
           Behaviors.same
 
