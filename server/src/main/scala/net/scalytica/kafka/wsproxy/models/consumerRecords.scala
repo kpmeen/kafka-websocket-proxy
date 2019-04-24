@@ -2,7 +2,9 @@ package net.scalytica.kafka.wsproxy.models
 
 import akka.Done
 import akka.kafka.ConsumerMessage
+import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroConsumerRecord
 import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails
+import org.apache.kafka.common.serialization.Serializer
 
 import scala.concurrent.Future
 
@@ -33,6 +35,52 @@ sealed abstract class WsConsumerRecord[+K, +V](
 
   def commit(): Future[Done] =
     committableOffset.map(_.commitScaladsl()).getOrElse(Future.successful(Done))
+
+  def toAvroRecord[Key >: K, Value >: V](
+      implicit
+      keySer: Serializer[Key],
+      valSer: Serializer[Value]
+  ): AvroConsumerRecord = {
+    AvroConsumerRecord(
+      wsProxyMessageId = wsProxyMessageId.value,
+      topic = topic.value,
+      partition = partition.value,
+      offset = offset.value,
+      timestamp = timestamp.value,
+      key = key.map(ovd => keySer.serialize(topic.value, ovd.value)),
+      value = valSer.serialize(topic.value, value.value)
+    )
+  }
+}
+
+object WsConsumerRecord {
+
+  def fromAvro(
+      avro: AvroConsumerRecord
+  ): WsConsumerRecord[Array[Byte], Array[Byte]] = {
+    avro.key match {
+      case Some(key) =>
+        ConsumerKeyValueRecord(
+          topic = avro.topic,
+          partition = avro.partition,
+          offset = avro.offset,
+          timestamp = avro.timestamp,
+          key = OutValueDetails(key, Option(Formats.AvroType)),
+          value = OutValueDetails(avro.value, Option(Formats.AvroType)),
+          committableOffset = None
+        )
+
+      case None =>
+        ConsumerValueRecord(
+          topic = avro.topic,
+          partition = avro.partition,
+          offset = avro.offset,
+          timestamp = avro.timestamp,
+          value = OutValueDetails(avro.value, Option(Formats.AvroType)),
+          committableOffset = None
+        )
+    }
+  }
 
 }
 

@@ -47,6 +47,7 @@ lazy val server = (project in file("server"))
       Akka.AkkaHttp,
       Akka.AkkaStreamKafka,
       Avro.Avro4sKafka,
+      Kafka.AvroSerializer,
       Kafka.Kafka,
       Kafka.Clients,
       Kafka.MonitoringInterceptors,

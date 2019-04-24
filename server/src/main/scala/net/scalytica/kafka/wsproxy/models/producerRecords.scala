@@ -1,5 +1,6 @@
 package net.scalytica.kafka.wsproxy.models
 
+import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroProducerRecord
 import net.scalytica.kafka.wsproxy.models.ValueDetails.InValueDetails
 
 /**
@@ -18,6 +19,27 @@ sealed trait WsProducerRecord[+K, +V] {
 
   def isEmpty: Boolean
   def nonEmpty: Boolean = !isEmpty
+
+}
+
+object WsProducerRecord {
+
+  def fromAvro(
+      avro: AvroProducerRecord
+  ): WsProducerRecord[Array[Byte], Array[Byte]] = {
+    avro.key
+      .map { k =>
+        ProducerKeyValueRecord[Array[Byte], Array[Byte]](
+          key = InValueDetails(k, Formats.AvroType),
+          value = InValueDetails(avro.value, Formats.AvroType)
+        )
+      }
+      .getOrElse {
+        ProducerValueRecord[Array[Byte]](
+          value = InValueDetails(avro.value, Formats.AvroType)
+        )
+      }
+  }
 
 }
 

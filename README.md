@@ -43,6 +43,7 @@ file. Where the following parameters can be adjusted:
 |:---                                                |:----                           |:------------:|:-----         |
 | kafka.ws.proxy.server.port                         | WSPROXY_PORT                   | `8078`       | Port where the server endpoints will be exposed |
 | kafka.ws.proxy.server.kafka-bootstrap-urls         | WSPROXY_KAFKA_BOOTSTRAP_URLS   |              | An array of strings with URLs to the Kafka brokers in the form `<host>:<port>` |
+| kafka.ws.proxy.server.schema-registry-url          | WSPROXY_SCHEMA_REGISTRY_URL    |              | URLs for the Confluent Schema Registry |
 | kafka.ws.proxy.consumer.default-rate-limit         | WSPROXY_DEFAULT_RATE_LIMIT     | `0`          | The maximum allowed throughput of data through a socket in bytes/second. A value of `0` means unlimited throughput. |
 | kafka.ws.proxy.consumer.default-batch-size         | WSPROXY_DEFAULT_BATCH_SIZE     | `0`          | The number of messages to include per batch when consuming data. This property has no meaning without rate limiting turned on. A value of `0` means there will be no batching. |
 | kafka.ws.proxy.commit-handler.max-stack-size       | WSPROXY_CH_MAX_STACK_SIZE      | `200`        | The maximum number of uncommitted messages, per partition, that will be kept track of in the commit handler stack. |

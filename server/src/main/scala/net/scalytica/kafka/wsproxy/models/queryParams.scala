@@ -1,5 +1,6 @@
 package net.scalytica.kafka.wsproxy.models
 
+import net.scalytica.kafka.wsproxy.SocketProtocol.SocketPayload
 import net.scalytica.kafka.wsproxy.models.Formats.FormatType
 import org.apache.kafka.clients.consumer.OffsetResetStrategy
 
@@ -21,6 +22,7 @@ case class SocketParams(
  * @param clientId the clientId to use for the Kafka consumer.
  * @param groupId the groupId to use for the Kafka consumer.
  * @param topic the Kafka topic to subscribe to.
+ * @param socketPayload the type of payload to expect through the socket.
  * @param keyType optional type for the message keys in the topic.
  * @param valType the type for the message values in the topic.
  * @param offsetResetStrategy the offset strategy to use. Defaults to EARLIEST
@@ -32,8 +34,9 @@ case class OutSocketArgs(
     clientId: String,
     groupId: Option[String],
     topic: String,
+    socketPayload: SocketPayload,
     keyType: Option[Formats.FormatType] = None,
-    valType: Formats.FormatType = Formats.StringType,
+    valType: Formats.FormatType,
     offsetResetStrategy: OffsetResetStrategy = OffsetResetStrategy.EARLIEST,
     rateLimit: Option[Int] = None,
     batchSize: Option[Int] = None,
@@ -47,6 +50,7 @@ object OutSocketArgs {
       clientId: String,
       groupId: Option[String],
       topicName: String,
+      socketPayload: SocketPayload,
       keyTpe: Option[Formats.FormatType],
       valTpe: Formats.FormatType,
       offsetResetStrategy: OffsetResetStrategy,
@@ -57,6 +61,7 @@ object OutSocketArgs {
     clientId = clientId,
     groupId = groupId,
     topic = topicName,
+    socketPayload = socketPayload,
     keyType = keyTpe,
     valType = valTpe,
     offsetResetStrategy = offsetResetStrategy,
@@ -71,11 +76,13 @@ object OutSocketArgs {
  * Encodes configuration params for an inbound WebSocket stream.
  *
  * @param topic the Kafka topic to subscribe to.
+ * @param socketPayload the type of payload to expect through the socket.
  * @param keyType optional type for the message keys in the topic.
  * @param valType the type for the message values in the topic.
  */
 case class InSocketArgs(
     topic: String,
+    socketPayload: SocketPayload,
     keyType: Option[Formats.FormatType] = None,
     valType: Formats.FormatType = Formats.StringType
 )
@@ -83,16 +90,31 @@ case class InSocketArgs(
 object InSocketArgs {
 
   def fromOptQueryParams(
-      t: Option[String],
-      kt: Option[FormatType],
-      vt: Option[FormatType]
+      topicName: Option[String],
+      socketPayload: SocketPayload,
+      keyTpe: Option[FormatType],
+      valTpe: Option[FormatType]
   ): Option[InSocketArgs] =
-    t.map(t => InSocketArgs(t, kt, vt.getOrElse(Formats.StringType)))
+    topicName.map { t =>
+      InSocketArgs(
+        topic = t,
+        socketPayload = socketPayload,
+        keyType = keyTpe,
+        valType = valTpe.getOrElse(Formats.StringType)
+      )
+    }
 
   def fromQueryParams(
-      t: String,
-      kt: Option[FormatType],
-      vt: FormatType
-  ): InSocketArgs = InSocketArgs(t, kt, vt)
+      topicName: String,
+      socketPayload: SocketPayload,
+      keyTpe: Option[FormatType],
+      valTpe: FormatType
+  ): InSocketArgs =
+    InSocketArgs(
+      topic = topicName,
+      socketPayload = socketPayload,
+      keyType = keyTpe,
+      valType = valTpe
+    )
 
 }
