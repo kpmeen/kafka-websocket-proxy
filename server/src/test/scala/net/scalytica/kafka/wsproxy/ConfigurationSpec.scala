@@ -12,6 +12,8 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
       |  server {
       |    port = 8078
       |    kafka-bootstrap-urls = ["localhost:29092"]
+      |    schema-registry-url = "http://localhost:28081"
+      |    auto-register-schemas = true
       |  }
       |
       |  consumer {
@@ -33,6 +35,8 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
       |  server {
       |    port = 8078
       |    kafka-bootstrap-urls = "localhost:29092"
+      |    schema-registry-url = "http://localhost:28081"
+      |    auto-register-schemas = true
       |  }
       |
       |  consumer {
@@ -57,6 +61,8 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
       cfg.consumer.defaultBatchSize mustBe 0
       cfg.consumer.defaultRateLimit mustBe 0
       cfg.server.kafkaBootstrapUrls mustBe Seq("localhost:29092")
+      cfg.server.schemaRegistryUrl mustBe Some("http://localhost:28081")
+      cfg.server.autoRegisterSchemas mustBe true
     }
 
     "fail when trying to load an invalid configuration" in {

@@ -11,6 +11,8 @@ import com.typesafe.scalalogging.Logger
 import io.circe.Decoder
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.ProducerInterceptorClass
+import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroProducerRecord
+import net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde
 import net.scalytica.kafka.wsproxy.models._
 import org.apache.kafka.clients.producer.ProducerConfig._
 import org.apache.kafka.clients.producer.ProducerRecord
@@ -132,7 +134,7 @@ object WsProducer {
    *         down-stream for further processing. For example sending the
    *         metadata to the external web client for it to process locally.
    */
-  def produce[K, V](args: InSocketArgs)(
+  def produceJson[K, V](args: InSocketArgs)(
       implicit
       cfg: AppCfg,
       as: ActorSystem,
@@ -152,11 +154,42 @@ object WsProducer {
       .mapAsync(1)(_.toStrict(2 seconds).map(_.text))
       .map(str => parseInput[K, V](str))
       .filter(_.nonEmpty)
-      .map { wsm =>
-        val record = asKafkaProducerRecord(args.topic, wsm)
+      .map { wpr =>
+        val record = asKafkaProducerRecord(args.topic, wpr)
         ProducerMessage.Message(record, record)
       }
       .via(Producer.flexiFlow(producerSettingsWithKey[K, V]))
+      .map(r => WsProducerResult.fromProducerResults(r))
+      .flatMapConcat(seqToSource)
+  }
+
+  def produceAvro[K, V](args: InSocketArgs)(
+      implicit
+      cfg: AppCfg,
+      as: ActorSystem,
+      mat: ActorMaterializer,
+      serde: WsProxyAvroSerde[AvroProducerRecord]
+  ): Flow[Message, WsProducerResult, NotUsed] = {
+    implicit val ec: ExecutionContext = as.dispatcher
+
+    import net.scalytica.kafka.wsproxy.codecs.BasicSerdes.ByteArrSerializer
+
+    Flow[Message]
+      .mapConcat {
+        case tm: TextMessage   => tm.textStream.runWith(Sink.ignore); Nil
+        case bm: BinaryMessage => BinaryMessage(bm.dataStream) :: Nil
+      }
+      .mapAsync(1)(_.toStrict(2 seconds).map(_.data))
+      .map(bs => serde.deserialize("", bs.toArray))
+      .map { wpr =>
+        val record =
+          asKafkaProducerRecord(args.topic, WsProducerRecord.fromAvro(wpr))
+        ProducerMessage.Message(record, record)
+
+      }
+      .via(
+        Producer.flexiFlow(producerSettingsWithKey[Array[Byte], Array[Byte]])
+      )
       .map(r => WsProducerResult.fromProducerResults(r))
       .flatMapConcat(seqToSource)
   }

@@ -1,6 +1,7 @@
 package net.scalytica.kafka.wsproxy.models
 
 import akka.kafka.ProducerMessage
+import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroProducerResult
 
 /**
  * Type that wraps metadata about messages committed to Kafka.
@@ -15,7 +16,18 @@ case class WsProducerResult(
     partition: Int,
     offset: Long,
     timestamp: Long
-)
+) {
+
+  def toAvro: AvroProducerResult = {
+    AvroProducerResult(
+      topic = topic,
+      partition = partition,
+      offset = offset,
+      timestamp = timestamp
+    )
+  }
+
+}
 
 object WsProducerResult {
 

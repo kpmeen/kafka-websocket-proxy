@@ -10,6 +10,7 @@ import akka.kafka.scaladsl.Consumer
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.stream.typed.scaladsl.ActorSink
+import akka.util.ByteString
 import akka.{Done, NotUsed}
 import com.typesafe.scalalogging.Logger
 import io.circe.Encoder
@@ -17,8 +18,12 @@ import io.circe.Printer.noSpaces
 import io.circe.parser.parse
 import io.circe.syntax._
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.SocketProtocol.{AvroPayload, JsonPayload}
+import net.scalytica.kafka.wsproxy.avro.SchemaTypes._
+import net.scalytica.kafka.wsproxy.avro.SchemaTypes.Implicits._
 import net.scalytica.kafka.wsproxy.codecs.Decoders._
 import net.scalytica.kafka.wsproxy.codecs.Encoders._
+import net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde
 import net.scalytica.kafka.wsproxy.consumer.{CommitHandler, WsConsumer}
 import net.scalytica.kafka.wsproxy.models.{
   Formats,
@@ -26,13 +31,28 @@ import net.scalytica.kafka.wsproxy.models.{
   WsCommit,
   WsConsumerRecord
 }
+import org.apache.kafka.common.serialization.Serializer
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 
-trait OutboundWebSocket {
+trait OutboundWebSocket extends WithSchemaRegistryConfig {
 
   private[this] val logger = Logger(getClass)
+
+  private[this] def avroCommitSerde(implicit cfg: AppCfg) =
+    cfg.server.schemaRegistryUrl
+      .map { url =>
+        WsProxyAvroSerde[AvroCommit](schemaRegistryCfg(url))
+      }
+      .getOrElse(WsProxyAvroSerde[AvroCommit]())
+
+  private[this] def avroConsumerRecordSerde(implicit cfg: AppCfg) =
+    cfg.server.schemaRegistryUrl
+      .map { url =>
+        WsProxyAvroSerde[AvroConsumerRecord](schemaRegistryCfg(url))
+      }
+      .getOrElse(WsProxyAvroSerde[AvroConsumerRecord]())
 
   /**
    * Request handler for the outbound Kafka WebSocket connection.
@@ -55,7 +75,14 @@ trait OutboundWebSocket {
       if (args.autoCommit) None
       else Some(as.spawn(CommitHandler.commitStack, args.clientId))
 
-    val sink   = prepareSink(commitHandlerRef)
+    val messageParser = args.socketPayload match {
+      case JsonPayload => messageToString
+      case AvroPayload => messageToByteString
+    }
+
+    val sink = prepareSink(messageParser, commitHandlerRef)
+    // TODO: Setup JSON or Avro sink based on the value of output
+    //       format type in OutSocketArgs.
     val source = kafkaSource(args, commitHandlerRef)
 
     handleWebSocketMessages {
@@ -84,23 +111,24 @@ trait OutboundWebSocket {
    *   of [[WsCommit]] messages. These are then passed on to an Actor with
    *   [[CommitHandler]] behaviour.
    *
+   * @param messageParser parser to use for decoding incoming messages.
    * @param aref an optional [[ActorRef]] to a [[CommitHandler]].
    * @param mat  the [[ActorMaterializer]] to use
    * @param ec   the [[ExecutionContext]] to use
    * @return a [[Sink]] for consuming [[Message]]s
    * @see [[CommitHandler.commitStack]]
    */
-  private[this] def prepareSink(aref: Option[ActorRef[CommitHandler.Protocol]])(
+  private[this] def prepareSink(
+      messageParser: Flow[Message, WsCommit, NotUsed],
+      aref: Option[ActorRef[CommitHandler.Protocol]]
+  )(
       implicit
       mat: ActorMaterializer,
       ec: ExecutionContext
   ): Sink[Message, _] =
     aref
       .map { ar =>
-        // A commit handler is defined, so we should accept commit messages.
-        messageToString
-          .map(msg => parse(msg).flatMap(_.as[WsCommit]))
-          .collect { case Right(res) => res }
+        messageParser
           .map(wc => CommitHandler.Commit(wc))
           .to(
             ActorSink.actorRef[CommitHandler.Protocol](
@@ -127,18 +155,37 @@ trait OutboundWebSocket {
       implicit
       mat: ActorMaterializer,
       ec: ExecutionContext
-  ): Flow[Message, String, NotUsed] =
+  ): Flow[Message, WsCommit, NotUsed] =
     Flow[Message]
       .mapConcat {
         case tm: TextMessage   => TextMessage(tm.textStream) :: Nil
         case bm: BinaryMessage => bm.dataStream.runWith(Sink.ignore); Nil
       }
       .mapAsync(1)(_.toStrict(2 seconds).map(_.text))
+      .map(msg => parse(msg).flatMap(_.as[WsCommit]))
+      .collect { case Right(res) => res }
+
+  private[this] def messageToByteString(
+      implicit
+      cfg: AppCfg,
+      mat: ActorMaterializer,
+      ec: ExecutionContext
+  ): Flow[Message, WsCommit, NotUsed] =
+    Flow[Message]
+      .mapConcat {
+        case tm: TextMessage   => tm.textStream.runWith(Sink.ignore); Nil
+        case bm: BinaryMessage => BinaryMessage(bm.dataStream) :: Nil
+      }
+      .mapAsync(1)(_.toStrict(2 seconds).map(_.data))
+      .map(msg => avroCommitSerde.deserialize("", msg.toArray[Byte]))
+      .map(WsCommit.fromAvro)
 
   /**
    * The Kafka Source where messages are consumed.
    *
    * @param args the output arguments to pass on to the consumer.
+   * @param cfg the application configuration.
+   * @param as the actor system to use.
    * @return a [[Source]] producing [[TextMessage]]s for the outbound WebSocket.
    */
   private[this] def kafkaSource(
@@ -148,42 +195,76 @@ trait OutboundWebSocket {
       implicit
       cfg: AppCfg,
       as: ActorSystem
-  ): Source[TextMessage, Consumer.Control] = {
+  ): Source[Message, Consumer.Control] = {
     val keyTpe = args.keyType.getOrElse(Formats.NoType)
     val valTpe = args.valType
 
-    // Lifting the FormatType types into aliases for ease of use.
-    type Key   = keyTpe.Aux
-    type Value = valTpe.Aux
+    type Key = keyTpe.Aux
+    type Val = valTpe.Aux
 
-    // Kafka deserializers
-    implicit val keySer = keyTpe.deserializer
-    implicit val valSer = valTpe.deserializer
+    // Kafka serdes
+    implicit val keySer = keyTpe.serializer
+    implicit val valSer = valTpe.serializer
+    implicit val keyDes = keyTpe.deserializer
+    implicit val valDes = valTpe.deserializer
     // JSON encoders
-    implicit val keyEnc: Encoder[Key]   = keyTpe.encoder
-    implicit val valEnc: Encoder[Value] = valTpe.encoder
-    implicit val recEnc: Encoder[WsConsumerRecord[Key, Value]] =
-      wsConsumerRecordEncoder[Key, Value]
+    implicit val keyEnc: Encoder[Key] = keyTpe.encoder
+    implicit val valEnc: Encoder[Val] = valTpe.encoder
+    implicit val recEnc: Encoder[WsConsumerRecord[Key, Val]] =
+      wsConsumerRecordEncoder[Key, Val]
+
+    val msgConverter = socketFormatConverter[Key, Val](args)
 
     if (args.autoCommit) {
       // if auto-commit is enabled, we don't need to handle manual commits.
       WsConsumer
-        .consumeAutoCommit[Key, Value](args.topic, args.clientId, args.groupId)
-        .map(cr => TextMessage(cr.asJson.pretty(noSpaces)))
+        .consumeAutoCommit[Key, Val](args.topic, args.clientId, args.groupId)
+        .map(cr => msgConverter(cr))
     } else {
       // if auto-commit is disabled, we need to ensure messages are sent to a
       // commit handler so its offset can be committed manually by the client.
-      val commitSink =
-        commitHandlerRef.map(manualCommitSink).getOrElse(Sink.ignore)
+      val sink = commitHandlerRef.map(manualCommitSink).getOrElse(Sink.ignore)
 
       WsConsumer
-        .consumeManualCommit[Key, Value](
-          args.topic,
-          args.clientId,
-          args.groupId
-        )
-        .alsoTo(commitSink) // also send each message to the commit handler sink
-        .map(cr => TextMessage(cr.asJson.pretty(noSpaces)))
+        .consumeManualCommit[Key, Val](args.topic, args.clientId, args.groupId)
+        .alsoTo(sink) // also send each message to the commit handler sink
+        .map(cr => msgConverter(cr))
+    }
+  }
+
+  /**
+   * Helper function that translates a [[WsConsumerRecord]] into the correct
+   * type of [[Message]], based on the {{{args}}}.
+   *
+   * @param args [[OutSocketArgs]] for building the outbound WebSocket.
+   * @param keySer the key serializer
+   * @param valSer the value serializer
+   * @param keyEnc JSON encoder for the key type
+   * @param valEnc JSON encoder for the value type
+   * @param recEnc JSON encoder for [[WsConsumerRecord]]
+   * @tparam K the key type
+   * @tparam V the value type
+   * @return the data as a [[Message]].
+   */
+  private[this] def socketFormatConverter[K, V](
+      args: OutSocketArgs
+  )(
+      implicit
+      cfg: AppCfg,
+      keySer: Serializer[K],
+      valSer: Serializer[V],
+      keyEnc: Encoder[K],
+      valEnc: Encoder[V],
+      recEnc: Encoder[WsConsumerRecord[K, V]]
+  ): WsConsumerRecord[K, V] => Message = args.socketPayload match {
+    case AvroPayload => { cr =>
+      val byteString = ByteString(
+        avroConsumerRecordSerde.serialize(args.topic, cr.toAvroRecord[K, V])
+      )
+      BinaryMessage(byteString)
+    }
+    case JsonPayload => { cr =>
+      TextMessage(cr.asJson.pretty(noSpaces))
     }
   }
 

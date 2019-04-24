@@ -1,34 +1,39 @@
 package net.scalytica.test
 
-import io.confluent.kafka.serializers.AbstractKafkaAvroSerDeConfig.{
-  AUTO_REGISTER_SCHEMAS,
-  SCHEMA_REGISTRY_URL_CONFIG
-}
+import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
+import akka.util.ByteString
 import net.manub.embeddedkafka.ConsumerExtensions.ConsumerRetryConfig
 import net.manub.embeddedkafka.schemaregistry.EmbeddedKafkaConfig
 import net.scalytica.kafka.wsproxy.Configuration
+import net.scalytica.kafka.wsproxy.SocketProtocol.AvroPayload
+import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
+  AvroConsumerRecord,
+  AvroProducerRecord,
+  AvroProducerResult
+}
+import net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde
+import net.scalytica.kafka.wsproxy.models.Formats
+import net.scalytica.kafka.wsproxy.models.Formats._
+import org.scalatest.Inspectors.forAll
+import org.scalatest.{MustMatchers, Suite}
+
 import scala.concurrent.duration._
 
-trait WSProxySpecLike extends FileLoader {
+trait WSProxySpecLike
+    extends FileLoader
+    with ScalatestRouteTest
+    with MustMatchers { self: Suite =>
 
   // scalastyle:off magic.number
   implicit val consumerRetryConfig: ConsumerRetryConfig =
-    ConsumerRetryConfig(maximumAttempts = 30, poll = 50 millis)
+    ConsumerRetryConfig(30, 50.millis)
   // scalastyle:on magic.number
 
   val embeddedKafkaConfig = EmbeddedKafkaConfig(
     kafkaPort = 0,
     zooKeeperPort = 0,
     schemaRegistryPort = 0
-  )
-
-  def serverPort(port: Int): String = s"localhost:$port"
-
-  implicit def registryConfig(
-      implicit schemaRegistryPort: Int
-  ): Map[String, Any] = Map(
-    SCHEMA_REGISTRY_URL_CONFIG -> serverPort(schemaRegistryPort),
-    AUTO_REGISTER_SCHEMAS      -> true
   )
 
   lazy val defaultApplicationTestConfig =
@@ -39,7 +44,83 @@ trait WSProxySpecLike extends FileLoader {
       schemaRegistryPort: Option[Int] = None
   ): Configuration.AppCfg = defaultApplicationTestConfig.copy(
     server = defaultApplicationTestConfig.server.copy(
-      kafkaBootstrapUrls = List(serverPort(kafkaPort))
+      kafkaBootstrapUrls = List(serverHost(kafkaPort)),
+      schemaRegistryUrl =
+        schemaRegistryPort.map(u => s"http://${serverHost(u)}")
     )
   )
+
+  def produceJson(
+      topic: String,
+      keyType: FormatType,
+      valType: FormatType,
+      routes: Route,
+      messages: Seq[String]
+  )(implicit wsClient: WSProbe): Unit = {
+    val baseUri =
+      s"/socket/in?topic=$topic&valType=${valType.name}"
+
+    val uri =
+      if (keyType != NoType) baseUri + s"&keyType=${keyType.name}" else baseUri
+
+    WS(uri, wsClient.flow) ~> routes ~> check {
+      isWebSocketUpgrade mustBe true
+
+      forAll(messages) { msg =>
+        wsClient.sendMessage(msg)
+        wsClient.expectWsProducerResultJson(topic)
+      }
+      wsClient.sendCompletion()
+      wsClient.expectCompletion()
+    }
+  }
+
+  def avroProducerRecordSerde(
+      implicit schemaRegistryPort: Int
+  ): WsProxyAvroSerde[AvroProducerRecord] =
+    WsProxyAvroSerde[AvroProducerRecord](registryConfig)
+
+  implicit def avroProducerResultSerde(
+      implicit schemaRegistryPort: Int
+  ): WsProxyAvroSerde[AvroProducerResult] =
+    WsProxyAvroSerde[AvroProducerResult](registryConfig)
+
+  implicit def avroConsumerRecordSerde(
+      implicit schemaRegistryPort: Int
+  ): WsProxyAvroSerde[AvroConsumerRecord] =
+    WsProxyAvroSerde[AvroConsumerRecord](registryConfig)
+
+  def produceAvro(
+      topic: String,
+      routes: Route,
+      keyType: Option[FormatType],
+      messages: Seq[AvroProducerRecord]
+  )(
+      implicit
+      wsClient: WSProbe,
+      kafkaCfg: EmbeddedKafkaConfig
+  ): Unit = {
+    implicit val schemaRegPort = kafkaCfg.schemaRegistryPort
+
+    val serializer = avroProducerRecordSerde(kafkaCfg.schemaRegistryPort)
+    val baseUri =
+      s"/socket/in?" +
+        s"topic=$topic&" +
+        s"socketPayload=${AvroPayload.name}&" +
+        s"valType=${Formats.AvroType.name}"
+
+    val uri = keyType.fold(baseUri)(kt => baseUri + s"&keyType=${kt.name}")
+
+    WS(uri, wsClient.flow) ~> routes ~> check {
+      isWebSocketUpgrade mustBe true
+
+      forAll(messages) { msg =>
+        val bytes = serializer.serialize("", msg)
+        wsClient.sendMessage(ByteString(bytes))
+        wsClient.expectWsProducerResultAvro(topic)
+      }
+      wsClient.sendCompletion()
+      wsClient.expectCompletion()
+    }
+  }
 }

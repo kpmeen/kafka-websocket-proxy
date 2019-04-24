@@ -89,14 +89,13 @@ object EmptySerde
 
 /**
  * Serde for handling JSON messages. Currently built on top of the String serde.
- *
- * Fixme: Build upon the standard Kafka JSON serde?
  */
 object JsonSerde
     extends Serde[Json]
     with Serializer[Json]
     with Deserializer[Json] {
 
+  // FIXME: Build upon the standard Kafka JSON serde?
   private[this] val underlying = KSerdes.String()
 
   override def serializer()   = this

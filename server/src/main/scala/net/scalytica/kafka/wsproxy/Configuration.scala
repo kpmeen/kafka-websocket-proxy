@@ -28,7 +28,9 @@ object Configuration {
 
   final case class ServerCfg(
       port: Int,
-      kafkaBootstrapUrls: Seq[String]
+      kafkaBootstrapUrls: Seq[String],
+      schemaRegistryUrl: Option[String],
+      autoRegisterSchemas: Boolean
   )
 
   final case class ConsumerCfg(

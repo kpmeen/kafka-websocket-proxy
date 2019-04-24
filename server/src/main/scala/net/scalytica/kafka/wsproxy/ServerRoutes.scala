@@ -9,6 +9,12 @@ import akka.http.scaladsl.server.{ExceptionHandler, RejectionHandler, Route}
 import akka.stream.ActorMaterializer
 import com.typesafe.scalalogging.Logger
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
+  AvroCommit,
+  AvroConsumerRecord,
+  AvroProducerRecord,
+  AvroProducerResult
+}
 import net.scalytica.kafka.wsproxy.models.{InSocketArgs, OutSocketArgs}
 
 import scala.concurrent.ExecutionContext
@@ -21,7 +27,10 @@ trait ServerRoutes
   private[this] val logger = Logger(this.getClass)
 
   private[this] def rejectAndComplete(m: => ToResponseMarshallable) = {
-    extractRequest { request ⇒
+    extractRequest { request =>
+      logger.warn(
+        s"Request ${request.method.value} ${request.uri.toString} failed"
+      )
       extractMaterializer { implicit mat ⇒
         request.discardEntityBytes()
         complete(m)
@@ -57,6 +66,7 @@ trait ServerRoutes
       ctx: ExecutionContext
   ): Route = routesWith(inboundWebSocket, outboundWebSocket)
 
+  //scalastyle:off method.length
   def routesWith(
       inbound: InSocketArgs => Route,
       outbound: OutSocketArgs => Route
@@ -69,12 +79,48 @@ trait ServerRoutes
   ): Route = {
     pathPrefix("socket") {
       path("in") {
-        inParams(inbound)
-      } ~
-        path("out") {
-          outParams(outbound)
+        inParams(args => inbound(args))
+      } ~ path("out") {
+        outParams(args => outbound(args))
+      }
+    } ~ pathPrefix("schemas") {
+      pathPrefix("avro") {
+        pathPrefix("producer") {
+          path("record") {
+            complete(
+              HttpEntity(
+                contentType = ContentTypes.`application/json`,
+                string = AvroProducerRecord.schema.toString(true)
+              )
+            )
+          } ~ path("result") {
+            complete(
+              HttpEntity(
+                contentType = ContentTypes.`application/json`,
+                string = AvroProducerResult.schema.toString(true)
+              )
+            )
+          }
+        } ~ pathPrefix("consumer") {
+          path("record") {
+            complete(
+              HttpEntity(
+                contentType = ContentTypes.`application/json`,
+                string = AvroConsumerRecord.schema.toString(true)
+              )
+            )
+          } ~ path("commit") {
+            complete(
+              HttpEntity(
+                contentType = ContentTypes.`application/json`,
+                string = AvroCommit.schema.toString(true)
+              )
+            )
+          }
         }
+      }
     }
   }
+  //scalastyle:on method.length
 
 }
