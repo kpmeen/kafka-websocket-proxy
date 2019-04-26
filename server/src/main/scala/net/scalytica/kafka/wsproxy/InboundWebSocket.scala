@@ -24,15 +24,21 @@ trait InboundWebSocket extends WithSchemaRegistryConfig {
 
   private[this] val logger = Logger(getClass)
 
-  implicit private[this] def producerRecordSerde(implicit cfg: AppCfg) =
+  implicit private[this] def producerRecordSerde(
+      implicit cfg: AppCfg
+  ): WsProxyAvroSerde[AvroProducerRecord] = {
     cfg.server.schemaRegistryUrl
       .map(url => WsProxyAvroSerde[AvroProducerRecord](schemaRegistryCfg(url)))
       .getOrElse(WsProxyAvroSerde[AvroProducerRecord]())
+  }
 
-  implicit private[this] def producerResultSerde(implicit cfg: AppCfg) =
+  implicit private[this] def producerResultSerde(
+      implicit cfg: AppCfg
+  ): WsProxyAvroSerde[AvroProducerResult] = {
     cfg.server.schemaRegistryUrl
       .map(url => WsProxyAvroSerde[AvroProducerResult](schemaRegistryCfg(url)))
       .getOrElse(WsProxyAvroSerde[AvroProducerResult]())
+  }
 
   /**
    * Request handler for the inbound Kafka WebSocket connection, with a Kafka
@@ -67,7 +73,8 @@ trait InboundWebSocket extends WithSchemaRegistryConfig {
 
       case AvroPayload =>
         WsProducer.produceAvro[ktpe.Aux, args.valType.Aux](args).map { res =>
-          val bs = ByteString(producerResultSerde.serialize("", res.toAvro))
+          val bs =
+            ByteString.fromArray(producerResultSerde.serialize("", res.toAvro))
           BinaryMessage.Strict(bs)
         }
     }

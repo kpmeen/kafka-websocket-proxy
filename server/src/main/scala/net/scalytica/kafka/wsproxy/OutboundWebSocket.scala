@@ -40,19 +40,21 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
 
   private[this] val logger = Logger(getClass)
 
-  private[this] def avroCommitSerde(implicit cfg: AppCfg) =
+  private[this] def avroCommitSerde(
+      implicit cfg: AppCfg
+  ): WsProxyAvroSerde[AvroCommit] = {
     cfg.server.schemaRegistryUrl
-      .map { url =>
-        WsProxyAvroSerde[AvroCommit](schemaRegistryCfg(url))
-      }
+      .map(url => WsProxyAvroSerde[AvroCommit](schemaRegistryCfg(url)))
       .getOrElse(WsProxyAvroSerde[AvroCommit]())
+  }
 
-  private[this] def avroConsumerRecordSerde(implicit cfg: AppCfg) =
+  private[this] def avroConsumerRecordSerde(
+      implicit cfg: AppCfg
+  ): WsProxyAvroSerde[AvroConsumerRecord] = {
     cfg.server.schemaRegistryUrl
-      .map { url =>
-        WsProxyAvroSerde[AvroConsumerRecord](schemaRegistryCfg(url))
-      }
+      .map(url => WsProxyAvroSerde[AvroConsumerRecord](schemaRegistryCfg(url)))
       .getOrElse(WsProxyAvroSerde[AvroConsumerRecord]())
+  }
 
   /**
    * Request handler for the outbound Kafka WebSocket connection.
@@ -80,9 +82,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
       case AvroPayload => messageToByteString
     }
 
-    val sink = prepareSink(messageParser, commitHandlerRef)
-    // TODO: Setup JSON or Avro sink based on the value of output
-    //       format type in OutSocketArgs.
+    val sink   = prepareSink(messageParser, commitHandlerRef)
     val source = kafkaSource(args, commitHandlerRef)
 
     handleWebSocketMessages {
