@@ -59,8 +59,6 @@ package object test {
 
   implicit class WsProbeExtensions(probe: WSProbe) extends MustMatchers {
 
-    // TODO Add Avro specific assertions
-
     def expectWsProducerResultJson(
         expectedTopic: String
     )(implicit mat: Materializer): Assertion = {

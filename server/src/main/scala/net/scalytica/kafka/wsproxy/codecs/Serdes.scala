@@ -95,7 +95,6 @@ object JsonSerde
     with Serializer[Json]
     with Deserializer[Json] {
 
-  // FIXME: Build upon the standard Kafka JSON serde?
   private[this] val underlying = KSerdes.String()
 
   override def serializer()   = this
