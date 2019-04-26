@@ -90,7 +90,7 @@ function stop() {
     compose_images=$(docker-compose images -q)
     docker-compose down --rmi local
     echo "$compose_images" | xargs docker rmi
-    docker volume prune
+    docker volume prune -f
   else
     docker-compose stop
   fi
