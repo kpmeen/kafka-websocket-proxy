@@ -51,6 +51,8 @@ object Configuration {
     loadString(arg.map(t => s"${t._1} = ${t._2}").mkString("\n"))
   }
 
+  def loadTypesafeConfig(): Config = ConfigFactory.load()
+
   def loadString(str: String): AppCfg =
     loadConfig(ConfigFactory.parseString(str))
 

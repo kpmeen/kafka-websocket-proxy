@@ -2,7 +2,9 @@ package net.scalytica.kafka.wsproxy
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
+import akka.http.scaladsl.settings.ServerSettings
 import akka.stream.ActorMaterializer
+import akka.util.ByteString
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 
 import scala.concurrent.ExecutionContext
@@ -38,8 +40,10 @@ object Server extends App with ServerRoutes {
     // scalastyle:on
   )
 
-  implicit val cfg: AppCfg            = Configuration.load()
-  implicit val sys: ActorSystem       = ActorSystem()
+  val config = Configuration.loadTypesafeConfig()
+
+  implicit val cfg: AppCfg            = Configuration.loadConfig(config)
+  implicit val sys: ActorSystem       = ActorSystem("kafka-ws-proxy", config)
   implicit val mat: ActorMaterializer = ActorMaterializer()
   implicit val ctx: ExecutionContext  = sys.dispatcher
 
