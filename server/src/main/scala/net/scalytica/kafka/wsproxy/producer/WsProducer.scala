@@ -151,7 +151,7 @@ object WsProducer {
         case tm: TextMessage   => TextMessage(tm.textStream) :: Nil
         case bm: BinaryMessage => bm.dataStream.runWith(Sink.ignore); Nil
       }
-      .mapAsync(1)(_.toStrict(2 seconds).map(_.text))
+      .mapAsync(1)(_.toStrict(5 seconds).map(_.text))
       .map(str => parseInput[K, V](str))
       .filter(_.nonEmpty)
       .map { wpr =>
@@ -179,7 +179,7 @@ object WsProducer {
         case tm: TextMessage   => tm.textStream.runWith(Sink.ignore); Nil
         case bm: BinaryMessage => BinaryMessage(bm.dataStream) :: Nil
       }
-      .mapAsync(1)(_.toStrict(2 seconds).map(_.data))
+      .mapAsync(1)(_.toStrict(5 seconds).map(_.data))
       .map(bs => serde.deserialize("", bs.toArray))
       .map { wpr =>
         val record =
