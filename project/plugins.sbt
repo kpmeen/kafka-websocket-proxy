@@ -24,3 +24,6 @@ addSbtPlugin("com.codacy"    %% "sbt-codacy-coverage" % "1.3.12")
 
 // Native packaging plugin
 addSbtPlugin("com.typesafe.sbt" %% "sbt-native-packager" % "1.3.5")
+
+// Gatling plugin
+addSbtPlugin("io.gatling" % "gatling-sbt" % "3.0.0")

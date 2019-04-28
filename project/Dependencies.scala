@@ -29,6 +29,8 @@ object Versions {
 
   val ScalaTestVersion         = "3.0.7"
   val ScalaTestPlusPlayVersion = "4.0.1"
+
+  val GatlingVersion = "3.1.1"
 }
 
 object Dependencies {
@@ -131,6 +133,14 @@ object Dependencies {
     val AkkaHttpTestKit        = "com.typesafe.akka" %% "akka-http-testkit"         % AkkaHttpVersion
     val AkkaStreamTestKit      = "com.typesafe.akka" %% "akka-stream-testkit"       % AkkaVersion
     val AkkaStreamKafkaTestKit = "com.typesafe.akka" %% "akka-stream-kafka-testkit" % AkkaStreamKafkaVersion
+  }
+
+  object GatlingDeps {
+
+    val GatlingHighcharts = "io.gatling.highcharts" % "gatling-charts-highcharts" % GatlingVersion % "test"
+    val GatlingTest       = "io.gatling"            % "gatling-test-framework"    % GatlingVersion % "test"
+
+    val All = Seq(GatlingHighcharts, GatlingTest)
   }
 
   object Logging {
