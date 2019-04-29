@@ -8,6 +8,7 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.{ExceptionHandler, RejectionHandler, Route}
 import akka.stream.ActorMaterializer
 import com.typesafe.scalalogging.Logger
+import io.circe.{Json, Printer}
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
   AvroCommit,
@@ -16,6 +17,7 @@ import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
   AvroProducerResult
 }
 import net.scalytica.kafka.wsproxy.models.{InSocketArgs, OutSocketArgs}
+import org.apache.avro.Schema
 
 import scala.concurrent.ExecutionContext
 
@@ -25,6 +27,24 @@ trait ServerRoutes
     with InboundWebSocket {
 
   private[this] val logger = Logger(this.getClass)
+
+  private[this] def jsonResponseMsg(sc: StatusCode, s: String): HttpResponse = {
+    val js = Json.obj("message" -> Json.fromString(s))
+    HttpResponse(
+      status = sc,
+      entity = HttpEntity(
+        contentType = ContentTypes.`application/json`,
+        string = js.pretty(Printer.noSpaces)
+      )
+    )
+  }
+
+  private[this] def avroSchemaString(schema: Schema): ToResponseMarshallable = {
+    HttpEntity(
+      contentType = ContentTypes.`application/json`,
+      string = schema.toString(true)
+    )
+  }
 
   private[this] def rejectAndComplete(m: => ToResponseMarshallable) = {
     extractRequest { request =>
@@ -42,7 +62,7 @@ trait ServerRoutes
     case t: Throwable =>
       extractUri { uri =>
         logger.warn(s"Request to $uri could not be handled normally", t)
-        complete(HttpResponse(InternalServerError, entity = t.getMessage))
+        complete(jsonResponseMsg(InternalServerError, t.getMessage))
       }
   }
 
@@ -51,7 +71,7 @@ trait ServerRoutes
       .newBuilder()
       .handleNotFound {
         rejectAndComplete(
-          (NotFound, "This is not the page you are looking for.")
+          jsonResponseMsg(NotFound, "This is not the page you are looking for.")
         )
       }
       .result()
@@ -87,35 +107,15 @@ trait ServerRoutes
       pathPrefix("avro") {
         pathPrefix("producer") {
           path("record") {
-            complete(
-              HttpEntity(
-                contentType = ContentTypes.`application/json`,
-                string = AvroProducerRecord.schema.toString(true)
-              )
-            )
+            complete(avroSchemaString(AvroProducerRecord.schema))
           } ~ path("result") {
-            complete(
-              HttpEntity(
-                contentType = ContentTypes.`application/json`,
-                string = AvroProducerResult.schema.toString(true)
-              )
-            )
+            complete(avroSchemaString(AvroProducerResult.schema))
           }
         } ~ pathPrefix("consumer") {
           path("record") {
-            complete(
-              HttpEntity(
-                contentType = ContentTypes.`application/json`,
-                string = AvroConsumerRecord.schema.toString(true)
-              )
-            )
+            complete(avroSchemaString(AvroConsumerRecord.schema))
           } ~ path("commit") {
-            complete(
-              HttpEntity(
-                contentType = ContentTypes.`application/json`,
-                string = AvroCommit.schema.toString(true)
-              )
-            )
+            complete(avroSchemaString(AvroCommit.schema))
           }
         }
       }

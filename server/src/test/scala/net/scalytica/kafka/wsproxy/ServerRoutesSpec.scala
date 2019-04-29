@@ -44,7 +44,7 @@ class ServerRoutesSpec
 
       Get() ~> routes ~> check {
         status mustBe NotFound
-        responseAs[String] mustBe "This is not the page you are looking for."
+        responseAs[String] mustBe "{\"message\":\"This is not the page you are looking for.\"}"
       }
     }
 
