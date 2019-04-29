@@ -56,6 +56,12 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
       .getOrElse(WsProxyAvroSerde[AvroConsumerRecord]())
   }
 
+  /** Convenience function for logging and throwing an error in a Flow */
+  private[this] def logAndThrow[T](message: String, t: Throwable): T = {
+    logger.error(message, t)
+    throw t
+  }
+
   /**
    * Request handler for the outbound Kafka WebSocket connection.
    *
@@ -78,8 +84,8 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
       else Some(as.spawn(CommitHandler.commitStack, args.clientId))
 
     val messageParser = args.socketPayload match {
-      case JsonPayload => messageToString
-      case AvroPayload => messageToByteString
+      case JsonPayload => jsonMessageToWsCommit
+      case AvroPayload => avroMessageToWsCommit
     }
 
     val sink   = prepareSink(messageParser, commitHandlerRef)
@@ -151,7 +157,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
    * @param ec  the ExecutionContext to use
    * @return a [[Flow]] converting [[Message]] to String
    */
-  private[this] def messageToString(
+  private[this] def jsonMessageToWsCommit(
       implicit
       mat: ActorMaterializer,
       ec: ExecutionContext
@@ -161,11 +167,18 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
         case tm: TextMessage   => TextMessage(tm.textStream) :: Nil
         case bm: BinaryMessage => bm.dataStream.runWith(Sink.ignore); Nil
       }
-      .mapAsync(1)(_.toStrict(2 seconds).map(_.text))
+      .mapAsync(1)(_.toStrict(5 seconds).map(_.text))
+      .recover {
+        case t: Throwable =>
+          logAndThrow("There was an error processing a JSON message", t)
+      }
       .map(msg => parse(msg).flatMap(_.as[WsCommit]))
+      .recover {
+        case t: Throwable => logAndThrow(s"JSON message could not be parsed", t)
+      }
       .collect { case Right(res) => res }
 
-  private[this] def messageToByteString(
+  private[this] def avroMessageToWsCommit(
       implicit
       cfg: AppCfg,
       mat: ActorMaterializer,
@@ -176,8 +189,16 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
         case tm: TextMessage   => tm.textStream.runWith(Sink.ignore); Nil
         case bm: BinaryMessage => BinaryMessage(bm.dataStream) :: Nil
       }
-      .mapAsync(1)(_.toStrict(2 seconds).map(_.data))
+      .mapAsync(1)(_.toStrict(5 seconds).map(_.data))
+      .recover {
+        case t: Throwable =>
+          logAndThrow("There was an error processing an Avro message", t)
+      }
       .map(msg => avroCommitSerde.deserialize("", msg.toArray[Byte]))
+      .recover {
+        case t: Throwable =>
+          logAndThrow(s"Avro message could not be deserialised", t)
+      }
       .map(WsCommit.fromAvro)
 
   /**

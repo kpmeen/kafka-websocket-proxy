@@ -68,6 +68,7 @@ object WsProducer {
    * @tparam K      the message key type
    * @tparam V      the message value type
    * @return an instance of [[WsProducerRecord]]
+   * @throws Throwable when the underlying parser fails.
    */
   private[this] def parseInput[K, V](jsonStr: String)(
       implicit
@@ -80,7 +81,7 @@ object WsProducer {
 
     parse(jsonStr) match {
       case Left(ParsingFailure(message, err)) =>
-        logger.error(s"Error parsing JSON string $message")
+        logger.error(s"Error parsing JSON string:\n$message")
         logger.debug(s"JSON was: $jsonStr")
         throw err
 
@@ -118,6 +119,12 @@ object WsProducer {
       )
   }
 
+  /** Convenience function for logging and throwing an error in a Flow */
+  private[this] def logAndThrow[T](message: String, t: Throwable): T = {
+    logger.error(message, t)
+    throw t
+  }
+
   /**
    *
    * @param args input arguments defining the base configs for the producer.
@@ -152,7 +159,14 @@ object WsProducer {
         case bm: BinaryMessage => bm.dataStream.runWith(Sink.ignore); Nil
       }
       .mapAsync(1)(_.toStrict(5 seconds).map(_.text))
+      .recover {
+        case t: Throwable =>
+          logAndThrow("There was an error processing a JSON message", t)
+      }
       .map(str => parseInput[K, V](str))
+      .recover {
+        case t: Throwable => logAndThrow(s"JSON message could not be parsed", t)
+      }
       .filter(_.nonEmpty)
       .map { wpr =>
         val record = asKafkaProducerRecord(args.topic, wpr)
@@ -180,7 +194,15 @@ object WsProducer {
         case bm: BinaryMessage => BinaryMessage(bm.dataStream) :: Nil
       }
       .mapAsync(1)(_.toStrict(5 seconds).map(_.data))
+      .recover {
+        case t: Throwable =>
+          logAndThrow("There was an error processing an Avro message", t)
+      }
       .map(bs => serde.deserialize("", bs.toArray))
+      .recover {
+        case t: Throwable =>
+          logAndThrow(s"Avro message could not be deserialised", t)
+      }
       .map { wpr =>
         val record =
           asKafkaProducerRecord(args.topic, WsProducerRecord.fromAvro(wpr))
