@@ -7,7 +7,6 @@ import io.circe.syntax._
 import net.scalytica.kafka.wsproxy.models.Formats.FormatType
 import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails
 import net.scalytica.kafka.wsproxy.models._
-import net.scalytica.kafka.wsproxy.utils.Binary
 
 object Encoders {
 

@@ -36,12 +36,12 @@ lazy val server = (project in file("server"))
   .settings(libraryDependencies ++= Circe.All)
   .settings(
     libraryDependencies ++= Seq(
-      Akka.AkkaActor,
-      Akka.AkkaTyped,
-      Akka.AkkaSlf4j,
-      Akka.AkkaStream,
-      Akka.AkkaStreamTyped,
-      Akka.AkkaHttp,
+      Akka.Actor,
+      Akka.ActorTyped,
+      Akka.Slf4j,
+      Akka.Stream,
+      Akka.StreamTyped,
+      Akka.Http,
       Akka.AkkaStreamKafka,
       Avro.Avro4sKafka,
       Kafka.AvroSerializer,

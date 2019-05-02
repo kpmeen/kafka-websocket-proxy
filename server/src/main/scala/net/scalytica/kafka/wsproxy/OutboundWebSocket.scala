@@ -126,7 +126,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
    */
   private[this] def prepareSink(
       messageParser: Flow[Message, WsCommit, NotUsed],
-      aref: Option[ActorRef[CommitHandler.Protocol]]
+      aref: Option[ActorRef[CommitHandler.CommitProtocol]]
   )(
       implicit
       mat: ActorMaterializer,
@@ -137,7 +137,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
         messageParser
           .map(wc => CommitHandler.Commit(wc))
           .to(
-            ActorSink.actorRef[CommitHandler.Protocol](
+            ActorSink.actorRef[CommitHandler.CommitProtocol](
               ref = ar,
               onCompleteMessage = CommitHandler.Stop,
               onFailureMessage = { t: Throwable =>
@@ -211,7 +211,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
    */
   private[this] def kafkaSource(
       args: OutSocketArgs,
-      commitHandlerRef: Option[ActorRef[CommitHandler.Protocol]]
+      commitHandlerRef: Option[ActorRef[CommitHandler.CommitProtocol]]
   )(
       implicit
       cfg: AppCfg,
@@ -300,12 +300,12 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
    * @return a commit [[Sink]] for [[WsConsumerRecord]] messages
    */
   private[this] def manualCommitSink[K, V](
-      ref: ActorRef[CommitHandler.Protocol]
+      ref: ActorRef[CommitHandler.CommitProtocol]
   ): Sink[WsConsumerRecord[K, V], NotUsed] = {
     Flow[WsConsumerRecord[K, V]]
       .map(rec => CommitHandler.Stash(rec))
       .to(
-        ActorSink.actorRef[CommitHandler.Protocol](
+        ActorSink.actorRef[CommitHandler.CommitProtocol](
           ref = ref,
           onCompleteMessage = CommitHandler.Continue,
           onFailureMessage = _ => CommitHandler.Continue

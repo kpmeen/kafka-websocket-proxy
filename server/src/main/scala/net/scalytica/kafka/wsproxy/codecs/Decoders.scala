@@ -9,7 +9,6 @@ import net.scalytica.kafka.wsproxy.models.ValueDetails.{
   OutValueDetails
 }
 import net.scalytica.kafka.wsproxy.models._
-import net.scalytica.kafka.wsproxy.utils.Binary
 
 import scala.util.{Failure, Success}
 

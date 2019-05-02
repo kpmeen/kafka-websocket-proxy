@@ -38,16 +38,17 @@ object CommitHandler {
   private[this] val EmptyStack: Stack = Map.empty
 
   /** ADT defining the valid protocol for the [[CommitHandler]] */
-  sealed trait Protocol
+  sealed trait CommitProtocol
 
-  case class Stash(record: WsConsumerRecord[_, _]) extends Protocol
-  case class Commit(commit: WsCommit)              extends Protocol
-  case object Continue                             extends Protocol
-  case object Stop                                 extends Protocol
-  case class GetStack(sender: ActorRef[Stack])     extends Protocol
+  case class Stash(record: WsConsumerRecord[_, _]) extends CommitProtocol
+  case class Commit(commit: WsCommit)              extends CommitProtocol
+  case object Continue                             extends CommitProtocol
+  case object Stop                                 extends CommitProtocol
+  case class GetStack(sender: ActorRef[Stack])     extends CommitProtocol
 
   /** Behaviour initialising the message commit stack */
-  def commitStack(implicit cfg: AppCfg): Behavior[Protocol] = committableStack()
+  def commitStack(implicit cfg: AppCfg): Behavior[CommitProtocol] =
+    committableStack()
 
   /**
    * Adds a new [[Uncommitted]] entry to the [[Stack]]
@@ -62,7 +63,7 @@ object CommitHandler {
   )(
       implicit
       cfg: AppCfg,
-      ctx: ActorContext[Protocol]
+      ctx: ActorContext[CommitProtocol]
   ): Option[Stack] = {
     def addToStack(partition: Partition, uncommitted: Uncommitted): Stack = {
       stack
@@ -105,7 +106,7 @@ object CommitHandler {
       implicit
       cfg: AppCfg,
       ec: ExecutionContext,
-      ctx: ActorContext[Protocol]
+      ctx: ActorContext[CommitProtocol]
   ): Option[Stack] = {
     stack
       .find(_._2.exists(_.wsProxyMsgId == msgId))
@@ -137,7 +138,7 @@ object CommitHandler {
    */
   private[this] def committableStack(
       stack: Stack = EmptyStack
-  )(implicit cfg: AppCfg): Behavior[Protocol] =
+  )(implicit cfg: AppCfg): Behavior[CommitProtocol] =
     Behaviors.setup { implicit ctx =>
       implicit val ec = implicitly(ctx.executionContext)
       Behaviors.receiveMessage {

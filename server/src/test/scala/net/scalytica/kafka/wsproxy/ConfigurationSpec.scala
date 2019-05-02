@@ -10,6 +10,7 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
   val invalidCfg1 = ConfigFactory.parseString(
     """kafka.ws.proxy {
       |  server {
+      |    server-id = 1
       |    port = 8078
       |    kafka-bootstrap-urls = ["localhost:29092"]
       |    schema-registry-url = "http://localhost:28081"
@@ -33,6 +34,7 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
   val invalidCfg2 = ConfigFactory.parseString(
     """kafka.ws.proxy {
       |  server {
+      |    server-id = 1
       |    port = 8078
       |    kafka-bootstrap-urls = "localhost:29092"
       |    schema-registry-url = "http://localhost:28081"
@@ -60,6 +62,7 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
 
       cfg.consumer.defaultBatchSize mustBe 0
       cfg.consumer.defaultRateLimit mustBe 0
+      cfg.server.serverId mustBe 1
       cfg.server.kafkaBootstrapUrls mustBe Seq("localhost:29092")
       cfg.server.schemaRegistryUrl mustBe Some("http://localhost:28081")
       cfg.server.autoRegisterSchemas mustBe true

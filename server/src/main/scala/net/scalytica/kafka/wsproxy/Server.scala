@@ -2,9 +2,7 @@ package net.scalytica.kafka.wsproxy
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.settings.ServerSettings
 import akka.stream.ActorMaterializer
-import akka.util.ByteString
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 
 import scala.concurrent.ExecutionContext

@@ -151,7 +151,7 @@ object WsConsumer {
    */
   private[this] def messageTransform[K, V](
       rec: ConsumerRecord[K, V],
-      coffset: Option[CommittableOffset]
+      maybeCommittableOffset: Option[CommittableOffset]
   ): WsConsumerRecord[K, V] = {
     Option(rec.key)
       .map { k =>
@@ -162,7 +162,7 @@ object WsConsumer {
           timestamp = rec.timestamp(),
           key = OutValueDetails[K](k),
           value = OutValueDetails[V](rec.value),
-          committableOffset = coffset
+          committableOffset = maybeCommittableOffset
         )
       }
       .getOrElse {
@@ -172,7 +172,7 @@ object WsConsumer {
           offset = rec.offset,
           timestamp = rec.timestamp(),
           value = OutValueDetails[V](rec.value),
-          committableOffset = coffset
+          committableOffset = maybeCommittableOffset
         )
       }
   }

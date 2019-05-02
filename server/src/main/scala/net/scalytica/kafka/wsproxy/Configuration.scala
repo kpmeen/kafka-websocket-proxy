@@ -27,6 +27,7 @@ object Configuration {
   }
 
   final case class ServerCfg(
+      serverId: Int,
       port: Int,
       kafkaBootstrapUrls: Seq[String],
       schemaRegistryUrl: Option[String],

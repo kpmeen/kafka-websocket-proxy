@@ -1,4 +1,4 @@
-package net.scalytica.kafka.wsproxy.utils
+package net.scalytica.kafka.wsproxy.codecs
 
 import javax.xml.bind.DatatypeConverter
 

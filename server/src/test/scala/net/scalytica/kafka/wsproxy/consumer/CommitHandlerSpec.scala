@@ -66,7 +66,7 @@ class CommitHandlerSpec
       removeIds: Option[Seq[WsMessageId]] = None
   )(
       implicit
-      tk: BehaviorTestKit[Protocol],
+      tk: BehaviorTestKit[CommitProtocol],
       inbox: TestInbox[Stack]
   ): TestInbox[Stack] = {
     val fullStack = recs.map { r =>

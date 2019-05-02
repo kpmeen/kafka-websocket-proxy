@@ -13,7 +13,7 @@ object Versions {
   val EmbeddedSchemaRegistryVersion = "5.2.0"
   val KafkaStreamsQueryVersion      = "0.1.1"
 
-  val AkkaVersion            = "2.5.21"
+  val AkkaVersion            = "2.5.22"
   val AkkaHttpVersion        = "10.1.8"
   val AkkaStreamKafkaVersion = "1.0.1"
 
@@ -48,12 +48,14 @@ object Dependencies {
 
   object Akka {
 
-    val AkkaActor       = "com.typesafe.akka" %% "akka-actor"        % AkkaVersion
-    val AkkaStream      = "com.typesafe.akka" %% "akka-stream"       % AkkaVersion
-    val AkkaTyped       = "com.typesafe.akka" %% "akka-actor-typed"  % AkkaVersion
-    val AkkaStreamTyped = "com.typesafe.akka" %% "akka-stream-typed" % AkkaVersion
-    val AkkaSlf4j       = "com.typesafe.akka" %% "akka-slf4j"        % AkkaVersion
-    val AkkaHttp        = "com.typesafe.akka" %% "akka-http"         % AkkaHttpVersion
+    val Actor         = "com.typesafe.akka" %% "akka-actor"         % AkkaVersion
+    val Stream        = "com.typesafe.akka" %% "akka-stream"        % AkkaVersion
+    val ActorTyped    = "com.typesafe.akka" %% "akka-actor-typed"   % AkkaVersion
+    val StreamTyped   = "com.typesafe.akka" %% "akka-stream-typed"  % AkkaVersion
+    val ClusterTyped  = "com.typesafe.akka" %% "akka-cluster-typed" % AkkaVersion
+    val DistDataTyped = "com.typesafe.akka" %% "akka-cluster-typed" % AkkaVersion
+    val Slf4j         = "com.typesafe.akka" %% "akka-slf4j"         % AkkaVersion
+    val Http          = "com.typesafe.akka" %% "akka-http"          % AkkaHttpVersion
 
     val AkkaStreamKafka = "com.typesafe.akka" %% "akka-stream-kafka" % AkkaStreamKafkaVersion
 
