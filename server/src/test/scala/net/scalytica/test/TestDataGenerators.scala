@@ -7,6 +7,21 @@ import scala.concurrent.duration._
 
 trait TestDataGenerators extends TestTypes { self =>
 
+  def sessionJson(
+      groupId: String,
+      consumer: Map[String, Int] = Map.empty
+  ): String = {
+    val consumersJson = consumer
+      .map(c => s"""{ "id": "${c._1}", "serverId": ${c._2} }""")
+      .mkString(",")
+
+    s"""{
+      |  "consumerGroupId": "$groupId",
+      |  "consumers": [$consumersJson],
+      |  "consumerLimit": 2
+      |}""".stripMargin
+  }
+
   def producerKeyValueJson(num: Int): Seq[String] = {
     (1 to num).map { i =>
       s"""{
@@ -63,8 +78,6 @@ trait TestDataGenerators extends TestTypes { self =>
   def producerValueAvro(
       num: Int
   )(implicit cfg: EmbeddedKafkaConfig): Seq[AvroProducerRecord] = {
-    val now = java.time.Instant.now().toEpochMilli
-
     val valSerdes = Serdes.valueSerdes(cfg.schemaRegistryPort)
 
     (1 to num).map { i =>

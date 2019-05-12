@@ -5,8 +5,15 @@ import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.{ExceptionHandler, RejectionHandler, Route}
+import akka.http.scaladsl.server.{
+  ExceptionHandler,
+  RejectionHandler,
+  Route,
+  ValidationRejection
+}
+import akka.kafka.scaladsl.Consumer
 import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.RunnableGraph
 import com.typesafe.scalalogging.Logger
 import io.circe.{Json, Printer}
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
@@ -17,6 +24,11 @@ import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
   AvroProducerResult
 }
 import net.scalytica.kafka.wsproxy.models.{InSocketArgs, OutSocketArgs}
+import net.scalytica.kafka.wsproxy.session.SessionHandler
+import net.scalytica.kafka.wsproxy.websockets.{
+  InboundWebSocket,
+  OutboundWebSocket
+}
 import org.apache.avro.Schema
 
 import scala.concurrent.ExecutionContext
@@ -74,28 +86,29 @@ trait ServerRoutes
           jsonResponseMsg(NotFound, "This is not the page you are looking for.")
         )
       }
+      .handle {
+        case ValidationRejection(msg, _) =>
+          rejectAndComplete(jsonResponseMsg(BadRequest, msg))
+      }
       .result()
       .withFallback(RejectionHandler.default)
   }
 
-  def routes(
+  def wsProxyRoutes(
       implicit
       cfg: AppCfg,
       sys: ActorSystem,
       mat: ActorMaterializer,
       ctx: ExecutionContext
-  ): Route = routesWith(inboundWebSocket, outboundWebSocket)
+  ): (RunnableGraph[Consumer.Control], Route) = {
+    implicit val (sdcStream, sh) = SessionHandler.init
+    (sdcStream, routesWith(inboundWebSocket, outboundWebSocket))
+  }
 
   //scalastyle:off method.length
   def routesWith(
       inbound: InSocketArgs => Route,
       outbound: OutSocketArgs => Route
-  )(
-      implicit
-      cfg: AppCfg,
-      sys: ActorSystem,
-      mat: ActorMaterializer,
-      ctx: ExecutionContext
   ): Route = {
     pathPrefix("socket") {
       path("in") {

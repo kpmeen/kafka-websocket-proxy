@@ -1,16 +1,16 @@
-package net.scalytica.kafka.wsproxy
+package net.scalytica.kafka.wsproxy.websockets
 
 import akka.actor.ActorSystem
 import akka.actor.typed.ActorRef
 import akka.actor.typed.scaladsl.adapter._
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
-import akka.http.scaladsl.server.Directives.handleWebSocketMessages
-import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.{Route, ValidationRejection}
 import akka.kafka.scaladsl.Consumer
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.stream.typed.scaladsl.ActorSink
-import akka.util.ByteString
+import akka.util.{ByteString, Timeout}
 import akka.{Done, NotUsed}
 import com.typesafe.scalalogging.Logger
 import io.circe.Encoder
@@ -19,8 +19,9 @@ import io.circe.parser.parse
 import io.circe.syntax._
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.SocketProtocol.{AvroPayload, JsonPayload}
-import net.scalytica.kafka.wsproxy.avro.SchemaTypes._
+import net.scalytica.kafka.wsproxy.WithSchemaRegistryConfig
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.Implicits._
+import net.scalytica.kafka.wsproxy.avro.SchemaTypes._
 import net.scalytica.kafka.wsproxy.codecs.Decoders._
 import net.scalytica.kafka.wsproxy.codecs.Encoders._
 import net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde
@@ -31,6 +32,8 @@ import net.scalytica.kafka.wsproxy.models.{
   WsCommit,
   WsConsumerRecord
 }
+import net.scalytica.kafka.wsproxy.session.SessionHandler._
+import net.scalytica.kafka.wsproxy.session.{Session, SessionHandlerProtocol}
 import org.apache.kafka.common.serialization.Serializer
 
 import scala.concurrent.duration._
@@ -39,6 +42,8 @@ import scala.concurrent.{ExecutionContext, Future}
 trait OutboundWebSocket extends WithSchemaRegistryConfig {
 
   private[this] val logger = Logger(getClass)
+
+  implicit private[this] val timeout: Timeout = 3 seconds
 
   private[this] def avroCommitSerde(
       implicit cfg: AppCfg
@@ -62,6 +67,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
     throw t
   }
 
+  // scalastyle:off method.length
   /**
    * Request handler for the outbound Kafka WebSocket connection.
    *
@@ -75,10 +81,95 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
       cfg: AppCfg,
       as: ActorSystem,
       mat: ActorMaterializer,
-      ec: ExecutionContext
+      ec: ExecutionContext,
+      sessionHandler: ActorRef[SessionHandlerProtocol.Protocol]
   ): Route = {
     logger.debug("Initialising outbound websocket")
 
+    implicit val scheduler = as.scheduler
+
+    val serverId = cfg.server.serverId
+    val clientId = args.clientId
+    val groupId  = args.groupId.getOrElse(s"$clientId-group")
+
+    val consumerAddResult = for {
+      // Initialise the session
+      initRes <- sessionHandler.initSession(groupId, 2)
+      _ <- Future.successful(
+            logger.debug(
+              s"Session ${initRes.session.consumerGroupId} is ready."
+            )
+          )
+      // Try to add a new consumer to the session
+      addResult <- sessionHandler.addConsumer(groupId, clientId, serverId)
+    } yield addResult
+
+    lazy val initSocket = () =>
+      prepareOutboundWebSocket(args) { () =>
+        sessionHandler.removeConsumer(groupId, clientId).map(_ => Done)
+    }
+
+    onSuccess(consumerAddResult) {
+      case Session.ConsumerAdded(_) =>
+        initSocket()
+
+      case Session.ConsumerExists(_) =>
+        reject(
+          ValidationRejection(
+            s"WebSocket for consumer $clientId in session $groupId not" +
+              s" established because a consumer with the same ID is already" +
+              s" registered"
+          )
+        )
+
+      case Session.ConsumerLimitReached(s) =>
+        reject(
+          ValidationRejection(
+            s"The maximum number of WebSockets for session $groupId has been " +
+              s"reached. Limit is ${s.consumerLimit}"
+          )
+        )
+
+      case Session.SessionNotFound(_) =>
+        reject(
+          ValidationRejection(s"Could not find an active session for $groupId")
+        )
+
+      case wrong =>
+        logger.error(
+          s"Adding consumer failed with an unexpected state." +
+            s" Session:\n ${wrong.session}"
+        )
+        failWith(
+          new InternalError(
+            "An unexpected error occurred when trying to establish the " +
+              s"WebSocket consumer $clientId in session $groupId"
+          )
+        )
+    }
+  }
+  // scalastyle:on
+
+  /**
+   * Actual preparation and setup of the outbound WebSocket [[Route]].
+   *
+   * @param args the [[OutSocketArgs]]
+   * @param terminateConsumer termination logic for current websocket consumer.
+   * @param cfg the implicit [[AppCfg]] to use
+   * @param as the implicit untyped [[ActorSystem]] to use
+   * @param mat the implicit [[ActorMaterializer]] to use
+   * @param ec the implicit [[ExecutionContext]] to use
+   * @return the WebSocket [[Route]]
+   */
+  private[this] def prepareOutboundWebSocket(
+      args: OutSocketArgs
+  )(terminateConsumer: () => Future[Done])(
+      implicit
+      cfg: AppCfg,
+      as: ActorSystem,
+      mat: ActorMaterializer,
+      ec: ExecutionContext
+  ): Route = {
     val commitHandlerRef =
       if (args.autoCommit) None
       else Some(as.spawn(CommitHandler.commitStack, args.clientId))
@@ -95,7 +186,12 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
       Flow
         .fromSinkAndSourceCoupledMat(sink, source)(Keep.both)
         .watchTermination() { (m, f) =>
-          f.onComplete {
+          val termination = for {
+            done <- f
+            _    <- terminateConsumer()
+          } yield done
+
+          termination.onComplete {
             case scala.util.Success(_) =>
               m._2.drainAndShutdown(Future.successful(Done))
               logger.info(s"Consumer client has disconnected.")
@@ -119,18 +215,12 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
    *
    * @param messageParser parser to use for decoding incoming messages.
    * @param aref an optional [[ActorRef]] to a [[CommitHandler]].
-   * @param mat  the [[ActorMaterializer]] to use
-   * @param ec   the [[ExecutionContext]] to use
    * @return a [[Sink]] for consuming [[Message]]s
    * @see [[CommitHandler.commitStack]]
    */
   private[this] def prepareSink(
       messageParser: Flow[Message, WsCommit, NotUsed],
       aref: Option[ActorRef[CommitHandler.CommitProtocol]]
-  )(
-      implicit
-      mat: ActorMaterializer,
-      ec: ExecutionContext
   ): Sink[Message, _] =
     aref
       .map { ar =>
@@ -151,7 +241,8 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
       .getOrElse(Sink.ignore)
 
   /**
-   * Converts a WebSocket [[Message]] into a String for down-stream processing.
+   * Converts a WebSocket [[Message]] with a JSON String payload into a
+   * [[WsCommit]] for down-stream processing.
    *
    * @param mat the Materializer to use
    * @param ec  the ExecutionContext to use
@@ -178,6 +269,15 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
       }
       .collect { case Right(res) => res }
 
+  /**
+   * Converts a WebSocket [[Message]] with an Avro payload into a [[WsCommit]]
+   * for down-stream processing.
+   *
+   * @param cfg the [[AppCfg]] to use
+   * @param mat the [[ActorMaterializer]] to use
+   * @param ec  the [[ExecutionContext]] to use
+   * @return a [[Flow]] converting [[Message]] to String
+   */
   private[this] def avroMessageToWsCommit(
       implicit
       cfg: AppCfg,
@@ -202,7 +302,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
       .map(WsCommit.fromAvro)
 
   /**
-   * The Kafka Source where messages are consumed.
+   * The Kafka [[Source]] where messages are consumed from the topic.
    *
    * @param args the output arguments to pass on to the consumer.
    * @param cfg the application configuration.
@@ -260,8 +360,6 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
    * @param args [[OutSocketArgs]] for building the outbound WebSocket.
    * @param keySer the key serializer
    * @param valSer the value serializer
-   * @param keyEnc JSON encoder for the key type
-   * @param valEnc JSON encoder for the value type
    * @param recEnc JSON encoder for [[WsConsumerRecord]]
    * @tparam K the key type
    * @tparam V the value type
@@ -274,19 +372,17 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
       cfg: AppCfg,
       keySer: Serializer[K],
       valSer: Serializer[V],
-      keyEnc: Encoder[K],
-      valEnc: Encoder[V],
       recEnc: Encoder[WsConsumerRecord[K, V]]
   ): WsConsumerRecord[K, V] => Message = args.socketPayload match {
-    case AvroPayload => { cr =>
-      val byteString = ByteString(
-        avroConsumerRecordSerde.serialize(args.topic, cr.toAvroRecord[K, V])
-      )
-      BinaryMessage(byteString)
-    }
-    case JsonPayload => { cr =>
-      TextMessage(cr.asJson.pretty(noSpaces))
-    }
+    case AvroPayload =>
+      cr =>
+        val byteString = ByteString(
+          avroConsumerRecordSerde.serialize(args.topic, cr.toAvroRecord[K, V])
+        )
+        BinaryMessage(byteString)
+    case JsonPayload =>
+      cr =>
+        TextMessage(cr.asJson.pretty(noSpaces))
   }
 
   /**

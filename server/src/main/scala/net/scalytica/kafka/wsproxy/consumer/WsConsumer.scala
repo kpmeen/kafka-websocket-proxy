@@ -37,12 +37,12 @@ object WsConsumer {
       implicit
       cfg: AppCfg,
       as: ActorSystem,
-      ks: Deserializer[K],
-      vs: Deserializer[V]
+      kd: Deserializer[K],
+      vd: Deserializer[V]
   ) = {
     val kafkaUrl = cfg.server.kafkaBootstrapUrls.mkString(",")
 
-    ConsumerSettings(as, ks, vs)
+    ConsumerSettings(as, kd, vd)
       .withBootstrapServers(kafkaUrl)
       .withProperties(
         // Enables stream monitoring in confluent control center
@@ -77,8 +77,8 @@ object WsConsumer {
    * @param groupId  the groupId to start a socket for.
    * @param cfg      the [[AppCfg]] containing application configurations.
    * @param as       an implicit ActorSystem
-   * @param ks       the Deserializer to use for the message key
-   * @param vs       the Deserializer to use for the message value
+   * @param kd       the Deserializer to use for the message key
+   * @param vd       the Deserializer to use for the message value
    * @tparam K the type of the message key
    * @tparam V the type of the message value
    * @return a [[Source]] containing [[WsConsumerRecord]]s.
@@ -91,8 +91,8 @@ object WsConsumer {
       implicit
       cfg: AppCfg,
       as: ActorSystem,
-      ks: Deserializer[K],
-      vs: Deserializer[V]
+      kd: Deserializer[K],
+      vd: Deserializer[V]
   ): Source[WsConsumerRecord[K, V], Consumer.Control] = {
     logger.debug("Setting up consumer with auto-commit ENABLED")
     val settings =
@@ -118,8 +118,8 @@ object WsConsumer {
    * @param groupId  the groupId to start a socket for.
    * @param cfg      the [[AppCfg]] containing application configurations.
    * @param as       an implicit ActorSystem
-   * @param ks       the Deserializer to use for the message key
-   * @param vs       the Deserializer to use for the message value
+   * @param kd       the Deserializer to use for the message key
+   * @param vd       the Deserializer to use for the message value
    * @tparam K the type of the message key
    * @tparam V the type of the message value
    * @return a [[Source]] containing [[WsConsumerRecord]]s.
@@ -132,8 +132,8 @@ object WsConsumer {
       implicit
       cfg: AppCfg,
       as: ActorSystem,
-      ks: Deserializer[K],
-      vs: Deserializer[V]
+      kd: Deserializer[K],
+      vd: Deserializer[V]
   ): Source[WsConsumerRecord[K, V], Consumer.Control] = {
     logger.debug("Setting up consumer with auto-commit DISABLED")
     val settings =

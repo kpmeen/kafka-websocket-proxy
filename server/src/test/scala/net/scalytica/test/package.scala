@@ -195,7 +195,7 @@ package object test {
               k.username mustBe expectedKey.get.username
               v.title mustBe expectedValue.title
               v.artist mustBe expectedValue.artist
-              v.tracks must have size expectedValue.tracks.size
+              v.tracks must have size expectedValue.tracks.size.toLong
               v.tracks must contain allElementsOf expectedValue.tracks
 
             case ConsumerValueRecord(_, _, _, _, valOut, _) =>
@@ -220,7 +220,7 @@ package object test {
     ): Assertion = {
       expectWsConsumerKeyValueResultJson[Unit, V](
         expectedTopic = expectedTopic,
-        expectedKey = None,
+        expectedKey = (),
         expectedValue = expectedValue
       )
     }

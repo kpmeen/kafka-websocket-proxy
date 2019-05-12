@@ -12,7 +12,7 @@ import net.scalytica.kafka.wsproxy.models.{
   WsCommit,
   WsMessageId
 }
-import net.scalytica.test.WSProxySpecLike
+import net.scalytica.test.WSProxyKafkaSpec
 import org.scalatest.concurrent.Eventually
 import org.scalatest.time.{Minute, Span}
 import org.scalatest.{BeforeAndAfter, MustMatchers, WordSpec}
@@ -24,7 +24,7 @@ class CommitHandlerSpec
     with MustMatchers
     with BeforeAndAfter
     with Eventually
-    with WSProxySpecLike {
+    with WSProxyKafkaSpec {
 
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(1, Minute))
@@ -90,7 +90,7 @@ class CommitHandlerSpec
   "The CommitHandler" should {
 
     "add a message to the stack" in {
-      implicit val testCfg = defaultApplicationTestConfig
+      implicit val testCfg = defaultTestAppCfg
       implicit val tk      = BehaviorTestKit(commitStack)
       implicit val inbox   = TestInbox[Stack]()
 
@@ -105,7 +105,7 @@ class CommitHandlerSpec
     }
 
     "add messages from different partitions to the stack" in {
-      implicit val testCfg = defaultApplicationTestConfig
+      implicit val testCfg = defaultTestAppCfg
       implicit val tk      = BehaviorTestKit(commitStack)
       implicit val inbox   = TestInbox[Stack]()
 
@@ -124,7 +124,7 @@ class CommitHandlerSpec
     }
 
     "drop the oldest messages in the stack when max size is reached" in {
-      implicit val testCfg = defaultApplicationTestConfig
+      implicit val testCfg = defaultTestAppCfg
       implicit val tk      = BehaviorTestKit(commitStack)
       implicit val inbox   = TestInbox[Stack]()
 
@@ -137,7 +137,7 @@ class CommitHandlerSpec
               groupId = "grp1",
               topic = "topic1",
               partition = p,
-              offset = i,
+              offset = i.toLong,
               timestamp = System.currentTimeMillis()
             )
           }
@@ -148,7 +148,7 @@ class CommitHandlerSpec
     }
 
     "accept a WsCommit command, commit the message and clean up the stack" in {
-      implicit val testCfg = defaultApplicationTestConfig
+      implicit val testCfg = defaultTestAppCfg
       implicit val tk      = BehaviorTestKit(commitStack)
       implicit val inbox   = TestInbox[Stack]()
 
@@ -164,7 +164,7 @@ class CommitHandlerSpec
     }
 
     "do nothing if the WsCommit message references a non-existing message" in {
-      implicit val testCfg = defaultApplicationTestConfig
+      implicit val testCfg = defaultTestAppCfg
       implicit val tk      = BehaviorTestKit(commitStack)
       implicit val inbox   = TestInbox[Stack]()
 

@@ -1,4 +1,4 @@
-package net.scalytica.kafka.wsproxy
+package net.scalytica.kafka.wsproxy.websockets
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.ws.{BinaryMessage, TextMessage}
@@ -11,6 +11,7 @@ import io.circe.Printer.noSpaces
 import io.circe.syntax._
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.SocketProtocol.{AvroPayload, JsonPayload}
+import net.scalytica.kafka.wsproxy.WithSchemaRegistryConfig
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
   AvroProducerRecord,
   AvroProducerResult

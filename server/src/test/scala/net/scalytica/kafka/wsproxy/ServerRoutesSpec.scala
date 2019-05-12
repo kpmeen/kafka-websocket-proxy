@@ -2,7 +2,7 @@ package net.scalytica.kafka.wsproxy
 
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server._
-import akka.http.scaladsl.testkit.WSProbe
+import akka.http.scaladsl.testkit.{RouteTestTimeout, WSProbe}
 import net.manub.embeddedkafka.schemaregistry._
 import net.scalytica.kafka.wsproxy.SocketProtocol.AvroPayload
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
@@ -13,7 +13,6 @@ import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
 }
 import net.scalytica.kafka.wsproxy.models.Formats.{AvroType, NoType, StringType}
 import net.scalytica.test._
-import net.scalytica.test.TestTypes._
 import org.scalatest.Inspectors.forAll
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Minutes, Span}
@@ -26,12 +25,15 @@ class ServerRoutesSpec
     extends WordSpec
     with EitherValues
     with ScalaFutures
-    with WSProxySpecLike
+    with WSProxyKafkaSpec
+    with WsProducerClients
     with TestDataGenerators
     with EmbeddedKafka {
 
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(2, Minutes))
+
+  implicit val timeout = RouteTestTimeout(20 seconds)
 
   case object TestRoutes extends ServerRoutes
 
@@ -39,20 +41,26 @@ class ServerRoutesSpec
 
   "The server routes" should {
     "return a 404 NotFound when requesting an invalid resource" in {
-      implicit val cfg = defaultApplicationTestConfig
-      val routes       = Route.seal(TestRoutes.routes)
+      implicit val cfg = defaultTestAppCfgWithServerId(1)
+
+      val expected =
+        "{\"message\":\"This is not the page you are looking for.\"}"
+
+      val (_, testRoutes) = TestRoutes.wsProxyRoutes
+
+      val routes = Route.seal(testRoutes)
 
       Get() ~> routes ~> check {
         status mustBe NotFound
-        responseAs[String] mustBe "{\"message\":\"This is not the page you are looking for.\"}"
+        responseAs[String] mustBe expected
       }
     }
 
     "return the Avro schema for producer records" in {
-      implicit val cfg = defaultApplicationTestConfig
-      val routes       = Route.seal(TestRoutes.routes)
+      implicit val cfg    = defaultTestAppCfgWithServerId(2)
+      val (_, testRoutes) = TestRoutes.wsProxyRoutes
 
-      Get("/schemas/avro/producer/record") ~> routes ~> check {
+      Get("/schemas/avro/producer/record") ~> testRoutes ~> check {
         status mustBe OK
         responseAs[String] mustBe AvroProducerRecord.schemaFor.schema
           .toString(true)
@@ -60,10 +68,10 @@ class ServerRoutesSpec
     }
 
     "return the Avro schema for producer results" in {
-      implicit val cfg = defaultApplicationTestConfig
-      val routes       = Route.seal(TestRoutes.routes)
+      implicit val cfg    = defaultTestAppCfgWithServerId(3)
+      val (_, testRoutes) = TestRoutes.wsProxyRoutes
 
-      Get("/schemas/avro/producer/result") ~> routes ~> check {
+      Get("/schemas/avro/producer/result") ~> testRoutes ~> check {
         status mustBe OK
         responseAs[String] mustBe AvroProducerResult.schemaFor.schema
           .toString(true)
@@ -71,10 +79,10 @@ class ServerRoutesSpec
     }
 
     "return the Avro schema for consumer record" in {
-      implicit val cfg = defaultApplicationTestConfig
-      val routes       = Route.seal(TestRoutes.routes)
+      implicit val cfg    = defaultTestAppCfgWithServerId(4)
+      val (_, testRoutes) = TestRoutes.wsProxyRoutes
 
-      Get("/schemas/avro/consumer/record") ~> routes ~> check {
+      Get("/schemas/avro/consumer/record") ~> testRoutes ~> check {
         status mustBe OK
         responseAs[String] mustBe AvroConsumerRecord.schemaFor.schema
           .toString(true)
@@ -82,10 +90,10 @@ class ServerRoutesSpec
     }
 
     "return the Avro schema for consumer commit" in {
-      implicit val cfg = defaultApplicationTestConfig
-      val routes       = Route.seal(TestRoutes.routes)
+      implicit val cfg    = defaultTestAppCfgWithServerId(5)
+      val (_, testRoutes) = TestRoutes.wsProxyRoutes
 
-      Get("/schemas/avro/consumer/commit") ~> routes ~> check {
+      Get("/schemas/avro/consumer/commit") ~> testRoutes ~> check {
         status mustBe OK
         responseAs[String] mustBe AvroCommit.schemaFor.schema.toString(true)
       }
@@ -93,40 +101,50 @@ class ServerRoutesSpec
 
     "set up a WebSocket connection for producing JSON key value messages" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-        implicit val wsCfg = applicationTestConfig(kcfg.kafkaPort)
+        implicit val wsCfg =
+          appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = 6)
 
-        implicit val wsClient = WSProbe()
-        val routes            = Route.seal(TestRoutes.routes)
-        val messages          = producerKeyValueJson(1)
+        implicit val wsClient       = WSProbe()
+        val (sdcStream, testRoutes) = TestRoutes.wsProxyRoutes
+        val ctrl                    = sdcStream.run()
+        val msgs                    = producerKeyValueJson(1)
 
-        produceJson("test-topic-1", StringType, StringType, routes, messages)
+        produceJson("test-topic-1", StringType, StringType, testRoutes, msgs)
+
+        ctrl.shutdown()
       }
 
     "set up a WebSocket connection for producing JSON value messages" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-        implicit val wsCfg = applicationTestConfig(kcfg.kafkaPort)
+        implicit val wsCfg =
+          appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = 7)
 
-        implicit val wsClient = WSProbe()
-        val routes            = Route.seal(TestRoutes.routes)
-        val messages          = producerValueJson(1)
+        implicit val wsClient       = WSProbe()
+        val (sdcStream, testRoutes) = TestRoutes.wsProxyRoutes
+        val ctrl                    = sdcStream.run()
+        val msgs                    = producerValueJson(1)
 
-        produceJson("test-topic-2", NoType, StringType, routes, messages)
+        produceJson("test-topic-2", NoType, StringType, testRoutes, msgs)
+
+        ctrl.shutdown()
       }
 
     "set up a WebSocket connection for consuming JSON key value messages" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-        implicit val wsCfg = applicationTestConfig(kcfg.kafkaPort)
+        implicit val wsCfg =
+          appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = 8)
 
         implicit val wsConsumerProbe = WSProbe()
         val producerProbe            = WSProbe()
-        val routes                   = Route.seal(TestRoutes.routes)
+        val (sdcStream, testRoutes)  = TestRoutes.wsProxyRoutes
+        val ctrl                     = sdcStream.run()
         val topic                    = "test-topic-3"
 
         produceJson(
           topic = topic,
           keyType = StringType,
           valType = StringType,
-          routes = routes,
+          routes = testRoutes,
           messages = producerKeyValueJson(10)
         )(producerProbe)
 
@@ -144,7 +162,7 @@ class ServerRoutesSpec
         rk mustBe "foo-1"
         rv mustBe "bar-1"
 
-        WS(outPath, wsConsumerProbe.flow) ~> routes ~> check {
+        WS(outPath, wsConsumerProbe.flow) ~> testRoutes ~> check {
           isWebSocketUpgrade mustBe true
 
           forAll(1 to 10) { i =>
@@ -156,22 +174,26 @@ class ServerRoutesSpec
           }
 
         }
+
+        ctrl.shutdown()
       }
 
     "set up a WebSocket connection for consuming JSON value messages" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-        implicit val wsCfg = applicationTestConfig(kcfg.kafkaPort)
+        implicit val wsCfg =
+          appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = 9)
 
         implicit val wsConsumerProbe = WSProbe()
         val producerProbe            = WSProbe()
-        val routes                   = Route.seal(TestRoutes.routes)
+        val (sdcStream, testRoutes)  = TestRoutes.wsProxyRoutes
+        val ctrl                     = sdcStream.run()
         val topic                    = "test-topic-4"
 
         produceJson(
           topic = topic,
           keyType = NoType,
           valType = StringType,
-          routes = routes,
+          routes = testRoutes,
           messages = producerValueJson(10)
         )(producerProbe)
 
@@ -186,7 +208,7 @@ class ServerRoutesSpec
 
         consumeFirstMessageFrom[String](topic) mustBe "bar-1"
 
-        WS(outPath, wsConsumerProbe.flow) ~> routes ~> check {
+        WS(outPath, wsConsumerProbe.flow) ~> testRoutes ~> check {
           isWebSocketUpgrade mustBe true
 
           forAll(1 to 10) { i =>
@@ -195,49 +217,57 @@ class ServerRoutesSpec
               expectedValue = s"bar-$i"
             )
           }
-
         }
+
+        ctrl.shutdown()
       }
 
     "set up a WebSocket connection for producing Avro key value messages" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val wsCfg =
-          applicationTestConfig(kcfg.kafkaPort, Option(kcfg.schemaRegistryPort))
+          appTestConfig(kcfg.kafkaPort, Option(kcfg.schemaRegistryPort), 10)
 
-        implicit val wsClient = WSProbe()
-        val routes            = Route.seal(TestRoutes.routes)
-        val messages          = producerKeyValueAvro(1)
+        implicit val wsClient       = WSProbe()
+        val (sdcStream, testRoutes) = TestRoutes.wsProxyRoutes
+        val ctrl                    = sdcStream.run()
+        val messages                = producerKeyValueAvro(1)
 
-        produceAvro("test-topic-5", routes, Some(AvroType), messages)
+        produceAvro("test-topic-5", testRoutes, Some(AvroType), messages)
+
+        ctrl.shutdown()
       }
 
     "set up a WebSocket connection for producing Avro value messages" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val wsCfg =
-          applicationTestConfig(kcfg.kafkaPort, Option(kcfg.schemaRegistryPort))
+          appTestConfig(kcfg.kafkaPort, Option(kcfg.schemaRegistryPort), 11)
 
-        implicit val wsClient = WSProbe()
-        val routes            = Route.seal(TestRoutes.routes)
-        val messages          = producerValueAvro(1)
+        implicit val wsClient       = WSProbe()
+        val (sdcStream, testRoutes) = TestRoutes.wsProxyRoutes
+        val ctrl                    = sdcStream.run()
+        val messages                = producerValueAvro(1)
 
-        produceAvro("test-topic-6", routes, None, messages)
+        produceAvro("test-topic-6", testRoutes, None, messages)
+
+        ctrl.shutdown()
       }
 
     "set up a WebSocket connection for consuming Avro key value messages" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val schemaRegPort = kcfg.schemaRegistryPort
         implicit val wsCfg =
-          applicationTestConfig(kcfg.kafkaPort, Option(schemaRegPort))
+          appTestConfig(kcfg.kafkaPort, Option(schemaRegPort), 12)
 
         implicit val wsConsumerProbe = WSProbe()
         val producerProbe            = WSProbe()
-        val routes                   = Route.seal(TestRoutes.routes)
+        val (sdcStream, testRoutes)  = TestRoutes.wsProxyRoutes
+        val ctrl                     = sdcStream.run()
         val topic                    = "test-topic-7"
         val messages                 = producerKeyValueAvro(10)
 
         produceAvro(
           topic = topic,
-          routes = routes,
+          routes = testRoutes,
           keyType = Some(AvroType),
           messages = messages
         )(producerProbe, kcfg)
@@ -264,7 +294,7 @@ class ServerRoutesSpec
           t.duration mustBe (120 seconds).toMillis
         }
 
-        WS(outPath, wsConsumerProbe.flow) ~> routes ~> check {
+        WS(outPath, wsConsumerProbe.flow) ~> testRoutes ~> check {
           isWebSocketUpgrade mustBe true
 
           forAll(1 to 10) { i =>
@@ -280,6 +310,8 @@ class ServerRoutesSpec
           }
 
         }
+
+        ctrl.shutdown()
       }
   }
 

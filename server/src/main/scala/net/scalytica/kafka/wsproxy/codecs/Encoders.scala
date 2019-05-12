@@ -1,16 +1,19 @@
 package net.scalytica.kafka.wsproxy.codecs
 
 import io.circe._
-import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.semiauto._
 import io.circe.syntax._
 import net.scalytica.kafka.wsproxy.models.Formats.FormatType
 import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails
 import net.scalytica.kafka.wsproxy.models._
+import net.scalytica.kafka.wsproxy.session.{ConsumerInstance, Session}
 
-object Encoders {
+trait Encoders {
 
-  implicit val cfg: Configuration = Configuration.default
+  implicit val sessionEncoder: Encoder[Session] = deriveEncoder
+
+  implicit val consumerInstanceEncoder: Encoder[ConsumerInstance] =
+    deriveEncoder
 
   implicit val msgIdEncoder: Encoder[WsMessageId] = { msgId =>
     Json.fromString(msgId.value)
@@ -79,3 +82,5 @@ object Encoders {
   }
 
 }
+
+object Encoders extends Encoders

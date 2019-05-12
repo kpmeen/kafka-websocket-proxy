@@ -62,7 +62,6 @@ object BasicSerdes {
 
   implicit val JsonSerializer   = JsonSerde.serializer()
   implicit val JsonDeserializer = JsonSerde.deserializer()
-
 }
 
 /**
@@ -90,28 +89,19 @@ object EmptySerde
 /**
  * Serde for handling JSON messages. Currently built on top of the String serde.
  */
-object JsonSerde
-    extends Serde[Json]
-    with Serializer[Json]
-    with Deserializer[Json] {
-
-  private[this] val underlying = KSerdes.String()
-
-  override def serializer()   = this
-  override def deserializer() = this
-
-  override def configure(configs: JMap[String, _], isKey: Boolean): Unit = {}
+object JsonSerde extends StringBasedSerde[Json] {
 
   override def serialize(topic: String, data: Json) =
-    underlying.serializer().serialize(topic, data.pretty(Printer.noSpaces))
+    Option(data)
+      .map(d => ser.serialize(topic, d.pretty(Printer.noSpaces)))
+      .orNull
 
   override def deserialize(topic: String, data: Array[Byte]) = {
-    val str = underlying.deserializer().deserialize(topic, data)
+    val str = des.deserialize(topic, data)
     parse(str) match {
       case Right(json) => json
       case Left(err)   => throw err.underlying
     }
   }
 
-  override def close(): Unit = {}
 }
