@@ -4,7 +4,7 @@ import javax.xml.bind.DatatypeConverter
 
 import scala.util.Try
 
-object Binary {
+private[codecs] object Binary {
 
   def decodeBase64(base64: String): Try[Array[Byte]] = {
     Try(DatatypeConverter.parseBase64Binary(base64))

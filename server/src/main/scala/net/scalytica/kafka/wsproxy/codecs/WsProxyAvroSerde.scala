@@ -37,7 +37,7 @@ class WsProxyAvroSerde[T <: Product: Decoder: Encoder: SchemaFor] private (
 
   override def serialize(topic: String, data: T): Array[Byte] = {
     val topicStr = Option(topic).getOrElse("NA")
-    logger.whenTraceEnabled(
+    logger.trace(
       s"Attempting to serialize ${data.getClass.getSimpleName} to for $topicStr"
     )
     val res = Option(data).map { d =>
@@ -50,15 +50,15 @@ class WsProxyAvroSerde[T <: Product: Decoder: Encoder: SchemaFor] private (
 
   override def deserialize(topic: String, data: Array[Byte]): T = {
     val topicStr = Option(topic).getOrElse("NA")
-    logger.whenTraceEnabled(
+    logger.trace(
       s"Attempting to deserialize message from topic $topicStr"
     )
-    logger.whenTraceEnabled(
+    logger.trace(
       s"Data array has length ${Option(data).map(_.length).orNull}"
     )
     try {
       val record = avroDes.deserialize(topic, data).asInstanceOf[GenericRecord]
-      logger.whenTraceEnabled(s"GenericRecord is:\n$record")
+      logger.trace(s"GenericRecord is:\n$record")
       val res = RecordFormat[T].from(record)
       res
     } catch {

@@ -5,7 +5,7 @@ import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 import scala.io.StdIn
 
 object Server extends App with ServerRoutes {
@@ -47,6 +47,10 @@ object Server extends App with ServerRoutes {
 
   private[this] val port = cfg.server.port
 
+  val (sessionHandlerStream, routes) = wsProxyRoutes
+
+  val ctrl = sessionHandlerStream.run()
+
   /** Bind to network interface and port, starting the server */
   private[this] val bindingFuture = Http().bindAndHandle(
     handler = routes,
@@ -60,6 +64,10 @@ object Server extends App with ServerRoutes {
        |Press RETURN to stop...""".stripMargin
   )
   StdIn.readLine()
+
+  ctrl.drainAndShutdown(
+    Future.successful(println("Session data consumer shutdown."))
+  )
   // scalastyle:on
 
   /** Unbind from the network interface and port, shutting down the server. */

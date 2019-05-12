@@ -104,7 +104,6 @@ object CommitHandler {
    */
   private[this] def commit(stack: Stack, msgId: WsMessageId)(
       implicit
-      cfg: AppCfg,
       ec: ExecutionContext,
       ctx: ActorContext[CommitProtocol]
   ): Option[Stack] = {

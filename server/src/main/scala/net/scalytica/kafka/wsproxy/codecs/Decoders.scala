@@ -1,7 +1,6 @@
 package net.scalytica.kafka.wsproxy.codecs
 
 import io.circe._
-import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.semiauto._
 import net.scalytica.kafka.wsproxy.models.Formats.FormatType
 import net.scalytica.kafka.wsproxy.models.ValueDetails.{
@@ -9,12 +8,16 @@ import net.scalytica.kafka.wsproxy.models.ValueDetails.{
   OutValueDetails
 }
 import net.scalytica.kafka.wsproxy.models._
+import net.scalytica.kafka.wsproxy.session.{ConsumerInstance, Session}
 
 import scala.util.{Failure, Success}
 
-object Decoders {
+trait Decoders {
 
-  implicit val cfg: Configuration = Configuration.default
+  implicit val sessionDecoder: Decoder[Session] = deriveDecoder
+
+  implicit val consumerInstanceDecoder: Decoder[ConsumerInstance] =
+    deriveDecoder
 
   implicit val wsMessageIdDecoder: Decoder[WsMessageId] = { json =>
     json.as[String].map(WsMessageId.apply)
@@ -103,7 +106,6 @@ object Decoders {
       valDec: Decoder[V]
   ): Decoder[WsConsumerRecord[K, V]] = { cursor =>
     for {
-      msgId     <- cursor.downField("wsProxyMessageId").as[WsMessageId]
       topic     <- cursor.downField("topic").as[TopicName]
       partition <- cursor.downField("partition").as[Partition]
       offset    <- cursor.downField("offset").as[Offset]
@@ -136,3 +138,5 @@ object Decoders {
     }
   }
 }
+
+object Decoders extends Decoders

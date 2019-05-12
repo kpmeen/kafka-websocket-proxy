@@ -3,7 +3,8 @@ package net.scalytica.kafka.wsproxy
 import java.nio.file.Path
 
 import com.typesafe.config.{Config, ConfigFactory}
-import pureconfig.loadConfigOrThrow
+import net.scalytica.kafka.wsproxy.models.SecurityProtocol
+import pureconfig.{loadConfigOrThrow, ConfigReader}
 import pureconfig.generic.auto._
 
 import scala.concurrent.duration.FiniteDuration
@@ -12,9 +13,15 @@ object Configuration {
 
   private[this] val CfgRootKey = "kafka.ws.proxy"
 
+  implicit val retentionCfgReader: ConfigReader[SecurityProtocol] =
+    ConfigReader.fromNonEmptyStringOpt { s =>
+      Some(SecurityProtocol.fromString(s))
+    }
+
   final case class AppCfg(
       server: ServerCfg,
       consumer: ConsumerCfg,
+      sessionHandler: SessionHandlerCfg,
       commitHandler: CommitHandlerCfg
   ) {
 
@@ -31,12 +38,19 @@ object Configuration {
       port: Int,
       kafkaBootstrapUrls: Seq[String],
       schemaRegistryUrl: Option[String],
-      autoRegisterSchemas: Boolean
+      autoRegisterSchemas: Boolean,
+      kafkaSecurityProtocol: SecurityProtocol
   )
 
   final case class ConsumerCfg(
       defaultRateLimit: Long,
       defaultBatchSize: Int
+  )
+
+  final case class SessionHandlerCfg(
+      sessionStateTopicName: String,
+      sessionStateReplicationFactor: Short,
+      sessionStateRetention: FiniteDuration
   )
 
   final case class CommitHandlerCfg(

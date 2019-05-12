@@ -2,8 +2,11 @@ package net.scalytica.kafka.wsproxy
 
 import com.typesafe.config.ConfigFactory
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.models.Plaintext
 import org.scalatest.{MustMatchers, WordSpec}
 import pureconfig.error.ConfigReaderException
+
+import scala.concurrent.duration._
 
 class ConfigurationSpec extends WordSpec with MustMatchers {
 
@@ -15,11 +18,18 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
       |    kafka-bootstrap-urls = ["localhost:29092"]
       |    schema-registry-url = "http://localhost:28081"
       |    auto-register-schemas = true
+      |    kafka-security-protocol = "plaintext"
       |  }
       |
       |  consumer {
       |    default-rate-limit = unlimited
       |    default-batch-size = 0
+      |  }
+      |
+      |  session-handler {
+      |    session-state-topic-name = "_wsproxy.session.state"
+      |    session-state-replication-factor = 3
+      |    session-state-retention = 30 days
       |  }
       |
       |  commit-handler {
@@ -39,11 +49,18 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
       |    kafka-bootstrap-urls = "localhost:29092"
       |    schema-registry-url = "http://localhost:28081"
       |    auto-register-schemas = true
+      |    kafka-security-protocol = "plaintext"
       |  }
       |
       |  consumer {
       |    default-rate-limit = 0
       |    default-batch-size = 0
+      |  }
+      |
+      |  session-handler {
+      |    session-state-topic-name = "_wsproxy.session.state"
+      |    session-state-replication-factor = 3
+      |    session-state-retention = 30 days
       |  }
       |
       |  commit-handler {
@@ -60,12 +77,24 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
     "successfully load the default configuration" in {
       val cfg = Configuration.load()
 
-      cfg.consumer.defaultBatchSize mustBe 0
-      cfg.consumer.defaultRateLimit mustBe 0
       cfg.server.serverId mustBe 1
+      cfg.server.port mustBe 8078
       cfg.server.kafkaBootstrapUrls mustBe Seq("localhost:29092")
       cfg.server.schemaRegistryUrl mustBe Some("http://localhost:28081")
       cfg.server.autoRegisterSchemas mustBe true
+      cfg.server.kafkaSecurityProtocol mustBe Plaintext
+
+      cfg.consumer.defaultBatchSize mustBe 0
+      cfg.consumer.defaultRateLimit mustBe 0
+
+      cfg.sessionHandler.sessionStateTopicName mustBe "_wsproxy.session.state"
+      cfg.sessionHandler.sessionStateReplicationFactor mustBe 3
+      cfg.sessionHandler.sessionStateRetention mustBe 30.days
+
+      cfg.commitHandler.maxStackSize mustBe 1000
+      cfg.commitHandler.autoCommitEnabled mustBe false
+      cfg.commitHandler.autoCommitInterval mustBe 1.second
+      cfg.commitHandler.autoCommitMaxAge mustBe 20.seconds
     }
 
     "fail when trying to load an invalid configuration" in {

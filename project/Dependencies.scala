@@ -3,11 +3,11 @@ import sbt._
 object Versions {
   val ScalaVersion = "2.12.8"
 
-  val ConfigVersion     = "1.3.3"
+  val ConfigVersion     = "1.3.4"
   val PureConfigVersion = "0.10.2"
 
   val Avro4sVersion                 = "2.0.4"
-  val ConfluentPlatformVersion      = "5.2.0"
+  val ConfluentPlatformVersion      = "5.2.1"
   val KafkaVersion                  = "2.2.0"
   val EmbeddedKafkaVersion          = "2.2.0"
   val EmbeddedSchemaRegistryVersion = "5.2.0"
@@ -15,7 +15,7 @@ object Versions {
 
   val AkkaVersion            = "2.5.22"
   val AkkaHttpVersion        = "10.1.8"
-  val AkkaStreamKafkaVersion = "1.0.1"
+  val AkkaStreamKafkaVersion = "1.0.2"
 
   val AlpakkaVersion = "0.20"
 

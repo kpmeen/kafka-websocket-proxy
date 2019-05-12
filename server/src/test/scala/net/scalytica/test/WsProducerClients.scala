@@ -3,9 +3,7 @@ package net.scalytica.test
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
 import akka.util.ByteString
-import net.manub.embeddedkafka.ConsumerExtensions.ConsumerRetryConfig
 import net.manub.embeddedkafka.schemaregistry.EmbeddedKafkaConfig
-import net.scalytica.kafka.wsproxy.Configuration
 import net.scalytica.kafka.wsproxy.SocketProtocol.AvroPayload
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
   AvroConsumerRecord,
@@ -18,37 +16,8 @@ import net.scalytica.kafka.wsproxy.models.Formats._
 import org.scalatest.Inspectors.forAll
 import org.scalatest.{MustMatchers, Suite}
 
-import scala.concurrent.duration._
-
-trait WSProxySpecLike
-    extends FileLoader
-    with ScalatestRouteTest
-    with MustMatchers { self: Suite =>
-
-  // scalastyle:off magic.number
-  implicit val consumerRetryConfig: ConsumerRetryConfig =
-    ConsumerRetryConfig(30, 50.millis)
-  // scalastyle:on magic.number
-
-  val embeddedKafkaConfig = EmbeddedKafkaConfig(
-    kafkaPort = 0,
-    zooKeeperPort = 0,
-    schemaRegistryPort = 0
-  )
-
-  lazy val defaultApplicationTestConfig =
-    Configuration.loadFile(filePath("/application-test.conf"))
-
-  def applicationTestConfig(
-      kafkaPort: Int,
-      schemaRegistryPort: Option[Int] = None
-  ): Configuration.AppCfg = defaultApplicationTestConfig.copy(
-    server = defaultApplicationTestConfig.server.copy(
-      kafkaBootstrapUrls = List(serverHost(kafkaPort)),
-      schemaRegistryUrl =
-        schemaRegistryPort.map(u => s"http://${serverHost(u)}")
-    )
-  )
+trait WsProducerClients extends ScalatestRouteTest with MustMatchers {
+  self: Suite =>
 
   def produceJson(
       topic: String,
@@ -123,4 +92,5 @@ trait WSProxySpecLike
       wsClient.expectCompletion()
     }
   }
+
 }
