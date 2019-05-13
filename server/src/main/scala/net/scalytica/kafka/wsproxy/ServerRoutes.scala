@@ -23,6 +23,7 @@ import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
   AvroProducerRecord,
   AvroProducerResult
 }
+import net.scalytica.kafka.wsproxy.errors.TopicNotFoundError
 import net.scalytica.kafka.wsproxy.models.{InSocketArgs, OutSocketArgs}
 import net.scalytica.kafka.wsproxy.session.SessionHandler
 import net.scalytica.kafka.wsproxy.websockets.{
@@ -40,10 +41,13 @@ trait ServerRoutes
 
   private[this] val logger = Logger(this.getClass)
 
-  private[this] def jsonResponseMsg(sc: StatusCode, s: String): HttpResponse = {
-    val js = Json.obj("message" -> Json.fromString(s))
+  private[this] def jsonResponseMsg(
+      statusCode: StatusCode,
+      message: String
+  ): HttpResponse = {
+    val js = Json.obj("message" -> Json.fromString(message))
     HttpResponse(
-      status = sc,
+      status = statusCode,
       entity = HttpEntity(
         contentType = ContentTypes.`application/json`,
         string = js.pretty(Printer.noSpaces)
@@ -71,7 +75,10 @@ trait ServerRoutes
   }
 
   implicit def serverErrorHandler: ExceptionHandler = ExceptionHandler {
-    case t: Throwable =>
+    case tnfe: TopicNotFoundError =>
+      logger.info(s"Socket not initialised. Reason: ${tnfe.getMessage}")
+      complete(jsonResponseMsg(NotFound, tnfe.getMessage))
+    case t =>
       extractUri { uri =>
         logger.warn(s"Request to $uri could not be handled normally", t)
         complete(jsonResponseMsg(InternalServerError, t.getMessage))
@@ -83,7 +90,10 @@ trait ServerRoutes
       .newBuilder()
       .handleNotFound {
         rejectAndComplete(
-          jsonResponseMsg(NotFound, "This is not the page you are looking for.")
+          jsonResponseMsg(
+            statusCode = NotFound,
+            message = "This is not the resource you are looking for."
+          )
         )
       }
       .handle {
