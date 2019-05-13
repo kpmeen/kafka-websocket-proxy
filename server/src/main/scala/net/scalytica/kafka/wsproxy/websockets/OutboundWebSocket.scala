@@ -19,7 +19,8 @@ import io.circe.parser.parse
 import io.circe.syntax._
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.SocketProtocol.{AvroPayload, JsonPayload}
-import net.scalytica.kafka.wsproxy.WithSchemaRegistryConfig
+import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
+import net.scalytica.kafka.wsproxy.{WithSchemaRegistryConfig, _}
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.Implicits._
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes._
 import net.scalytica.kafka.wsproxy.codecs.Decoders._
@@ -88,21 +89,18 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
 
     implicit val scheduler = as.scheduler
 
+    val wsAdminClient   = new WsKafkaAdminClient(cfg)
+    val topicPartitions = wsAdminClient.topicPartitions(args.topic)
+
     val serverId = cfg.server.serverId
     val clientId = args.clientId
     val groupId  = args.groupId.getOrElse(s"$clientId-group")
 
     val consumerAddResult = for {
-      // Initialise the session
-      initRes <- sessionHandler.initSession(groupId, 2)
-      _ <- Future.successful(
-            logger.debug(
-              s"Session ${initRes.session.consumerGroupId} is ready."
-            )
-          )
-      // Try to add a new consumer to the session
-      addResult <- sessionHandler.addConsumer(groupId, clientId, serverId)
-    } yield addResult
+      ir     <- sessionHandler.initSession(groupId, topicPartitions)
+      _      <- logger.debugf(s"Session ${ir.session.consumerGroupId} ready.")
+      addRes <- sessionHandler.addConsumer(groupId, clientId, serverId)
+    } yield addRes
 
     lazy val initSocket = () =>
       prepareOutboundWebSocket(args) { () =>

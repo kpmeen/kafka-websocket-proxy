@@ -216,7 +216,9 @@ trait SessionHandler {
 
       val log = ctx.log.withLoggerClass(classOf[SessionHandler])
 
-      adminClient.initSessionStateTopic()
+      adminClient.initSessionStateTopic().foreach { _ =>
+        ctx.log.info("Sessions state topic initialised")
+      }
 
       log.debug("Initialising session data producer...")
       implicit val producer = new SessionDataProducer()

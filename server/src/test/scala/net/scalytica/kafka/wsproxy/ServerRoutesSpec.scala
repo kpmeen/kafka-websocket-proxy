@@ -35,6 +35,13 @@ class ServerRoutesSpec
 
   implicit val timeout = RouteTestTimeout(20 seconds)
 
+  def initTopic(topicName: String, partitions: Int = 1)(
+      implicit kcfg: EmbeddedKafkaConfig
+  ): Unit = createCustomTopic(
+    topic = topicName,
+    partitions = partitions
+  )
+
   case object TestRoutes extends ServerRoutes
 
   import TestRoutes.{serverErrorHandler, serverRejectionHandler}
@@ -44,7 +51,7 @@ class ServerRoutesSpec
       implicit val cfg = defaultTestAppCfgWithServerId(1)
 
       val expected =
-        "{\"message\":\"This is not the page you are looking for.\"}"
+        "{\"message\":\"This is not the resource you are looking for.\"}"
 
       val (_, testRoutes) = TestRoutes.wsProxyRoutes
 
@@ -104,12 +111,15 @@ class ServerRoutesSpec
         implicit val wsCfg =
           appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = 6)
 
+        val topicName = "test-topic-1"
+        initTopic(topicName)
+
         implicit val wsClient       = WSProbe()
         val (sdcStream, testRoutes) = TestRoutes.wsProxyRoutes
         val ctrl                    = sdcStream.run()
         val msgs                    = producerKeyValueJson(1)
 
-        produceJson("test-topic-1", StringType, StringType, testRoutes, msgs)
+        produceJson(topicName, StringType, StringType, testRoutes, msgs)
 
         ctrl.shutdown()
       }
@@ -119,12 +129,15 @@ class ServerRoutesSpec
         implicit val wsCfg =
           appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = 7)
 
+        val topicName = "test-topic-2"
+        initTopic(topicName)
+
         implicit val wsClient       = WSProbe()
         val (sdcStream, testRoutes) = TestRoutes.wsProxyRoutes
         val ctrl                    = sdcStream.run()
         val msgs                    = producerValueJson(1)
 
-        produceJson("test-topic-2", NoType, StringType, testRoutes, msgs)
+        produceJson(topicName, NoType, StringType, testRoutes, msgs)
 
         ctrl.shutdown()
       }
@@ -134,14 +147,16 @@ class ServerRoutesSpec
         implicit val wsCfg =
           appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = 8)
 
+        val topicName = "test-topic-3"
+        initTopic(topicName)
+
         implicit val wsConsumerProbe = WSProbe()
         val producerProbe            = WSProbe()
         val (sdcStream, testRoutes)  = TestRoutes.wsProxyRoutes
         val ctrl                     = sdcStream.run()
-        val topic                    = "test-topic-3"
 
         produceJson(
-          topic = topic,
+          topic = topicName,
           keyType = StringType,
           valType = StringType,
           routes = testRoutes,
@@ -151,14 +166,14 @@ class ServerRoutesSpec
         val outPath = "/socket/out?" +
           "clientId=test-3" +
           "&groupId=test-group-3" +
-          s"&topic=$topic" +
+          s"&topic=$topicName" +
           "&keyType=string" +
           "&valType=string" +
           "&autoCommit=false"
 
         import net.manub.embeddedkafka.Codecs.stringDeserializer
 
-        val (rk, rv) = consumeFirstKeyedMessageFrom[String, String](topic)
+        val (rk, rv) = consumeFirstKeyedMessageFrom[String, String](topicName)
         rk mustBe "foo-1"
         rv mustBe "bar-1"
 
@@ -167,7 +182,7 @@ class ServerRoutesSpec
 
           forAll(1 to 10) { i =>
             wsConsumerProbe.expectWsConsumerKeyValueResultJson[String, String](
-              expectedTopic = topic,
+              expectedTopic = topicName,
               expectedKey = s"foo-$i",
               expectedValue = s"bar-$i"
             )
@@ -183,14 +198,16 @@ class ServerRoutesSpec
         implicit val wsCfg =
           appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = 9)
 
+        val topicName = "test-topic-4"
+        initTopic(topicName)
+
         implicit val wsConsumerProbe = WSProbe()
         val producerProbe            = WSProbe()
         val (sdcStream, testRoutes)  = TestRoutes.wsProxyRoutes
         val ctrl                     = sdcStream.run()
-        val topic                    = "test-topic-4"
 
         produceJson(
-          topic = topic,
+          topic = topicName,
           keyType = NoType,
           valType = StringType,
           routes = testRoutes,
@@ -200,20 +217,20 @@ class ServerRoutesSpec
         val outPath = "/socket/out?" +
           "clientId=test-4" +
           "&groupId=test-group-4" +
-          s"&topic=$topic" +
+          s"&topic=$topicName" +
           "&valType=string" +
           "&autoCommit=false"
 
         import net.manub.embeddedkafka.Codecs.stringDeserializer
 
-        consumeFirstMessageFrom[String](topic) mustBe "bar-1"
+        consumeFirstMessageFrom[String](topicName) mustBe "bar-1"
 
         WS(outPath, wsConsumerProbe.flow) ~> testRoutes ~> check {
           isWebSocketUpgrade mustBe true
 
           forAll(1 to 10) { i =>
             wsConsumerProbe.expectWsConsumerValueResultJson[String](
-              expectedTopic = topic,
+              expectedTopic = topicName,
               expectedValue = s"bar-$i"
             )
           }
@@ -227,12 +244,15 @@ class ServerRoutesSpec
         implicit val wsCfg =
           appTestConfig(kcfg.kafkaPort, Option(kcfg.schemaRegistryPort), 10)
 
+        val topicName = "test-topic-5"
+        initTopic(topicName)
+
         implicit val wsClient       = WSProbe()
         val (sdcStream, testRoutes) = TestRoutes.wsProxyRoutes
         val ctrl                    = sdcStream.run()
         val messages                = producerKeyValueAvro(1)
 
-        produceAvro("test-topic-5", testRoutes, Some(AvroType), messages)
+        produceAvro(topicName, testRoutes, Some(AvroType), messages)
 
         ctrl.shutdown()
       }
@@ -242,12 +262,15 @@ class ServerRoutesSpec
         implicit val wsCfg =
           appTestConfig(kcfg.kafkaPort, Option(kcfg.schemaRegistryPort), 11)
 
+        val topicName = "test-topic-6"
+        initTopic(topicName)
+
         implicit val wsClient       = WSProbe()
         val (sdcStream, testRoutes) = TestRoutes.wsProxyRoutes
         val ctrl                    = sdcStream.run()
         val messages                = producerValueAvro(1)
 
-        produceAvro("test-topic-6", testRoutes, None, messages)
+        produceAvro(topicName, testRoutes, None, messages)
 
         ctrl.shutdown()
       }
@@ -258,15 +281,17 @@ class ServerRoutesSpec
         implicit val wsCfg =
           appTestConfig(kcfg.kafkaPort, Option(schemaRegPort), 12)
 
+        val topicName = "test-topic-7"
+        initTopic(topicName)
+
         implicit val wsConsumerProbe = WSProbe()
         val producerProbe            = WSProbe()
         val (sdcStream, testRoutes)  = TestRoutes.wsProxyRoutes
         val ctrl                     = sdcStream.run()
-        val topic                    = "test-topic-7"
         val messages                 = producerKeyValueAvro(10)
 
         produceAvro(
-          topic = topic,
+          topic = topicName,
           routes = testRoutes,
           keyType = Some(AvroType),
           messages = messages
@@ -275,7 +300,7 @@ class ServerRoutesSpec
         val outPath = "/socket/out?" +
           "clientId=test-7" +
           "&groupId=test-group-7" +
-          s"&topic=$topic" +
+          s"&topic=$topicName" +
           s"&socketPayload=${AvroPayload.name}" +
           "&keyType=avro" +
           "&valType=avro" +
@@ -284,7 +309,7 @@ class ServerRoutesSpec
         implicit val keySerdes = Serdes.keySerdes.deserializer()
         implicit val valSerdes = Serdes.valueSerdes.deserializer()
 
-        val (rk, rv) = consumeFirstKeyedMessageFrom[TestKey, Album](topic)
+        val (rk, rv) = consumeFirstKeyedMessageFrom[TestKey, Album](topicName)
         rk.username mustBe "foo-1"
         rv.artist mustBe "artist-1"
         rv.title mustBe "title-1"
@@ -302,7 +327,7 @@ class ServerRoutesSpec
               TestTypes.Track(s"track-$i", (120 seconds).toMillis)
             }
             wsConsumerProbe.expectWsConsumerKeyValueResultAvro(
-              expectedTopic = topic,
+              expectedTopic = topicName,
               expectedKey = Option(TestTypes.TestKey(s"foo-$i", 1234567L)),
               expectedValue =
                 TestTypes.Album(s"artist-$i", s"title-$i", expectedTracks)

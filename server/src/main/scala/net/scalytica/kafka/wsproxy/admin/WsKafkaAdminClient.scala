@@ -5,13 +5,16 @@ import net.scalytica.kafka.wsproxy.{
   KafkaFutureConverter,
   KafkaFutureVoidConverter
 }
+import net.scalytica.kafka.wsproxy._
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.errors.TopicNotFoundError
 import org.apache.kafka.clients.admin.AdminClientConfig._
 import org.apache.kafka.clients.admin._
 import org.apache.kafka.common.config.TopicConfig._
 
 import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.duration._
 
 /**
  * Simple wrapper around the Kafka AdminClient to allow for bootstrapping the
@@ -24,9 +27,10 @@ class WsKafkaAdminClient(cfg: AppCfg) {
   private[this] val logger = Logger(getClass)
 
   private[this] lazy val admConfig = Map[String, AnyRef](
-    BOOTSTRAP_SERVERS_CONFIG -> cfg.server.kafkaBootstrapUrls.mkString(","),
-    CLIENT_ID_CONFIG         -> "kafka-websocket-proxy-admin",
-    SECURITY_PROTOCOL_CONFIG -> cfg.server.kafkaSecurityProtocol.stringValue
+    BOOTSTRAP_SERVERS_CONFIG  -> cfg.server.kafkaBootstrapUrls.mkString(","),
+    CLIENT_ID_CONFIG          -> "kafka-websocket-proxy-admin",
+    SECURITY_PROTOCOL_CONFIG  -> cfg.server.kafkaSecurityProtocol.stringValue,
+    REQUEST_TIMEOUT_MS_CONFIG -> s"${(10 seconds).toMillis}"
   )
 
   private[this] val sessionStateTopic = cfg.sessionHandler.sessionStateTopicName
@@ -89,6 +93,27 @@ class WsKafkaAdminClient(cfg: AppCfg) {
           logger.error("Session state topic verification failed.", ex)
           throw ex
       }
+  }
+
+  /**
+   * Fetches the configured number of partitions for the given Kafka topic.
+   *
+   * @param topicName the topic name to get partitions for
+   * @return returns the number of partitions for the topic. If it is not found,
+   *         a [[TopicNotFoundError]] is thrown.
+   */
+  @throws(classOf[TopicNotFoundError])
+  def topicPartitions(topicName: String): Int = {
+    logger.debug(s"Fetching topic partitions for $topicName...")
+    logger.debug(s"Using configuration: ${cfg.server}")
+    underlying
+      .describeTopics(Seq(topicName).asJava)
+      .all()
+      .get()
+      .asScala
+      .headOption
+      .map(_._2.partitions().size())
+      .orThrow(TopicNotFoundError(s"Topic $topicName was not found"))
   }
 
 }

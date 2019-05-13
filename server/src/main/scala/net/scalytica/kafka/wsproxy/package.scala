@@ -2,6 +2,7 @@ package net.scalytica.kafka
 
 import java.util.concurrent.CompletableFuture
 
+import com.typesafe.scalalogging.Logger
 import io.confluent.monitoring.clients.interceptor.{
   MonitoringConsumerInterceptor,
   MonitoringProducerInterceptor
@@ -11,7 +12,6 @@ import org.apache.kafka.common.KafkaFuture
 import scala.concurrent.{Future, Promise}
 import scala.util.Try
 import scala.util.control.NonFatal
-
 import scala.compat.java8.FunctionConverters
 import scala.compat.java8.FutureConverters
 
@@ -26,12 +26,14 @@ package object wsproxy {
   implicit class OptionExtensions[T](underlying: Option[T]) {
 
     def getUnsafe: T = {
-      underlying.getOrElse {
-        throw new NoSuchElementException(
+      orThrow(
+        new NoSuchElementException(
           "Cannot lift the value from the Option[T] because it was empty."
         )
-      }
+      )
     }
+
+    def orThrow(t: Throwable): T = underlying.getOrElse(throw t)
   }
 
   implicit class StringExtensions(val underlying: String) extends AnyVal {
@@ -79,5 +81,34 @@ package object wsproxy {
       val sup = FunctionConverters.asJavaSupplier[A](() => jf.get)
       FutureConverters.toScala(CompletableFuture.supplyAsync(sup))
     }
+  }
+
+  implicit class LoggerExtensions(val logger: Logger) {
+    private[this] def wrapInFuture(stmnt: => Unit): Future[Unit] =
+      Future.successful(stmnt)
+
+    def errorf(message: String): Future[Unit] =
+      wrapInFuture(logger.error(message))
+
+    def errorf(message: String, cause: Throwable): Future[Unit] =
+      wrapInFuture(logger.error(message, cause))
+
+    def warnf(message: String): Future[Unit] =
+      wrapInFuture(logger.warn(message))
+
+    def warnf(message: String, cause: Throwable): Future[Unit] =
+      wrapInFuture(logger.warn(message, cause))
+
+    def infof(message: String): Future[Unit] =
+      wrapInFuture(logger.info(message))
+
+    def infof(message: String, cause: Throwable): Future[Unit] =
+      wrapInFuture(logger.info(message, cause))
+
+    def debugf(message: String): Future[Unit] =
+      wrapInFuture(logger.debug(message))
+
+    def debugf(message: String, cause: Throwable): Future[Unit] =
+      wrapInFuture(logger.debug(message, cause))
   }
 }
