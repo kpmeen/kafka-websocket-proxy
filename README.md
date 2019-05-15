@@ -56,6 +56,7 @@ file. Where the following parameters can be adjusted:
 | kafka.ws.proxy.commit-handler.auto-commit-interval              | WSPROXY_CH_AUTOCOMMIT_INTERVAL           | `1 second`               | The interval to execute the jobo for auto-committing messages of a given age. |
 | kafka.ws.proxy.commit-handler.auto-commit-max-age               | WSPROXY_CH_AUTOCOMMIT_MAX_AGE            | `20 seconds`             | The max allowed age of uncommitted messages in the commit handler stack. |
 
+
 ### Kafka Security
 
 TBD...
