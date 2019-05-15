@@ -5,12 +5,14 @@ import akka.actor.typed.ActorSystem
 import akka.actor.typed.scaladsl.adapter._
 import akka.kafka.ProducerSettings
 import com.typesafe.scalalogging.Logger
-import net.scalytica.kafka.wsproxy._
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy._
 import net.scalytica.kafka.wsproxy.codecs.Implicits._
 import net.scalytica.kafka.wsproxy.codecs.{BasicSerdes, SessionSerde}
-import org.apache.kafka.clients.producer.{ProducerConfig, ProducerRecord}
+import org.apache.kafka.clients.producer.ProducerConfig._
+import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 
+import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
@@ -40,16 +42,26 @@ private[session] class SessionDataProducer(
       .withProperties(
         // scalastyle:off
         // Enables stream monitoring in confluent control center
-        ProducerConfig.INTERCEPTOR_CLASSES_CONFIG -> ProducerInterceptorClass
+        INTERCEPTOR_CLASSES_CONFIG -> ProducerInterceptorClass
         // scalastyle:on
       )
+      .withProducerFactory { ps =>
+        val props: java.util.Properties =
+          cfg.producer.kafkaClientProperties ++ ps.getProperties.asScala.toMap
+        new KafkaProducer[String, Session](
+          props,
+          ps.keySerializerOpt.orNull,
+          ps.valueSerializerOpt.orNull
+        )
+      }
 
   private[this] lazy val producer = producerProps.createKafkaProducer()
 
   /**
    * Writes the [[Session]] data to the session state topic in Kafka.
+   *
    * @param session Session to write
-   * @param ec The [[ExecutionContext]] to use
+   * @param ec      The [[ExecutionContext]] to use
    * @return eventually returns [[Done]] when successfully completed
    */
   def publish(session: Session)(implicit ec: ExecutionContext): Future[Done] = {

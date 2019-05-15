@@ -56,6 +56,41 @@ file. Where the following parameters can be adjusted:
 | kafka.ws.proxy.commit-handler.auto-commit-interval              | WSPROXY_CH_AUTOCOMMIT_INTERVAL           | `1 second`               | The interval to execute the jobo for auto-committing messages of a given age. |
 | kafka.ws.proxy.commit-handler.auto-commit-max-age               | WSPROXY_CH_AUTOCOMMIT_MAX_AGE            | `20 seconds`             | The max allowed age of uncommitted messages in the commit handler stack. |
 
+### Kafka Security
+
+TBD...
+
+```hocon
+kafka.ws.proxy {
+
+  // The main security configurations can be defined under this key
+  kafka-security-properties {
+    sasl.mechanism = PLAIN
+    security.protocol = SASL_SSL
+    ssl.truststore.location = /path/to/kafka.client.truststore.jks
+    ssl.truststore.password = <password>
+    ssl.keystore.location = /path/to/kafka.client.keystore.jks
+    ssl.keystore.password = <password>
+    ssl.key.password = <password>
+    sasl.jaas.config = """org.apache.kafka.common.security.plain.PlainLoginModule required username="client" password="client";"""
+    ssl.endpoint.identification.algorithm=""
+  }
+
+  // Each client refer to the main security configuration. Each can be
+  // individually overridden if necessary.
+  
+  admin-client {
+    kafka-client-properties = ${kafka.ws.proxy.kafka-security-properties}
+  }
+  consumer {
+    kafka-client-properties = ${kafka.ws.proxy.kafka-security-properties}
+  }
+  producer {
+    kafka-client-properties = ${kafka.ws.proxy.kafka-security-properties}
+  }
+}
+```
+
 
 ## Endpoints and API
 

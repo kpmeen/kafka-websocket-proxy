@@ -2,7 +2,6 @@ package net.scalytica.kafka.wsproxy
 
 import com.typesafe.config.ConfigFactory
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
-import net.scalytica.kafka.wsproxy.models.Plaintext
 import org.scalatest.{MustMatchers, WordSpec}
 import pureconfig.error.ConfigReaderException
 
@@ -18,12 +17,20 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
       |    kafka-bootstrap-urls = ["localhost:29092"]
       |    schema-registry-url = "http://localhost:28081"
       |    auto-register-schemas = true
-      |    kafka-security-protocol = "plaintext"
+      |  }
+      |
+      |  admin-client {
+      |    kafka-client-properties {}
       |  }
       |
       |  consumer {
       |    default-rate-limit = unlimited
       |    default-batch-size = 0
+      |    kafka-client-properties {}
+      |  }
+      |
+      |  producer {
+      |    kafka-client-properties {}
       |  }
       |
       |  session-handler {
@@ -49,12 +56,20 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
       |    kafka-bootstrap-urls = "localhost:29092"
       |    schema-registry-url = "http://localhost:28081"
       |    auto-register-schemas = true
-      |    kafka-security-protocol = "plaintext"
+      |  }
+      |
+      |  admin-client {
+      |    kafka-client-properties {}
       |  }
       |
       |  consumer {
       |    default-rate-limit = 0
       |    default-batch-size = 0
+      |    kafka-client-properties {}
+      |  }
+      |
+      |  producer {
+      |    kafka-client-properties {}
       |  }
       |
       |  session-handler {
@@ -82,7 +97,6 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
       cfg.server.kafkaBootstrapUrls mustBe Seq("localhost:29092")
       cfg.server.schemaRegistryUrl mustBe Some("http://localhost:28081")
       cfg.server.autoRegisterSchemas mustBe true
-      cfg.server.kafkaSecurityProtocol mustBe Plaintext
 
       cfg.consumer.defaultBatchSize mustBe 0
       cfg.consumer.defaultRateLimit mustBe 0

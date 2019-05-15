@@ -11,9 +11,12 @@ import net.scalytica.kafka.wsproxy.codecs.Implicits._
 import net.scalytica.kafka.wsproxy.codecs.{BasicSerdes, SessionSerde}
 import org.apache.kafka.clients.consumer.ConsumerConfig.{
   AUTO_OFFSET_RESET_CONFIG,
-  ENABLE_AUTO_COMMIT_CONFIG
+  ENABLE_AUTO_COMMIT_CONFIG,
+  _
 }
-import org.apache.kafka.clients.consumer.{ConsumerConfig, OffsetResetStrategy}
+import org.apache.kafka.clients.consumer.{KafkaConsumer, OffsetResetStrategy}
+
+import scala.collection.JavaConverters._
 
 /**
  * Consumer for processing all updates to session state topic and transforming
@@ -49,10 +52,19 @@ private[session] class SessionDataConsumer(
         .toLowerCase,
       ENABLE_AUTO_COMMIT_CONFIG -> "false",
       // Enables stream monitoring in confluent control center
-      ConsumerConfig.INTERCEPTOR_CLASSES_CONFIG -> ConsumerInterceptorClass
+      INTERCEPTOR_CLASSES_CONFIG -> ConsumerInterceptorClass
     )
     .withGroupId(cid)
     .withClientId(cid)
+    .withConsumerFactory { cs =>
+      val props: java.util.Properties =
+        cfg.consumer.kafkaClientProperties ++ cs.getProperties.asScala.toMap
+      new KafkaConsumer[String, Session](
+        props,
+        cs.keyDeserializerOpt.orNull,
+        cs.valueDeserializerOpt.orNull
+      )
+    }
 
   /**
    * The akka-stream Source consuming messages from the session state topic.

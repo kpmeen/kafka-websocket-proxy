@@ -9,11 +9,11 @@ import io.confluent.monitoring.clients.interceptor.{
 }
 import org.apache.kafka.common.KafkaFuture
 
+import scala.collection.JavaConverters._
+import scala.compat.java8.{FunctionConverters, FutureConverters}
 import scala.concurrent.{Future, Promise}
 import scala.util.Try
 import scala.util.control.NonFatal
-import scala.compat.java8.FunctionConverters
-import scala.compat.java8.FutureConverters
 
 package object wsproxy {
 
@@ -22,6 +22,12 @@ package object wsproxy {
 
   val ConsumerInterceptorClass =
     classOf[MonitoringConsumerInterceptor[_, _]].getName
+
+  implicit def mapToProperties(m: Map[String, AnyRef]): java.util.Properties = {
+    val props = new java.util.Properties
+    props.putAll(m.asJava)
+    props
+  }
 
   implicit class OptionExtensions[T](underlying: Option[T]) {
 

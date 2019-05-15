@@ -1,20 +1,20 @@
 package net.scalytica.kafka.wsproxy.admin
 
 import com.typesafe.scalalogging.Logger
-import net.scalytica.kafka.wsproxy.{
-  KafkaFutureConverter,
-  KafkaFutureVoidConverter
-}
-import net.scalytica.kafka.wsproxy._
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.errors.TopicNotFoundError
+import net.scalytica.kafka.wsproxy.{
+  KafkaFutureConverter,
+  KafkaFutureVoidConverter,
+  _
+}
 import org.apache.kafka.clients.admin.AdminClientConfig._
 import org.apache.kafka.clients.admin._
 import org.apache.kafka.common.config.TopicConfig._
 
 import scala.collection.JavaConverters._
-import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
  * Simple wrapper around the Kafka AdminClient to allow for bootstrapping the
@@ -26,12 +26,12 @@ class WsKafkaAdminClient(cfg: AppCfg) {
 
   private[this] val logger = Logger(getClass)
 
-  private[this] lazy val admConfig = Map[String, AnyRef](
-    BOOTSTRAP_SERVERS_CONFIG  -> cfg.server.kafkaBootstrapUrls.mkString(","),
-    CLIENT_ID_CONFIG          -> "kafka-websocket-proxy-admin",
-    SECURITY_PROTOCOL_CONFIG  -> cfg.server.kafkaSecurityProtocol.stringValue,
-    REQUEST_TIMEOUT_MS_CONFIG -> s"${(10 seconds).toMillis}"
-  )
+  private[this] lazy val admConfig =
+    cfg.adminClient.kafkaClientProperties ++ Map[String, AnyRef](
+      BOOTSTRAP_SERVERS_CONFIG  -> cfg.server.kafkaBootstrapUrls.mkString(","),
+      CLIENT_ID_CONFIG          -> "kafka-websocket-proxy-admin",
+      REQUEST_TIMEOUT_MS_CONFIG -> s"${(10 seconds).toMillis}"
+    )
 
   private[this] val sessionStateTopic = cfg.sessionHandler.sessionStateTopicName
   private[this] val configuredReplicas =
@@ -40,7 +40,7 @@ class WsKafkaAdminClient(cfg: AppCfg) {
   private[this] val retentionDuration =
     cfg.sessionHandler.sessionStateRetention.toMillis
 
-  private[this] lazy val underlying = AdminClient.create(admConfig.asJava)
+  private[this] lazy val underlying = AdminClient.create(admConfig)
 
   private[this] def replicationFactor(
       implicit ec: ExecutionContext

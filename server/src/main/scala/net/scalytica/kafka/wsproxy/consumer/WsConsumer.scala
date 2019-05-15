@@ -7,14 +7,19 @@ import akka.kafka.{ConsumerSettings, Subscriptions}
 import akka.stream.scaladsl.Source
 import com.typesafe.scalalogging.Logger
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
-import net.scalytica.kafka.wsproxy.ConsumerInterceptorClass
 import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails
 import net.scalytica.kafka.wsproxy.models._
+import net.scalytica.kafka.wsproxy.{mapToProperties, ConsumerInterceptorClass}
 import org.apache.kafka.clients.consumer.ConsumerConfig._
 import org.apache.kafka.clients.consumer.OffsetResetStrategy.EARLIEST
-import org.apache.kafka.clients.consumer.{ConsumerRecord, OffsetResetStrategy}
+import org.apache.kafka.clients.consumer.{
+  ConsumerRecord,
+  KafkaConsumer,
+  OffsetResetStrategy
+}
 import org.apache.kafka.common.serialization.Deserializer
 
+import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 
 /**
@@ -45,14 +50,25 @@ object WsConsumer {
     ConsumerSettings(as, kd, vd)
       .withBootstrapServers(kafkaUrl)
       .withProperties(
-        // Enables stream monitoring in confluent control center
-        INTERCEPTOR_CLASSES_CONFIG     -> ConsumerInterceptorClass,
+        // scalastyle:off
         AUTO_OFFSET_RESET_CONFIG       -> offsetReset.name.toLowerCase,
         ENABLE_AUTO_COMMIT_CONFIG      -> s"$autoCommit",
-        AUTO_COMMIT_INTERVAL_MS_CONFIG -> s"${50.millis.toMillis}"
+        AUTO_COMMIT_INTERVAL_MS_CONFIG -> s"${50.millis.toMillis}",
+        // Enables stream monitoring in confluent control center
+        INTERCEPTOR_CLASSES_CONFIG -> ConsumerInterceptorClass
+        // scalastyle:on
       )
       .withClientId(s"$id-client")
       .withGroupId(gid.getOrElse(s"$id-group"))
+      .withConsumerFactory { cs =>
+        val props: java.util.Properties =
+          cfg.consumer.kafkaClientProperties ++ cs.getProperties.asScala.toMap
+        new KafkaConsumer[K, V](
+          props,
+          cs.keyDeserializerOpt.orNull,
+          cs.valueDeserializerOpt.orNull
+        )
+      }
   }
 
   /** Convenience function for logging a [[ConsumerRecord]]. */

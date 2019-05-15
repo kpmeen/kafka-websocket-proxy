@@ -7,19 +7,21 @@ import akka.kafka.scaladsl.Producer
 import akka.kafka.{ProducerMessage, ProducerSettings}
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Flow, Sink}
+import akka.util.ByteString
 import com.typesafe.scalalogging.Logger
 import io.circe.Decoder
+import net.scalytica.kafka.wsproxy.{mapToProperties, ProducerInterceptorClass}
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
-import net.scalytica.kafka.wsproxy.ProducerInterceptorClass
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroProducerRecord
 import net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde
 import net.scalytica.kafka.wsproxy.models._
 import org.apache.kafka.clients.producer.ProducerConfig._
-import org.apache.kafka.clients.producer.ProducerRecord
+import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.apache.kafka.common.serialization.Serializer
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
+import scala.collection.JavaConverters._
 
 /**
  * Functions for initialising Kafka producer sinks and flows.
@@ -45,6 +47,15 @@ object WsProducer {
         INTERCEPTOR_CLASSES_CONFIG -> ProducerInterceptorClass
         // scalastyle:on
       )
+      .withProducerFactory { ps =>
+        val props: java.util.Properties =
+          cfg.producer.kafkaClientProperties ++ ps.getProperties.asScala.toMap
+        new KafkaProducer[K, V](
+          props,
+          ps.keySerializerOpt.orNull,
+          ps.valueSerializerOpt.orNull
+        )
+      }
   }
 
   /**
@@ -79,17 +90,20 @@ object WsProducer {
     import io.circe.parser._
     import net.scalytica.kafka.wsproxy.codecs.Decoders._
 
-    parse(jsonStr) match {
-      case Left(ParsingFailure(message, err)) =>
-        logger.error(s"Error parsing JSON string:\n$message")
-        logger.debug(s"JSON was: $jsonStr")
-        throw err
+    if (jsonStr.isEmpty) ProducerEmptyMessage
+    else {
+      parse(jsonStr) match {
+        case Left(ParsingFailure(message, err)) =>
+          logger.error(s"Error parsing JSON string:\n$message")
+          logger.debug(s"JSON was: $jsonStr")
+          throw err
 
-      case Right(json) =>
-        json.as[WsProducerRecord[K, V]] match {
-          case Left(err)  => throw err
-          case Right(wpr) => wpr
-        }
+        case Right(json) =>
+          json.as[WsProducerRecord[K, V]] match {
+            case Left(err)  => throw err
+            case Right(wpr) => wpr
+          }
+      }
     }
   }
 
@@ -120,9 +134,12 @@ object WsProducer {
   }
 
   /** Convenience function for logging and throwing an error in a Flow */
-  private[this] def logAndThrow[T](message: String, t: Throwable): T = {
+  private[this] def logAndEmpty[T](
+      message: String,
+      t: Throwable
+  )(empty: T): T = {
     logger.error(message, t)
-    throw t
+    empty
   }
 
   /**
@@ -160,12 +177,15 @@ object WsProducer {
       }
       .mapAsync(1)(_.toStrict(5 seconds).map(_.text))
       .recover {
-        case t: Throwable =>
-          logAndThrow("There was an error processing a JSON message", t)
+        case t: Exception =>
+          logAndEmpty("There was an error processing a JSON message", t)("")
       }
       .map(str => parseInput[K, V](str))
       .recover {
-        case t: Throwable => logAndThrow(s"JSON message could not be parsed", t)
+        case t: Exception =>
+          logAndEmpty(s"JSON message could not be parsed", t)(
+            ProducerEmptyMessage
+          )
       }
       .filter(_.nonEmpty)
       .map { wpr =>
@@ -195,14 +215,19 @@ object WsProducer {
       }
       .mapAsync(1)(_.toStrict(5 seconds).map(_.data))
       .recover {
-        case t: Throwable =>
-          logAndThrow("There was an error processing an Avro message", t)
+        case t: Exception =>
+          logAndEmpty("There was an error processing an Avro message", t)(
+            ByteString.empty
+          )
       }
       .map(bs => serde.deserialize("", bs.toArray))
       .recover {
-        case t: Throwable =>
-          logAndThrow(s"Avro message could not be deserialised", t)
+        case t: Exception =>
+          logAndEmpty(s"Avro message could not be deserialised", t)(
+            AvroProducerRecord.empty
+          )
       }
+      .filterNot(_.isEmpty)
       .map { wpr =>
         val record =
           asKafkaProducerRecord(args.topic, WsProducerRecord.fromAvro(wpr))

@@ -3,24 +3,31 @@ package net.scalytica.kafka.wsproxy
 import java.nio.file.Path
 
 import com.typesafe.config.{Config, ConfigFactory}
-import net.scalytica.kafka.wsproxy.models.SecurityProtocol
 import pureconfig.{loadConfigOrThrow, ConfigReader}
 import pureconfig.generic.auto._
 
 import scala.concurrent.duration.FiniteDuration
+import scala.collection.JavaConverters._
 
 object Configuration {
 
   private[this] val CfgRootKey = "kafka.ws.proxy"
 
-  implicit val retentionCfgReader: ConfigReader[SecurityProtocol] =
-    ConfigReader.fromNonEmptyStringOpt { s =>
-      Some(SecurityProtocol.fromString(s))
+  implicit val configAsMap: ConfigReader[Map[String, AnyRef]] =
+    ConfigReader.fromCursor(_.asObjectCursor.right.map(_.value.toConfig)).map {
+      cfg =>
+        cfg
+          .entrySet()
+          .asScala
+          .map(e => e.getKey -> e.getValue.unwrapped())
+          .toMap
     }
 
   final case class AppCfg(
       server: ServerCfg,
+      adminClient: AdminClientCfg,
       consumer: ConsumerCfg,
+      producer: ProducerCfg,
       sessionHandler: SessionHandlerCfg,
       commitHandler: CommitHandlerCfg
   ) {
@@ -38,13 +45,21 @@ object Configuration {
       port: Int,
       kafkaBootstrapUrls: Seq[String],
       schemaRegistryUrl: Option[String],
-      autoRegisterSchemas: Boolean,
-      kafkaSecurityProtocol: SecurityProtocol
+      autoRegisterSchemas: Boolean
+  )
+
+  final case class AdminClientCfg(
+      kafkaClientProperties: Map[String, AnyRef]
   )
 
   final case class ConsumerCfg(
       defaultRateLimit: Long,
-      defaultBatchSize: Int
+      defaultBatchSize: Int,
+      kafkaClientProperties: Map[String, AnyRef]
+  )
+
+  final case class ProducerCfg(
+      kafkaClientProperties: Map[String, AnyRef]
   )
 
   final case class SessionHandlerCfg(

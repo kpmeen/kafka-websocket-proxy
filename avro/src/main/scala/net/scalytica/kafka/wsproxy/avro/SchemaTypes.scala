@@ -52,9 +52,15 @@ object SchemaTypes {
   case class AvroProducerRecord(
       key: Option[Array[Byte]],
       value: Array[Byte]
-  ) extends WsProxyAvroRecord
+  ) extends WsProxyAvroRecord {
+
+    def isEmpty: Boolean = AvroProducerRecord.empty == this
+
+  }
 
   object AvroProducerRecord {
+    lazy val empty: AvroProducerRecord = AvroProducerRecord(None, Array.empty)
+
     val schemaFor  = SchemaFor[AvroProducerRecord]
     val toRecord   = ToRecord[AvroProducerRecord]
     val fromRecord = FromRecord[AvroProducerRecord]
