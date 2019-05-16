@@ -55,6 +55,7 @@ file. Where the following parameters can be adjusted:
 | kafka.ws.proxy.commit-handler.auto-commit-max-age               | WSPROXY_CH_AUTOCOMMIT_MAX_AGE            | `20 seconds`             | The max allowed age of uncommitted messages in the commit handler stack. |
 
 
+
 ### Kafka Security
 
 TBD...
