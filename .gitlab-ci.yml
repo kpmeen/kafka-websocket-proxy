@@ -49,6 +49,7 @@ publish docker containers:
     - docker:dind
   script:
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN registry.gitlab.com
+    - docker login -u kpmeen -p $DOCKERHUB_TOKEN index.docker.io
     - sbt docker:publish
   only:
     - master@kpmeen/kafka-websocket-proxy
