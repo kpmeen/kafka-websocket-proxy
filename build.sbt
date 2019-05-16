@@ -7,7 +7,6 @@ import scala.language.postfixOps
 // scalastyle:off
 
 name := "kafka-websocket-proxy"
-version := "0.1"
 
 lazy val root = (project in file("."))
   .enablePlugins(DockerTasksPlugin)
