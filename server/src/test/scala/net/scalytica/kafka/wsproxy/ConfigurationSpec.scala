@@ -12,7 +12,7 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
   val invalidCfg1 = ConfigFactory.parseString(
     """kafka.ws.proxy {
       |  server {
-      |    server-id = 1
+      |    server-id = "node-1"
       |    port = 8078
       |    kafka-bootstrap-urls = "localhost:29092"
       |    schema-registry-url = "http://localhost:28081"
@@ -51,7 +51,7 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
   val invalidCfg2 = ConfigFactory.parseString(
     """kafka.ws.proxy {
       |  server {
-      |    server-id = 1
+      |    server-id = "node-1"
       |    port = 8078
       |    kafka-bootstrap-urls = "localhost:29092"
       |    schema-registry-url = "http://localhost:28081"
@@ -92,7 +92,7 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
     "successfully load the default configuration" in {
       val cfg = Configuration.load()
 
-      cfg.server.serverId mustBe 1
+      cfg.server.serverId mustBe "node-1"
       cfg.server.port mustBe 8078
       cfg.server.kafkaBootstrapUrls mustBe KafkaBootstrapUrls(
         List("localhost:29092")

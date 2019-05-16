@@ -20,13 +20,15 @@ class SessionSpec
     }
 
     "be initialised with consumer group, limit and consumer instances" in {
-      assertCompiles("""Session("foo", Set(ConsumerInstance("bar", 123)), 1)""")
+      assertCompiles(
+        """Session("foo", Set(ConsumerInstance("bar", "node-123")), 1)"""
+      )
     }
 
     "allow adding a new consumer using base arguments" in {
       val s1 = Session("s1")
-      val s2 = s1.addConsumer("c1", 1).value
-      val s3 = s2.addConsumer("c2", 2).value
+      val s2 = s1.addConsumer("c1", "n1").value
+      val s3 = s2.addConsumer("c2", "n2").value
 
       s1.consumers mustBe empty
       s2.consumers must have size 1
@@ -34,8 +36,8 @@ class SessionSpec
     }
 
     "allow adding a new consumer instance" in {
-      val s1 = Session("s1").addConsumer("c1", 1).value
-      val ci = ConsumerInstance("c2", 2)
+      val s1 = Session("s1").addConsumer("c1", "n1").value
+      val ci = ConsumerInstance("c2", "n2")
       val s2 = s1.addConsumer(ci).value
 
       s1.consumers must have size 1
@@ -46,15 +48,23 @@ class SessionSpec
 
     "return the same session if an existing consumer is added" in {
       val s1 =
-        Session("s1").addConsumer("c1", 1).value.addConsumer("c2", 2).value
-      val s2 = s1.addConsumer("c2", 2).value
+        Session("s1")
+          .addConsumer("c1", "n1")
+          .value
+          .addConsumer("c2", "n2")
+          .value
+      val s2 = s1.addConsumer("c2", "n2").value
 
       s2 mustBe s1
     }
 
     "remove a consumer based on its consumer id" in {
       val s1 =
-        Session("s1").addConsumer("c1", 1).value.addConsumer("c2", 2).value
+        Session("s1")
+          .addConsumer("c1", "n1")
+          .value
+          .addConsumer("c2", "n2")
+          .value
       val s2 = s1.removeConsumer("c1").value
 
       s2.consumers must have size 1
@@ -63,29 +73,37 @@ class SessionSpec
 
     "return the same session when removing a non-existing consumer id" in {
       val s1 =
-        Session("s1").addConsumer("c1", 1).value.addConsumer("c2", 2).value
+        Session("s1")
+          .addConsumer("c1", "n1")
+          .value
+          .addConsumer("c2", "n2")
+          .value
       val s2 = s1.removeConsumer("c0").value
 
       s2 mustBe s1
     }
 
     "return true when the session can have more consumers" in {
-      Session("s1").addConsumer("c1", 1).value.canOpenSocket mustBe true
+      Session("s1").addConsumer("c1", "n1").value.canOpenSocket mustBe true
     }
 
     "return false when the session can not have more consumers" in {
       Session("s1")
-        .addConsumer("c1", 1)
+        .addConsumer("c1", "n1")
         .value
-        .addConsumer("c2", 2)
+        .addConsumer("c2", "n2")
         .value
         .canOpenSocket mustBe false
     }
 
     "not allowing adding more consumer instances when limit is reached" in {
       val s1 =
-        Session("s1").addConsumer("c1", 1).value.addConsumer("c2", 2).value
-      s1.addConsumer("c3", 3) mustBe Session.ConsumerLimitReached(s1)
+        Session("s1")
+          .addConsumer("c1", "n1")
+          .value
+          .addConsumer("c2", "n2")
+          .value
+      s1.addConsumer("c3", "n3") mustBe Session.ConsumerLimitReached(s1)
     }
 
   }

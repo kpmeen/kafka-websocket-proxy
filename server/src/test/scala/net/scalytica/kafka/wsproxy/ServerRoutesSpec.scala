@@ -48,7 +48,7 @@ class ServerRoutesSpec
 
   "The server routes" should {
     "return a 404 NotFound when requesting an invalid resource" in {
-      implicit val cfg = defaultTestAppCfgWithServerId(1)
+      implicit val cfg = defaultTestAppCfgWithServerId("n1")
 
       val expected =
         "{\"message\":\"This is not the resource you are looking for.\"}"
@@ -64,7 +64,7 @@ class ServerRoutesSpec
     }
 
     "return the Avro schema for producer records" in {
-      implicit val cfg    = defaultTestAppCfgWithServerId(2)
+      implicit val cfg    = defaultTestAppCfgWithServerId("n2")
       val (_, testRoutes) = TestRoutes.wsProxyRoutes
 
       Get("/schemas/avro/producer/record") ~> testRoutes ~> check {
@@ -75,7 +75,7 @@ class ServerRoutesSpec
     }
 
     "return the Avro schema for producer results" in {
-      implicit val cfg    = defaultTestAppCfgWithServerId(3)
+      implicit val cfg    = defaultTestAppCfgWithServerId("n3")
       val (_, testRoutes) = TestRoutes.wsProxyRoutes
 
       Get("/schemas/avro/producer/result") ~> testRoutes ~> check {
@@ -86,7 +86,7 @@ class ServerRoutesSpec
     }
 
     "return the Avro schema for consumer record" in {
-      implicit val cfg    = defaultTestAppCfgWithServerId(4)
+      implicit val cfg    = defaultTestAppCfgWithServerId("n4")
       val (_, testRoutes) = TestRoutes.wsProxyRoutes
 
       Get("/schemas/avro/consumer/record") ~> testRoutes ~> check {
@@ -97,7 +97,7 @@ class ServerRoutesSpec
     }
 
     "return the Avro schema for consumer commit" in {
-      implicit val cfg    = defaultTestAppCfgWithServerId(5)
+      implicit val cfg    = defaultTestAppCfgWithServerId("n5")
       val (_, testRoutes) = TestRoutes.wsProxyRoutes
 
       Get("/schemas/avro/consumer/commit") ~> testRoutes ~> check {
@@ -109,7 +109,7 @@ class ServerRoutesSpec
     "set up a WebSocket connection for producing JSON key value messages" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val wsCfg =
-          appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = 6)
+          appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = "n6")
 
         val topicName = "test-topic-1"
         initTopic(topicName)
@@ -127,7 +127,7 @@ class ServerRoutesSpec
     "set up a WebSocket connection for producing JSON value messages" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val wsCfg =
-          appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = 7)
+          appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = "n7")
 
         val topicName = "test-topic-2"
         initTopic(topicName)
@@ -145,7 +145,7 @@ class ServerRoutesSpec
     "set up a WebSocket connection for consuming JSON key value messages" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val wsCfg =
-          appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = 8)
+          appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = "n8")
 
         val topicName = "test-topic-3"
         initTopic(topicName)
@@ -196,7 +196,7 @@ class ServerRoutesSpec
     "set up a WebSocket connection for consuming JSON value messages" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val wsCfg =
-          appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = 9)
+          appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = "n9")
 
         val topicName = "test-topic-4"
         initTopic(topicName)
@@ -242,7 +242,7 @@ class ServerRoutesSpec
     "set up a WebSocket connection for producing Avro key value messages" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val wsCfg =
-          appTestConfig(kcfg.kafkaPort, Option(kcfg.schemaRegistryPort), 10)
+          appTestConfig(kcfg.kafkaPort, Option(kcfg.schemaRegistryPort), "n10")
 
         val topicName = "test-topic-5"
         initTopic(topicName)
@@ -260,7 +260,7 @@ class ServerRoutesSpec
     "set up a WebSocket connection for producing Avro value messages" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val wsCfg =
-          appTestConfig(kcfg.kafkaPort, Option(kcfg.schemaRegistryPort), 11)
+          appTestConfig(kcfg.kafkaPort, Option(kcfg.schemaRegistryPort), "n11")
 
         val topicName = "test-topic-6"
         initTopic(topicName)
@@ -279,7 +279,7 @@ class ServerRoutesSpec
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val schemaRegPort = kcfg.schemaRegistryPort
         implicit val wsCfg =
-          appTestConfig(kcfg.kafkaPort, Option(schemaRegPort), 12)
+          appTestConfig(kcfg.kafkaPort, Option(schemaRegPort), "n12")
 
         val topicName = "test-topic-7"
         initTopic(topicName)

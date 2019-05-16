@@ -13,7 +13,7 @@ case class Session(
   def hasConsumer(consumerId: String): Boolean =
     consumers.exists(_.id == consumerId)
 
-  def addConsumer(consumerId: String, serverId: Int): SessionOpResult =
+  def addConsumer(consumerId: String, serverId: String): SessionOpResult =
     addConsumer(ConsumerInstance(consumerId, serverId))
 
   def addConsumer(consumerInstance: ConsumerInstance): SessionOpResult =
@@ -70,4 +70,4 @@ case object Session {
 
 }
 
-case class ConsumerInstance(id: String, serverId: Int)
+case class ConsumerInstance(id: String, serverId: String)

@@ -37,7 +37,7 @@ object SessionHandlerProtocol {
   case class AddConsumer(
       groupId: String,
       consumerId: String,
-      serverId: Int,
+      serverId: String,
       replyTo: ActorRef[Session.SessionOpResult]
   ) extends ClientSessionProtocol
 
@@ -87,7 +87,7 @@ object SessionHandler extends SessionHandler {
       }
     }
 
-    def addConsumer(groupId: String, clientId: String, serverId: Int)(
+    def addConsumer(groupId: String, clientId: String, serverId: String)(
         implicit
         timeout: Timeout,
         scheduler: Scheduler

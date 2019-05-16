@@ -31,7 +31,7 @@ trait WSProxyKafkaSpec
   lazy val defaultTestAppCfg =
     Configuration.loadFile(filePath("/application-test.conf"))
 
-  lazy val defaultTestAppCfgWithServerId = (sid: Int) =>
+  lazy val defaultTestAppCfgWithServerId = (sid: String) =>
     defaultTestAppCfg.copy(
       server = defaultTestAppCfg.server.copy(serverId = sid)
   )
@@ -39,7 +39,7 @@ trait WSProxyKafkaSpec
   def appTestConfig(
       kafkaPort: Int,
       schemaRegistryPort: Option[Int] = None,
-      serverId: Int = 1
+      serverId: String = "node-1"
   ): Configuration.AppCfg = defaultTestAppCfg.copy(
     server = defaultTestAppCfg.server.copy(
       serverId = serverId,
