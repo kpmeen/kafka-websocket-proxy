@@ -1,8 +1,8 @@
-import sbt.Keys._
-import sbt._
 import com.typesafe.sbt.packager.Keys._
 import com.typesafe.sbt.packager.docker.DockerAlias
 import com.typesafe.sbt.packager.docker.DockerPlugin.autoImport.Docker
+import sbt.Keys._
+import sbt._
 
 // scalastyle:off
 object Settings {
