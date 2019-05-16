@@ -6,7 +6,7 @@ package net.scalytica.kafka.wsproxy.models
  *
  * @param value the String which uniquely identifies the a consumed message.
  */
-case class WsMessageId private (value: String)
+case class WsMessageId private (value: String) extends AnyVal
 
 object WsMessageId {
 

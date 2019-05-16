@@ -4,6 +4,7 @@ import akka.http.scaladsl.testkit.ScalatestRouteTest
 import net.manub.embeddedkafka.ConsumerExtensions.ConsumerRetryConfig
 import net.manub.embeddedkafka.schemaregistry.EmbeddedKafkaConfig
 import net.scalytica.kafka.wsproxy.Configuration
+import net.scalytica.kafka.wsproxy.Configuration.KafkaBootstrapUrls
 import org.scalatest.{MustMatchers, Suite}
 
 import scala.concurrent.duration._
@@ -42,7 +43,7 @@ trait WSProxyKafkaSpec
   ): Configuration.AppCfg = defaultTestAppCfg.copy(
     server = defaultTestAppCfg.server.copy(
       serverId = serverId,
-      kafkaBootstrapUrls = List(serverHost(kafkaPort)),
+      kafkaBootstrapUrls = KafkaBootstrapUrls(List(serverHost(kafkaPort))),
       schemaRegistryUrl =
         schemaRegistryPort.map(u => s"http://${serverHost(u)}")
     )

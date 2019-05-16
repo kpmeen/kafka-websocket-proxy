@@ -1,7 +1,7 @@
 package net.scalytica.kafka.wsproxy
 
 import com.typesafe.config.ConfigFactory
-import net.scalytica.kafka.wsproxy.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.Configuration.{AppCfg, KafkaBootstrapUrls}
 import org.scalatest.{MustMatchers, WordSpec}
 import pureconfig.error.ConfigReaderException
 
@@ -14,7 +14,7 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
       |  server {
       |    server-id = 1
       |    port = 8078
-      |    kafka-bootstrap-urls = ["localhost:29092"]
+      |    kafka-bootstrap-urls = "localhost:29092"
       |    schema-registry-url = "http://localhost:28081"
       |    auto-register-schemas = true
       |  }
@@ -79,7 +79,7 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
       |  }
       |
       |  commit-handler {
-      |    max-stack-size: 200
+      |    max-stack: 200
       |    auto-commit-enabled: false
       |    auto-commit-interval: 1 seconds
       |    auto-commit-max-age: 20 seconds
@@ -94,7 +94,9 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
 
       cfg.server.serverId mustBe 1
       cfg.server.port mustBe 8078
-      cfg.server.kafkaBootstrapUrls mustBe Seq("localhost:29092")
+      cfg.server.kafkaBootstrapUrls mustBe KafkaBootstrapUrls(
+        List("localhost:29092")
+      )
       cfg.server.schemaRegistryUrl mustBe Some("http://localhost:28081")
       cfg.server.autoRegisterSchemas mustBe true
 

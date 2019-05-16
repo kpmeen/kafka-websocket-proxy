@@ -50,6 +50,14 @@ object CommitHandler {
   def commitStack(implicit cfg: AppCfg): Behavior[CommitProtocol] =
     committableStack()
 
+  implicit private[this] class SubStackExt(subStack: SubStack) {
+
+    def dropOldest()(implicit cfg: AppCfg): SubStack = {
+      if (subStack.size == cfg.commitHandler.maxStackSize) subStack.drop(1)
+      else subStack
+    }
+  }
+
   /**
    * Adds a new [[Uncommitted]] entry to the [[Stack]]
    *
@@ -66,30 +74,36 @@ object CommitHandler {
       ctx: ActorContext[CommitProtocol]
   ): Option[Stack] = {
     def addToStack(partition: Partition, uncommitted: Uncommitted): Stack = {
-      stack
+      val nextStack = stack
         .find(_._1 == partition)
         .map { _ =>
           stack
             .get(partition)
             .map { pStack =>
-              val subStack =
-                pStack.drop(
-                  Math.abs(cfg.commitHandler.maxStackSize - pStack.size)
-                ) :+ uncommitted
-
-              stack.updated(partition, subStack)
+              val subStack = pStack.dropOldest() :+ uncommitted
+              val ns       = stack.updated(partition, subStack)
+              ctx.log.debug(
+                s"STASH: stashed ${record.wsProxyMessageId} to sub-stack for" +
+                  s" partition ${partition.value}"
+              )
+              ns
             }
             .getOrElse(stack)
         }
-        .getOrElse(stack + (partition -> List(uncommitted)))
+        .getOrElse {
+          ctx.log.debug(
+            s"STASH: stashed ${record.wsProxyMessageId} to NEW sub-stack for" +
+              s" partition ${partition.value}"
+          )
+          stack + (partition -> List(uncommitted))
+        }
+      ctx.log.debug(s"STASH: Next stack is: " + stack.mkString(","))
+      nextStack
     }
 
     record.committableOffset.map { co =>
       // Append the uncommitted message at the END of the stack
-      val next =
-        addToStack(record.partition, Uncommitted(record.wsProxyMessageId, co))
-      ctx.log.debug(s"STASHED ${record.wsProxyMessageId} to stack")
-      next
+      addToStack(record.partition, Uncommitted(record.wsProxyMessageId, co))
     }
   }
 
@@ -106,9 +120,13 @@ object CommitHandler {
       implicit
       ec: ExecutionContext,
       ctx: ActorContext[CommitProtocol]
-  ): Option[Stack] = {
+  ): Option[Stack] =
     stack
       .find(_._2.exists(_.wsProxyMsgId == msgId))
+      .orElse {
+        ctx.log.debug(s"COMMIT: Could not find $msgId in stack")
+        None
+      }
       .map {
         case (p, s) =>
           val reduced = s.dropWhile(_.wsProxyMsgId != msgId)
@@ -118,12 +136,11 @@ object CommitHandler {
         case (nextStack, maybeCommittable) =>
           maybeCommittable.map { u =>
             u.committable.commitScaladsl().foreach { _ =>
-              ctx.log.debug(s"COMMITTED $msgId and cleaned up stack")
+              ctx.log.debug(s"COMMIT: committed $msgId and cleaned up stack")
             }
             nextStack
           }
       }
-  }
 
   /**
    * Behavior implementation for the CommitHandler. The [[Stack]] is implemented
@@ -153,11 +170,12 @@ object CommitHandler {
           Behaviors.same
 
         case GetStack(to) =>
-          ctx.log.debug(stack.mkString("\n"))
+          ctx.log.debug("Current stack is:\n" + stack.mkString("\n"))
           to ! stack
           Behaviors.same
 
         case Stop =>
+          ctx.log.debug(s"Received stop message")
           Behaviors.stopped
       }
     }

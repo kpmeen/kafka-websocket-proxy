@@ -69,11 +69,14 @@ class CommitHandlerSpec
       tk: BehaviorTestKit[CommitProtocol],
       inbox: TestInbox[Stack]
   ): TestInbox[Stack] = {
-    val fullStack = recs.map { r =>
-      r.partition -> List(
-        Uncommitted(r.wsProxyMessageId, r.committableOffset.get)
-      )
-    }.toMap
+    val fullStack =
+      recs.foldLeft(Map.empty[Partition, List[CommitHandler.Uncommitted]]) {
+        case (s, r) =>
+          val uc = Uncommitted(r.wsProxyMessageId, r.committableOffset.get)
+          s.get(r.partition)
+            .map(u => s.updated(r.partition, u :+ uc))
+            .getOrElse(s + (r.partition -> List(uc)))
+      }
 
     val stack = removeIds
       .map { remIds =>
@@ -123,16 +126,19 @@ class CommitHandlerSpec
       pending
     }
 
-    "drop the oldest messages in the stack when max size is reached" in {
-      implicit val testCfg = defaultTestAppCfg
-      implicit val tk      = BehaviorTestKit(commitStack)
-      implicit val inbox   = TestInbox[Stack]()
+    "drop the oldest messages for a partition from the stack when the max" +
+      " size is reached" in {
+      implicit val testCfg = defaultTestAppCfg.copy(
+        commitHandler = defaultTestAppCfg.commitHandler.copy(maxStackSize = 3)
+      )
+      implicit val tk    = BehaviorTestKit(commitStack)
+      implicit val inbox = TestInbox[Stack]()
 
       val stackSize = testCfg.commitHandler.maxStackSize
 
       val recs =
-        0 until 3 flatMap { p =>
-          0 until 25 map { i =>
+        0 until 3 map { p =>
+          0 until 20 map { i =>
             createKeyValueRecord(
               groupId = "grp1",
               topic = "topic1",
@@ -143,8 +149,11 @@ class CommitHandlerSpec
           }
         }
 
-      recs.foreach(cmd => tk.run(Stash(cmd)))
-      validateStack(recs, Some(recs.take(stackSize).map(_.wsProxyMessageId)))
+      val insert  = recs.flatten
+      val removed = recs.flatMap(_.dropRight(stackSize))
+
+      insert.foreach(cmd => tk.run(Stash(cmd)))
+      validateStack(insert, Some(removed.map(_.wsProxyMessageId)))
     }
 
     "accept a WsCommit command, commit the message and clean up the stack" in {

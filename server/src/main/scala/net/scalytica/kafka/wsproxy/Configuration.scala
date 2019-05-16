@@ -23,6 +23,12 @@ object Configuration {
           .toMap
     }
 
+  implicit val stringAsKafkaBootstrapUrls: ConfigReader[KafkaBootstrapUrls] =
+    ConfigReader.fromString { str =>
+      val urls = str.split(",").map(_.trim).toList
+      Right(KafkaBootstrapUrls(urls))
+    }
+
   final case class AppCfg(
       server: ServerCfg,
       adminClient: AdminClientCfg,
@@ -40,10 +46,14 @@ object Configuration {
 
   }
 
+  final case class KafkaBootstrapUrls(urls: List[String]) {
+    def mkString(): String = urls.mkString(",")
+  }
+
   final case class ServerCfg(
       serverId: Int,
       port: Int,
-      kafkaBootstrapUrls: Seq[String],
+      kafkaBootstrapUrls: KafkaBootstrapUrls,
       schemaRegistryUrl: Option[String],
       autoRegisterSchemas: Boolean
   )

@@ -37,7 +37,7 @@ object WsProducer {
       ks: Option[Serializer[K]],
       vs: Option[Serializer[V]]
   ) = {
-    val kafkaUrl = cfg.server.kafkaBootstrapUrls.mkString(",")
+    val kafkaUrl = cfg.server.kafkaBootstrapUrls.mkString()
 
     ProducerSettings(as, ks, vs)
       .withBootstrapServers(kafkaUrl)

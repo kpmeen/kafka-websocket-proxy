@@ -32,7 +32,7 @@ private[session] class SessionDataProducer(
   private[this] val kSer = BasicSerdes.StringSerializer
   private[this] val vSer = new SessionSerde().serializer()
 
-  private[this] val kafkaUrl = cfg.server.kafkaBootstrapUrls.mkString(",")
+  private[this] val kafkaUrl = cfg.server.kafkaBootstrapUrls.mkString()
 
   private[this] val sessionStateTopic = cfg.sessionHandler.sessionStateTopicName
 
