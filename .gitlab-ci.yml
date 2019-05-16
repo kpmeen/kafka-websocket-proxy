@@ -52,3 +52,4 @@ publish docker containers:
     - sbt docker:publish
   only:
     - master@kpmeen/kafka-websocket-proxy
+    - tags
