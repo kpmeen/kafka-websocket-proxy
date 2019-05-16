@@ -107,7 +107,7 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
       cfg.sessionHandler.sessionStateReplicationFactor mustBe 3
       cfg.sessionHandler.sessionStateRetention mustBe 30.days
 
-      cfg.commitHandler.maxStackSize mustBe 1000
+      cfg.commitHandler.maxStackSize mustBe 100
       cfg.commitHandler.autoCommitEnabled mustBe false
       cfg.commitHandler.autoCommitInterval mustBe 1.second
       cfg.commitHandler.autoCommitMaxAge mustBe 20.seconds
