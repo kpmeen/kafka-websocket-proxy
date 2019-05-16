@@ -88,32 +88,45 @@ object Settings {
     sources in (Compile, doc) := Seq.empty
   )
 
-  val GitlabRegistry = "registry.gitlab.com"
-  val GitlabUser     = "kpmeen"
+  val GitLabRegistry = "registry.gitlab.com"
+  val DockerHub      = "hub.docker.com"
+  val GitLabUser     = "kpmeen"
+  val DockerHubUser  = "kpmeen"
 
   def dockerSettings(exposedPort: Option[Int] = None) =
     Seq(
       maintainer in Docker := maintainer.value,
-      dockerRepository := Some(s"$GitlabRegistry/$GitlabUser"),
+      dockerRepository := Some(s"$GitLabRegistry/$GitLabUser"),
       dockerAlias := {
-        val tag = version.value
         DockerAlias(
-          Some(GitlabRegistry),
-          Some(GitlabUser),
-          s"kafka-websocket-proxy/${packageName.value}",
-          Some(tag)
+          registryHost = Some(GitLabRegistry),
+          username = Some(GitLabUser),
+          name = s"kafka-websocket-proxy/${packageName.value}",
+          tag = Some(version.value)
         )
       },
-      dockerUpdateLatest := {
-        val snapshot = isSnapshot.value
-        val log      = sLog.value
-        if (!snapshot) {
-          log.info("Building release, updating docker latest tag")
-          true
+      dockerAliases ++= {
+        val gitLab = dockerAlias.value
+        val dockerHub = dockerAlias.value
+          .withRegistryHost(Option(DockerHub))
+          .withUsername(Option(DockerHubUser))
+          .withName("kafka-websocket-proxy")
+          .withTag(Option(version.value))
+
+        if (dockerUpdateLatest.value) {
+          // Push to both the GitLab and DockerHub registries.
+          Seq(
+            gitLab,
+            gitLab.withTag(Option("latest")),
+            dockerHub,
+            dockerHub.withTag(Option("latest"))
+          )
         } else {
-          false
+          // Snapshots are only pushed to the GitLab registry.
+          Seq(gitLab)
         }
       },
+      dockerUpdateLatest := !isSnapshot.value,
       dockerBaseImage in Docker := "openjdk:8",
       dockerExposedPorts in Docker := exposedPort.toSeq
     )
