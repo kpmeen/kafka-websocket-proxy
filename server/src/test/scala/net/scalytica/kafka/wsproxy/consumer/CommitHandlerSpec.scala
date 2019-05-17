@@ -9,6 +9,8 @@ import net.scalytica.kafka.wsproxy.models.{
   Formats,
   Offset,
   Partition,
+  Timestamp,
+  TopicName,
   WsCommit,
   WsMessageId
 }
@@ -37,10 +39,10 @@ class CommitHandlerSpec
       timestamp: Long
   ) = {
     ConsumerKeyValueRecord(
-      topic = topic,
-      partition = partition,
-      offset = offset,
-      timestamp = timestamp,
+      topic = TopicName(topic),
+      partition = Partition(partition),
+      offset = Offset(offset),
+      timestamp = Timestamp(timestamp),
       key = OutValueDetails[String](
         value = s"$topic-$partition-$offset",
         format = Some(Formats.StringType)
@@ -55,7 +57,7 @@ class CommitHandlerSpec
           topic = topic,
           partition = partition,
           offset = offset,
-          metadata = null // scalastyle:off
+          metadata = null // scalastyle:ignore
         )
       )
     )
@@ -180,8 +182,12 @@ class CommitHandlerSpec
       val recs = 0 until 3 map { i =>
         createKeyValueRecord("grp1", "topic1", i, 0, System.currentTimeMillis())
       }
-      val bogusId =
-        WsMessageId("topic1", Partition(2), Offset(1), recs(2).timestamp)
+      val bogusId = WsMessageId(
+        topic = TopicName("topic1"),
+        partition = Partition(2),
+        offset = Offset(1),
+        timestamp = recs(2).timestamp
+      )
 
       recs.foreach(cmd => tk.run(Stash(cmd)))
       validateStack(recs)

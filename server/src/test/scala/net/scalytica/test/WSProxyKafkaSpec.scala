@@ -5,6 +5,7 @@ import net.manub.embeddedkafka.ConsumerExtensions.ConsumerRetryConfig
 import net.manub.embeddedkafka.schemaregistry.EmbeddedKafkaConfig
 import net.scalytica.kafka.wsproxy.Configuration
 import net.scalytica.kafka.wsproxy.Configuration.KafkaBootstrapUrls
+import net.scalytica.kafka.wsproxy.models.WsServerId
 import org.scalatest.{MustMatchers, Suite}
 
 import scala.concurrent.duration._
@@ -33,7 +34,7 @@ trait WSProxyKafkaSpec
 
   lazy val defaultTestAppCfgWithServerId = (sid: String) =>
     defaultTestAppCfg.copy(
-      server = defaultTestAppCfg.server.copy(serverId = sid)
+      server = defaultTestAppCfg.server.copy(serverId = WsServerId(sid))
   )
 
   def appTestConfig(
@@ -42,7 +43,7 @@ trait WSProxyKafkaSpec
       serverId: String = "node-1"
   ): Configuration.AppCfg = defaultTestAppCfg.copy(
     server = defaultTestAppCfg.server.copy(
-      serverId = serverId,
+      serverId = WsServerId(serverId),
       kafkaBootstrapUrls = KafkaBootstrapUrls(List(serverHost(kafkaPort))),
       schemaRegistryUrl =
         schemaRegistryPort.map(u => s"http://${serverHost(u)}")

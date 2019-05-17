@@ -9,6 +9,7 @@ import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy._
 import net.scalytica.kafka.wsproxy.codecs.Implicits._
 import net.scalytica.kafka.wsproxy.codecs.{BasicSerdes, SessionSerde}
+import net.scalytica.kafka.wsproxy.models.WsGroupId
 import org.apache.kafka.clients.consumer.ConsumerConfig.{
   AUTO_OFFSET_RESET_CONFIG,
   ENABLE_AUTO_COMMIT_CONFIG,
@@ -40,9 +41,11 @@ private[session] class SessionDataConsumer(
 
   private[this] val kafkaUrl = cfg.server.kafkaBootstrapUrls.mkString()
 
-  private[this] val cid = s"ws-proxy-session-consumer-${cfg.server.serverId}"
+  private[this] val cid =
+    s"ws-proxy-session-consumer-${cfg.server.serverId.value}"
 
-  private[this] val sessionStateTopic = cfg.sessionHandler.sessionStateTopicName
+  private[this] val sessionStateTopic =
+    cfg.sessionHandler.sessionStateTopicName.value
 
   private[this] val consumerProps = ConsumerSettings(sys.toUntyped, kDes, vDes)
     .withBootstrapServers(kafkaUrl)
@@ -77,8 +80,8 @@ private[session] class SessionDataConsumer(
       .log("New session record for consumer group", cr => cr.key)
       .map { cr =>
         Option(cr.value)
-          .map(v => SessionHandlerProtocol.UpdateSession(cr.key, v))
-          .getOrElse(SessionHandlerProtocol.RemoveSession(cr.key))
+          .map(v => SessionHandlerProtocol.UpdateSession(WsGroupId(cr.key), v))
+          .getOrElse(SessionHandlerProtocol.RemoveSession(WsGroupId(cr.key)))
       }
   }
 

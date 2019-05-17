@@ -5,12 +5,39 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.unmarshalling.Unmarshaller
 import net.scalytica.kafka.wsproxy.SocketProtocol._
 import net.scalytica.kafka.wsproxy.models.Formats._
-import net.scalytica.kafka.wsproxy.models.{InSocketArgs, OutSocketArgs}
+import net.scalytica.kafka.wsproxy.models.{
+  InSocketArgs,
+  OutSocketArgs,
+  TopicName,
+  WsClientId,
+  WsGroupId
+}
 import org.apache.kafka.clients.consumer.OffsetResetStrategy
 
 import scala.util.Try
 
 trait QueryParamParsers {
+
+  implicit val clientIdUnmarshaller: Unmarshaller[String, WsClientId] =
+    Unmarshaller.strict[String, WsClientId] { str =>
+      Option(str).map(WsClientId.apply).getOrElse {
+        throw Unmarshaller.NoContentException
+      }
+    }
+
+  implicit val groupIdUnmarshaller: Unmarshaller[String, WsGroupId] =
+    Unmarshaller.strict[String, WsGroupId] { str =>
+      Option(str).map(WsGroupId.apply).getOrElse {
+        throw Unmarshaller.NoContentException
+      }
+    }
+
+  implicit val topicNameUnmarshaller: Unmarshaller[String, TopicName] =
+    Unmarshaller.strict[String, TopicName] { str =>
+      Option(str).map(TopicName.apply).getOrElse {
+        throw Unmarshaller.NoContentException
+      }
+    }
 
   // Unmarshaller for SocketPayload query params
   implicit val socketPayloadUnmarshaller: Unmarshaller[String, SocketPayload] =
@@ -45,9 +72,9 @@ trait QueryParamParsers {
   def outParams: Directive[Tuple1[OutSocketArgs]] =
     parameters(
       (
-        'clientId,
-        'groupId ?,
-        'topic,
+        'clientId.as[WsClientId],
+        'groupId.as[WsGroupId] ?,
+        'topic.as[TopicName],
         'socketPayload.as[SocketPayload] ? (JsonPayload: SocketPayload),
         'keyType.as[FormatType] ?,
         'valType.as[FormatType] ? (StringType: FormatType),
@@ -61,7 +88,7 @@ trait QueryParamParsers {
       OutSocketArgs.fromQueryParams(
         clientId = t._1,
         groupId = t._2,
-        topicName = t._3,
+        topic = t._3,
         socketPayload = t._4,
         keyTpe = t._5,
         valTpe = t._6,
@@ -79,7 +106,7 @@ trait QueryParamParsers {
   def inParams: Directive[Tuple1[InSocketArgs]] =
     parameters(
       (
-        'topic,
+        'topic.as[TopicName],
         'socketPayload.as[SocketPayload] ? (JsonPayload: SocketPayload),
         'keyType.as[FormatType] ?,
         'valType.as[FormatType] ? (StringType: FormatType)

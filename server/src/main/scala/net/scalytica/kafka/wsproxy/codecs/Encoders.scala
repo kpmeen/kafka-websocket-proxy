@@ -19,6 +19,16 @@ trait Encoders {
     Json.fromString(msgId.value)
   }
 
+  implicit val clientIdEncoder: Encoder[WsClientId] = { cid =>
+    Json.fromString(cid.value)
+  }
+  implicit val groupIdEncoder: Encoder[WsGroupId] = { gid =>
+    Json.fromString(gid.value)
+  }
+  implicit val serverIdEncoder: Encoder[WsServerId] = { sid =>
+    Json.fromString(sid.value)
+  }
+
   implicit val topicNameEncoder: Encoder[TopicName] = { tn =>
     Json.fromString(tn.value)
   }

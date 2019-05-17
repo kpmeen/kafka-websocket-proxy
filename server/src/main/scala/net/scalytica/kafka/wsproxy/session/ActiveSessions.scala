@@ -1,17 +1,19 @@
 package net.scalytica.kafka.wsproxy.session
 
+import net.scalytica.kafka.wsproxy.models.WsGroupId
+
 /**
  * Data type for keeping track of active sessions. Each active session is
  * represented as a key-value pair, where the key is the consumer group id.
  *
- * @param sessions a [[Map]] with {{String}} keys and [[Session]] values.
+ * @param sessions a [[Map]] with [[WsGroupId]] keys and [[Session]] values.
  * @see [[Session]]
  */
 case class ActiveSessions(
-    sessions: Map[String, Session] = Map.empty
+    sessions: Map[WsGroupId, Session] = Map.empty
 ) {
 
-  def find(groupId: String): Option[Session] = sessions.get(groupId)
+  def find(groupId: WsGroupId): Option[Session] = sessions.get(groupId)
 
   def add(session: Session): Either[String, ActiveSessions] = {
     sessions.find(_._1 == session.consumerGroupId) match {
@@ -25,7 +27,7 @@ case class ActiveSessions(
   }
 
   def updateSession(
-      groupId: String,
+      groupId: WsGroupId,
       session: Session
   ): Either[String, ActiveSessions] = {
     sessions.find(_._1 == groupId) match {
@@ -38,7 +40,7 @@ case class ActiveSessions(
     }
   }
 
-  def removeSession(groupId: String): Either[String, ActiveSessions] = {
+  def removeSession(groupId: WsGroupId): Either[String, ActiveSessions] = {
     sessions.find(_._1 == groupId) match {
       case None    => Left(s"Session for $groupId does not exist")
       case Some(_) => Right(copy(sessions = sessions - groupId))

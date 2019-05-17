@@ -3,6 +3,7 @@ package net.scalytica.kafka.wsproxy.admin
 import com.typesafe.scalalogging.Logger
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.errors.TopicNotFoundError
+import net.scalytica.kafka.wsproxy.models.TopicName
 import net.scalytica.kafka.wsproxy.{
   KafkaFutureConverter,
   KafkaFutureVoidConverter,
@@ -33,7 +34,8 @@ class WsKafkaAdminClient(cfg: AppCfg) {
       REQUEST_TIMEOUT_MS_CONFIG -> s"${(10 seconds).toMillis}"
     )
 
-  private[this] val sessionStateTopic = cfg.sessionHandler.sessionStateTopicName
+  private[this] val sessionStateTopic =
+    cfg.sessionHandler.sessionStateTopicName.value
   private[this] val configuredReplicas =
     cfg.sessionHandler.sessionStateReplicationFactor
   private[this] val maxReplicas = 3
@@ -103,11 +105,11 @@ class WsKafkaAdminClient(cfg: AppCfg) {
    *         a [[TopicNotFoundError]] is thrown.
    */
   @throws(classOf[TopicNotFoundError])
-  def topicPartitions(topicName: String): Int = {
+  def topicPartitions(topicName: TopicName): Int = {
     logger.debug(s"Fetching topic partitions for $topicName...")
     logger.debug(s"Using configuration: ${cfg.server}")
     underlying
-      .describeTopics(Seq(topicName).asJava)
+      .describeTopics(Seq(topicName.value).asJava)
       .all()
       .get()
       .asScala

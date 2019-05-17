@@ -1,5 +1,6 @@
 package net.scalytica.kafka.wsproxy.session
 
+import net.scalytica.kafka.wsproxy.models.{WsClientId, WsGroupId, WsServerId}
 import net.scalytica.test.SessionOpResultValues
 import org.scalatest.{MustMatchers, OptionValues, WordSpec}
 
@@ -12,23 +13,23 @@ class SessionSpec
   "A session" should {
 
     "be initialised with consumer group and default consumer limit" in {
-      assertCompiles("""Session("foo")""")
+      assertCompiles("""Session(WsGroupId("foo"))""")
     }
 
     "be initialised with consumer group and limit" in {
-      assertCompiles("""Session("foo", 3)""")
+      assertCompiles("""Session(WsGroupId("foo"), 3)""")
     }
 
     "be initialised with consumer group, limit and consumer instances" in {
       assertCompiles(
-        """Session("foo", Set(ConsumerInstance("bar", "node-123")), 1)"""
+        """Session(WsGroupId("foo"), Set(ConsumerInstance(WsClientId("bar"), WsServerId("node-123"))), 1)""" // scalastyle:ignore
       )
     }
 
     "allow adding a new consumer using base arguments" in {
-      val s1 = Session("s1")
-      val s2 = s1.addConsumer("c1", "n1").value
-      val s3 = s2.addConsumer("c2", "n2").value
+      val s1 = Session(WsGroupId("s1"))
+      val s2 = s1.addConsumer(WsClientId("c1"), WsServerId("n1")).value
+      val s3 = s2.addConsumer(WsClientId("c2"), WsServerId("n2")).value
 
       s1.consumers mustBe empty
       s2.consumers must have size 1
@@ -36,8 +37,10 @@ class SessionSpec
     }
 
     "allow adding a new consumer instance" in {
-      val s1 = Session("s1").addConsumer("c1", "n1").value
-      val ci = ConsumerInstance("c2", "n2")
+      val s1 = Session(WsGroupId("s1"))
+        .addConsumer(WsClientId("c1"), WsServerId("n1"))
+        .value
+      val ci = ConsumerInstance(WsClientId("c2"), WsServerId("n2"))
       val s2 = s1.addConsumer(ci).value
 
       s1.consumers must have size 1
@@ -48,62 +51,66 @@ class SessionSpec
 
     "return the same session if an existing consumer is added" in {
       val s1 =
-        Session("s1")
-          .addConsumer("c1", "n1")
+        Session(WsGroupId("s1"))
+          .addConsumer(WsClientId("c1"), WsServerId("n1"))
           .value
-          .addConsumer("c2", "n2")
+          .addConsumer(WsClientId("c2"), WsServerId("n2"))
           .value
-      val s2 = s1.addConsumer("c2", "n2").value
+      val s2 = s1.addConsumer(WsClientId("c2"), WsServerId("n2")).value
 
       s2 mustBe s1
     }
 
     "remove a consumer based on its consumer id" in {
       val s1 =
-        Session("s1")
-          .addConsumer("c1", "n1")
+        Session(WsGroupId("s1"))
+          .addConsumer(WsClientId("c1"), WsServerId("n1"))
           .value
-          .addConsumer("c2", "n2")
+          .addConsumer(WsClientId("c2"), WsServerId("n2"))
           .value
-      val s2 = s1.removeConsumer("c1").value
+      val s2 = s1.removeConsumer(WsClientId("c1")).value
 
       s2.consumers must have size 1
-      s2.consumers.headOption.value.id mustBe "c2"
+      s2.consumers.headOption.value.id mustBe WsClientId("c2")
     }
 
     "return the same session when removing a non-existing consumer id" in {
       val s1 =
-        Session("s1")
-          .addConsumer("c1", "n1")
+        Session(WsGroupId("s1"))
+          .addConsumer(WsClientId("c1"), WsServerId("n1"))
           .value
-          .addConsumer("c2", "n2")
+          .addConsumer(WsClientId("c2"), WsServerId("n2"))
           .value
-      val s2 = s1.removeConsumer("c0").value
+      val s2 = s1.removeConsumer(WsClientId("c0")).value
 
       s2 mustBe s1
     }
 
     "return true when the session can have more consumers" in {
-      Session("s1").addConsumer("c1", "n1").value.canOpenSocket mustBe true
+      Session(WsGroupId("s1"))
+        .addConsumer(WsClientId("c1"), WsServerId("n1"))
+        .value
+        .canOpenSocket mustBe true
     }
 
     "return false when the session can not have more consumers" in {
-      Session("s1")
-        .addConsumer("c1", "n1")
+      Session(WsGroupId("s1"))
+        .addConsumer(WsClientId("c1"), WsServerId("n1"))
         .value
-        .addConsumer("c2", "n2")
+        .addConsumer(WsClientId("c2"), WsServerId("n2"))
         .value
         .canOpenSocket mustBe false
     }
 
     "not allowing adding more consumer instances when limit is reached" in {
       val s1 =
-        Session("s1")
-          .addConsumer("c1", "n1")
+        Session(WsGroupId("s1"))
+          .addConsumer(WsClientId("c1"), WsServerId("n1"))
           .value
-          .addConsumer("c2", "n2")
+          .addConsumer(WsClientId("c2"), WsServerId("n2"))
           .value
-      s1.addConsumer("c3", "n3") mustBe Session.ConsumerLimitReached(s1)
+      s1.addConsumer(WsClientId("c3"), WsServerId("n3")) mustBe Session
+        .ConsumerLimitReached(s1)
     }
 
   }

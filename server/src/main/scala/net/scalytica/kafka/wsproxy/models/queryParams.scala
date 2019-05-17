@@ -31,9 +31,9 @@ case class SocketParams(
  * @param autoCommit enable kafka consumer auto-commit interval.
  */
 case class OutSocketArgs(
-    clientId: String,
-    groupId: Option[String],
-    topic: String,
+    clientId: WsClientId,
+    groupId: Option[WsGroupId],
+    topic: TopicName,
     socketPayload: SocketPayload,
     keyType: Option[Formats.FormatType] = None,
     valType: Formats.FormatType,
@@ -47,9 +47,9 @@ object OutSocketArgs {
 
   // scalastyle:off
   def fromQueryParams(
-      clientId: String,
-      groupId: Option[String],
-      topicName: String,
+      clientId: WsClientId,
+      groupId: Option[WsGroupId],
+      topic: TopicName,
       socketPayload: SocketPayload,
       keyTpe: Option[Formats.FormatType],
       valTpe: Formats.FormatType,
@@ -60,7 +60,7 @@ object OutSocketArgs {
   ): OutSocketArgs = OutSocketArgs(
     clientId = clientId,
     groupId = groupId,
-    topic = topicName,
+    topic = topic,
     socketPayload = socketPayload,
     keyType = keyTpe,
     valType = valTpe,
@@ -81,7 +81,7 @@ object OutSocketArgs {
  * @param valType the type for the message values in the topic.
  */
 case class InSocketArgs(
-    topic: String,
+    topic: TopicName,
     socketPayload: SocketPayload,
     keyType: Option[Formats.FormatType] = None,
     valType: Formats.FormatType = Formats.StringType
@@ -90,7 +90,7 @@ case class InSocketArgs(
 object InSocketArgs {
 
   def fromOptQueryParams(
-      topicName: Option[String],
+      topicName: Option[TopicName],
       socketPayload: SocketPayload,
       keyTpe: Option[FormatType],
       valTpe: Option[FormatType]
@@ -105,7 +105,7 @@ object InSocketArgs {
     }
 
   def fromQueryParams(
-      topicName: String,
+      topicName: TopicName,
       socketPayload: SocketPayload,
       keyTpe: Option[FormatType],
       valTpe: FormatType

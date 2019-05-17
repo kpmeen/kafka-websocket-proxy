@@ -2,8 +2,9 @@ package net.scalytica.kafka.wsproxy.session
 
 import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import net.manub.embeddedkafka.schemaregistry._
-import net.scalytica.kafka.wsproxy.codecs.{BasicSerdes, SessionSerde}
+import net.scalytica.kafka.wsproxy.codecs.{SessionSerde, WsGroupIdSerde}
 import net.scalytica.kafka.wsproxy.codecs.Implicits._
+import net.scalytica.kafka.wsproxy.models.WsGroupId
 import net.scalytica.test.WSProxyKafkaSpec
 import org.scalatest.{BeforeAndAfterAll, MustMatchers, OptionValues, WordSpec}
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
@@ -31,7 +32,7 @@ class SessionDataProducerSpec
   val atk          = ActorTestKit("session-data-producer-test", config)
   implicit val sys = atk.system
 
-  implicit val keyDes = BasicSerdes.StringDeserializer
+  implicit val keyDes = new WsGroupIdSerde().deserializer()
   implicit val valDes = new SessionSerde().deserializer()
 
   override def afterAll(): Unit = {
@@ -40,7 +41,7 @@ class SessionDataProducerSpec
   }
 
   private[this] def testSession(i: Int): Session =
-    Session(s"c$i", consumerLimit = i)
+    Session(WsGroupId(s"c$i"), consumerLimit = i)
 
   val session1 = testSession(1)
   val session2 = testSession(2)
@@ -59,7 +60,7 @@ class SessionDataProducerSpec
         sdp.publish(session1)
         // Verify the data can be consumed
         val (key, value) =
-          consumeFirstKeyedMessageFrom[String, Session](sessionTopic)
+          consumeFirstKeyedMessageFrom[WsGroupId, Session](sessionTopic.value)
 
         key mustBe session1.consumerGroupId
         value.consumerGroupId mustBe session1.consumerGroupId
@@ -81,7 +82,10 @@ class SessionDataProducerSpec
         expected.foreach(s => sdp.publish(s))
 
         val recs =
-          consumeNumberKeyedMessagesFrom[String, Session](sessionTopic, 4)
+          consumeNumberKeyedMessagesFrom[WsGroupId, Session](
+            topic = sessionTopic.value,
+            number = 4
+          )
 
         val keys   = recs.map(_._1)
         val values = recs.map(_._2)
@@ -105,7 +109,10 @@ class SessionDataProducerSpec
         sdp.publishRemoval(session2.consumerGroupId)
         // Verify the presence of all expected messages
         val r1 =
-          consumeNumberKeyedMessagesFrom[String, Session](sessionTopic, 5)
+          consumeNumberKeyedMessagesFrom[WsGroupId, Session](
+            topic = sessionTopic.value,
+            number = 5
+          )
 
         r1.map(_._2) must contain allElementsOf in
         Option(r1.lastOption.value._2) mustBe empty

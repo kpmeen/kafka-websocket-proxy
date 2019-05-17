@@ -11,6 +11,7 @@ import akka.util.Timeout
 import com.typesafe.scalalogging.Logger
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
+import net.scalytica.kafka.wsproxy.models.{WsClientId, WsGroupId, WsServerId}
 import net.scalytica.kafka.wsproxy.session.Session.SessionOpResult
 import net.scalytica.kafka.wsproxy.session.SessionHandlerProtocol._
 
@@ -29,26 +30,26 @@ object SessionHandlerProtocol {
   sealed trait ClientSessionProtocol extends Protocol
 
   case class InitSession(
-      groupId: String,
+      groupId: WsGroupId,
       consumerLimit: Int,
       replyTo: ActorRef[Session.SessionOpResult]
   ) extends ClientSessionProtocol
 
   case class AddConsumer(
-      groupId: String,
-      consumerId: String,
-      serverId: String,
+      groupId: WsGroupId,
+      consumerId: WsClientId,
+      serverId: WsServerId,
       replyTo: ActorRef[Session.SessionOpResult]
   ) extends ClientSessionProtocol
 
   case class RemoveConsumer(
-      groupId: String,
-      consumerId: String,
+      groupId: WsGroupId,
+      consumerId: WsClientId,
       replyTo: ActorRef[Session.SessionOpResult]
   ) extends ClientSessionProtocol
 
   case class GetSession(
-      groupId: String,
+      groupId: WsGroupId,
       replyTo: ActorRef[Option[Session]]
   ) extends ClientSessionProtocol
 
@@ -58,12 +59,12 @@ object SessionHandlerProtocol {
   sealed private[session] trait InternalProtocol extends Protocol
 
   private[session] case class UpdateSession(
-      groupId: String,
+      groupId: WsGroupId,
       s: Session
   ) extends InternalProtocol
 
   private[session] case class RemoveSession(
-      groupId: String
+      groupId: WsGroupId
   ) extends InternalProtocol
 }
 
@@ -73,7 +74,7 @@ object SessionHandler extends SessionHandler {
       sh: ActorRef[SessionHandlerProtocol.Protocol]
   ) {
 
-    def initSession(groupId: String, consumerLimit: Int)(
+    def initSession(groupId: WsGroupId, consumerLimit: Int)(
         implicit
         timeout: Timeout,
         scheduler: Scheduler
@@ -87,7 +88,11 @@ object SessionHandler extends SessionHandler {
       }
     }
 
-    def addConsumer(groupId: String, clientId: String, serverId: String)(
+    def addConsumer(
+        groupId: WsGroupId,
+        clientId: WsClientId,
+        serverId: WsServerId
+    )(
         implicit
         timeout: Timeout,
         scheduler: Scheduler
@@ -102,7 +107,7 @@ object SessionHandler extends SessionHandler {
       }
     }
 
-    def removeConsumer(groupId: String, clientId: String)(
+    def removeConsumer(groupId: WsGroupId, clientId: WsClientId)(
         implicit
         timeout: Timeout,
         scheduler: Scheduler
@@ -112,7 +117,7 @@ object SessionHandler extends SessionHandler {
       }
     }
 
-    def getSession(groupId: String)(
+    def getSession(groupId: WsGroupId)(
         implicit
         timeout: Timeout,
         scheduler: Scheduler
@@ -181,14 +186,14 @@ trait SessionHandler {
   ): (RunnableGraph[Consumer.Control], ActorRef[Protocol]) = {
     implicit val typedSys = sys.toTyped
 
-    val sessionHandlerName = s"session-handler-actor-${cfg.server.serverId}"
-    logger.debug(s"Initialising session handler $sessionHandlerName...")
+    val handlerName = s"session-handler-actor-${cfg.server.serverId.value}"
+    logger.debug(s"Initialising session handler $handlerName...")
 
     val ref =
-      sys.spawn(sessionHandler, sessionHandlerName)
+      sys.spawn(sessionHandler, handlerName)
 
     logger.debug(
-      s"Starting session state consumer for server id $sessionHandlerName..."
+      s"Starting session state consumer for server id $handlerName..."
     )
 
     val consumer = new SessionDataConsumer()
@@ -230,18 +235,22 @@ trait SessionHandler {
           csp match {
             case InitSession(gid, limit, replyTo) =>
               log.debug(
-                s"INIT_SESSION: initialise session $gid with limit $limit"
+                s"INIT_SESSION: initialise session ${gid.value} " +
+                  s"with limit $limit"
               )
               active.find(gid) match {
                 case Some(s) =>
-                  log.debug(s"INIT_SESSION: session $gid already initialised.")
+                  log.debug(
+                    s"INIT_SESSION: session ${gid.value} already initialised."
+                  )
                   replyTo ! Session.SessionInitialised(s)
                   Behaviors.same
 
                 case None =>
                   val s = Session(gid, limit)
                   producer.publish(s).map { _ =>
-                    log.debug(s"INIT_SESSION: session $gid initialised.")
+                    log
+                      .debug(s"INIT_SESSION: session ${gid.value} initialised.")
                     replyTo ! Session.SessionInitialised(s)
                   }
                   active
@@ -251,10 +260,15 @@ trait SessionHandler {
               }
 
             case AddConsumer(gid, cid, sid, replyTo) =>
-              log.debug(s"ADD_CONSUMER: add consumer $cid to session $gid...")
+              log.debug(
+                s"ADD_CONSUMER: add consumer ${cid.value} to " +
+                  s"session ${gid.value}..."
+              )
               active.find(gid) match {
                 case None =>
-                  log.debug(s"ADD_CONSUMER: session $gid was not found.")
+                  log.debug(
+                    s"ADD_CONSUMER: session ${gid.value} was not found."
+                  )
                   replyTo ! Session.SessionNotFound(gid)
                   Behaviors.same
 
@@ -263,7 +277,8 @@ trait SessionHandler {
                     case added @ Session.ConsumerAdded(s) =>
                       producer.publish(s).map { _ =>
                         log.debug(
-                          s"ADD_CONSUMER: consumer added to session $gid"
+                          "ADD_CONSUMER: consumer added to session" +
+                            s" ${gid.value}"
                         )
                         replyTo ! added
                       }
@@ -271,7 +286,7 @@ trait SessionHandler {
 
                     case notAdded =>
                       log.debug(
-                        s"ADD_CONSUMER: session op result for $gid:" +
+                        s"ADD_CONSUMER: session op result for ${gid.value}:" +
                           s" ${notAdded.asString}"
                       )
                       replyTo ! notAdded
@@ -281,11 +296,14 @@ trait SessionHandler {
 
             case RemoveConsumer(gid, cid, replyTo) =>
               log.debug(
-                s"REMOVE_CONSUMER: remove consumer $cid to session $gid..."
+                s"REMOVE_CONSUMER: remove consumer ${cid.value} from " +
+                  s"session ${gid.value}..."
               )
               active.find(gid) match {
                 case None =>
-                  log.debug(s"REMOVE_CONSUMER: session $gid was not found")
+                  log.debug(
+                    s"REMOVE_CONSUMER: session ${gid.value} was not found"
+                  )
                   replyTo ! Session.SessionNotFound(gid)
                   Behaviors.same
 
@@ -294,7 +312,8 @@ trait SessionHandler {
                     case removed @ Session.ConsumerRemoved(s) =>
                       producer.publish(s).map { _ =>
                         log.debug(
-                          s"REMOVE_CONSUMER: consumer removed from session $gid"
+                          s"REMOVE_CONSUMER: consumer ${cid.value} removed " +
+                            s"from session ${gid.value}"
                         )
                         replyTo ! removed
                       }
@@ -303,7 +322,7 @@ trait SessionHandler {
                     case notRemoved =>
                       log.debug(
                         "REMOVE_CONSUMER: session op result " +
-                          s"for $gid: ${notRemoved.asString}"
+                          s"for ${gid.value}: ${notRemoved.asString}"
                       )
                       replyTo ! notRemoved
                       Behaviors.same
@@ -315,18 +334,20 @@ trait SessionHandler {
               Behaviors.same
 
             case Stop =>
-              log.debug(s"STOP: stopping session handler for server $serverId")
+              log.debug(
+                s"STOP: stopping session handler for server ${serverId.value}"
+              )
               Behaviors.stopped
           }
 
         case ip: InternalProtocol =>
           ip match {
             case UpdateSession(gid, s) =>
-              log.debug(s"INTERNAL: Updating session $gid...")
+              log.debug(s"INTERNAL: Updating session ${gid.value}...")
               nextOrSame(active.updateSession(gid, s))(behavior)
 
             case RemoveSession(gid) =>
-              log.debug(s"INTERNAL: Removing session $gid..")
+              log.debug(s"INTERNAL: Removing session ${gid.value}..")
               nextOrSame(active.removeSession(gid))(behavior)
           }
       }

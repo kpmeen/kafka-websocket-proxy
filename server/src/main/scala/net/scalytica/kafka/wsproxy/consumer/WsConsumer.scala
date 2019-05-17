@@ -34,8 +34,8 @@ object WsConsumer {
    * the Kafka consumer [[Source]].
    */
   private[this] def consumerSettings[K, V](
-      id: String,
-      gid: Option[String],
+      id: WsClientId,
+      gid: Option[WsGroupId],
       offsetReset: OffsetResetStrategy = EARLIEST,
       autoCommit: Boolean
   )(
@@ -58,8 +58,8 @@ object WsConsumer {
         INTERCEPTOR_CLASSES_CONFIG -> ConsumerInterceptorClass
         // scalastyle:on
       )
-      .withClientId(s"$id-client")
-      .withGroupId(gid.getOrElse(s"$id-group"))
+      .withClientId(id.value)
+      .withGroupId(gid.getOrElse(WsGroupId(s"$id-group")).value)
       .withConsumerFactory { cs =>
         val props: java.util.Properties =
           cfg.consumer.kafkaClientProperties ++ cs.getProperties.asScala.toMap
@@ -101,8 +101,8 @@ object WsConsumer {
    */
   def consumeAutoCommit[K, V](
       topic: TopicName,
-      clientId: String,
-      groupId: Option[String]
+      clientId: WsClientId,
+      groupId: Option[WsGroupId]
   )(
       implicit
       cfg: AppCfg,
@@ -142,8 +142,8 @@ object WsConsumer {
    */
   def consumeManualCommit[K, V](
       topic: TopicName,
-      clientId: String,
-      groupId: Option[String]
+      clientId: WsClientId,
+      groupId: Option[WsGroupId]
   )(
       implicit
       cfg: AppCfg,
@@ -172,10 +172,10 @@ object WsConsumer {
     Option(rec.key)
       .map { k =>
         ConsumerKeyValueRecord[K, V](
-          topic = rec.topic,
-          partition = rec.partition,
-          offset = rec.offset,
-          timestamp = rec.timestamp(),
+          topic = TopicName(rec.topic),
+          partition = Partition(rec.partition),
+          offset = Offset(rec.offset),
+          timestamp = Timestamp(rec.timestamp()),
           key = OutValueDetails[K](k),
           value = OutValueDetails[V](rec.value),
           committableOffset = maybeCommittableOffset
@@ -183,10 +183,10 @@ object WsConsumer {
       }
       .getOrElse {
         ConsumerValueRecord[V](
-          topic = rec.topic,
-          partition = rec.partition,
-          offset = rec.offset,
-          timestamp = rec.timestamp(),
+          topic = TopicName(rec.topic),
+          partition = Partition(rec.partition),
+          offset = Offset(rec.offset),
+          timestamp = Timestamp(rec.timestamp()),
           value = OutValueDetails[V](rec.value),
           committableOffset = maybeCommittableOffset
         )

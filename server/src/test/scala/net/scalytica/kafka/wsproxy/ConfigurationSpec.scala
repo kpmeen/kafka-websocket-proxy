@@ -92,7 +92,7 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
     "successfully load the default configuration" in {
       val cfg = Configuration.load()
 
-      cfg.server.serverId mustBe "node-1"
+      cfg.server.serverId.value mustBe "node-1"
       cfg.server.port mustBe 8078
       cfg.server.kafkaBootstrapUrls mustBe KafkaBootstrapUrls(
         List("localhost:29092")
@@ -103,7 +103,7 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
       cfg.consumer.defaultBatchSize mustBe 0
       cfg.consumer.defaultRateLimit mustBe 0
 
-      cfg.sessionHandler.sessionStateTopicName mustBe "_wsproxy.session.state"
+      cfg.sessionHandler.sessionStateTopicName.value mustBe "_wsproxy.session.state" // scalastyle:ignore
       cfg.sessionHandler.sessionStateReplicationFactor mustBe 3
       cfg.sessionHandler.sessionStateRetention mustBe 30.days
 

@@ -3,6 +3,7 @@ package net.scalytica.kafka.wsproxy
 import java.nio.file.Path
 
 import com.typesafe.config.{Config, ConfigFactory}
+import net.scalytica.kafka.wsproxy.models.{TopicName, WsServerId}
 import pureconfig.{loadConfigOrThrow, ConfigReader}
 import pureconfig.generic.auto._
 
@@ -29,6 +30,12 @@ object Configuration {
       Right(KafkaBootstrapUrls(urls))
     }
 
+  implicit val stringAsServerId: ConfigReader[WsServerId] =
+    ConfigReader.fromString(str => Right(WsServerId(str)))
+
+  implicit val stringAsTopicName: ConfigReader[TopicName] =
+    ConfigReader.fromString(str => Right(TopicName(str)))
+
   final case class AppCfg(
       server: ServerCfg,
       adminClient: AdminClientCfg,
@@ -51,7 +58,7 @@ object Configuration {
   }
 
   final case class ServerCfg(
-      serverId: String,
+      serverId: WsServerId,
       port: Int,
       kafkaBootstrapUrls: KafkaBootstrapUrls,
       schemaRegistryUrl: Option[String],
@@ -73,7 +80,7 @@ object Configuration {
   )
 
   final case class SessionHandlerCfg(
-      sessionStateTopicName: String,
+      sessionStateTopicName: TopicName,
       sessionStateReplicationFactor: Short,
       sessionStateRetention: FiniteDuration
   )

@@ -1,19 +1,23 @@
 package net.scalytica.kafka.wsproxy.session
 
+import net.scalytica.kafka.wsproxy.models.{WsClientId, WsGroupId, WsServerId}
 import net.scalytica.kafka.wsproxy.session.Session._
 
 case class Session(
-    consumerGroupId: String,
+    consumerGroupId: WsGroupId,
     consumers: Set[ConsumerInstance],
     consumerLimit: Int
 ) {
 
   def canOpenSocket: Boolean = consumers.size < consumerLimit
 
-  def hasConsumer(consumerId: String): Boolean =
+  def hasConsumer(consumerId: WsClientId): Boolean =
     consumers.exists(_.id == consumerId)
 
-  def addConsumer(consumerId: String, serverId: String): SessionOpResult =
+  def addConsumer(
+      consumerId: WsClientId,
+      serverId: WsServerId
+  ): SessionOpResult =
     addConsumer(ConsumerInstance(consumerId, serverId))
 
   def addConsumer(consumerInstance: ConsumerInstance): SessionOpResult =
@@ -23,7 +27,7 @@ case class Session(
       else ConsumerAdded(copy(consumers = consumers + consumerInstance))
     }
 
-  def removeConsumer(consumerId: String): SessionOpResult = {
+  def removeConsumer(consumerId: WsClientId): SessionOpResult = {
     if (hasConsumer(consumerId))
       ConsumerRemoved(copy(consumers = consumers.filterNot(_.id == consumerId)))
     else ConsumerDoesNotExists(this)
@@ -32,7 +36,7 @@ case class Session(
 
 case object Session {
 
-  def apply(consumerGroupId: String, consumerLimit: Int = 2): Session = {
+  def apply(consumerGroupId: WsGroupId, consumerLimit: Int = 2): Session = {
     Session(
       consumerGroupId = consumerGroupId,
       consumers = Set.empty,
@@ -61,7 +65,7 @@ case object Session {
   case class ConsumerExists(session: Session)        extends SessionOpResult
   case class ConsumerLimitReached(session: Session)  extends SessionOpResult
   case class ConsumerDoesNotExists(session: Session) extends SessionOpResult
-  case class SessionNotFound(groupId: String) extends SessionOpResult {
+  case class SessionNotFound(groupId: WsGroupId) extends SessionOpResult {
 
     override def session = throw new NoSuchElementException(
       "Cannot access session value when it's not found"
@@ -70,4 +74,4 @@ case object Session {
 
 }
 
-case class ConsumerInstance(id: String, serverId: String)
+case class ConsumerInstance(id: WsClientId, serverId: WsServerId)

@@ -7,12 +7,13 @@ import akka.util.Timeout
 import net.scalytica.kafka.wsproxy.session.SessionHandler._
 import net.manub.embeddedkafka.schemaregistry._
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
-import net.scalytica.kafka.wsproxy.codecs.SessionSerde
+import net.scalytica.kafka.wsproxy.codecs.{SessionSerde, WsGroupIdSerde}
 import net.scalytica.kafka.wsproxy.codecs.Decoders.sessionDecoder
 import net.scalytica.kafka.wsproxy.codecs.Encoders.sessionEncoder
+import net.scalytica.kafka.wsproxy.models.{WsClientId, WsGroupId, WsServerId}
 import net.scalytica.kafka.wsproxy.session.Session.SessionOpResult
 import net.scalytica.test.{TestDataGenerators, WSProxyKafkaSpec}
-import org.apache.kafka.common.serialization.{Deserializer, Serdes => KSerdes}
+import org.apache.kafka.common.serialization.Deserializer
 import org.scalatest.{
   Assertion,
   BeforeAndAfter,
@@ -44,7 +45,8 @@ class SessionHandlerSpec
   implicit val timeout: Timeout     = 3 seconds
   implicit val scheduler: Scheduler = system.scheduler
 
-  implicit val keyDes: Deserializer[String]  = KSerdes.String().deserializer()
+  implicit val keyDes: Deserializer[WsGroupId] =
+    new WsGroupIdSerde().deserializer()
   implicit val valDes: Deserializer[Session] = new SessionSerde().deserializer()
 
   val testTopic = defaultTestAppCfg.sessionHandler.sessionStateTopicName
@@ -57,9 +59,9 @@ class SessionHandlerSpec
 
   def consumeSingleMessage()(
       implicit kcfg: EmbeddedKafkaConfig
-  ): Option[(String, Session)] =
-    consumeNumberKeyedMessagesFrom[String, Session](
-      topic = testTopic,
+  ): Option[(WsGroupId, Session)] =
+    consumeNumberKeyedMessagesFrom[WsGroupId, Session](
+      topic = testTopic.value,
       number = 1,
       autoCommit = true
     ).headOption
@@ -78,7 +80,7 @@ class SessionHandlerSpec
     }
 
   def validateSession(actual: Session)(
-      expectedGroupId: String,
+      expectedGroupId: WsGroupId,
       expectedConsumerLimit: Int,
       expectedNumConsumers: Int = 0
   ): Assertion = {
@@ -88,15 +90,15 @@ class SessionHandlerSpec
   }
 
   def validateConsumer(actual: ConsumerInstance)(
-      expectedConsumerId: String,
-      expectedServerId: String
+      expectedConsumerId: WsClientId,
+      expectedServerId: WsServerId
   ): Assertion = {
     actual.id mustBe expectedConsumerId
     actual.serverId mustBe expectedServerId
   }
 
   def initAndValidateSession(
-      groupId: String,
+      groupId: WsGroupId,
       consumerLimit: Int
   )(implicit ctx: Ctx): SessionOpResult = {
     val res = ctx.sh.initSession(groupId, consumerLimit).futureValue
@@ -110,32 +112,34 @@ class SessionHandlerSpec
     "register a new session" in sessionHandlerCtx("n1") { implicit ctx =>
       implicit val kcfg = ctx.kcfg
 
-      val res = ctx.sh.initSession("group1", 3).futureValue
-      validateSession(res.session)("group1", 3)
+      val res = ctx.sh.initSession(WsGroupId("group1"), 3).futureValue
+      validateSession(res.session)(WsGroupId("group1"), 3)
 
-      val (k, v) = consumeFirstKeyedMessageFrom[String, Session](testTopic)
+      val (k, v) =
+        consumeFirstKeyedMessageFrom[WsGroupId, Session](testTopic.value)
 
-      k mustBe "group1"
-      v mustBe Session("group1", consumerLimit = 3)
+      k mustBe WsGroupId("group1")
+      v mustBe Session(WsGroupId("group1"), consumerLimit = 3)
     }
 
     "add a few new sessions" in sessionHandlerCtx("n2") { implicit ctx =>
       implicit val kcfg = ctx.kcfg
 
-      val r1 = ctx.sh.initSession("group1", 3).futureValue
-      val r2 = ctx.sh.initSession("group2", 2).futureValue
-      val r3 = ctx.sh.initSession("group3", 1).futureValue
+      val r1 = ctx.sh.initSession(WsGroupId("group1"), 3).futureValue
+      val r2 = ctx.sh.initSession(WsGroupId("group2"), 2).futureValue
+      val r3 = ctx.sh.initSession(WsGroupId("group3"), 1).futureValue
 
-      validateSession(r1.session)("group1", 3)
-      validateSession(r2.session)("group2", 2)
-      validateSession(r3.session)("group3", 1)
+      validateSession(r1.session)(WsGroupId("group1"), 3)
+      validateSession(r2.session)(WsGroupId("group2"), 2)
+      validateSession(r3.session)(WsGroupId("group3"), 1)
 
-      val kvs = consumeNumberKeyedMessagesFrom[String, Session](testTopic, 3)
+      val kvs =
+        consumeNumberKeyedMessagesFrom[WsGroupId, Session](testTopic.value, 3)
 
       forAll(kvs.zipWithIndex) {
         case ((k, v), idx) =>
-          k mustBe s"group${idx + 1}"
-          v.consumerGroupId mustBe s"group${idx + 1}"
+          k mustBe WsGroupId(s"group${idx + 1}")
+          v.consumerGroupId mustBe WsGroupId(s"group${idx + 1}")
           v.consumers mustBe empty
       }
     }
@@ -143,13 +147,18 @@ class SessionHandlerSpec
     "add a consumer to a session" in sessionHandlerCtx("n3") { implicit ctx =>
       implicit val kcfg = ctx.kcfg
 
-      val s = ctx.sh.initSession("group1", 2).futureValue.session
-      validateSession(s)("group1", 2)
+      val s = ctx.sh.initSession(WsGroupId("group1"), 2).futureValue.session
+      validateSession(s)(WsGroupId("group1"), 2)
 
-      validateSession(consumeSingleMessage().value._2)("group1", 2)
+      validateSession(consumeSingleMessage().value._2)(WsGroupId("group1"), 2)
 
-      val r2 =
-        ctx.sh.addConsumer(s.consumerGroupId, "client1", "n1").futureValue
+      val r2 = ctx.sh
+        .addConsumer(
+          s.consumerGroupId,
+          WsClientId("client1"),
+          WsServerId("n1")
+        )
+        .futureValue
       validateSession(consumeSingleMessage().value._2)(
         expectedGroupId = s.consumerGroupId,
         expectedConsumerLimit = s.consumerLimit,
@@ -157,43 +166,67 @@ class SessionHandlerSpec
       )
       validateSession(r2.session)(s.consumerGroupId, s.consumerLimit, 1)
       r2.session.canOpenSocket mustBe true
-      validateConsumer(r2.session.consumers.headOption.value)("client1", "n1")
+      validateConsumer(r2.session.consumers.headOption.value)(
+        WsClientId("client1"),
+        WsServerId("n1")
+      )
     }
 
     "not allow adding a consumer if the session has reached its limit" in
       sessionHandlerCtx("n4") { implicit ctx =>
         implicit val kcfg = ctx.kcfg
 
-        val s = ctx.sh.initSession("group1", 2).futureValue.session
-        validateSession(s)("group1", 2)
+        val s = ctx.sh.initSession(WsGroupId("group1"), 2).futureValue.session
+        validateSession(s)(WsGroupId("group1"), 2)
         validateSession(consumeSingleMessage().value._2)(
-          expectedGroupId = "group1",
+          expectedGroupId = WsGroupId("group1"),
           expectedConsumerLimit = 2
         )
 
-        val r2 =
-          ctx.sh.addConsumer(s.consumerGroupId, "client1", "n1").futureValue
+        val r2 = ctx.sh
+          .addConsumer(
+            s.consumerGroupId,
+            WsClientId("client1"),
+            WsServerId("n1")
+          )
+          .futureValue
         validateSession(r2.session)(s.consumerGroupId, s.consumerLimit, 1)
         r2.session.canOpenSocket mustBe true
-        validateConsumer(r2.session.consumers.headOption.value)("client1", "n1")
+        validateConsumer(r2.session.consumers.headOption.value)(
+          WsClientId("client1"),
+          WsServerId("n1")
+        )
         validateSession(consumeSingleMessage().value._2)(
           expectedGroupId = s.consumerGroupId,
           expectedConsumerLimit = s.consumerLimit,
           expectedNumConsumers = 1
         )
 
-        val r3 =
-          ctx.sh.addConsumer(s.consumerGroupId, "client2", "n2").futureValue
+        val r3 = ctx.sh
+          .addConsumer(
+            s.consumerGroupId,
+            WsClientId("client2"),
+            WsServerId("n2")
+          )
+          .futureValue
         r3.session.canOpenSocket mustBe false
-        validateConsumer(r3.session.consumers.lastOption.value)("client2", "n2")
+        validateConsumer(r3.session.consumers.lastOption.value)(
+          WsClientId("client2"),
+          WsServerId("n2")
+        )
         validateSession(consumeSingleMessage().value._2)(
           expectedGroupId = s.consumerGroupId,
           expectedConsumerLimit = s.consumerLimit,
           expectedNumConsumers = 2
         )
 
-        val r4 =
-          ctx.sh.addConsumer(s.consumerGroupId, "client3", "n1").futureValue
+        val r4 = ctx.sh
+          .addConsumer(
+            s.consumerGroupId,
+            WsClientId("client3"),
+            WsServerId("n1")
+          )
+          .futureValue
         r4 mustBe a[Session.ConsumerLimitReached]
         r4.session mustBe r3.session
       }

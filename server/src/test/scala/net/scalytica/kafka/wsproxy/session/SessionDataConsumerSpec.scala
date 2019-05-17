@@ -7,8 +7,13 @@ import net.manub.embeddedkafka.schemaregistry.{
   EmbeddedKafka,
   EmbeddedKafkaConfig
 }
-import net.scalytica.kafka.wsproxy.codecs.{BasicSerdes, SessionSerde}
 import net.scalytica.kafka.wsproxy.codecs.Implicits._
+import net.scalytica.kafka.wsproxy.codecs.{
+  BasicSerdes,
+  SessionSerde,
+  WsGroupIdSerde
+}
+import net.scalytica.kafka.wsproxy.models.WsGroupId
 import net.scalytica.kafka.wsproxy.session.SessionHandlerProtocol.{
   ClientSessionProtocol,
   InternalProtocol,
@@ -16,10 +21,10 @@ import net.scalytica.kafka.wsproxy.session.SessionHandlerProtocol.{
   UpdateSession
 }
 import net.scalytica.test.WSProxyKafkaSpec
-import org.scalatest.{BeforeAndAfterAll, MustMatchers, OptionValues, WordSpec}
 import org.scalatest.Inspectors.forAll
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Minute, Span}
+import org.scalatest.{BeforeAndAfterAll, MustMatchers, OptionValues, WordSpec}
 
 // scalastyle:off magic.number
 class SessionDataConsumerSpec
@@ -44,6 +49,7 @@ class SessionDataConsumerSpec
   implicit val sys = atk.system
   implicit val mat = ActorMaterializer()
 
+  implicit val groupIdSerde = new WsGroupIdSerde()
   implicit val sessionSerde = new SessionSerde()
   implicit val keyDes       = BasicSerdes.StringDeserializer
   implicit val keySer       = BasicSerdes.StringSerializer
@@ -57,25 +63,25 @@ class SessionDataConsumerSpec
   private[this] def publish(
       s: Session
   )(implicit config: EmbeddedKafkaConfig): Unit = {
-    publishToKafka[String, Session](
-      topic = sessionTopic,
+    publishToKafka[WsGroupId, Session](
+      topic = sessionTopic.value,
       key = s.consumerGroupId,
       message = s
     )
   }
 
   private[this] def publishTombstone(
-      gid: String
+      gid: WsGroupId
   )(implicit config: EmbeddedKafkaConfig): Unit = {
-    publishToKafka[String, Session](
-      topic = sessionTopic,
+    publishToKafka[WsGroupId, Session](
+      topic = sessionTopic.value,
       key = gid,
       message = null // scalastyle:ignore
     )
   }
 
   private[this] def testSession(i: Int): Session =
-    Session(s"c$i", consumerLimit = i)
+    Session(WsGroupId(s"c$i"), consumerLimit = i)
 
   val session1 = testSession(1)
   val session2 = testSession(2)

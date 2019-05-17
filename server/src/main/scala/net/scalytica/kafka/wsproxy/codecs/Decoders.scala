@@ -23,6 +23,18 @@ trait Decoders {
     json.as[String].map(WsMessageId.apply)
   }
 
+  implicit val wsClientIdDecoder: Decoder[WsClientId] = { json =>
+    json.as[String].map(WsClientId.apply)
+  }
+
+  implicit val wsGroupIdDecoder: Decoder[WsGroupId] = { json =>
+    json.as[String].map(WsGroupId.apply)
+  }
+
+  implicit val wsServerIdDecoder: Decoder[WsServerId] = { json =>
+    json.as[String].map(WsServerId.apply)
+  }
+
   implicit val topicNameDecoder: Decoder[TopicName] = { json =>
     json.as[String].map(TopicName.apply)
   }

@@ -31,7 +31,8 @@ import net.scalytica.kafka.wsproxy.models.{
   Formats,
   OutSocketArgs,
   WsCommit,
-  WsConsumerRecord
+  WsConsumerRecord,
+  WsGroupId
 }
 import net.scalytica.kafka.wsproxy.session.SessionHandler._
 import net.scalytica.kafka.wsproxy.session.{Session, SessionHandlerProtocol}
@@ -94,7 +95,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
 
     val serverId = cfg.server.serverId
     val clientId = args.clientId
-    val groupId  = args.groupId.getOrElse(s"$clientId-group")
+    val groupId  = args.groupId.getOrElse(WsGroupId(s"$clientId-group"))
 
     val consumerAddResult = for {
       ir     <- sessionHandler.initSession(groupId, topicPartitions)
@@ -114,23 +115,25 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
       case Session.ConsumerExists(_) =>
         reject(
           ValidationRejection(
-            s"WebSocket for consumer $clientId in session $groupId not" +
-              s" established because a consumer with the same ID is already" +
-              s" registered"
+            s"WebSocket for consumer ${clientId.value} in session " +
+              s"${groupId.value} not established because a consumer with the" +
+              " same ID is already registered"
           )
         )
 
       case Session.ConsumerLimitReached(s) =>
         reject(
           ValidationRejection(
-            s"The maximum number of WebSockets for session $groupId has been " +
-              s"reached. Limit is ${s.consumerLimit}"
+            s"The maximum number of WebSockets for session ${groupId.value} " +
+              s"has been reached. Limit is ${s.consumerLimit}"
           )
         )
 
       case Session.SessionNotFound(_) =>
         reject(
-          ValidationRejection(s"Could not find an active session for $groupId")
+          ValidationRejection(
+            s"Could not find an active session for ${groupId.value}"
+          )
         )
 
       case wrong =>
@@ -141,7 +144,8 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
         failWith(
           new InternalError(
             "An unexpected error occurred when trying to establish the " +
-              s"WebSocket consumer $clientId in session $groupId"
+              s"WebSocket consumer ${clientId.value} in session" +
+              s" ${groupId.value}"
           )
         )
     }
@@ -170,7 +174,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
   ): Route = {
     val commitHandlerRef =
       if (args.autoCommit) None
-      else Some(as.spawn(CommitHandler.commitStack, args.clientId))
+      else Some(as.spawn(CommitHandler.commitStack, args.clientId.value))
 
     val messageParser = args.socketPayload match {
       case JsonPayload => jsonMessageToWsCommit
@@ -375,7 +379,8 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
     case AvroPayload =>
       cr =>
         val byteString = ByteString(
-          avroConsumerRecordSerde.serialize(args.topic, cr.toAvroRecord[K, V])
+          avroConsumerRecordSerde
+            .serialize(args.topic.value, cr.toAvroRecord[K, V])
         )
         BinaryMessage(byteString)
     case JsonPayload =>

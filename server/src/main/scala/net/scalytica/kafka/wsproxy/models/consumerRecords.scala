@@ -61,10 +61,10 @@ object WsConsumerRecord {
     avro.key match {
       case Some(key) =>
         ConsumerKeyValueRecord(
-          topic = avro.topic,
-          partition = avro.partition,
-          offset = avro.offset,
-          timestamp = avro.timestamp,
+          topic = TopicName(avro.topic),
+          partition = Partition(avro.partition),
+          offset = Offset(avro.offset),
+          timestamp = Timestamp(avro.timestamp),
           key = OutValueDetails(key, Option(Formats.AvroType)),
           value = OutValueDetails(avro.value, Option(Formats.AvroType)),
           committableOffset = None
@@ -72,10 +72,10 @@ object WsConsumerRecord {
 
       case None =>
         ConsumerValueRecord(
-          topic = avro.topic,
-          partition = avro.partition,
-          offset = avro.offset,
-          timestamp = avro.timestamp,
+          topic = TopicName(avro.topic),
+          partition = Partition(avro.partition),
+          offset = Offset(avro.offset),
+          timestamp = Timestamp(avro.timestamp),
           value = OutValueDetails(avro.value, Option(Formats.AvroType)),
           committableOffset = None
         )
