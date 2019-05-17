@@ -39,12 +39,14 @@ file. Where the following parameters can be adjusted:
 > For a complete overview of all the configuration parameters, please refer to
 > the `application.conf` file in `src/main/resources`.
 
+
+ 
 | Config key                                                      | Environment                              | Default                  | Description   |
-|:---                                                             |:----                                     |:------------            :|:-----         |
+|:---                                                             |:----                                     |:------------------------:|:-----         |
 | kafka.ws.proxy.server.server-id                                 | WSPROXY_SERVER_ID                        | `node-1`                 | A unique identifier for the specific kafka-websocket-proxy instance. |
 | kafka.ws.proxy.server.port                                      | WSPROXY_PORT                             | `8078`                   | Port where the server endpoints will be exposed |
 | kafka.ws.proxy.server.kafka-bootstrap-urls                      | WSPROXY_KAFKA_BOOTSTRAP_URLS             |                          | A string with the Kafka brokers to bootstrap against, in the form `<host>:<port>`, separated by comma. |
-| kafka.ws.proxy.server.schema-registry-url                       | WSPROXY_SCHEMA_REGISTRY_URL              |                          | URLs for the Confluent Schema Registry |
+| kafka.ws.proxy.server.schema-registry-url                       | WSPROXY_SCHEMA_REGISTRY_URL              |                          | URLs for the Confluent Schema Registry. |
 | kafka.ws.proxy.server.auto-register-schemas                     | WSPROXY_SCHEMA_AUTO_REGISTER             | `true`                   | By default, the proxy will automatically register any internal Avro schemas it needs. If disabled, these schemas must be registered with the schema registry manually. |
 | kafka.ws.proxy.session-handler.session-state-topic-name         | WSPROXY_SESSION_STATE_TOPIC              | `_wsproxy.session.state` | The name of the compacted topic where session state is kept. |
 | kafka.ws.proxy.session-handler.session-state-replication-factor | WSPROXY_SESSION_STATE_REPLICATION_FACTOR | `3`                      | How many replicas to keep for the session state topic. |
@@ -58,38 +60,35 @@ file. Where the following parameters can be adjusted:
 
 ### Kafka Security
 
-TBD...
-
-```hocon
-kafka.ws.proxy {
-
-  // The main security configurations can be defined under this key
-  kafka-security-properties {
-    sasl.mechanism = PLAIN
-    security.protocol = SASL_SSL
-    ssl.truststore.location = /path/to/kafka.client.truststore.jks
-    ssl.truststore.password = <password>
-    ssl.keystore.location = /path/to/kafka.client.keystore.jks
-    ssl.keystore.password = <password>
-    ssl.key.password = <password>
-    sasl.jaas.config = """org.apache.kafka.common.security.plain.PlainLoginModule required username="client" password="client";"""
-    ssl.endpoint.identification.algorithm=""
-  }
-
-  // Each client refer to the main security configuration. Each can be
-  // individually overridden if necessary.
+The `kafka-websocket-proxy` allows setting Kafka client specific properties
+under the key `kafka.ws.proxy.kafka-client-properties` in the `application.conf`
+file. To connect to a secure Kafka cluster, the necessary security properties
+should be added here. Below is a table containing the properties that are
+currently possible to set using specific environment variables:
   
-  admin-client {
-    kafka-client-properties = ${kafka.ws.proxy.kafka-security-properties}
-  }
-  consumer {
-    kafka-client-properties = ${kafka.ws.proxy.kafka-security-properties}
-  }
-  producer {
-    kafka-client-properties = ${kafka.ws.proxy.kafka-security-properties}
-  }
-}
-```
+
+| Config key                            | Environment                              | Default      |
+|:---                                   |:----                                     |:------------:|
+| security.protocol                     | WSPROXY_KAFKA_SECURITY_PROTOCOL          | `PLAINTEXT`  |
+| sasl.mechanism                        | WSPROXY_KAFKA_SASL_MECHANISM             |  not set     |
+| sasl.jaas.config                      | WSPROXY_KAFKA_SASL_JAAS_CFG              |  not set     |
+| ssl.key.password                      | WSPROXY_KAFKA_SSL_KEY_PASS               |  not set     |
+| ssl.endpoint.identification.algorithm | WSPROXY_KAFKA_SASL_ENDPOINT_ID_ALOGO     |  not set     |
+| ssl.truststore.location               | WSPROXY_KAFKA_SSL_TRUSTSTORE_LOCATION    |  not set     |
+| ssl.truststore.truststore.password    | WSPROXY_KAFKA_SSL_TRUSTSTORE_PASS        |  not set     |
+| ssl.keystore.location                 | WSPROXY_KAFKA_SSL_KEYSTORE_LOCATION      |  not set     |
+| ssl.keystore.password                 | WSPROXY_KAFKA_SSL_KEYSTORE_PASS          |  not set     |
+
+Additionally, each of the different clients (admin, producer and consumer), can
+be configured individually. However, these configurations are not currently
+exposed as environment variables.
+
+The client specific configuration keys have the same structure as the
+`kafka.ws.proxy.kafka-client-properties` key:
+
+* `kafka.ws.proxy.admin-client.kafka-client-properties`
+* `kafka.ws.proxy.consumer.kafka-client-properties`
+* `kafka.ws.proxy.producer.kafka-client-properties`
 
 
 ## Endpoints and API
