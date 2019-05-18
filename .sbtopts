@@ -1,3 +1,3 @@
--mem 2048
+-mem 2048 -J-Xss2M
 #-mem 2048 -J-XX:MaxDirectMemorySize=1024M
 #-mem 2048 -J-XX:+UnlockExperimentalVMOptions -J-XX:+EnableJVMCI -J-XX:+UseJVMCICompiler
