@@ -50,7 +50,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
   private[this] def avroCommitSerde(
       implicit cfg: AppCfg
   ): WsProxyAvroSerde[AvroCommit] = {
-    cfg.server.schemaRegistryUrl
+    cfg.kafkaClient.schemaRegistryUrl
       .map(url => WsProxyAvroSerde[AvroCommit](schemaRegistryCfg(url)))
       .getOrElse(WsProxyAvroSerde[AvroCommit]())
   }
@@ -58,7 +58,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
   private[this] def avroConsumerRecordSerde(
       implicit cfg: AppCfg
   ): WsProxyAvroSerde[AvroConsumerRecord] = {
-    cfg.server.schemaRegistryUrl
+    cfg.kafkaClient.schemaRegistryUrl
       .map(url => WsProxyAvroSerde[AvroConsumerRecord](schemaRegistryCfg(url)))
       .getOrElse(WsProxyAvroSerde[AvroConsumerRecord]())
   }

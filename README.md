@@ -45,9 +45,10 @@ file. Where the following parameters can be adjusted:
 |:---                                                             |:----                                     |:------------------------:|:-----         |
 | kafka.ws.proxy.server.server-id                                 | WSPROXY_SERVER_ID                        | `node-1`                 | A unique identifier for the specific kafka-websocket-proxy instance. |
 | kafka.ws.proxy.server.port                                      | WSPROXY_PORT                             | `8078`                   | Port where the server endpoints will be exposed |
-| kafka.ws.proxy.server.kafka-bootstrap-urls                      | WSPROXY_KAFKA_BOOTSTRAP_URLS             |                          | A string with the Kafka brokers to bootstrap against, in the form `<host>:<port>`, separated by comma. |
-| kafka.ws.proxy.server.schema-registry-url                       | WSPROXY_SCHEMA_REGISTRY_URL              |                          | URLs for the Confluent Schema Registry. |
-| kafka.ws.proxy.server.auto-register-schemas                     | WSPROXY_SCHEMA_AUTO_REGISTER             | `true`                   | By default, the proxy will automatically register any internal Avro schemas it needs. If disabled, these schemas must be registered with the schema registry manually. |
+| kafka.ws.proxy.kafka-client.bootstrap-urls                      | WSPROXY_KAFKA_BOOTSTRAP_URLS             |                          | A string with the Kafka brokers to bootstrap against, in the form `<host>:<port>`, separated by comma. |
+| kafka.ws.proxy.kafka-client.schema-registry-url                 | WSPROXY_SCHEMA_REGISTRY_URL              |                          | URLs for the Confluent Schema Registry. |
+| kafka.ws.proxy.kafka-client.auto-register-schemas               | WSPROXY_SCHEMA_AUTO_REGISTER             | `true`                   | By default, the proxy will automatically register any internal Avro schemas it needs. If disabled, these schemas must be registered with the schema registry manually. |
+| kafka.ws.proxy.kafka-client.metrics-enabled                     | WS_PROXY_CONFLUENT_METRICS_ENABLED       | `false`                  | When this flag is set to `true`, it will enable the Confluent Metrics Reporter |
 | kafka.ws.proxy.session-handler.session-state-topic-name         | WSPROXY_SESSION_STATE_TOPIC              | `_wsproxy.session.state` | The name of the compacted topic where session state is kept. |
 | kafka.ws.proxy.session-handler.session-state-replication-factor | WSPROXY_SESSION_STATE_REPLICATION_FACTOR | `3`                      | How many replicas to keep for the session state topic. |
 | kafka.ws.proxy.session-handler.session-state-retention          | WSPROXY_SESSION_STATE_RETENTION          | `30 days`                | How long to keep sessions in the session state topic. |
@@ -61,7 +62,7 @@ file. Where the following parameters can be adjusted:
 ### Kafka Security
 
 The `kafka-websocket-proxy` allows setting Kafka client specific properties
-under the key `kafka.ws.proxy.kafka-client-properties` in the `application.conf`
+under the key `kafka.ws.proxy.kafka-client.properties` in the `application.conf`
 file. To connect to a secure Kafka cluster, the necessary security properties
 should be added here. Below is a table containing the properties that are
 currently possible to set using specific environment variables:
@@ -80,15 +81,39 @@ currently possible to set using specific environment variables:
 | ssl.keystore.password                 | WSPROXY_KAFKA_SSL_KEYSTORE_PASS          |  not set     |
 
 Additionally, each of the different clients (admin, producer and consumer), can
-be configured individually. However, these configurations are not currently
-exposed as environment variables.
+be configured individually. However, _these configurations are not currently
+exposed as environment variables_.
 
 The client specific configuration keys have the same structure as the
-`kafka.ws.proxy.kafka-client-properties` key:
+`kafka.ws.proxy.kafka-client.properties` key:
 
 * `kafka.ws.proxy.admin-client.kafka-client-properties`
 * `kafka.ws.proxy.consumer.kafka-client-properties`
 * `kafka.ws.proxy.producer.kafka-client-properties`
+
+
+### Confluent Metrics Reporter
+
+If the property `kafka.ws.proxy.kafka-client.metrics-enabled` is set to `true`,
+the proxy service can be configured to send metrics data to a different cluster.
+The cluster can be differently configured, and it is therefore necessary to
+provide a distinct client configuration for the metrics reporter.
+  
+
+| Config key                                                                                     | Environment                                      | Default      |
+|:---                                                                                            |:----                                             |:------------:|
+| kafka.ws.proxy.kafka-client.confluent.metrics.properties.bootstrap-urls                        | WSPROXY_KAFKA_METRICS_BOOTSTRAP_URLS             | same as kafka.ws.proxy.kafka-client.bootstrap-urls |
+| kafka.ws.proxy.kafka-client.confluent.metrics.properties.security.protocol                     | WSPROXY_KAFKA_METRICS_SECURITY_PROTOCOL          | `PLAINTEXT`  |
+| kafka.ws.proxy.kafka-client.confluent.metrics.properties.sasl.mechanism                        | WSPROXY_KAFKA_METRICS_SASL_MECHANISM             |  not set     |
+| kafka.ws.proxy.kafka-client.confluent.metrics.properties.sasl.jaas.config                      | WSPROXY_KAFKA_METRICS_SASL_JAAS_CFG              |  not set     |
+| kafka.ws.proxy.kafka-client.confluent.metrics.properties.ssl.key.password                      | WSPROXY_KAFKA_METRICS_SSL_KEY_PASS               |  not set     |
+| kafka.ws.proxy.kafka-client.confluent.metrics.properties.ssl.endpoint.identification.algorithm | WSPROXY_KAFKA_METRICS_SASL_ENDPOINT_ID_ALOGO     |  not set     |
+| kafka.ws.proxy.kafka-client.confluent.metrics.properties.ssl.truststore.location               | WSPROXY_KAFKA_METRICS_SSL_TRUSTSTORE_LOCATION    |  not set     |
+| kafka.ws.proxy.kafka-client.confluent.metrics.properties.ssl.truststore.truststore.password    | WSPROXY_KAFKA_METRICS_SSL_TRUSTSTORE_PASS        |  not set     |
+| kafka.ws.proxy.kafka-client.confluent.metrics.properties.ssl.keystore.location                 | WSPROXY_KAFKA_METRICS_SSL_KEYSTORE_LOCATION      |  not set     |
+| kafka.ws.proxy.kafka-client.confluent.metrics.properties.ssl.keystore.password                 | WSPROXY_KAFKA_METRICS_SSL_KEYSTORE_PASS          |  not set     |
+
+
 
 
 ## Endpoints and API

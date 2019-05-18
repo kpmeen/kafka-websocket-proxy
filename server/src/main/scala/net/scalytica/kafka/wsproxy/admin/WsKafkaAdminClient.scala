@@ -27,12 +27,15 @@ class WsKafkaAdminClient(cfg: AppCfg) {
 
   private[this] val logger = Logger(getClass)
 
-  private[this] lazy val admConfig =
+  // scalastyle:off line.size.limit
+  private[this] lazy val admConfig = {
     cfg.adminClient.kafkaClientProperties ++ Map[String, AnyRef](
-      BOOTSTRAP_SERVERS_CONFIG  -> cfg.server.kafkaBootstrapUrls.mkString(),
+      BOOTSTRAP_SERVERS_CONFIG  -> cfg.kafkaClient.bootstrapUrls.mkString(),
       CLIENT_ID_CONFIG          -> "kafka-websocket-proxy-admin",
       REQUEST_TIMEOUT_MS_CONFIG -> s"${(10 seconds).toMillis}"
     )
+  }
+  // scalastyle:on line.size.limit
 
   private[this] val sessionStateTopic =
     cfg.sessionHandler.sessionStateTopicName.value

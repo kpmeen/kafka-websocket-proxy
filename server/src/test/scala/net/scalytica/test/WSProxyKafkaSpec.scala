@@ -41,13 +41,15 @@ trait WSProxyKafkaSpec
       kafkaPort: Int,
       schemaRegistryPort: Option[Int] = None,
       serverId: String = "node-1"
-  ): Configuration.AppCfg = defaultTestAppCfg.copy(
-    server = defaultTestAppCfg.server.copy(
-      serverId = WsServerId(serverId),
-      kafkaBootstrapUrls = KafkaBootstrapUrls(List(serverHost(kafkaPort))),
-      schemaRegistryUrl =
-        schemaRegistryPort.map(u => s"http://${serverHost(u)}")
+  ): Configuration.AppCfg = {
+    defaultTestAppCfg.copy(
+      server = defaultTestAppCfg.server.copy(serverId = WsServerId(serverId)),
+      kafkaClient = defaultTestAppCfg.kafkaClient.copy(
+        bootstrapUrls = KafkaBootstrapUrls(List(serverHost(kafkaPort))),
+        schemaRegistryUrl =
+          schemaRegistryPort.map(u => s"http://${serverHost(u)}")
+      )
     )
-  )
+  }
 
 }

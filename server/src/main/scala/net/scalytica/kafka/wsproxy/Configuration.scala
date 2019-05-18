@@ -4,6 +4,7 @@ import java.nio.file.Path
 
 import com.typesafe.config.{Config, ConfigFactory}
 import net.scalytica.kafka.wsproxy.models.{TopicName, WsServerId}
+import org.apache.kafka.clients.CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG
 import pureconfig.{loadConfigOrThrow, ConfigReader}
 import pureconfig.generic.auto._
 
@@ -38,6 +39,7 @@ object Configuration {
 
   final case class AppCfg(
       server: ServerCfg,
+      kafkaClient: KafkaClientCfg,
       adminClient: AdminClientCfg,
       consumer: ConsumerCfg,
       producer: ProducerCfg,
@@ -59,11 +61,44 @@ object Configuration {
 
   final case class ServerCfg(
       serverId: WsServerId,
-      port: Int,
-      kafkaBootstrapUrls: KafkaBootstrapUrls,
-      schemaRegistryUrl: Option[String],
-      autoRegisterSchemas: Boolean
+      port: Int
   )
+
+  final case class KafkaClientCfg(
+      bootstrapUrls: KafkaBootstrapUrls,
+      schemaRegistryUrl: Option[String],
+      autoRegisterSchemas: Boolean,
+      metricsEnabled: Boolean,
+      properties: Map[String, AnyRef],
+      confluentMetrics: Option[ConfluentMetricsCfg]
+  )
+
+  final case class ConfluentMetricsCfg(
+      bootstrapUrls: KafkaBootstrapUrls,
+      properties: Map[String, AnyRef]
+  ) {
+
+    def asPrefixedProperties: Map[String, AnyRef] =
+      ConfluentMetricsCfg.withConfluentMetricsPrefix(bootstrapUrls, properties)
+
+  }
+
+  object ConfluentMetricsCfg {
+    val MetricsPrefix = "confluent.metrics.reporter"
+
+    val BootstrapServersKey =
+      s"${ConfluentMetricsCfg.MetricsPrefix}.$BOOTSTRAP_SERVERS_CONFIG"
+
+    def withConfluentMetricsPrefix(
+        bootstrapUrls: KafkaBootstrapUrls,
+        props: Map[String, AnyRef]
+    ): Map[String, AnyRef] = {
+      props.map {
+        case (key, value) =>
+          s"${ConfluentMetricsCfg.MetricsPrefix}.$key" -> value
+      } + (BootstrapServersKey -> bootstrapUrls.urls.mkString(","))
+    }
+  }
 
   final case class AdminClientCfg(
       kafkaClientProperties: Map[String, AnyRef]

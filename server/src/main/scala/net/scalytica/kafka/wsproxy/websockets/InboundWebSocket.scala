@@ -28,7 +28,7 @@ trait InboundWebSocket extends WithSchemaRegistryConfig {
   implicit private[this] def producerRecordSerde(
       implicit cfg: AppCfg
   ): WsProxyAvroSerde[AvroProducerRecord] = {
-    cfg.server.schemaRegistryUrl
+    cfg.kafkaClient.schemaRegistryUrl
       .map(url => WsProxyAvroSerde[AvroProducerRecord](schemaRegistryCfg(url)))
       .getOrElse(WsProxyAvroSerde[AvroProducerRecord]())
   }
@@ -36,7 +36,7 @@ trait InboundWebSocket extends WithSchemaRegistryConfig {
   implicit private[this] def producerResultSerde(
       implicit cfg: AppCfg
   ): WsProxyAvroSerde[AvroProducerResult] = {
-    cfg.server.schemaRegistryUrl
+    cfg.kafkaClient.schemaRegistryUrl
       .map(url => WsProxyAvroSerde[AvroProducerResult](schemaRegistryCfg(url)))
       .getOrElse(WsProxyAvroSerde[AvroProducerResult]())
   }

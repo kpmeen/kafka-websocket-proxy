@@ -15,7 +15,8 @@ import org.apache.kafka.clients.consumer.ConsumerConfig.{
   ENABLE_AUTO_COMMIT_CONFIG,
   _
 }
-import org.apache.kafka.clients.consumer.{KafkaConsumer, OffsetResetStrategy}
+import org.apache.kafka.clients.consumer.KafkaConsumer
+import org.apache.kafka.clients.consumer.OffsetResetStrategy.EARLIEST
 
 import scala.collection.JavaConverters._
 
@@ -39,7 +40,7 @@ private[session] class SessionDataConsumer(
   private[this] val kDes = BasicSerdes.StringDeserializer
   private[this] val vDes = new SessionSerde().deserializer()
 
-  private[this] val kafkaUrl = cfg.server.kafkaBootstrapUrls.mkString()
+  private[this] val kafkaUrl = cfg.kafkaClient.bootstrapUrls.mkString()
 
   private[this] val cid =
     s"ws-proxy-session-consumer-${cfg.server.serverId.value}"
@@ -50,18 +51,25 @@ private[session] class SessionDataConsumer(
   private[this] val consumerProps = ConsumerSettings(sys.toUntyped, kDes, vDes)
     .withBootstrapServers(kafkaUrl)
     .withProperties(
-      AUTO_OFFSET_RESET_CONFIG -> OffsetResetStrategy.EARLIEST
-        .name()
-        .toLowerCase,
-      ENABLE_AUTO_COMMIT_CONFIG -> "false",
-      // Enables stream monitoring in confluent control center
-      INTERCEPTOR_CLASSES_CONFIG -> ConsumerInterceptorClass
+      AUTO_OFFSET_RESET_CONFIG  -> EARLIEST.name.toLowerCase,
+      ENABLE_AUTO_COMMIT_CONFIG -> "false"
     )
     .withGroupId(cid)
     .withClientId(cid)
     .withConsumerFactory { cs =>
-      val props: java.util.Properties =
-        cfg.consumer.kafkaClientProperties ++ cs.getProperties.asScala.toMap
+      val props: java.util.Properties = {
+        if (cfg.kafkaClient.metricsEnabled) {
+          // Enables stream monitoring in confluent control center
+          Map(INTERCEPTOR_CLASSES_CONFIG -> ConsumerInterceptorClass) ++
+            cfg.kafkaClient.confluentMetrics
+              .map(cmr => cmr.asPrefixedProperties)
+              .getOrElse(Map.empty[String, AnyRef])
+        } else {
+          Map.empty[String, AnyRef]
+        } ++
+          cfg.consumer.kafkaClientProperties ++
+          cs.getProperties.asScala.toMap
+      }
       new KafkaConsumer[String, Session](
         props,
         cs.keyDeserializerOpt.orNull,

@@ -45,24 +45,31 @@ object WsConsumer {
       kd: Deserializer[K],
       vd: Deserializer[V]
   ) = {
-    val kafkaUrl = cfg.server.kafkaBootstrapUrls.mkString()
+    val kafkaUrl = cfg.kafkaClient.bootstrapUrls.mkString()
 
     ConsumerSettings(as, kd, vd)
       .withBootstrapServers(kafkaUrl)
       .withProperties(
-        // scalastyle:off
         AUTO_OFFSET_RESET_CONFIG       -> offsetReset.name.toLowerCase,
         ENABLE_AUTO_COMMIT_CONFIG      -> s"$autoCommit",
-        AUTO_COMMIT_INTERVAL_MS_CONFIG -> s"${50.millis.toMillis}",
-        // Enables stream monitoring in confluent control center
-        INTERCEPTOR_CLASSES_CONFIG -> ConsumerInterceptorClass
-        // scalastyle:on
+        AUTO_COMMIT_INTERVAL_MS_CONFIG -> s"${50.millis.toMillis}"
       )
       .withClientId(id.value)
       .withGroupId(gid.getOrElse(WsGroupId(s"$id-group")).value)
       .withConsumerFactory { cs =>
-        val props: java.util.Properties =
-          cfg.consumer.kafkaClientProperties ++ cs.getProperties.asScala.toMap
+        val props: java.util.Properties = {
+          if (cfg.kafkaClient.metricsEnabled) {
+            // Enables stream monitoring in confluent control center
+            Map(INTERCEPTOR_CLASSES_CONFIG -> ConsumerInterceptorClass) ++
+              cfg.kafkaClient.confluentMetrics
+                .map(cmr => cmr.asPrefixedProperties)
+                .getOrElse(Map.empty[String, AnyRef])
+          } else {
+            Map.empty[String, AnyRef]
+          } ++
+            cfg.consumer.kafkaClientProperties ++
+            cs.getProperties.asScala.toMap
+        }
         new KafkaConsumer[K, V](
           props,
           cs.keyDeserializerOpt.orNull,

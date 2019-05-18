@@ -37,19 +37,24 @@ object WsProducer {
       ks: Option[Serializer[K]],
       vs: Option[Serializer[V]]
   ) = {
-    val kafkaUrl = cfg.server.kafkaBootstrapUrls.mkString()
+    val kafkaUrl = cfg.kafkaClient.bootstrapUrls.mkString()
 
     ProducerSettings(as, ks, vs)
       .withBootstrapServers(kafkaUrl)
-      .withProperties(
-        // scalastyle:off
-        // Enables stream monitoring in confluent control center
-        INTERCEPTOR_CLASSES_CONFIG -> ProducerInterceptorClass
-        // scalastyle:on
-      )
       .withProducerFactory { ps =>
-        val props: java.util.Properties =
-          cfg.producer.kafkaClientProperties ++ ps.getProperties.asScala.toMap
+        val props: java.util.Properties = {
+          if (cfg.kafkaClient.metricsEnabled) {
+            // Enables stream monitoring in confluent control center
+            Map(INTERCEPTOR_CLASSES_CONFIG -> ProducerInterceptorClass) ++
+              cfg.kafkaClient.confluentMetrics
+                .map(cmr => cmr.asPrefixedProperties)
+                .getOrElse(Map.empty[String, AnyRef])
+          } else {
+            Map.empty[String, AnyRef]
+          } ++
+            cfg.producer.kafkaClientProperties ++
+            ps.getProperties.asScala.toMap
+        }
         new KafkaProducer[K, V](
           props,
           ps.keySerializerOpt.orNull,

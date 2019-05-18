@@ -11,7 +11,7 @@ trait WithSchemaRegistryConfig {
   protected def schemaRegistryCfg(registryUrl: String)(implicit cfg: AppCfg) =
     Map[String, Any](
       SCHEMA_REGISTRY_URL_CONFIG -> registryUrl,
-      AUTO_REGISTER_SCHEMAS      -> cfg.server.autoRegisterSchemas
+      AUTO_REGISTER_SCHEMAS      -> cfg.kafkaClient.autoRegisterSchemas
     )
 
 }

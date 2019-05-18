@@ -9,28 +9,44 @@ import scala.concurrent.duration._
 
 class ConfigurationSpec extends WordSpec with MustMatchers {
 
-  val invalidCfg1 = ConfigFactory.parseString(
-    """kafka.ws.proxy {
+  val invalidCfg1 = ConfigFactory
+    .parseString(
+      s"""kafka.ws.proxy {
       |  server {
       |    server-id = "node-1"
-      |    port = 8078
-      |    kafka-bootstrap-urls = "localhost:29092"
+      |    // port = 8078 // missing key
+      |  }
+      |
+      |  kafka-client {
+      |    bootstrap-urls = "localhost:29092"
       |    schema-registry-url = "http://localhost:28081"
       |    auto-register-schemas = true
+      |    metrics-enabled = false
+      |
+      |    properties {
+      |      security.protocol = PLAINTEXT
+      |    }
+      |
+      |    confluent-metrics {
+      |      bootstrap-urls = "localhost:29092"
+      |      properties {
+      |        security.protocol = PLAINTEXT
+      |      }
+      |    }
       |  }
       |
       |  admin-client {
-      |    kafka-client-properties {}
+      |    kafka-client-properties = $${kafka.ws.proxy.kafka-client.properties}
       |  }
       |
       |  consumer {
-      |    default-rate-limit = unlimited
+      |    default-rate-limit = 0
       |    default-batch-size = 0
-      |    kafka-client-properties {}
+      |    kafka-client-properties = $${kafka.ws.proxy.kafka-client.properties}
       |  }
       |
       |  producer {
-      |    kafka-client-properties {}
+      |    kafka-client-properties = $${kafka.ws.proxy.kafka-client.properties}
       |  }
       |
       |  session-handler {
@@ -42,34 +58,49 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
       |  commit-handler {
       |    max-stack-size: 200
       |    auto-commit-enabled: false
-      |    auto-commit-interval: 1 seconds
+      |    auto-commit-interval: 1 second
       |    auto-commit-max-age: 20 seconds
       |  }
       |}""".stripMargin
-  )
+    )
+    .resolve()
 
-  val invalidCfg2 = ConfigFactory.parseString(
-    """kafka.ws.proxy {
+  val invalidCfg2 = ConfigFactory
+    .parseString(
+      s"""kafka.ws.proxy {
       |  server {
-      |    server-id = "node-1"
+      |    serverId = "node-1" // wrong key
       |    port = 8078
+      |  }
+      |
+      |  kafka-client {
       |    kafka-bootstrap-urls = "localhost:29092"
       |    schema-registry-url = "http://localhost:28081"
       |    auto-register-schemas = true
+      |    metrics-enabled = false
+      |
+      |    properties {
+      |      security.protocol = PLAINTEXT
+      |    }
+      |
+      |    confluent-metrics {
+      |      bootstrap-urls = "localhost:29092"
+      |      properties {}
+      |    }
       |  }
       |
       |  admin-client {
-      |    kafka-client-properties {}
+      |    kafka-client-properties = $${kafka.ws.proxy.kafka-client.properties}
       |  }
       |
       |  consumer {
       |    default-rate-limit = 0
       |    default-batch-size = 0
-      |    kafka-client-properties {}
+      |    kafka-client-properties = $${kafka.ws.proxy.kafka-client.properties}
       |  }
       |
       |  producer {
-      |    kafka-client-properties {}
+      |    kafka-client-properties = $${kafka.ws.proxy.kafka-client.properties}
       |  }
       |
       |  session-handler {
@@ -79,13 +110,14 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
       |  }
       |
       |  commit-handler {
-      |    max-stack: 200
+      |    max-stack: 200  // wrong key
       |    auto-commit-enabled: false
       |    auto-commit-interval: 1 seconds
       |    auto-commit-max-age: 20 seconds
       |  }
       |}""".stripMargin
-  )
+    )
+    .resolve()
 
   "The Configuration" should {
 
@@ -94,11 +126,13 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
 
       cfg.server.serverId.value mustBe "node-1"
       cfg.server.port mustBe 8078
-      cfg.server.kafkaBootstrapUrls mustBe KafkaBootstrapUrls(
+
+      cfg.kafkaClient.bootstrapUrls mustBe KafkaBootstrapUrls(
         List("localhost:29092")
       )
-      cfg.server.schemaRegistryUrl mustBe Some("http://localhost:28081")
-      cfg.server.autoRegisterSchemas mustBe true
+      cfg.kafkaClient.schemaRegistryUrl mustBe Some("http://localhost:28081")
+      cfg.kafkaClient.autoRegisterSchemas mustBe true
+      cfg.kafkaClient.metricsEnabled mustBe false
 
       cfg.consumer.defaultBatchSize mustBe 0
       cfg.consumer.defaultRateLimit mustBe 0
