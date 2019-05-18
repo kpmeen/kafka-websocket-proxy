@@ -6,7 +6,6 @@ import akka.stream.ActorMaterializer
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.io.StdIn
 
 object Server extends App with ServerRoutes {
 
@@ -52,24 +51,32 @@ object Server extends App with ServerRoutes {
   val ctrl = sessionHandlerStream.run()
 
   /** Bind to network interface and port, starting the server */
-  private[this] val bindingFuture = Http().bindAndHandle(
+  val bindingFuture = Http().bindAndHandle(
     handler = routes,
     interface = "localhost",
     port = port
   )
 
+  private[this] def shutdown(): Unit = {
+    ctrl.drainAndShutdown(
+      // scalastyle:off
+      Future.successful(println("Session data consumer shutdown."))
+      // scalastyle:on
+    )
+    // scalastyle:on
+
+    /** Unbind from the network interface and port, shutting down the server. */
+    bindingFuture.flatMap(_.unbind()).onComplete(_ => sys.terminate())
+  }
+
+  scala.sys.addShutdownHook {
+    shutdown()
+  }
+
   // scalastyle:off
   println(
-    s"""Server online at http://localhost:$port/
-       |Press RETURN to stop...""".stripMargin
-  )
-  StdIn.readLine()
-
-  ctrl.drainAndShutdown(
-    Future.successful(println("Session data consumer shutdown."))
+    s"""Server online at http://localhost:$port/ ..."""
   )
   // scalastyle:on
 
-  /** Unbind from the network interface and port, shutting down the server. */
-  bindingFuture.flatMap(_.unbind()).onComplete(_ => sys.terminate())
 }
