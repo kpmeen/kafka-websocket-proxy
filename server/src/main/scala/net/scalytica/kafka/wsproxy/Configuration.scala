@@ -57,6 +57,8 @@ object Configuration {
 
   final case class KafkaBootstrapUrls(urls: List[String]) {
     def mkString(): String = urls.mkString(",")
+
+    def hosts: List[String] = urls.map(_.takeWhile(_ != ':'))
   }
 
   final case class ServerCfg(
@@ -65,6 +67,7 @@ object Configuration {
   )
 
   final case class KafkaClientCfg(
+      brokerResolutionTimeout: FiniteDuration,
       bootstrapUrls: KafkaBootstrapUrls,
       schemaRegistryUrl: Option[String],
       autoRegisterSchemas: Boolean,

@@ -18,6 +18,7 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
       |  }
       |
       |  kafka-client {
+      |    broker-resolution-timeout = 10 seconds
       |    bootstrap-urls = "localhost:29092"
       |    schema-registry-url = "http://localhost:28081"
       |    auto-register-schemas = true
@@ -74,6 +75,7 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
       |  }
       |
       |  kafka-client {
+      |    broker-resolution-timeout = 10 seconds
       |    kafka-bootstrap-urls = "localhost:29092"
       |    schema-registry-url = "http://localhost:28081"
       |    auto-register-schemas = true

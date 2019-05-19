@@ -73,7 +73,7 @@ object Settings {
 //      "-XX:+EnableJVMCI",
 //      "-XX:+UseJVMCICompiler"
     ),
-//    fork in run := true,
+    fork in run := true,
     javaOptions in Test += "-Dlogger.resource=logback-test.xml",
     fork in Test := true,
     logBuffered in Test := true,

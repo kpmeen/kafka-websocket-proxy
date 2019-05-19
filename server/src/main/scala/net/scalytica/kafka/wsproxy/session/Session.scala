@@ -74,4 +74,10 @@ case object Session {
 
 }
 
+/**
+ * Wraps information about each instantiated consumer within a [[Session]].
+ *
+ * @param id The client (or consumer) ID given.
+ * @param serverId The server ID where the consumer instance is running.
+ */
 case class ConsumerInstance(id: WsClientId, serverId: WsServerId)

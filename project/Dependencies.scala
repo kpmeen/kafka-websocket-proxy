@@ -10,12 +10,12 @@ object Versions {
   val ConfluentPlatformVersion      = "5.2.1"
   val KafkaVersion                  = "2.2.0"
   val EmbeddedKafkaVersion          = "2.2.0"
-  val EmbeddedSchemaRegistryVersion = "5.2.0"
+  val EmbeddedSchemaRegistryVersion = "5.2.1"
   val KafkaStreamsQueryVersion      = "0.1.1"
 
   val AkkaVersion            = "2.5.22"
   val AkkaHttpVersion        = "10.1.8"
-  val AkkaStreamKafkaVersion = "1.0.2"
+  val AkkaStreamKafkaVersion = "1.0.3"
 
   val AlpakkaVersion = "0.20"
 

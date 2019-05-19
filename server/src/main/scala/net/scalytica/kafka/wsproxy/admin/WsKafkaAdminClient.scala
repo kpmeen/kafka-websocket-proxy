@@ -49,13 +49,12 @@ class WsKafkaAdminClient(cfg: AppCfg) {
 
   private[this] def replicationFactor(
       implicit ec: ExecutionContext
-  ): Future[Short] = {
+  ): Future[Short] =
     underlying.describeCluster().nodes().call(_.size()).map { numNodes =>
       val numReplicas = if (numNodes >= maxReplicas) maxReplicas else numNodes
       if (configuredReplicas > numReplicas) numReplicas.toShort
       else configuredReplicas
     }
-  }
 
   private[this] def findSessionStateTopic(
       implicit ec: ExecutionContext
@@ -66,9 +65,7 @@ class WsKafkaAdminClient(cfg: AppCfg) {
       .call(n => Set[String](n.asScala.toSeq: _*))
       .map(_.find(_ == sessionStateTopic))
 
-  private[this] def createTopic()(
-      implicit ec: ExecutionContext
-  ): Future[Unit] = {
+  private[this] def createTopic()(implicit ec: ExecutionContext): Future[Unit] =
     replicationFactor.flatMap { replFactor =>
       val tconf = Map[String, String](
         CLEANUP_POLICY_CONFIG -> CLEANUP_POLICY_COMPACT,
@@ -79,7 +76,6 @@ class WsKafkaAdminClient(cfg: AppCfg) {
       logger.info("Creating session state topic...")
       underlying.createTopics(Seq(topic).asJava).all().callVoid()
     }
-  }
 
   /**
    * Trigger the initialisation of the session state topic. This method will
@@ -109,8 +105,6 @@ class WsKafkaAdminClient(cfg: AppCfg) {
    */
   @throws(classOf[TopicNotFoundError])
   def topicPartitions(topicName: TopicName): Int = {
-    logger.debug(s"Fetching topic partitions for $topicName...")
-    logger.debug(s"Using configuration: ${cfg.server}")
     underlying
       .describeTopics(Seq(topicName.value).asJava)
       .all()

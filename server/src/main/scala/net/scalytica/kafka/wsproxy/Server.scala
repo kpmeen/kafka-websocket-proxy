@@ -1,11 +1,16 @@
 package net.scalytica.kafka.wsproxy
 
-import akka.actor.ActorSystem
+import akka.Done
+import akka.actor.CoordinatedShutdown._
+import akka.actor.{ActorSystem, CoordinatedShutdown}
 import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
+import com.typesafe.scalalogging.Logger
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.utils.HostResolver
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.duration._
+import scala.concurrent.{Await, ExecutionContext, Future}
 
 object Server extends App with ServerRoutes {
 
@@ -37,12 +42,24 @@ object Server extends App with ServerRoutes {
     // scalastyle:on
   )
 
+  private[this] val logger = Logger(getClass)
+
   val config = Configuration.loadTypesafeConfig()
 
   implicit val cfg: AppCfg            = Configuration.loadConfig(config)
   implicit val sys: ActorSystem       = ActorSystem("kafka-ws-proxy", config)
   implicit val mat: ActorMaterializer = ActorMaterializer()
   implicit val ctx: ExecutionContext  = sys.dispatcher
+
+  HostResolver.resolveKafkaBootstrapHosts(cfg.kafkaClient.bootstrapUrls) match {
+    case Right(addr) =>
+      logger.info(s"Host ${addr.getHostName} was correctly resolved")
+
+    case Left(resolutionError) =>
+      logger.warn(resolutionError.reason)
+      val _ = Await.result(sys.terminate(), 10 seconds)
+      System.exit(1)
+  }
 
   private[this] val port = cfg.server.port
 
@@ -51,32 +68,42 @@ object Server extends App with ServerRoutes {
   val ctrl = sessionHandlerStream.run()
 
   /** Bind to network interface and port, starting the server */
-  val bindingFuture = Http().bindAndHandle(
+  val binding = Http().bindAndHandle(
     handler = routes,
     interface = "localhost",
     port = port
   )
 
-  private[this] def shutdown(): Unit = {
-    ctrl.drainAndShutdown(
-      // scalastyle:off
-      Future.successful(println("Session data consumer shutdown."))
-      // scalastyle:on
-    )
-    // scalastyle:on
+  val shutdown: CoordinatedShutdown = {
+    val cs = CoordinatedShutdown(sys)
 
-    /** Unbind from the network interface and port, shutting down the server. */
-    bindingFuture.flatMap(_.unbind()).onComplete(_ => sys.terminate())
+    cs.addTask(PhaseServiceUnbind, "http-unbind") { () =>
+      for {
+        _ <- ctrl.drainAndShutdown(
+              Future.successful(logger.info("Session data consumer shutdown."))
+            )
+        _ <- binding.flatMap(_.unbind())
+      } yield Done
+    }
+
+    cs.addTask(PhaseServiceRequestsDone, "http-graceful-terminate") { () =>
+      /** Unbind from network interface and port, shutting down the server. */
+      binding.flatMap(_.terminate(10.seconds)).map(_ => Done)
+    }
+
+    cs.addTask(PhaseServiceStop, "http-shutdown") { () =>
+      Http().shutdownAllConnectionPools().map(_ => Done)
+    }
+
+    cs
   }
 
   scala.sys.addShutdownHook {
-    shutdown()
+    val _ = shutdown.run(JvmExitReason)
   }
 
   // scalastyle:off
-  println(
-    s"""Server online at http://localhost:$port/ ..."""
-  )
+  println(s"""Server online at http://localhost:$port/ ...""")
   // scalastyle:on
 
 }

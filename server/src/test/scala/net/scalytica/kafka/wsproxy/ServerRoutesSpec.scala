@@ -3,7 +3,10 @@ package net.scalytica.kafka.wsproxy
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.testkit.{RouteTestTimeout, WSProbe}
-import net.manub.embeddedkafka.schemaregistry._
+import net.manub.embeddedkafka.schemaregistry.{
+  EmbeddedKafka,
+  EmbeddedKafkaConfig
+}
 import net.scalytica.kafka.wsproxy.SocketProtocol.AvroPayload
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
   AvroCommit,

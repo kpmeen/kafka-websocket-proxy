@@ -261,8 +261,8 @@ trait SessionHandler {
 
             case AddConsumer(gid, cid, sid, replyTo) =>
               log.debug(
-                s"ADD_CONSUMER: add consumer ${cid.value} to " +
-                  s"session ${gid.value}..."
+                s"ADD_CONSUMER: add consumer ${cid.value} connected to server" +
+                  s" ${sid.value} to session ${gid.value}..."
               )
               active.find(gid) match {
                 case None =>
@@ -277,8 +277,8 @@ trait SessionHandler {
                     case added @ Session.ConsumerAdded(s) =>
                       producer.publish(s).map { _ =>
                         log.debug(
-                          "ADD_CONSUMER: consumer added to session" +
-                            s" ${gid.value}"
+                          s"ADD_CONSUMER: consumer ${cid.value} added to" +
+                            s"session ${gid.value}"
                         )
                         replyTo ! added
                       }
@@ -297,7 +297,7 @@ trait SessionHandler {
             case RemoveConsumer(gid, cid, replyTo) =>
               log.debug(
                 s"REMOVE_CONSUMER: remove consumer ${cid.value} from " +
-                  s"session ${gid.value}..."
+                  s"session ${gid.value} on server..."
               )
               active.find(gid) match {
                 case None =>
