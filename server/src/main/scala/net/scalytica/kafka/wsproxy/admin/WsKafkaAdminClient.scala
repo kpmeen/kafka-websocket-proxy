@@ -3,7 +3,7 @@ package net.scalytica.kafka.wsproxy.admin
 import com.typesafe.scalalogging.Logger
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.errors.TopicNotFoundError
-import net.scalytica.kafka.wsproxy.models.TopicName
+import net.scalytica.kafka.wsproxy.models.{BrokerInfo, TopicName}
 import net.scalytica.kafka.wsproxy.{
   KafkaFutureConverter,
   KafkaFutureVoidConverter,
@@ -113,6 +113,17 @@ class WsKafkaAdminClient(cfg: AppCfg) {
       .headOption
       .map(_._2.partitions().size())
       .orThrow(TopicNotFoundError(s"Topic $topicName was not found"))
+  }
+
+  def clusterInfo: List[BrokerInfo] = {
+    logger.debug("Fetching Kafka cluster information...")
+    underlying
+      .describeCluster()
+      .nodes()
+      .get()
+      .asScala
+      .toList
+      .map(n => BrokerInfo(n.id, n.host, n.port, Option(n.rack)))
   }
 
 }

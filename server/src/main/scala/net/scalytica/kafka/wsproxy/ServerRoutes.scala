@@ -16,13 +16,16 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.RunnableGraph
 import com.typesafe.scalalogging.Logger
 import io.circe.{Json, Printer}
+import io.circe.syntax._
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
   AvroCommit,
   AvroConsumerRecord,
   AvroProducerRecord,
   AvroProducerResult
 }
+import net.scalytica.kafka.wsproxy.codecs.Encoders.brokerInfoEncoder
 import net.scalytica.kafka.wsproxy.errors.TopicNotFoundError
 import net.scalytica.kafka.wsproxy.models.{InSocketArgs, OutSocketArgs}
 import net.scalytica.kafka.wsproxy.session.SessionHandler
@@ -119,6 +122,9 @@ trait ServerRoutes
   def routesWith(
       inbound: InSocketArgs => Route,
       outbound: OutSocketArgs => Route
+  )(
+      implicit
+      cfg: AppCfg
   ): Route = {
     pathPrefix("socket") {
       path("in") {
@@ -139,6 +145,21 @@ trait ServerRoutes
             complete(avroSchemaString(AvroConsumerRecord.schema))
           } ~ path("commit") {
             complete(avroSchemaString(AvroCommit.schema))
+          }
+        }
+      }
+    } ~ pathPrefix("kafka") {
+      pathPrefix("cluster") {
+        path("info") {
+          complete {
+            val ci = new WsKafkaAdminClient(cfg).clusterInfo
+            HttpResponse(
+              status = OK,
+              entity = HttpEntity(
+                contentType = ContentTypes.`application/json`,
+                string = ci.asJson.pretty(Printer.spaces2)
+              )
+            )
           }
         }
       }

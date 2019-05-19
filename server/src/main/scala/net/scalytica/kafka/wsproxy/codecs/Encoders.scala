@@ -10,10 +10,11 @@ import net.scalytica.kafka.wsproxy.session.{ConsumerInstance, Session}
 
 trait Encoders {
 
+  implicit val brokerInfoEncoder: Encoder[BrokerInfo] = deriveEncoder
+
   implicit val sessionEncoder: Encoder[Session] = deriveEncoder
 
-  implicit val consumerInstanceEncoder: Encoder[ConsumerInstance] =
-    deriveEncoder
+  implicit val consumerInstEncoder: Encoder[ConsumerInstance] = deriveEncoder
 
   implicit val msgIdEncoder: Encoder[WsMessageId] = { msgId =>
     Json.fromString(msgId.value)

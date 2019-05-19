@@ -125,6 +125,7 @@ class CommitHandlerSpec
     }
 
     "optionally auto commit and drop messages older than a given age" in {
+      // Not yet implemented
       pending
     }
 

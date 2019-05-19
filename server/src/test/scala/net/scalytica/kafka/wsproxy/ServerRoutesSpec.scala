@@ -1,8 +1,10 @@
 package net.scalytica.kafka.wsproxy
 
+import akka.http.scaladsl.model.ContentTypes
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.testkit.{RouteTestTimeout, WSProbe}
+import io.circe.parser._
 import net.manub.embeddedkafka.schemaregistry.{
   EmbeddedKafka,
   EmbeddedKafkaConfig
@@ -15,11 +17,13 @@ import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
   AvroProducerResult
 }
 import net.scalytica.kafka.wsproxy.models.Formats.{AvroType, NoType, StringType}
+import net.scalytica.kafka.wsproxy.codecs.Decoders.brokerInfoDecoder
+import net.scalytica.kafka.wsproxy.models.BrokerInfo
 import net.scalytica.test._
 import org.scalatest.Inspectors.forAll
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Minutes, Span}
-import org.scalatest.{EitherValues, WordSpec}
+import org.scalatest.{EitherValues, OptionValues, WordSpec}
 
 import scala.concurrent.duration._
 
@@ -27,6 +31,7 @@ import scala.concurrent.duration._
 class ServerRoutesSpec
     extends WordSpec
     with EitherValues
+    with OptionValues
     with ScalaFutures
     with WSProxyKafkaSpec
     with WsProducerClients
@@ -340,6 +345,33 @@ class ServerRoutesSpec
         }
 
         ctrl.shutdown()
+      }
+
+    "return the kafka cluster info" in
+      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
+        implicit val wsCfg =
+          appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = "n13")
+
+        val (_, testRoutes) = TestRoutes.wsProxyRoutes
+
+        Get("/kafka/cluster/info") ~> testRoutes ~> check {
+          status mustBe OK
+          responseEntity.contentType mustBe ContentTypes.`application/json`
+
+          val ci = parse(responseAs[String])
+            .map(_.as[Seq[BrokerInfo]])
+            .flatMap(identity)
+            .right
+            .value
+
+          ci must have size 1
+          ci.headOption.value mustBe BrokerInfo(
+            id = 0,
+            host = "localhost",
+            port = kcfg.kafkaPort,
+            rack = None
+          )
+        }
       }
   }
 

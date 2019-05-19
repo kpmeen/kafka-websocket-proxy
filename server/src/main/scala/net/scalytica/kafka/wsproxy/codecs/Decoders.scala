@@ -14,10 +14,11 @@ import scala.util.{Failure, Success}
 
 trait Decoders {
 
+  implicit val brokerInfoDecoder: Decoder[BrokerInfo] = deriveDecoder
+
   implicit val sessionDecoder: Decoder[Session] = deriveDecoder
 
-  implicit val consumerInstanceDecoder: Decoder[ConsumerInstance] =
-    deriveDecoder
+  implicit val consumerInstDecoder: Decoder[ConsumerInstance] = deriveDecoder
 
   implicit val wsMessageIdDecoder: Decoder[WsMessageId] = { json =>
     json.as[String].map(WsMessageId.apply)
