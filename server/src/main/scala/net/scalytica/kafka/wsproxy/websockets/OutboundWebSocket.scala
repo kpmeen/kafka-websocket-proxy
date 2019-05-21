@@ -342,6 +342,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
       // if auto-commit is enabled, we don't need to handle manual commits.
       WsConsumer
         .consumeAutoCommit[Key, Val](args.topic, args.clientId, args.groupId)
+        .map(cr => cr.withKeyFormatType(keyTpe).withValueFormatType(valTpe))
         .map(cr => msgConverter(cr))
     } else {
       // if auto-commit is disabled, we need to ensure messages are sent to a
@@ -350,6 +351,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
 
       WsConsumer
         .consumeManualCommit[Key, Val](args.topic, args.clientId, args.groupId)
+        .map(cr => cr.withKeyFormatType(keyTpe).withValueFormatType(valTpe))
         .alsoTo(sink) // also send each message to the commit handler sink
         .map(cr => msgConverter(cr))
     }

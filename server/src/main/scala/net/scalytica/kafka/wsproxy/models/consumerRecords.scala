@@ -51,6 +51,9 @@ sealed abstract class WsConsumerRecord[+K, +V](
       value = valSer.serialize(topic.value, value.value)
     )
   }
+
+  def withKeyFormatType(keyType: Formats.FormatType): WsConsumerRecord[K, V]
+  def withValueFormatType(valType: Formats.FormatType): WsConsumerRecord[K, V]
 }
 
 object WsConsumerRecord {
@@ -106,7 +109,15 @@ case class ConsumerKeyValueRecord[K, V](
     key: OutValueDetails[K],
     value: OutValueDetails[V],
     committableOffset: Option[ConsumerMessage.CommittableOffset]
-) extends WsConsumerRecord[K, V](Some(key), value)
+) extends WsConsumerRecord[K, V](Some(key), value) {
+
+  def withKeyFormatType(keyType: Formats.FormatType): WsConsumerRecord[K, V] =
+    copy(key = key.copy(format = Option(keyType)))
+
+  def withValueFormatType(valType: Formats.FormatType): WsConsumerRecord[K, V] =
+    copy(value = value.copy(format = Option(valType)))
+
+}
 
 /**
  * Consumer record type with value only.
@@ -127,4 +138,14 @@ case class ConsumerValueRecord[V](
     timestamp: Timestamp,
     value: OutValueDetails[V],
     committableOffset: Option[ConsumerMessage.CommittableOffset]
-) extends WsConsumerRecord[Nothing, V](None, value)
+) extends WsConsumerRecord[Nothing, V](None, value) {
+
+  def withKeyFormatType(
+      keyType: Formats.FormatType
+  ): WsConsumerRecord[Nothing, V] = this
+
+  def withValueFormatType(
+      valType: Formats.FormatType
+  ): WsConsumerRecord[Nothing, V] =
+    copy(value = value.copy(format = Option(valType)))
+}
