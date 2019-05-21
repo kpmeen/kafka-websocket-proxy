@@ -6,7 +6,7 @@ import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.kafka.scaladsl.Producer
 import akka.kafka.{ProducerMessage, ProducerSettings}
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{Flow, Sink}
+import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.ByteString
 import com.typesafe.scalalogging.Logger
 import io.circe.Decoder
@@ -29,6 +29,13 @@ import scala.collection.JavaConverters._
 object WsProducer {
 
   private[this] val logger = Logger(getClass)
+
+  implicit def seqToSource[Out](s: Seq[Out]): Source[Out, NotUsed] = {
+    val it = new scala.collection.immutable.Iterable[Out] {
+      override def iterator: Iterator[Out] = s.toIterator
+    }
+    Source(it)
+  }
 
   /** Create producer settings to use for the Kafka producer. */
   private[this] def baseProducerSettings[K, V](
