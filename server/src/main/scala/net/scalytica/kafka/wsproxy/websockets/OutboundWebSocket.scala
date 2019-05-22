@@ -342,7 +342,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
       // if auto-commit is enabled, we don't need to handle manual commits.
       WsConsumer
         .consumeAutoCommit[Key, Val](args.topic, args.clientId, args.groupId)
-        .map(cr => cr.withKeyFormatType(keyTpe).withValueFormatType(valTpe))
+        .map(cr => enrichWithFormatType(args, cr))
         .map(cr => msgConverter(cr))
     } else {
       // if auto-commit is disabled, we need to ensure messages are sent to a
@@ -351,11 +351,20 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
 
       WsConsumer
         .consumeManualCommit[Key, Val](args.topic, args.clientId, args.groupId)
-        .map(cr => cr.withKeyFormatType(keyTpe).withValueFormatType(valTpe))
+        .map(cr => enrichWithFormatType(args, cr))
         .alsoTo(sink) // also send each message to the commit handler sink
         .map(cr => msgConverter(cr))
     }
   }
+
+  private[this] def enrichWithFormatType[K, V](
+      args: OutSocketArgs,
+      cr: WsConsumerRecord[K, V]
+  ): WsConsumerRecord[K, V] =
+    args.keyType
+      .map(kt => cr.withKeyFormatType(kt))
+      .getOrElse(cr)
+      .withValueFormatType(args.valType)
 
   /**
    * Helper function that translates a [[WsConsumerRecord]] into the correct
