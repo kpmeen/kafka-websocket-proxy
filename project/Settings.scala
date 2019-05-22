@@ -128,7 +128,7 @@ object Settings {
         }
       },
       dockerUpdateLatest := !isSnapshot.value,
-      dockerBaseImage in Docker := "openjdk:8",
+      dockerBaseImage := "openjdk:8-slim",
       dockerExposedPorts in Docker := exposedPort.toSeq
     )
 
