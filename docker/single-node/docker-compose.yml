@@ -18,7 +18,7 @@ services:
     extra_hosts:
       - "moby:127.0.0.1"
     labels:
-      no.itera.cryptex.container.type: "zookeeper"
+      net.scalytica.kafka.wsproxy.container.type: "zookeeper"
 
   # The Kafka broker
   kafka:
@@ -47,7 +47,7 @@ services:
     extra_hosts:
       - "moby:127.0.0.1"
     labels:
-      no.itera.cryptex.container.type: "kafka"
+      net.scalytica.kafka.wsproxy.container.type: "kafka"
 
   # Confluent Schema Registry
   schema-registry:
@@ -65,7 +65,7 @@ services:
     extra_hosts:
       - "moby:127.0.0.1"
     labels:
-      no.itera.cryptex.container.type: "schema-registry"
+      net.scalytica.kafka.wsproxy.container.type: "schema-registry"
 
 #  # Confluent Control Center
 #  control-center:
@@ -90,4 +90,4 @@ services:
 #    extra_hosts:
 #      - "moby:127.0.0.1"
 #    labels:
-#      no.itera.cryptex.container.type: "control-center"
+#      net.scalytica.kafka.wsproxy.container.type: "control-center"

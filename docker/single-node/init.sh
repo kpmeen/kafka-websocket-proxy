@@ -101,7 +101,7 @@ function stop() {
 function status() {
   docker ps \
     -a \
-    --filter=label=no.itera.cryptex.container.type \
+    --filter=label=net.scalytica.kafka.wsproxy.container.type \
     --format "table {{.Names}}\t{{.Status}}"
 }
 
