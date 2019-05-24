@@ -45,7 +45,7 @@ object WsConsumer {
       kd: Deserializer[K],
       vd: Deserializer[V]
   ) = {
-    val kafkaUrl = cfg.kafkaClient.bootstrapUrls.mkString()
+    val kafkaUrl = cfg.kafkaClient.bootstrapHosts.mkString()
 
     ConsumerSettings(as, kd, vd)
       .withBootstrapServers(kafkaUrl)

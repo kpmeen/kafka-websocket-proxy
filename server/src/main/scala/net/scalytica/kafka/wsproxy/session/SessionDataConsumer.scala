@@ -40,7 +40,7 @@ private[session] class SessionDataConsumer(
   private[this] val kDes = BasicSerdes.StringDeserializer
   private[this] val vDes = new SessionSerde().deserializer()
 
-  private[this] val kafkaUrl = cfg.kafkaClient.bootstrapUrls.mkString()
+  private[this] val kafkaUrl = cfg.kafkaClient.bootstrapHosts.mkString()
 
   private[this] val cid =
     s"ws-proxy-session-consumer-${cfg.server.serverId.value}"

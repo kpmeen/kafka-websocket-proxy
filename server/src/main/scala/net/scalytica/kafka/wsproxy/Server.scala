@@ -7,7 +7,10 @@ import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
 import com.typesafe.scalalogging.Logger
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
-import net.scalytica.kafka.wsproxy.utils.HostResolver
+import net.scalytica.kafka.wsproxy.utils.HostResolver.{
+  resolveKafkaBootstrapHosts,
+  HostResolutionError
+}
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
@@ -51,14 +54,16 @@ object Server extends App with ServerRoutes {
   implicit val mat: ActorMaterializer = ActorMaterializer()
   implicit val ctx: ExecutionContext  = sys.dispatcher
 
-  HostResolver.resolveKafkaBootstrapHosts(cfg.kafkaClient.bootstrapUrls) match {
-    case Right(addr) =>
-      logger.info(s"Host ${addr.getHostName} was correctly resolved")
-
-    case Left(resolutionError) =>
-      logger.warn(resolutionError.reason)
-      val _ = Await.result(sys.terminate(), 10 seconds)
-      System.exit(1)
+  val resStatus = resolveKafkaBootstrapHosts(cfg.kafkaClient.bootstrapHosts)
+  if (!resStatus.hasErrors) {
+    logger.info("All Kafka broker hosts were correctly resolved")
+  } else {
+    val r = resStatus.results.collect {
+      case HostResolutionError(reason) => reason
+    }
+    logger.warn(s"Some hosts were unresolved:\n${r.mkString("  - ", "\n", "")}")
+    val _ = Await.result(sys.terminate(), 10 seconds)
+    System.exit(1)
   }
 
   private[this] val port = cfg.server.port
@@ -70,7 +75,7 @@ object Server extends App with ServerRoutes {
   /** Bind to network interface and port, starting the server */
   val binding = Http().bindAndHandle(
     handler = routes,
-    interface = "localhost",
+    interface = "0.0.0.0",
     port = port
   )
 

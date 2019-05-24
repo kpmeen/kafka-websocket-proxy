@@ -25,10 +25,10 @@ object Configuration {
           .toMap
     }
 
-  implicit val stringAsKafkaBootstrapUrls: ConfigReader[KafkaBootstrapUrls] =
+  implicit val stringAsKafkaBootstrapUrls: ConfigReader[KafkaBootstrapHosts] =
     ConfigReader.fromString { str =>
       val urls = str.split(",").map(_.trim).toList
-      Right(KafkaBootstrapUrls(urls))
+      Right(KafkaBootstrapHosts(urls))
     }
 
   implicit val stringAsServerId: ConfigReader[WsServerId] =
@@ -55,20 +55,21 @@ object Configuration {
 
   }
 
-  final case class KafkaBootstrapUrls(urls: List[String]) {
-    def mkString(): String = urls.mkString(",")
+  final case class KafkaBootstrapHosts(hosts: List[String]) {
+    def mkString(): String = hosts.mkString(",")
 
-    def hosts: List[String] = urls.map(_.takeWhile(_ != ':'))
+    def hostsString: List[String] = hosts.map(_.takeWhile(_ != ':'))
   }
 
   final case class ServerCfg(
       serverId: WsServerId,
+      bindInterface: String,
       port: Int
   )
 
   final case class KafkaClientCfg(
       brokerResolutionTimeout: FiniteDuration,
-      bootstrapUrls: KafkaBootstrapUrls,
+      bootstrapHosts: KafkaBootstrapHosts,
       schemaRegistryUrl: Option[String],
       autoRegisterSchemas: Boolean,
       metricsEnabled: Boolean,
@@ -77,12 +78,12 @@ object Configuration {
   )
 
   final case class ConfluentMetricsCfg(
-      bootstrapUrls: KafkaBootstrapUrls,
+      bootstrapHosts: KafkaBootstrapHosts,
       properties: Map[String, AnyRef]
   ) {
 
     def asPrefixedProperties: Map[String, AnyRef] =
-      ConfluentMetricsCfg.withConfluentMetricsPrefix(bootstrapUrls, properties)
+      ConfluentMetricsCfg.withConfluentMetricsPrefix(bootstrapHosts, properties)
 
   }
 
@@ -93,13 +94,13 @@ object Configuration {
       s"${ConfluentMetricsCfg.MetricsPrefix}.$BOOTSTRAP_SERVERS_CONFIG"
 
     def withConfluentMetricsPrefix(
-        bootstrapUrls: KafkaBootstrapUrls,
+        bootstrapHosts: KafkaBootstrapHosts,
         props: Map[String, AnyRef]
     ): Map[String, AnyRef] = {
       props.map {
         case (key, value) =>
           s"${ConfluentMetricsCfg.MetricsPrefix}.$key" -> value
-      } + (BootstrapServersKey -> bootstrapUrls.urls.mkString(","))
+      } + (BootstrapServersKey -> bootstrapHosts.hosts.mkString(","))
     }
   }
 

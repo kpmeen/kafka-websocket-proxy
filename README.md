@@ -44,8 +44,9 @@ file. Where the following parameters can be adjusted:
 | Config key                                                      | Environment                              | Default                  | Description   |
 |:---                                                             |:----                                     |:------------------------:|:-----         |
 | kafka.ws.proxy.server.server-id                                 | WSPROXY_SERVER_ID                        | `node-1`                 | A unique identifier for the specific kafka-websocket-proxy instance. |
+| kafka.ws.proxy.server.bind-interface                            | WSPROXY_BIND_INTERFACE                   | `0.0.0.0`                | Network interface to bind the http server. |
 | kafka.ws.proxy.server.port                                      | WSPROXY_PORT                             | `8078`                   | Port where the server endpoints will be exposed |
-| kafka.ws.proxy.kafka-client.bootstrap-urls                      | WSPROXY_KAFKA_BOOTSTRAP_URLS             |                          | A string with the Kafka brokers to bootstrap against, in the form `<host>:<port>`, separated by comma. |
+| kafka.ws.proxy.kafka-client.bootstrap-hosts                     | WSPROXY_KAFKA_BOOTSTRAP_HOSTS            |                          | A string with the Kafka brokers to bootstrap against, in the form `<host>:<port>`, separated by comma. |
 | kafka.ws.proxy.kafka-client.schema-registry-url                 | WSPROXY_SCHEMA_REGISTRY_URL              |                          | URLs for the Confluent Schema Registry. |
 | kafka.ws.proxy.kafka-client.auto-register-schemas               | WSPROXY_SCHEMA_AUTO_REGISTER             | `true`                   | By default, the proxy will automatically register any internal Avro schemas it needs. If disabled, these schemas must be registered with the schema registry manually. |
 | kafka.ws.proxy.kafka-client.metrics-enabled                     | WS_PROXY_CONFLUENT_METRICS_ENABLED       | `false`                  | When this flag is set to `true`, it will enable the Confluent Metrics Reporter |
@@ -102,7 +103,7 @@ provide a distinct client configuration for the metrics reporter.
 
 | Config key                                                                                     | Environment                                      | Default      |
 |:---                                                                                            |:----                                             |:------------:|
-| kafka.ws.proxy.kafka-client.confluent.metrics.properties.bootstrap-urls                        | WSPROXY_KAFKA_METRICS_BOOTSTRAP_URLS             | same as kafka.ws.proxy.kafka-client.bootstrap-urls |
+| kafka.ws.proxy.kafka-client.confluent.metrics.properties.bootstrap-hosts                       | WSPROXY_KAFKA_METRICS_BOOTSTRAP_HOSTS            | same as kafka.ws.proxy.kafka-client.bootstrap-hosts |
 | kafka.ws.proxy.kafka-client.confluent.metrics.properties.security.protocol                     | WSPROXY_KAFKA_METRICS_SECURITY_PROTOCOL          | `PLAINTEXT`  |
 | kafka.ws.proxy.kafka-client.confluent.metrics.properties.sasl.mechanism                        | WSPROXY_KAFKA_METRICS_SASL_MECHANISM             |  not set     |
 | kafka.ws.proxy.kafka-client.confluent.metrics.properties.sasl.jaas.config                      | WSPROXY_KAFKA_METRICS_SASL_JAAS_CFG              |  not set     |

@@ -3,7 +3,7 @@ package net.scalytica.kafka.wsproxy.utils
 import java.net.InetAddress
 
 import com.typesafe.scalalogging.Logger
-import net.scalytica.kafka.wsproxy.Configuration.{AppCfg, KafkaBootstrapUrls}
+import net.scalytica.kafka.wsproxy.Configuration.{AppCfg, KafkaBootstrapHosts}
 
 import scala.annotation.tailrec
 import scala.concurrent.blocking
@@ -14,21 +14,47 @@ object HostResolver {
 
   private[this] val logger = Logger(getClass)
 
-  case class HostResolutionError(reason: String)
+  sealed trait HostResolutionResult {
+    def isSuccess: Boolean
+    def isError: Boolean = !isSuccess
+  }
+  case class HostResolved(host: InetAddress) extends HostResolutionResult {
+    override def isSuccess = true
+  }
+  case class HostResolutionError(reason: String) extends HostResolutionResult {
+    override def isSuccess = false
+  }
 
+  case class HostResolutionStatus(results: List[HostResolutionResult]) {
+
+    def hasErrors: Boolean = results.exists(_.isError)
+
+  }
+
+  /**
+   * Will try to resolve all the kafka hosts configured in the
+   * {{{kafka.ws.proxy.kafka-client.bootstrap-hosts}}} configuration property.
+   *
+   * This is a workaround for https://github.com/apache/kafka/pull/6305.
+   *
+   * @param bootstrapHosts the kafka hosts to resolve
+   * @param cfg the application configuration to use
+   * @return an instance of [[HostResolutionStatus]] containing all
+   *         [[HostResolutionResult]]s for the configured Kafka bootstrap hosts.
+   */
   def resolveKafkaBootstrapHosts(
-      bootstrapUrls: KafkaBootstrapUrls
-  )(implicit cfg: AppCfg): Either[HostResolutionError, InetAddress] = {
+      bootstrapHosts: KafkaBootstrapHosts
+  )(implicit cfg: AppCfg): HostResolutionStatus = {
     val retryInterval = 1 second
     val retryFor      = cfg.kafkaClient.brokerResolutionTimeout
     val deadline      = retryFor.fromNow
 
     @tailrec
-    def resolve(host: String): Either[HostResolutionError, InetAddress] = {
+    def resolve(host: String): HostResolutionResult = {
       Try(InetAddress.getByName(host)) match {
         case Success(addr) =>
           logger.info(s"Successfully resolved host $host")
-          Right(addr)
+          HostResolved(addr)
 
         case Failure(_) =>
           if (deadline.hasTimeLeft()) {
@@ -37,18 +63,19 @@ object HostResolver {
             resolve(host)
           } else {
             logger.warn(s"Resolution of host $host failed, no more retries.")
-            Left(
-              HostResolutionError(
-                s"$host could not be resolved within time limit of $retryFor."
-              )
+            HostResolutionError(
+              s"$host could not be resolved within time limit of $retryFor."
             )
           }
       }
     }
 
-    bootstrapUrls.hosts.headOption
-      .map(resolve)
-      .getOrElse(Left(HostResolutionError("NOT DEFINED")))
+    if (bootstrapHosts.hosts.nonEmpty) {
+      val resolutions = bootstrapHosts.hostsString.map(resolve)
+      HostResolutionStatus(resolutions)
+    } else {
+      HostResolutionStatus(List(HostResolutionError("NOT DEFINED")))
+    }
   }
 
   private[this] def sleep(duration: FiniteDuration): Unit =

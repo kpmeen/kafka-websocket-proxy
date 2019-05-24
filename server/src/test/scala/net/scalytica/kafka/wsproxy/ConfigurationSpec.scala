@@ -1,7 +1,7 @@
 package net.scalytica.kafka.wsproxy
 
 import com.typesafe.config.ConfigFactory
-import net.scalytica.kafka.wsproxy.Configuration.{AppCfg, KafkaBootstrapUrls}
+import net.scalytica.kafka.wsproxy.Configuration.{AppCfg, KafkaBootstrapHosts}
 import org.scalatest.{MustMatchers, WordSpec}
 import pureconfig.error.ConfigReaderException
 
@@ -14,12 +14,13 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
       s"""kafka.ws.proxy {
       |  server {
       |    server-id = "node-1"
+      |    bind-interface = "localhost"
       |    // port = 8078 // missing key
       |  }
       |
       |  kafka-client {
       |    broker-resolution-timeout = 10 seconds
-      |    bootstrap-urls = "localhost:29092"
+      |    bootstrap-hosts = "localhost:29092"
       |    schema-registry-url = "http://localhost:28081"
       |    auto-register-schemas = true
       |    metrics-enabled = false
@@ -29,7 +30,7 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
       |    }
       |
       |    confluent-metrics {
-      |      bootstrap-urls = "localhost:29092"
+      |      bootstrap-hosts = "localhost:29092"
       |      properties {
       |        security.protocol = PLAINTEXT
       |      }
@@ -71,12 +72,13 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
       s"""kafka.ws.proxy {
       |  server {
       |    serverId = "node-1" // wrong key
+      |    bind-interface = "localhost"
       |    port = 8078
       |  }
       |
       |  kafka-client {
       |    broker-resolution-timeout = 10 seconds
-      |    kafka-bootstrap-urls = "localhost:29092"
+      |    kafka-bootstrap-hosts = "localhost:29092"
       |    schema-registry-url = "http://localhost:28081"
       |    auto-register-schemas = true
       |    metrics-enabled = false
@@ -86,7 +88,7 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
       |    }
       |
       |    confluent-metrics {
-      |      bootstrap-urls = "localhost:29092"
+      |      bootstrap-hosts = "localhost:29092"
       |      properties {}
       |    }
       |  }
@@ -127,9 +129,10 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
       val cfg = Configuration.load()
 
       cfg.server.serverId.value mustBe "node-1"
+      cfg.server.bindInterface mustBe "0.0.0.0"
       cfg.server.port mustBe 8078
 
-      cfg.kafkaClient.bootstrapUrls mustBe KafkaBootstrapUrls(
+      cfg.kafkaClient.bootstrapHosts mustBe KafkaBootstrapHosts(
         List("localhost:29092")
       )
       cfg.kafkaClient.schemaRegistryUrl mustBe Some("http://localhost:28081")

@@ -95,7 +95,7 @@ object Settings {
 
   def dockerSettings(exposedPort: Option[Int] = None) =
     Seq(
-      maintainer in Docker := maintainer.value,
+      maintainer := "contact@scalytica.net",
       dockerRepository := Some(s"$GitLabRegistry/$GitLabUser"),
       dockerAlias := {
         DockerAlias(
