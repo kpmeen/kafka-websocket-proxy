@@ -23,7 +23,10 @@ trait WSProxyKafkaSpec
   val embeddedKafkaConfig = EmbeddedKafkaConfig(
     kafkaPort = 0,
     zooKeeperPort = 0,
-    schemaRegistryPort = 0
+    schemaRegistryPort = 0,
+    customBrokerProperties = Map(
+      kafka.server.KafkaConfig.AutoCreateTopicsEnableProp -> "false"
+    )
   )
 
   lazy val defaultTypesafeConfig =

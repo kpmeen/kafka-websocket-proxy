@@ -10,18 +10,18 @@ import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.ByteString
 import com.typesafe.scalalogging.Logger
 import io.circe.Decoder
-import net.scalytica.kafka.wsproxy.{mapToProperties, ProducerInterceptorClass}
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroProducerRecord
 import net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde
 import net.scalytica.kafka.wsproxy.models._
+import net.scalytica.kafka.wsproxy.{mapToProperties, ProducerInterceptorClass}
 import org.apache.kafka.clients.producer.ProducerConfig._
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.apache.kafka.common.serialization.Serializer
 
+import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-import scala.collection.JavaConverters._
 
 /**
  * Functions for initialising Kafka producer sinks and flows.

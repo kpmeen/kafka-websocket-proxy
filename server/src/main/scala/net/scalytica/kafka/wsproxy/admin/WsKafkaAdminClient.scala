@@ -2,20 +2,18 @@ package net.scalytica.kafka.wsproxy.admin
 
 import com.typesafe.scalalogging.Logger
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy._
 import net.scalytica.kafka.wsproxy.errors.TopicNotFoundError
 import net.scalytica.kafka.wsproxy.models.{BrokerInfo, TopicName}
-import net.scalytica.kafka.wsproxy.{
-  KafkaFutureConverter,
-  KafkaFutureVoidConverter,
-  _
-}
 import org.apache.kafka.clients.admin.AdminClientConfig._
 import org.apache.kafka.clients.admin._
+import org.apache.kafka.common.KafkaException
 import org.apache.kafka.common.config.TopicConfig._
+import org.apache.kafka.common.errors.UnknownTopicOrPartitionException
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContext, Future}
+import scala.util.control.NonFatal
 
 /**
  * Simple wrapper around the Kafka AdminClient to allow for bootstrapping the
@@ -37,7 +35,7 @@ class WsKafkaAdminClient(cfg: AppCfg) {
   }
   // scalastyle:on line.size.limit
 
-  private[this] val sessionStateTopic =
+  private[this] val sessionStateTopicStr =
     cfg.sessionHandler.sessionStateTopicName.value
   private[this] val configuredReplicas =
     cfg.sessionHandler.sessionStateReplicationFactor
@@ -47,54 +45,49 @@ class WsKafkaAdminClient(cfg: AppCfg) {
 
   private[this] lazy val underlying = AdminClient.create(admConfig)
 
-  private[this] def replicationFactor(
-      implicit ec: ExecutionContext
-  ): Future[Short] =
-    underlying.describeCluster().nodes().call(_.size()).map { numNodes =>
-      val numReplicas = if (numNodes >= maxReplicas) maxReplicas else numNodes
-      if (configuredReplicas > numReplicas) numReplicas.toShort
-      else configuredReplicas
-    }
+  private[admin] def findSessionStateTopic: Option[String] = {
+    findTopic(cfg.sessionHandler.sessionStateTopicName)
+  }
 
-  private[this] def findSessionStateTopic(
-      implicit ec: ExecutionContext
-  ): Future[Option[String]] =
-    underlying
-      .listTopics()
-      .names()
-      .call(n => Set[String](n.asScala.toSeq: _*))
-      .map(_.find(_ == sessionStateTopic))
+  private[admin] def createSessionStateTopic(): Unit = {
+    val replFactor = replicationFactor
+    val tconf = Map[String, String](
+      CLEANUP_POLICY_CONFIG -> CLEANUP_POLICY_COMPACT,
+      RETENTION_MS_CONFIG   -> s"$retentionDuration"
+    ).asJava
+    val topic = new NewTopic(sessionStateTopicStr, 1, replFactor).configs(tconf)
 
-  private[this] def createTopic()(implicit ec: ExecutionContext): Future[Unit] =
-    replicationFactor.flatMap { replFactor =>
-      val tconf = Map[String, String](
-        CLEANUP_POLICY_CONFIG -> CLEANUP_POLICY_COMPACT,
-        RETENTION_MS_CONFIG   -> s"$retentionDuration"
-      ).asJava
-      val topic = new NewTopic(sessionStateTopic, 1, replFactor).configs(tconf)
+    logger.info("Creating session state topic...")
+    underlying.createTopics(Seq(topic).asJava).all().get()
+    logger.info("Session state topic created.")
+  }
 
-      logger.info("Creating session state topic...")
-      underlying.createTopics(Seq(topic).asJava).all().callVoid()
-    }
+  def findTopic(topic: TopicName): Option[String] = {
+    logger.debug(s"Trying to find topic ${topic.value}...")
+    val t = underlying.listTopics().names().get().asScala.find(_ == topic.value)
+    logger.debug(
+      s"Topic ${topic.value} was ${if (t.nonEmpty) "" else "not "}found"
+    )
+    t
+  }
+
+  def topicExists(topic: TopicName): Boolean = findTopic(topic).nonEmpty
 
   /**
    * Trigger the initialisation of the session state topic. This method will
    * first check if the topic already exists before attempting to create it.
    */
-  def initSessionStateTopic()(implicit ec: ExecutionContext): Future[Unit] = {
-    findSessionStateTopic
-      .flatMap {
-        case None    => createTopic()
-        case Some(_) => Future.successful(())
+  def initSessionStateTopic(): Unit =
+    try {
+      findSessionStateTopic match {
+        case None    => createSessionStateTopic()
+        case Some(_) => logger.info("Session state topic verified.")
       }
-      .map(_ => underlying.close())
-      .map(_ => logger.info("Session state topic verified."))
-      .recover {
-        case ex: Throwable =>
-          logger.error("Session state topic verification failed.", ex)
-          throw ex
-      }
-  }
+    } catch {
+      case ex: Throwable =>
+        logger.error("Session state topic verification failed.", ex)
+        throw ex
+    }
 
   /**
    * Fetches the configured number of partitions for the given Kafka topic.
@@ -105,14 +98,28 @@ class WsKafkaAdminClient(cfg: AppCfg) {
    */
   @throws(classOf[TopicNotFoundError])
   def topicPartitions(topicName: TopicName): Int = {
-    underlying
-      .describeTopics(Seq(topicName.value).asJava)
-      .all()
-      .get()
-      .asScala
-      .headOption
-      .map(_._2.partitions().size())
-      .orThrow(TopicNotFoundError(s"Topic $topicName was not found"))
+    try {
+      underlying
+        .describeTopics(Seq(topicName.value).asJava)
+        .all()
+        .get()
+        .asScala
+        .headOption
+        .map(_._2.partitions().size())
+        .getOrElse(0)
+    } catch {
+      case ee: java.util.concurrent.ExecutionException =>
+        ee.getCause match {
+          case _: UnknownTopicOrPartitionException =>
+            throw TopicNotFoundError(s"Topic ${topicName.value} was not found")
+          case ke: KafkaException =>
+            logger.error("Unhandled Kafka Exception", ke)
+            throw ke
+        }
+      case NonFatal(e) =>
+        logger.error("Unhandled exception", e)
+        throw e
+    }
   }
 
   def clusterInfo: List[BrokerInfo] = {
@@ -126,4 +133,17 @@ class WsKafkaAdminClient(cfg: AppCfg) {
       .map(n => BrokerInfo(n.id, n.host, n.port, Option(n.rack)))
   }
 
+  def replicationFactor: Short = {
+    val numNodes = clusterInfo.size
+    logger.debug(s"Calculating number of replicas for $sessionStateTopicStr...")
+    val numReplicas = if (numNodes >= maxReplicas) maxReplicas else numNodes
+
+    if (configuredReplicas > numReplicas) numReplicas.toShort
+    else configuredReplicas
+  }
+
+  def close(): Unit = {
+    underlying.close()
+    logger.debug("Underlying admin client closed.")
+  }
 }

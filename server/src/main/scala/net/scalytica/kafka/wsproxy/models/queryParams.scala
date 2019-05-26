@@ -4,17 +4,12 @@ import net.scalytica.kafka.wsproxy.SocketProtocol.SocketPayload
 import net.scalytica.kafka.wsproxy.models.Formats.FormatType
 import org.apache.kafka.clients.consumer.OffsetResetStrategy
 
-/**
- * Wrapper class for query parameters describing properties for both inbound and
- * outbound traffic through the WebSocket.
- *
- * @param out parameters describing the props for the outbound socket.
- * @param in optional parameters describing the props for the inbound socket.
- */
-case class SocketParams(
-    out: OutSocketArgs,
-    in: Option[InSocketArgs] = None
-)
+trait SocketArgs {
+  val topic: TopicName
+  val socketPayload: SocketPayload
+  val keyType: Option[Formats.FormatType]
+  val valType: Formats.FormatType
+}
 
 /**
  * Encodes configuration params for an outbound WebSocket stream.
@@ -41,7 +36,7 @@ case class OutSocketArgs(
     rateLimit: Option[Int] = None,
     batchSize: Option[Int] = None,
     autoCommit: Boolean = true
-)
+) extends SocketArgs
 
 object OutSocketArgs {
 
@@ -85,7 +80,7 @@ case class InSocketArgs(
     socketPayload: SocketPayload,
     keyType: Option[Formats.FormatType] = None,
     valType: Formats.FormatType = Formats.StringType
-)
+) extends SocketArgs
 
 object InSocketArgs {
 

@@ -189,6 +189,13 @@ trait SessionHandler {
     val handlerName = s"session-handler-actor-${cfg.server.serverId.value}"
     logger.debug(s"Initialising session handler $handlerName...")
 
+    val admin = new WsKafkaAdminClient(cfg)
+    try {
+      admin.initSessionStateTopic()
+    } finally {
+      admin.close()
+    }
+
     val ref =
       sys.spawn(sessionHandler, handlerName)
 
@@ -212,18 +219,13 @@ trait SessionHandler {
 
   // scalastyle:off method.length cyclomatic.complexity
   protected def sessionHandler(implicit cfg: AppCfg): Behavior[Protocol] = {
-    val adminClient = new WsKafkaAdminClient(cfg)
-    val serverId    = cfg.server.serverId
+    val serverId = cfg.server.serverId
 
     Behaviors.setup { implicit ctx =>
       implicit val sys = ctx.system
       implicit val ec  = sys.executionContext
 
       val log = ctx.log.withLoggerClass(classOf[SessionHandler])
-
-      adminClient.initSessionStateTopic().foreach { _ =>
-        ctx.log.info("Sessions state topic initialised")
-      }
 
       log.debug("Initialising session data producer...")
       implicit val producer = new SessionDataProducer()

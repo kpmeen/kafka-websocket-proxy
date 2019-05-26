@@ -1,7 +1,7 @@
 package net.scalytica.kafka.wsproxy
 
-import akka.http.scaladsl.model.ContentTypes
 import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.model.{ContentTypes, StatusCodes}
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.testkit.{RouteTestTimeout, WSProbe}
 import io.circe.parser._
@@ -16,9 +16,9 @@ import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
   AvroProducerRecord,
   AvroProducerResult
 }
-import net.scalytica.kafka.wsproxy.models.Formats.{AvroType, NoType, StringType}
 import net.scalytica.kafka.wsproxy.codecs.Decoders.brokerInfoDecoder
 import net.scalytica.kafka.wsproxy.models.BrokerInfo
+import net.scalytica.kafka.wsproxy.models.Formats.{AvroType, NoType, StringType}
 import net.scalytica.test._
 import org.scalatest.Inspectors.forAll
 import org.scalatest.concurrent.ScalaFutures
@@ -43,7 +43,7 @@ class ServerRoutesSpec
 
   implicit val timeout = RouteTestTimeout(20 seconds)
 
-  def initTopic(topicName: String, partitions: Int = 1)(
+  private[this] def initTopic(topicName: String, partitions: Int = 1)(
       implicit kcfg: EmbeddedKafkaConfig
   ): Unit = createCustomTopic(
     topic = topicName,
@@ -55,64 +55,74 @@ class ServerRoutesSpec
   import TestRoutes.{serverErrorHandler, serverRejectionHandler}
 
   "The server routes" should {
-    "return a 404 NotFound when requesting an invalid resource" in {
-      implicit val cfg = defaultTestAppCfgWithServerId("n1")
+    "return HTTP 404 when requesting an invalid resource" in
+      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
+        implicit val wsCfg =
+          appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = "n1")
 
-      val expected =
-        "{\"message\":\"This is not the resource you are looking for.\"}"
+        val expected =
+          "{\"message\":\"This is not the resource you are looking for.\"}"
 
-      val (_, testRoutes) = TestRoutes.wsProxyRoutes
+        val (_, testRoutes) = TestRoutes.wsProxyRoutes
 
-      val routes = Route.seal(testRoutes)
+        val routes = Route.seal(testRoutes)
 
-      Get() ~> routes ~> check {
-        status mustBe NotFound
-        responseAs[String] mustBe expected
+        Get() ~> routes ~> check {
+          status mustBe NotFound
+          responseAs[String] mustBe expected
+        }
       }
-    }
 
-    "return the Avro schema for producer records" in {
-      implicit val cfg    = defaultTestAppCfgWithServerId("n2")
-      val (_, testRoutes) = TestRoutes.wsProxyRoutes
+    "return the Avro schema for producer records" in
+      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
+        implicit val wsCfg =
+          appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = "n2")
+        val (_, testRoutes) = TestRoutes.wsProxyRoutes
 
-      Get("/schemas/avro/producer/record") ~> testRoutes ~> check {
-        status mustBe OK
-        responseAs[String] mustBe AvroProducerRecord.schemaFor.schema
-          .toString(true)
+        Get("/schemas/avro/producer/record") ~> testRoutes ~> check {
+          status mustBe OK
+          responseAs[String] mustBe AvroProducerRecord.schemaFor.schema
+            .toString(true)
+        }
       }
-    }
 
-    "return the Avro schema for producer results" in {
-      implicit val cfg    = defaultTestAppCfgWithServerId("n3")
-      val (_, testRoutes) = TestRoutes.wsProxyRoutes
+    "return the Avro schema for producer results" in
+      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
+        implicit val wsCfg =
+          appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = "n3")
+        val (_, testRoutes) = TestRoutes.wsProxyRoutes
 
-      Get("/schemas/avro/producer/result") ~> testRoutes ~> check {
-        status mustBe OK
-        responseAs[String] mustBe AvroProducerResult.schemaFor.schema
-          .toString(true)
+        Get("/schemas/avro/producer/result") ~> testRoutes ~> check {
+          status mustBe OK
+          responseAs[String] mustBe AvroProducerResult.schemaFor.schema
+            .toString(true)
+        }
       }
-    }
 
-    "return the Avro schema for consumer record" in {
-      implicit val cfg    = defaultTestAppCfgWithServerId("n4")
-      val (_, testRoutes) = TestRoutes.wsProxyRoutes
+    "return the Avro schema for consumer record" in
+      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
+        implicit val wsCfg =
+          appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = "n4")
+        val (_, testRoutes) = TestRoutes.wsProxyRoutes
 
-      Get("/schemas/avro/consumer/record") ~> testRoutes ~> check {
-        status mustBe OK
-        responseAs[String] mustBe AvroConsumerRecord.schemaFor.schema
-          .toString(true)
+        Get("/schemas/avro/consumer/record") ~> testRoutes ~> check {
+          status mustBe OK
+          responseAs[String] mustBe AvroConsumerRecord.schemaFor.schema
+            .toString(true)
+        }
       }
-    }
 
-    "return the Avro schema for consumer commit" in {
-      implicit val cfg    = defaultTestAppCfgWithServerId("n5")
-      val (_, testRoutes) = TestRoutes.wsProxyRoutes
+    "return the Avro schema for consumer commit" in
+      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
+        implicit val wsCfg =
+          appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = "n5")
+        val (_, testRoutes) = TestRoutes.wsProxyRoutes
 
-      Get("/schemas/avro/consumer/commit") ~> testRoutes ~> check {
-        status mustBe OK
-        responseAs[String] mustBe AvroCommit.schemaFor.schema.toString(true)
+        Get("/schemas/avro/consumer/commit") ~> testRoutes ~> check {
+          status mustBe OK
+          responseAs[String] mustBe AvroCommit.schemaFor.schema.toString(true)
+        }
       }
-    }
 
     "set up a WebSocket connection for producing JSON key value messages" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
@@ -371,6 +381,48 @@ class ServerRoutesSpec
             port = kcfg.kafkaPort,
             rack = None
           )
+        }
+      }
+
+    "return HTTP 400 when attempting to produce to a non-existing topic" in
+      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
+        implicit val wsCfg =
+          appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = "n14")
+
+        val topicName = "non-existing-topic"
+
+        implicit val wsClient = WSProbe()
+        val (_, testRoutes)   = TestRoutes.wsProxyRoutes
+        val routes            = Route.seal(testRoutes)
+
+        val uri = baseWebSocketUri(topicName, StringType, StringType)
+
+        WS(uri, wsClient.flow) ~> routes ~> check {
+          status mustBe StatusCodes.BadRequest
+        }
+      }
+
+    "return HTTP 400 when attempting to consume from non-existing topic" in
+      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
+        implicit val wsCfg =
+          appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = "n15")
+
+        val topicName = "non-existing-topic"
+        val outPath = "/socket/out?" +
+          "clientId=test-8" +
+          "&groupId=test-group-8" +
+          s"&topic=$topicName" +
+          s"&socketPayload=${AvroPayload.name}" +
+          "&keyType=avro" +
+          "&valType=avro" +
+          "&autoCommit=false"
+
+        implicit val wsClient = WSProbe()
+        val (_, testRoutes)   = TestRoutes.wsProxyRoutes
+        val routes            = Route.seal(testRoutes)
+
+        WS(outPath, wsClient.flow) ~> routes ~> check {
+          status mustBe StatusCodes.BadRequest
         }
       }
   }

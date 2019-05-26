@@ -19,6 +19,15 @@ import org.scalatest.{MustMatchers, Suite}
 trait WsProducerClients extends ScalatestRouteTest with MustMatchers {
   self: Suite =>
 
+  def baseWebSocketUri(
+      topic: String,
+      keyType: FormatType,
+      valType: FormatType
+  ): String = {
+    val baseUri = s"/socket/in?topic=$topic&valType=${valType.name}"
+    if (keyType != NoType) baseUri + s"&keyType=${keyType.name}" else baseUri
+  }
+
   def produceJson(
       topic: String,
       keyType: FormatType,
@@ -26,11 +35,7 @@ trait WsProducerClients extends ScalatestRouteTest with MustMatchers {
       routes: Route,
       messages: Seq[String]
   )(implicit wsClient: WSProbe): Unit = {
-    val baseUri =
-      s"/socket/in?topic=$topic&valType=${valType.name}"
-
-    val uri =
-      if (keyType != NoType) baseUri + s"&keyType=${keyType.name}" else baseUri
+    val uri = baseWebSocketUri(topic, keyType, valType)
 
     WS(uri, wsClient.flow) ~> routes ~> check {
       isWebSocketUpgrade mustBe true

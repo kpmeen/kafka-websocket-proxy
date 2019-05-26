@@ -58,10 +58,13 @@ object Server extends App with ServerRoutes {
   if (!resStatus.hasErrors) {
     logger.info("All Kafka broker hosts were correctly resolved")
   } else {
-    val r = resStatus.results.collect {
+    val reasons = resStatus.results.collect {
       case HostResolutionError(reason) => reason
     }
-    logger.warn(s"Some hosts were unresolved:\n${r.mkString("  - ", "\n", "")}")
+    logger.warn(
+      "Some hosts could not be resolved. Reasons:" +
+        s"\n${reasons.mkString("  - ", "\n", "")}"
+    )
     val _ = Await.result(sys.terminate(), 10 seconds)
     System.exit(1)
   }

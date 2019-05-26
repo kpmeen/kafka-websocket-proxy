@@ -4,26 +4,20 @@ import akka.Done
 import akka.actor.Scheduler
 import akka.actor.typed.ActorRef
 import akka.util.Timeout
-import net.scalytica.kafka.wsproxy.session.SessionHandler._
 import net.manub.embeddedkafka.schemaregistry._
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
-import net.scalytica.kafka.wsproxy.codecs.{SessionSerde, WsGroupIdSerde}
 import net.scalytica.kafka.wsproxy.codecs.Decoders.sessionDecoder
 import net.scalytica.kafka.wsproxy.codecs.Encoders.sessionEncoder
+import net.scalytica.kafka.wsproxy.codecs.{SessionSerde, WsGroupIdSerde}
 import net.scalytica.kafka.wsproxy.models.{WsClientId, WsGroupId, WsServerId}
 import net.scalytica.kafka.wsproxy.session.Session.SessionOpResult
+import net.scalytica.kafka.wsproxy.session.SessionHandler._
 import net.scalytica.test.{TestDataGenerators, WSProxyKafkaSpec}
 import org.apache.kafka.common.serialization.Deserializer
-import org.scalatest.{
-  Assertion,
-  BeforeAndAfter,
-  MustMatchers,
-  OptionValues,
-  WordSpec
-}
-import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.Inspectors.forAll
+import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Minute, Span}
+import org.scalatest._
 
 import scala.concurrent.duration._
 

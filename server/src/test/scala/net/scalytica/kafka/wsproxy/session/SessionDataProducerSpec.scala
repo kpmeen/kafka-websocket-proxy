@@ -4,7 +4,7 @@ import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import net.manub.embeddedkafka.schemaregistry._
 import net.scalytica.kafka.wsproxy.codecs.{SessionSerde, WsGroupIdSerde}
 import net.scalytica.kafka.wsproxy.codecs.Implicits._
-import net.scalytica.kafka.wsproxy.models.WsGroupId
+import net.scalytica.kafka.wsproxy.models.{TopicName, WsGroupId}
 import net.scalytica.test.WSProxyKafkaSpec
 import org.scalatest.{BeforeAndAfterAll, MustMatchers, OptionValues, WordSpec}
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
@@ -40,6 +40,13 @@ class SessionDataProducerSpec
     super.afterAll()
   }
 
+  private[this] def initTopic(topicName: TopicName, partitions: Int = 1)(
+      implicit kcfg: EmbeddedKafkaConfig
+  ): Unit = createCustomTopic(
+    topic = topicName.value,
+    partitions = partitions
+  )
+
   private[this] def testSession(i: Int): Session =
     Session(WsGroupId(s"c$i"), consumerLimit = i)
 
@@ -54,6 +61,8 @@ class SessionDataProducerSpec
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val cfg =
           appTestConfig(kcfg.kafkaPort, Option(kcfg.schemaRegistryPort))
+
+        initTopic(cfg.sessionHandler.sessionStateTopicName)
 
         val sdp = new SessionDataProducer()
         // Write the session data to Kafka
@@ -74,6 +83,8 @@ class SessionDataProducerSpec
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val cfg =
           appTestConfig(kcfg.kafkaPort, Option(kcfg.schemaRegistryPort))
+
+        initTopic(cfg.sessionHandler.sessionStateTopicName)
 
         val sdp = new SessionDataProducer()
 
@@ -98,6 +109,8 @@ class SessionDataProducerSpec
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val cfg =
           appTestConfig(kcfg.kafkaPort, Option(kcfg.schemaRegistryPort))
+
+        initTopic(cfg.sessionHandler.sessionStateTopicName)
 
         val sdp = new SessionDataProducer()
 

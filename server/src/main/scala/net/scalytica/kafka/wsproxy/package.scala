@@ -7,13 +7,10 @@ import io.confluent.monitoring.clients.interceptor.{
   MonitoringConsumerInterceptor,
   MonitoringProducerInterceptor
 }
-import org.apache.kafka.common.KafkaFuture
 
 import scala.collection.JavaConverters._
 import scala.compat.java8.{FunctionConverters, FutureConverters}
-import scala.concurrent.{Future, Promise}
-import scala.util.Try
-import scala.util.control.NonFatal
+import scala.concurrent.Future
 
 package object wsproxy {
 
@@ -54,29 +51,6 @@ package object wsproxy {
         }
       }
     }
-  }
-
-  implicit class KafkaFutureConverter[A](val k: KafkaFuture[A]) extends AnyVal {
-
-    def call[B](f: A => B): Future[B] = {
-      val promise = Promise[B]()
-
-      try {
-        k.thenApply { n: A =>
-          Try(f(n))
-        }
-      } catch {
-        case NonFatal(e) => promise.failure(e)
-      }
-
-      promise.future
-    }
-  }
-
-  implicit class KafkaFutureVoidConverter(val k: KafkaFuture[Void])
-      extends AnyVal {
-
-    def callVoid(): Future[Unit] = k.call(_ => ())
   }
 
   implicit class JavaFutureConverter[A](

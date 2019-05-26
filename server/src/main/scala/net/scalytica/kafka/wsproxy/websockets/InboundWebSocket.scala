@@ -57,7 +57,10 @@ trait InboundWebSocket extends WithSchemaRegistryConfig {
       as: ActorSystem,
       mat: ActorMaterializer
   ): Route = handleWebSocketMessages {
-    logger.debug(s"Initialising inbound websocket for ${args.socketPayload}")
+    logger.debug(
+      s"Initialising inbound websocket for topic ${args.topic.value}" +
+        s" with payload ${args.socketPayload}"
+    )
 
     val ktpe = args.keyType.getOrElse(Formats.NoType)
 

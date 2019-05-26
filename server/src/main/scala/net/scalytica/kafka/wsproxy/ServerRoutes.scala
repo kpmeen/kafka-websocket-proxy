@@ -5,18 +5,13 @@ import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.{
-  ExceptionHandler,
-  RejectionHandler,
-  Route,
-  ValidationRejection
-}
+import akka.http.scaladsl.server.{ExceptionHandler, RejectionHandler, Route}
 import akka.kafka.scaladsl.Consumer
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.RunnableGraph
 import com.typesafe.scalalogging.Logger
-import io.circe.{Json, Printer}
 import io.circe.syntax._
+import io.circe.{Json, Printer}
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
@@ -27,7 +22,11 @@ import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
 }
 import net.scalytica.kafka.wsproxy.codecs.Encoders.brokerInfoEncoder
 import net.scalytica.kafka.wsproxy.errors.TopicNotFoundError
-import net.scalytica.kafka.wsproxy.models.{InSocketArgs, OutSocketArgs}
+import net.scalytica.kafka.wsproxy.models.{
+  InSocketArgs,
+  OutSocketArgs,
+  SocketArgs
+}
 import net.scalytica.kafka.wsproxy.session.SessionHandler
 import net.scalytica.kafka.wsproxy.websockets.{
   InboundWebSocket,
@@ -40,20 +39,22 @@ import scala.concurrent.ExecutionContext
 trait ServerRoutes
     extends QueryParamParsers
     with OutboundWebSocket
-    with InboundWebSocket {
+    with InboundWebSocket { self =>
 
-  private[this] val logger = Logger(this.getClass)
+  private[this] val logger = Logger(classOf[ServerRoutes])
+
+  private[this] def jsonMessageStr(msg: String): Json =
+    Json.obj("message" -> Json.fromString(msg))
 
   private[this] def jsonResponseMsg(
       statusCode: StatusCode,
       message: String
   ): HttpResponse = {
-    val js = Json.obj("message" -> Json.fromString(message))
     HttpResponse(
       status = statusCode,
       entity = HttpEntity(
         contentType = ContentTypes.`application/json`,
-        string = js.pretty(Printer.noSpaces)
+        string = jsonMessageStr(message).pretty(Printer.noSpaces)
       )
     )
   }
@@ -78,13 +79,16 @@ trait ServerRoutes
   }
 
   implicit def serverErrorHandler: ExceptionHandler = ExceptionHandler {
-    case tnfe: TopicNotFoundError =>
-      logger.info(s"Socket not initialised. Reason: ${tnfe.getMessage}")
-      complete(jsonResponseMsg(NotFound, tnfe.getMessage))
+    case tnf: TopicNotFoundError =>
+      extractUri { uri =>
+        logger.info(s"WebSocket request $uri failed. Reason: ${tnf.getMessage}")
+        rejectAndComplete(jsonResponseMsg(BadRequest, tnf.getMessage))
+      }
+
     case t =>
       extractUri { uri =>
         logger.warn(s"Request to $uri could not be handled normally", t)
-        complete(jsonResponseMsg(InternalServerError, t.getMessage))
+        rejectAndComplete(jsonResponseMsg(InternalServerError, t.getMessage))
       }
   }
 
@@ -99,12 +103,31 @@ trait ServerRoutes
           )
         )
       }
-      .handle {
-        case ValidationRejection(msg, _) =>
-          rejectAndComplete(jsonResponseMsg(BadRequest, msg))
-      }
       .result()
       .withFallback(RejectionHandler.default)
+      .mapRejectionResponse { res =>
+        res.entity match {
+          case HttpEntity.Strict(ContentTypes.`text/plain(UTF-8)`, body) =>
+            val js = jsonMessageStr(body.utf8String).pretty(Printer.noSpaces)
+            res.copy(entity = HttpEntity(ContentTypes.`application/json`, js))
+          case _ => res
+        }
+      }
+  }
+
+  private[this] def validateAndHandleWebSocket(
+      args: SocketArgs
+  )(
+      webSocketHandler: Route
+  )(implicit cfg: AppCfg): Route = {
+    val topic = args.topic
+    val admin = new WsKafkaAdminClient(cfg)
+    val topicExists = try { admin.topicExists(topic) } finally {
+      admin.close()
+    }
+
+    if (topicExists) webSocketHandler
+    else failWith(TopicNotFoundError(s"Topic ${topic.value} does not exist"))
   }
 
   def wsProxyRoutes(
@@ -128,9 +151,9 @@ trait ServerRoutes
   ): Route = {
     pathPrefix("socket") {
       path("in") {
-        inParams(args => inbound(args))
+        inParams(args => validateAndHandleWebSocket(args)(inbound(args)))
       } ~ path("out") {
-        outParams(args => outbound(args))
+        outParams(args => validateAndHandleWebSocket(args)(outbound(args)))
       }
     } ~ pathPrefix("schemas") {
       pathPrefix("avro") {
@@ -152,14 +175,20 @@ trait ServerRoutes
       pathPrefix("cluster") {
         path("info") {
           complete {
-            val ci = new WsKafkaAdminClient(cfg).clusterInfo
-            HttpResponse(
-              status = OK,
-              entity = HttpEntity(
-                contentType = ContentTypes.`application/json`,
-                string = ci.asJson.pretty(Printer.spaces2)
+            val admin = new WsKafkaAdminClient(cfg)
+            try {
+              val ci = admin.clusterInfo
+
+              HttpResponse(
+                status = OK,
+                entity = HttpEntity(
+                  contentType = ContentTypes.`application/json`,
+                  string = ci.asJson.pretty(Printer.spaces2)
+                )
               )
-            )
+            } finally {
+              admin.close()
+            }
           }
         }
       }
