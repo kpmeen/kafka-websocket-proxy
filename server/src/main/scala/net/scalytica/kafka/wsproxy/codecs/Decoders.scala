@@ -71,6 +71,8 @@ trait Decoders {
 
   implicit val prodResDecoder: Decoder[WsProducerResult] = deriveDecoder
 
+  implicit val kafkaHeaderDecoder: Decoder[KafkaHeader] = deriveDecoder
+
   implicit def inValDecoder[T](
       implicit dec: Decoder[T]
   ): Decoder[InValueDetails[T]] = { json =>
@@ -100,12 +102,17 @@ trait Decoders {
   ): Decoder[WsProducerRecord[K, V]] = { cursor =>
     val key   = cursor.downField("key").as[InValueDetails[K]]
     val value = cursor.downField("value").as[InValueDetails[V]]
+    val headers =
+      cursor.downField("headers").as[Option[Seq[KafkaHeader]]] match {
+        case Right(h) => h
+        case Left(_)  => None
+      }
 
     value match {
       case Right(v) =>
         key match {
-          case Right(k) => Right(ProducerKeyValueRecord[K, V](k, v))
-          case Left(_)  => Right(ProducerValueRecord[V](v))
+          case Right(k) => Right(ProducerKeyValueRecord[K, V](k, v, headers))
+          case Left(_)  => Right(ProducerValueRecord[V](v, headers))
         }
 
       case Left(fail) =>
@@ -123,6 +130,7 @@ trait Decoders {
       partition <- cursor.downField("partition").as[Partition]
       offset    <- cursor.downField("offset").as[Offset]
       timestamp <- cursor.downField("timestamp").as[Timestamp]
+      headers   <- cursor.downField("").as[Option[Seq[KafkaHeader]]]
       key       <- cursor.downField("key").as[Option[OutValueDetails[K]]]
       value     <- cursor.downField("value").as[OutValueDetails[V]]
     } yield {
@@ -133,6 +141,7 @@ trait Decoders {
             partition = partition,
             offset = offset,
             timestamp = timestamp,
+            headers = headers,
             key = k,
             value = value,
             committableOffset = None
@@ -144,6 +153,7 @@ trait Decoders {
             partition = partition,
             offset = offset,
             timestamp,
+            headers = headers,
             value = value,
             committableOffset = None
           )

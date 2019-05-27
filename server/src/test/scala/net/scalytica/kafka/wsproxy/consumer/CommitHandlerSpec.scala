@@ -4,16 +4,7 @@ import akka.actor.testkit.typed.scaladsl.{BehaviorTestKit, TestInbox}
 import akka.kafka.testkit.ConsumerResultFactory
 import net.scalytica.kafka.wsproxy.consumer.CommitHandler._
 import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails
-import net.scalytica.kafka.wsproxy.models.{
-  ConsumerKeyValueRecord,
-  Formats,
-  Offset,
-  Partition,
-  Timestamp,
-  TopicName,
-  WsCommit,
-  WsMessageId
-}
+import net.scalytica.kafka.wsproxy.models._
 import net.scalytica.test.WSProxyKafkaSpec
 import org.scalatest.concurrent.Eventually
 import org.scalatest.time.{Minute, Span}
@@ -43,6 +34,7 @@ class CommitHandlerSpec
       partition = Partition(partition),
       offset = Offset(offset),
       timestamp = Timestamp(timestamp),
+      headers = None,
       key = OutValueDetails[String](
         value = s"$topic-$partition-$offset",
         format = Some(Formats.StringType)

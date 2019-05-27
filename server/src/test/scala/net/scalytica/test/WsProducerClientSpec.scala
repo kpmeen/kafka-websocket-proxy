@@ -16,7 +16,7 @@ import net.scalytica.kafka.wsproxy.models.Formats._
 import org.scalatest.Inspectors.forAll
 import org.scalatest.{MustMatchers, Suite}
 
-trait WsProducerClients extends ScalatestRouteTest with MustMatchers {
+trait WsProducerClientSpec extends ScalatestRouteTest with MustMatchers {
   self: Suite =>
 
   def baseWebSocketUri(

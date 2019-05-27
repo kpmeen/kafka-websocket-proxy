@@ -56,6 +56,8 @@ trait Encoders {
 
   implicit val prodResEncoder: Encoder[WsProducerResult] = deriveEncoder
 
+  implicit val kafkaHeaderEncoder: Encoder[KafkaHeader] = deriveEncoder
+
   implicit def outValEncoder[T](
       implicit enc: Encoder[T]
   ): Encoder[OutValueDetails[T]] = { ovd =>
@@ -77,6 +79,7 @@ trait Encoders {
         "partition"        -> ckvr.partition.asJson,
         "offset"           -> ckvr.offset.asJson,
         "timestamp"        -> ckvr.timestamp.asJson,
+        "headers"          -> ckvr.headers.asJson,
         "key"              -> ckvr.key.asJson,
         "value"            -> ckvr.value.asJson
       )
@@ -88,6 +91,7 @@ trait Encoders {
         "partition"        -> cvr.partition.asJson,
         "offset"           -> cvr.offset.asJson,
         "timestamp"        -> cvr.timestamp.asJson,
+        "headers"          -> cvr.headers.asJson,
         "value"            -> cvr.value.asJson
       )
   }

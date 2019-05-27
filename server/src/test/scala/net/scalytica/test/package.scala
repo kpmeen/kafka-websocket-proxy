@@ -23,7 +23,7 @@ import net.scalytica.kafka.wsproxy.models.{
   WsProducerResult
 }
 import net.scalytica.test.TestTypes.{Album, TestKey}
-import org.scalatest.{Assertion, MustMatchers}
+import org.scalatest.{Assertion, MustMatchers, OptionValues}
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
@@ -57,7 +57,9 @@ package object test {
     }
   }
 
-  implicit class WsProbeExtensions(probe: WSProbe) extends MustMatchers {
+  implicit class WsProbeExtensions(probe: WSProbe)
+      extends MustMatchers
+      with OptionValues {
 
     def expectWsProducerResultJson(
         expectedTopic: String
@@ -113,10 +115,12 @@ package object test {
       }
     }
 
+    // scalastyle:off method.length
     def expectWsConsumerKeyValueResultJson[K, V](
         expectedTopic: String,
         expectedKey: K,
-        expectedValue: V
+        expectedValue: V,
+        expectHeaders: Boolean = false
     )(
         implicit
         mat: Materializer,
@@ -141,6 +145,19 @@ package object test {
                   actual.offset.value mustBe >=(0L)
                   actual.partition.value mustBe >=(0)
 
+                  if (expectHeaders) {
+                    actual.headers must not be empty
+                    actual.headers.value must have size 1
+                    actual.headers.value.headOption.value.key must startWith(
+                      "key"
+                    )
+                    actual.headers.value.headOption.value.value must startWith(
+                      "value"
+                    )
+                  } else {
+                    actual.headers mustBe empty
+                  }
+
                   actual match {
                     case kvr: ConsumerKeyValueRecord[K, V] =>
                       kvr.key.value mustBe expectedKey
@@ -162,7 +179,8 @@ package object test {
     def expectWsConsumerKeyValueResultAvro(
         expectedTopic: String,
         expectedKey: Option[TestKey],
-        expectedValue: Album
+        expectedValue: Album,
+        expectHeaders: Boolean = false
     )(
         implicit
         mat: Materializer,
@@ -188,8 +206,17 @@ package object test {
           actual.offset.value mustBe >=(0L)
           actual.partition.value mustBe >=(0)
 
+          if (expectHeaders) {
+            actual.headers must not be empty
+            actual.headers.value must have size 1
+            actual.headers.value.headOption.value.key must startWith("key")
+            actual.headers.value.headOption.value.value must startWith("value")
+          } else {
+            actual.headers mustBe empty
+          }
+
           actual match {
-            case ConsumerKeyValueRecord(_, _, _, _, keyOut, valOut, _) =>
+            case ConsumerKeyValueRecord(_, _, _, _, _, keyOut, valOut, _) =>
               val k = keySerdes.deserialize("", keyOut.value)
               val v = valSerdes.deserialize("", valOut.value)
               k.username mustBe expectedKey.get.username
@@ -198,7 +225,7 @@ package object test {
               v.tracks must have size expectedValue.tracks.size.toLong
               v.tracks must contain allElementsOf expectedValue.tracks
 
-            case ConsumerValueRecord(_, _, _, _, valOut, _) =>
+            case ConsumerValueRecord(_, _, _, _, _, valOut, _) =>
               val v = valSerdes.deserialize("", valOut.value)
               v mustBe expectedValue
           }
@@ -209,6 +236,7 @@ package object test {
           )
       }
     }
+    // scalastyle:on method.length
 
     def expectWsConsumerValueResultJson[V](
         expectedTopic: String,

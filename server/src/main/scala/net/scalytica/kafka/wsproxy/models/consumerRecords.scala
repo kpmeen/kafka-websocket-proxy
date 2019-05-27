@@ -2,7 +2,10 @@ package net.scalytica.kafka.wsproxy.models
 
 import akka.Done
 import akka.kafka.ConsumerMessage
-import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroConsumerRecord
+import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
+  AvroConsumerRecord,
+  KafkaMessageHeader
+}
 import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails
 import org.apache.kafka.common.serialization.Serializer
 
@@ -28,6 +31,7 @@ sealed abstract class WsConsumerRecord[+K, +V](
   val partition: Partition
   val offset: Offset
   val timestamp: Timestamp
+  val headers: Option[Seq[KafkaHeader]]
   val committableOffset: Option[ConsumerMessage.CommittableOffset]
 
   lazy val wsProxyMessageId: WsMessageId =
@@ -47,6 +51,7 @@ sealed abstract class WsConsumerRecord[+K, +V](
       partition = partition.value,
       offset = offset.value,
       timestamp = timestamp.value,
+      headers = headers.map(_.map(h => KafkaMessageHeader(h.key, h.value))),
       key = key.map(ovd => keySer.serialize(topic.value, ovd.value)),
       value = valSer.serialize(topic.value, value.value)
     )
@@ -68,6 +73,7 @@ object WsConsumerRecord {
           partition = Partition(avro.partition),
           offset = Offset(avro.offset),
           timestamp = Timestamp(avro.timestamp),
+          headers = avro.headers.map(_.map(KafkaHeader.fromAvro)),
           key = OutValueDetails(key, Option(Formats.AvroType)),
           value = OutValueDetails(avro.value, Option(Formats.AvroType)),
           committableOffset = None
@@ -80,6 +86,7 @@ object WsConsumerRecord {
           offset = Offset(avro.offset),
           timestamp = Timestamp(avro.timestamp),
           value = OutValueDetails(avro.value, Option(Formats.AvroType)),
+          headers = avro.headers.map(_.map(KafkaHeader.fromAvro)),
           committableOffset = None
         )
     }
@@ -94,6 +101,7 @@ object WsConsumerRecord {
  * @param partition         The topic partition for the message
  * @param offset            The topic offset of the message
  * @param timestamp         The timestamp for when Kafka received the record
+ * @param headers           The [[KafkaHeader]]s found on the message.
  * @param key               The [[OutValueDetails]] describing the message key
  * @param value             The [[OutValueDetails]] describing the message value
  * @param committableOffset An optional handle to the mechanism that allows
@@ -106,6 +114,7 @@ case class ConsumerKeyValueRecord[K, V](
     partition: Partition,
     offset: Offset,
     timestamp: Timestamp,
+    headers: Option[Seq[KafkaHeader]],
     key: OutValueDetails[K],
     value: OutValueDetails[V],
     committableOffset: Option[ConsumerMessage.CommittableOffset]
@@ -126,6 +135,7 @@ case class ConsumerKeyValueRecord[K, V](
  * @param partition         The topic partition for the message
  * @param offset            The topic offset of the message
  * @param timestamp         The timestamp for when Kafka received the record
+ * @param headers           The [[KafkaHeader]]s found on the message.
  * @param value             The [[OutValueDetails]] describing the message value
  * @param committableOffset An optional handle to the mechanism that allows
  *                          committing the message offset back to Kafka.
@@ -136,6 +146,7 @@ case class ConsumerValueRecord[V](
     partition: Partition,
     offset: Offset,
     timestamp: Timestamp,
+    headers: Option[Seq[KafkaHeader]],
     value: OutValueDetails[V],
     committableOffset: Option[ConsumerMessage.CommittableOffset]
 ) extends WsConsumerRecord[Nothing, V](None, value) {

@@ -6,6 +6,13 @@ object SchemaTypes {
 
   object Implicits {
 
+    implicit val KafkaMessageHeaderSchemaFor: SchemaFor[KafkaMessageHeader] =
+      KafkaMessageHeader.schemaFor
+    implicit val KafkaMessageHeaderToRecord: ToRecord[KafkaMessageHeader] =
+      KafkaMessageHeader.toRecord
+    implicit val KafkaMessageHeaderFromRecord: FromRecord[KafkaMessageHeader] =
+      KafkaMessageHeader.fromRecord
+
     implicit val ProducerRecordSchemaFor: SchemaFor[AvroProducerRecord] =
       AvroProducerRecord.schemaFor
     implicit val ProducerRecordToRecord: ToRecord[AvroProducerRecord] =
@@ -37,11 +44,31 @@ object SchemaTypes {
   trait WsProxyAvroRecord
 
   /**
+   * Simple representation of Kafka message headers. Currently there is only
+   * support for String values.
+   *
+   * @param key The header key
+   * @param value The header value
+   */
+  @AvroDoc("Schema definition for simple Kafka message headers.")
+  case class KafkaMessageHeader(key: String, value: String)
+      extends WsProxyAvroRecord
+
+  object KafkaMessageHeader {
+    val schemaFor  = SchemaFor[KafkaMessageHeader]
+    val toRecord   = ToRecord[KafkaMessageHeader]
+    val fromRecord = FromRecord[KafkaMessageHeader]
+
+    lazy val schema = AvroSchema[KafkaMessageHeader]
+  }
+
+  /**
    * Wrapper schema for messages to produce into Kafka topics via the WebSocket
    * Proxy.
    *
    * @param key The message key.
    * @param value The message value.
+   * @param headers The headers to apply to the message in Kafka.
    */
   @AvroDoc(
     """Inbound schema for producing messages with a key and value to Kafka
@@ -51,7 +78,8 @@ object SchemaTypes {
   )
   case class AvroProducerRecord(
       key: Option[Array[Byte]],
-      value: Array[Byte]
+      value: Array[Byte],
+      headers: Option[Seq[KafkaMessageHeader]]
   ) extends WsProxyAvroRecord {
 
     def isEmpty: Boolean = AvroProducerRecord.empty == this
@@ -59,7 +87,8 @@ object SchemaTypes {
   }
 
   object AvroProducerRecord {
-    lazy val empty: AvroProducerRecord = AvroProducerRecord(None, Array.empty)
+    lazy val empty: AvroProducerRecord =
+      AvroProducerRecord(None, Array.empty, None)
 
     val schemaFor  = SchemaFor[AvroProducerRecord]
     val toRecord   = ToRecord[AvroProducerRecord]
@@ -69,6 +98,8 @@ object SchemaTypes {
   }
 
   /**
+   * Schema for confirmation messages sent back through the producer socket when
+   * a message has been successfully sent to Kafka.
    *
    * @param topic The topic the message was written to.
    * @param partition The topic partition the message was written to.
@@ -92,6 +123,9 @@ object SchemaTypes {
   }
 
   /**
+   * Outbound schema for consumed messages with Avro key and value. It is up to
+   * the client to deserialize the key and value using the correct schemas,
+   * since these are passed through as raw byte arrays in this wrapper message.
    *
    * @param wsProxyMessageId The message ID for this record.
    * @param topic The topic the message came from.
@@ -100,6 +134,7 @@ object SchemaTypes {
    * @param timestamp The timestamp for when the message was written to Kafka.
    * @param key The message key.
    * @param value The message value.
+   * @param headers The headers applied to the message in Kafka.
    */
   @AvroDoc(
     """Outbound schema for messages with Avro key and value. It is up to the
@@ -113,7 +148,8 @@ object SchemaTypes {
       offset: Long,
       timestamp: Long,
       key: Option[Array[Byte]],
-      value: Array[Byte]
+      value: Array[Byte],
+      headers: Option[Seq[KafkaMessageHeader]]
   ) extends WsProxyAvroRecord
 
   object AvroConsumerRecord {
@@ -125,6 +161,8 @@ object SchemaTypes {
   }
 
   /**
+   * Schema to use when committing consumed Kafka messages through an outbound
+   * websocket.
    *
    * @param wsProxyMessageId The message ID to commit.
    */

@@ -146,11 +146,8 @@ object WsProducer {
   }
 
   /** Convenience function for logging and throwing an error in a Flow */
-  private[this] def logAndEmpty[T](
-      message: String,
-      t: Throwable
-  )(empty: T): T = {
-    logger.error(message, t)
+  private[this] def logAndEmpty[T](msg: String, t: Throwable)(empty: T): T = {
+    logger.error(msg, t)
     empty
   }
 

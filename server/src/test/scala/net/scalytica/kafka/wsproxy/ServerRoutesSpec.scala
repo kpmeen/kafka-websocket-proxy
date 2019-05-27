@@ -5,6 +5,7 @@ import akka.http.scaladsl.model.{ContentTypes, StatusCodes}
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.testkit.{RouteTestTimeout, WSProbe}
 import io.circe.parser._
+import net.manub.embeddedkafka.Codecs._
 import net.manub.embeddedkafka.schemaregistry.{
   EmbeddedKafka,
   EmbeddedKafkaConfig
@@ -34,7 +35,7 @@ class ServerRoutesSpec
     with OptionValues
     with ScalaFutures
     with WSProxyKafkaSpec
-    with WsProducerClients
+    with WsProducerClientSpec
     with TestDataGenerators
     with EmbeddedKafka {
 
@@ -124,7 +125,7 @@ class ServerRoutesSpec
         }
       }
 
-    "set up a WebSocket connection for producing JSON key value messages" in
+    "set up a WebSocket for producing JSON key value messages" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val wsCfg =
           appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = "n6")
@@ -135,14 +136,15 @@ class ServerRoutesSpec
         implicit val wsClient       = WSProbe()
         val (sdcStream, testRoutes) = TestRoutes.wsProxyRoutes
         val ctrl                    = sdcStream.run()
-        val msgs                    = producerKeyValueJson(1)
+
+        val msgs = producerKeyValueJson(1)
 
         produceJson(topicName, StringType, StringType, testRoutes, msgs)
 
         ctrl.shutdown()
       }
 
-    "set up a WebSocket connection for producing JSON value messages" in
+    "set up a WebSocket for producing JSON value messages" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val wsCfg =
           appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = "n7")
@@ -153,9 +155,56 @@ class ServerRoutesSpec
         implicit val wsClient       = WSProbe()
         val (sdcStream, testRoutes) = TestRoutes.wsProxyRoutes
         val ctrl                    = sdcStream.run()
-        val msgs                    = producerValueJson(1)
+
+        val msgs = producerValueJson(1)
 
         produceJson(topicName, NoType, StringType, testRoutes, msgs)
+
+        ctrl.shutdown()
+      }
+
+    "set up a WebSocket for producing JSON key value messages with headers" in
+      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
+        implicit val wsCfg =
+          appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = "n8")
+
+        val topicName = "test-topic-1"
+        initTopic(topicName)
+
+        implicit val wsClient       = WSProbe()
+        val (sdcStream, testRoutes) = TestRoutes.wsProxyRoutes
+        val ctrl                    = sdcStream.run()
+
+        val msgs = producerKeyValueJson(1, withHeaders = true)
+
+        produceJson(topicName, StringType, StringType, testRoutes, msgs)
+
+        // validate the topic contents
+        val (k, v) = consumeFirstKeyedMessageFrom[String, String](topicName)
+        k mustBe "foo-1"
+        v mustBe "bar-1"
+
+        ctrl.shutdown()
+      }
+
+    "set up a WebSocket for producing JSON value messages with headers" in
+      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
+        implicit val wsCfg =
+          appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = "n9")
+
+        val topicName = "test-topic-2"
+        initTopic(topicName)
+
+        implicit val wsClient       = WSProbe()
+        val (sdcStream, testRoutes) = TestRoutes.wsProxyRoutes
+        val ctrl                    = sdcStream.run()
+
+        val msgs = producerValueJson(1, withHeaders = true)
+
+        produceJson(topicName, NoType, StringType, testRoutes, msgs)
+
+        // validate the topic contents
+        consumeFirstMessageFrom[String](topicName) mustBe "bar-1"
 
         ctrl.shutdown()
       }
@@ -163,7 +212,7 @@ class ServerRoutesSpec
     "set up a WebSocket connection for consuming JSON key value messages" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val wsCfg =
-          appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = "n8")
+          appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = "n10")
 
         val topicName = "test-topic-3"
         initTopic(topicName)
@@ -178,7 +227,7 @@ class ServerRoutesSpec
           keyType = StringType,
           valType = StringType,
           routes = testRoutes,
-          messages = producerKeyValueJson(10)
+          messages = producerKeyValueJson(10, withHeaders = true)
         )(producerProbe)
 
         val outPath = "/socket/out?" +
@@ -191,10 +240,14 @@ class ServerRoutesSpec
 
         import net.manub.embeddedkafka.Codecs.stringDeserializer
 
-        val (rk, rv) = consumeFirstKeyedMessageFrom[String, String](topicName)
-        rk mustBe "foo-1"
-        rv mustBe "bar-1"
-
+        // validate the topic contents
+        val res = consumeNumberKeyedMessagesFrom[String, String](topicName, 10)
+        res must have size 10
+        forAll(res) {
+          case (k, v) =>
+            k must startWith("foo-")
+            v must startWith("bar-")
+        }
         WS(outPath, wsConsumerProbe.flow) ~> testRoutes ~> check {
           isWebSocketUpgrade mustBe true
 
@@ -214,7 +267,7 @@ class ServerRoutesSpec
     "set up a WebSocket connection for consuming JSON value messages" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val wsCfg =
-          appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = "n9")
+          appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = "n11")
 
         val topicName = "test-topic-4"
         initTopic(topicName)
@@ -260,7 +313,7 @@ class ServerRoutesSpec
     "set up a WebSocket connection for producing Avro key value messages" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val wsCfg =
-          appTestConfig(kcfg.kafkaPort, Option(kcfg.schemaRegistryPort), "n10")
+          appTestConfig(kcfg.kafkaPort, Option(kcfg.schemaRegistryPort), "n12")
 
         val topicName = "test-topic-5"
         initTopic(topicName)
@@ -278,7 +331,7 @@ class ServerRoutesSpec
     "set up a WebSocket connection for producing Avro value messages" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val wsCfg =
-          appTestConfig(kcfg.kafkaPort, Option(kcfg.schemaRegistryPort), "n11")
+          appTestConfig(kcfg.kafkaPort, Option(kcfg.schemaRegistryPort), "n13")
 
         val topicName = "test-topic-6"
         initTopic(topicName)
@@ -297,7 +350,7 @@ class ServerRoutesSpec
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val schemaRegPort = kcfg.schemaRegistryPort
         implicit val wsCfg =
-          appTestConfig(kcfg.kafkaPort, Option(schemaRegPort), "n12")
+          appTestConfig(kcfg.kafkaPort, Option(schemaRegPort), "n14")
 
         val topicName = "test-topic-7"
         initTopic(topicName)
@@ -360,7 +413,7 @@ class ServerRoutesSpec
     "return the kafka cluster info" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val wsCfg =
-          appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = "n13")
+          appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = "n15")
 
         val (_, testRoutes) = TestRoutes.wsProxyRoutes
 
@@ -387,7 +440,7 @@ class ServerRoutesSpec
     "return HTTP 400 when attempting to produce to a non-existing topic" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val wsCfg =
-          appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = "n14")
+          appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = "n16")
 
         val topicName = "non-existing-topic"
 
@@ -405,7 +458,7 @@ class ServerRoutesSpec
     "return HTTP 400 when attempting to consume from non-existing topic" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val wsCfg =
-          appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = "n15")
+          appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = "n17")
 
         val topicName = "non-existing-topic"
         val outPath = "/socket/out?" +

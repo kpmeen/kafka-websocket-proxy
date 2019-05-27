@@ -183,6 +183,7 @@ object WsConsumer {
           partition = Partition(rec.partition),
           offset = Offset(rec.offset),
           timestamp = Timestamp(rec.timestamp()),
+          headers = KafkaHeader.fromKafkaRecordHeaders(rec.headers()),
           key = OutValueDetails[K](k),
           value = OutValueDetails[V](rec.value),
           committableOffset = maybeCommittableOffset
@@ -194,6 +195,7 @@ object WsConsumer {
           partition = Partition(rec.partition),
           offset = Offset(rec.offset),
           timestamp = Timestamp(rec.timestamp()),
+          headers = KafkaHeader.fromKafkaRecordHeaders(rec.headers()),
           value = OutValueDetails[V](rec.value),
           committableOffset = maybeCommittableOffset
         )

@@ -31,12 +31,14 @@ object WsProducerRecord {
       .map { k =>
         ProducerKeyValueRecord[Array[Byte], Array[Byte]](
           key = InValueDetails(k, Formats.AvroType),
-          value = InValueDetails(avro.value, Formats.AvroType)
+          value = InValueDetails(avro.value, Formats.AvroType),
+          headers = avro.headers.map(_.map(KafkaHeader.fromAvro))
         )
       }
       .getOrElse {
         ProducerValueRecord[Array[Byte]](
-          value = InValueDetails(avro.value, Formats.AvroType)
+          value = InValueDetails(avro.value, Formats.AvroType),
+          headers = avro.headers.map(_.map(KafkaHeader.fromAvro))
         )
       }
   }
@@ -48,12 +50,14 @@ object WsProducerRecord {
  *
  * @param key   The [[InValueDetails]] describing the message key
  * @param value The [[InValueDetails]] describing the message value
+ * @param headers Optional [[KafkaHeader]]s to use for the Kafka message
  * @tparam K the type of the key
  * @tparam V the type of the value
  */
 case class ProducerKeyValueRecord[K, V](
     key: InValueDetails[K],
-    value: InValueDetails[V]
+    value: InValueDetails[V],
+    headers: Option[Seq[KafkaHeader]]
 ) extends WsProducerRecord[K, V] {
   override val maybeKey = Some(key)
   override def isEmpty  = false
@@ -63,10 +67,12 @@ case class ProducerKeyValueRecord[K, V](
  * Producer record type with value only.
  *
  * @param value The [[InValueDetails]] describing the message value
+ * @param headers Optional [[KafkaHeader]]s to use for the Kafka message
  * @tparam V the type of the value
  */
 case class ProducerValueRecord[V](
-    value: InValueDetails[V]
+    value: InValueDetails[V],
+    headers: Option[Seq[KafkaHeader]]
 ) extends WsProducerRecord[Nothing, V] {
   override val maybeKey = None
   override def isEmpty  = false
