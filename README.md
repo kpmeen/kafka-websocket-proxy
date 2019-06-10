@@ -40,23 +40,65 @@ file. Where the following parameters can be adjusted:
 > the `application.conf` file in `src/main/resources`.
 
 
+### Main Server Configuration
+
+Basic properties allowing configurations of things related to the basic server.
+Allows for changing things like network interface, port number, etc. 
  
 | Config key                                                      | Environment                              | Default                  | Description   |
 |:---                                                             |:----                                     |:------------------------:|:-----         |
 | kafka.ws.proxy.server.server-id                                 | WSPROXY_SERVER_ID                        | `node-1`                 | A unique identifier for the specific kafka-websocket-proxy instance. |
 | kafka.ws.proxy.server.bind-interface                            | WSPROXY_BIND_INTERFACE                   | `0.0.0.0`                | Network interface to bind the http server. |
 | kafka.ws.proxy.server.port                                      | WSPROXY_PORT                             | `8078`                   | Port where the server endpoints will be exposed |
-| kafka.ws.proxy.kafka-client.bootstrap-hosts                     | WSPROXY_KAFKA_BOOTSTRAP_HOSTS            |                          | A string with the Kafka brokers to bootstrap against, in the form `<host>:<port>`, separated by comma. |
-| kafka.ws.proxy.kafka-client.schema-registry-url                 | WSPROXY_SCHEMA_REGISTRY_URL              |                          | URLs for the Confluent Schema Registry. |
-| kafka.ws.proxy.kafka-client.auto-register-schemas               | WSPROXY_SCHEMA_AUTO_REGISTER             | `true`                   | By default, the proxy will automatically register any internal Avro schemas it needs. If disabled, these schemas must be registered with the schema registry manually. |
-| kafka.ws.proxy.kafka-client.metrics-enabled                     | WS_PROXY_CONFLUENT_METRICS_ENABLED       | `false`                  | When this flag is set to `true`, it will enable the Confluent Metrics Reporter |
+
+
+### Internal Session Handler
+
+The `kafka-websocket-proxy` needs to keep some state about the different active
+sessions across a multi-node deployment. The state is synced to other nodes
+through a dedicated Kafka topic and kept up to date in each node in an in-memory
+data structure. This allows e.g. controlling the number of open WebSockets in
+a given consumer group, and much more. The below properties gives some
+possibility to change the behaviour of the session handler.
+
+| Config key                                                      | Environment                              | Default                  | Description   |
+|:---                                                             |:----                                     |:------------------------:|:-----         |
 | kafka.ws.proxy.session-handler.session-state-topic-name         | WSPROXY_SESSION_STATE_TOPIC              | `_wsproxy.session.state` | The name of the compacted topic where session state is kept. |
 | kafka.ws.proxy.session-handler.session-state-replication-factor | WSPROXY_SESSION_STATE_REPLICATION_FACTOR | `3`                      | How many replicas to keep for the session state topic. |
 | kafka.ws.proxy.session-handler.session-state-retention          | WSPROXY_SESSION_STATE_RETENTION          | `30 days`                | How long to keep sessions in the session state topic. |
-| kafka.ws.proxy.commit-handler.max-stack-size                    | WSPROXY_CH_MAX_STACK_SIZE                | `100`                    | The maximum number of uncommitted messages, per partition, that will be kept track of in the commit handler stack. |
-| kafka.ws.proxy.commit-handler.auto-commit-enabled               | WSPROXY_CH_AUTOCOMMIT_ENABLED            | `false`                  | Whether or not to allow the proxy to perform automatic offset commits of uncommitted messages. |
-| kafka.ws.proxy.commit-handler.auto-commit-interval              | WSPROXY_CH_AUTOCOMMIT_INTERVAL           | `1 second`               | The interval to execute the jobo for auto-committing messages of a given age. |
-| kafka.ws.proxy.commit-handler.auto-commit-max-age               | WSPROXY_CH_AUTOCOMMIT_MAX_AGE            | `20 seconds`             | The max allowed age of uncommitted messages in the commit handler stack. |
+
+
+### Internal Message Commit Handler
+
+When a WebSocket client connects, it can specify whether or not the auto-commit
+feature should be used. In the case where the client opens the connection with
+`autoCommit=false` in the query parameters, the websocket will keep track of
+the uncommitted message offsets in an in-memory "stack" structure in a _commit
+handler_. This allows the client to send in a special _commit_ message on the
+inbound WebSocket channel, that will trigger a given message offset to be
+committed to Kafka.
+The below properties allows to tune some of the parameters that affect the
+behaviour of the commit handler 
+
+| Config key                                         | Environment                    | Default      | Description   |
+|:---                                                |:----                           |:------------:|:-----         |
+| kafka.ws.proxy.commit-handler.max-stack-size       | WSPROXY_CH_MAX_STACK_SIZE      | `100`        | The maximum number of uncommitted messages, per partition, that will be kept track of in the commit handler stack. |
+| kafka.ws.proxy.commit-handler.auto-commit-enabled  | WSPROXY_CH_AUTOCOMMIT_ENABLED  | `false`      | Whether or not to allow the proxy to perform automatic offset commits of uncommitted messages. |
+| kafka.ws.proxy.commit-handler.auto-commit-interval | WSPROXY_CH_AUTOCOMMIT_INTERVAL | `1 second`   | The interval to execute the jobo for auto-committing messages of a given age. |
+| kafka.ws.proxy.commit-handler.auto-commit-max-age  | WSPROXY_CH_AUTOCOMMIT_MAX_AGE  | `20 seconds` | The max allowed age of uncommitted messages in the commit handler stack. |
+
+
+### Internal Kafka Client
+
+Exposed configuration properties for the Kafka clients initialised and used by
+the `kafka-websocket-proxy` whenever a WebSocket connection is established.  
+
+| Config key                                        | Environment                       | Default | Description   |
+|:---                                               |:----                              |:-------:|:-----         |
+| kafka.ws.proxy.kafka-client.bootstrap-hosts       | WSPROXY_KAFKA_BOOTSTRAP_HOSTS     |         | A string with the Kafka brokers to bootstrap against, in the form `<host>:<port>`, separated by comma. |
+| kafka.ws.proxy.kafka-client.schema-registry-url   | WSPROXY_SCHEMA_REGISTRY_URL       |         | URLs for the Confluent Schema Registry. |
+| kafka.ws.proxy.kafka-client.auto-register-schemas | WSPROXY_SCHEMA_AUTO_REGISTER      | `true`  | By default, the proxy will automatically register any internal Avro schemas it needs. If disabled, these schemas must be registered with the schema registry manually. |
+| kafka.ws.proxy.kafka-client.metrics-enabled       | WSPROXY_CONFLUENT_METRICS_ENABLED | `false` | When this flag is set to `true`, it will enable the Confluent Metrics Reporter |
 
 
 
@@ -103,19 +145,16 @@ provide a distinct client configuration for the metrics reporter.
 
 | Config key                                                                                     | Environment                                      | Default      |
 |:---                                                                                            |:----                                             |:------------:|
-| kafka.ws.proxy.kafka-client.confluent.metrics.properties.bootstrap-hosts                       | WSPROXY_KAFKA_METRICS_BOOTSTRAP_HOSTS            | same as kafka.ws.proxy.kafka-client.bootstrap-hosts |
-| kafka.ws.proxy.kafka-client.confluent.metrics.properties.security.protocol                     | WSPROXY_KAFKA_METRICS_SECURITY_PROTOCOL          | `PLAINTEXT`  |
-| kafka.ws.proxy.kafka-client.confluent.metrics.properties.sasl.mechanism                        | WSPROXY_KAFKA_METRICS_SASL_MECHANISM             |  not set     |
-| kafka.ws.proxy.kafka-client.confluent.metrics.properties.sasl.jaas.config                      | WSPROXY_KAFKA_METRICS_SASL_JAAS_CFG              |  not set     |
-| kafka.ws.proxy.kafka-client.confluent.metrics.properties.ssl.key.password                      | WSPROXY_KAFKA_METRICS_SSL_KEY_PASS               |  not set     |
-| kafka.ws.proxy.kafka-client.confluent.metrics.properties.ssl.endpoint.identification.algorithm | WSPROXY_KAFKA_METRICS_SASL_ENDPOINT_ID_ALOGO     |  not set     |
-| kafka.ws.proxy.kafka-client.confluent.metrics.properties.ssl.truststore.location               | WSPROXY_KAFKA_METRICS_SSL_TRUSTSTORE_LOCATION    |  not set     |
-| kafka.ws.proxy.kafka-client.confluent.metrics.properties.ssl.truststore.truststore.password    | WSPROXY_KAFKA_METRICS_SSL_TRUSTSTORE_PASS        |  not set     |
-| kafka.ws.proxy.kafka-client.confluent.metrics.properties.ssl.keystore.location                 | WSPROXY_KAFKA_METRICS_SSL_KEYSTORE_LOCATION      |  not set     |
-| kafka.ws.proxy.kafka-client.confluent.metrics.properties.ssl.keystore.password                 | WSPROXY_KAFKA_METRICS_SSL_KEYSTORE_PASS          |  not set     |
-
-
-
+| kafka.ws.proxy.kafka-client.confluent-metrics.bootstrap-hosts                                  | WSPROXY_KAFKA_METRICS_BOOTSTRAP_HOSTS            | same as kafka.ws.proxy.kafka-client.bootstrap-hosts |
+| kafka.ws.proxy.kafka-client.confluent-metrics.properties.security.protocol                     | WSPROXY_KAFKA_METRICS_SECURITY_PROTOCOL          | `PLAINTEXT`  |
+| kafka.ws.proxy.kafka-client.confluent-metrics.properties.sasl.mechanism                        | WSPROXY_KAFKA_METRICS_SASL_MECHANISM             |  not set     |
+| kafka.ws.proxy.kafka-client.confluent-metrics.properties.sasl.jaas.config                      | WSPROXY_KAFKA_METRICS_SASL_JAAS_CFG              |  not set     |
+| kafka.ws.proxy.kafka-client.confluent-metrics.properties.ssl.key.password                      | WSPROXY_KAFKA_METRICS_SSL_KEY_PASS               |  not set     |
+| kafka.ws.proxy.kafka-client.confluent-metrics.properties.ssl.endpoint.identification.algorithm | WSPROXY_KAFKA_METRICS_SASL_ENDPOINT_ID_ALOGO     |  not set     |
+| kafka.ws.proxy.kafka-client.confluent-metrics.properties.ssl.truststore.location               | WSPROXY_KAFKA_METRICS_SSL_TRUSTSTORE_LOCATION    |  not set     |
+| kafka.ws.proxy.kafka-client.confluent-metrics.properties.ssl.truststore.truststore.password    | WSPROXY_KAFKA_METRICS_SSL_TRUSTSTORE_PASS        |  not set     |
+| kafka.ws.proxy.kafka-client.confluent-metrics.properties.ssl.keystore.location                 | WSPROXY_KAFKA_METRICS_SSL_KEYSTORE_LOCATION      |  not set     |
+| kafka.ws.proxy.kafka-client.confluent-metrics.properties.ssl.keystore.password                 | WSPROXY_KAFKA_METRICS_SSL_KEYSTORE_PASS          |  not set     |
 
 ## Endpoints and API
 
