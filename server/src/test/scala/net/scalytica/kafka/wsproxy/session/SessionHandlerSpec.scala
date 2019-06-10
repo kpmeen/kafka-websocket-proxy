@@ -15,9 +15,9 @@ import net.scalytica.kafka.wsproxy.session.SessionHandler._
 import net.scalytica.test.{TestDataGenerators, WSProxyKafkaSpec}
 import org.apache.kafka.common.serialization.Deserializer
 import org.scalatest.Inspectors.forAll
+import org.scalatest._
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Minute, Span}
-import org.scalatest._
 
 import scala.concurrent.duration._
 
@@ -60,10 +60,9 @@ class SessionHandlerSpec
       autoCommit = true
     ).headOption
 
-  def sessionHandlerCtx[T](serverId: String)(body: Ctx => T): Assertion =
+  def sessionHandlerCtx[T](body: Ctx => T): Assertion =
     withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-      implicit val wsCfg =
-        appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = serverId)
+      implicit val wsCfg = appTestConfig(kcfg.kafkaPort)
 
       val (sdcStream, shRef) = SessionHandler.init
       val ctrl               = sdcStream.run()
@@ -103,7 +102,7 @@ class SessionHandlerSpec
 
   "The SessionHandler" should {
 
-    "register a new session" in sessionHandlerCtx("n1") { implicit ctx =>
+    "register a new session" in sessionHandlerCtx { implicit ctx =>
       implicit val kcfg = ctx.kcfg
 
       val res = ctx.sh.initSession(WsGroupId("group1"), 3).futureValue
@@ -116,7 +115,7 @@ class SessionHandlerSpec
       v mustBe Session(WsGroupId("group1"), consumerLimit = 3)
     }
 
-    "add a few new sessions" in sessionHandlerCtx("n2") { implicit ctx =>
+    "add a few new sessions" in sessionHandlerCtx { implicit ctx =>
       implicit val kcfg = ctx.kcfg
 
       val r1 = ctx.sh.initSession(WsGroupId("group1"), 3).futureValue
@@ -138,7 +137,7 @@ class SessionHandlerSpec
       }
     }
 
-    "add a consumer to a session" in sessionHandlerCtx("n3") { implicit ctx =>
+    "add a consumer to a session" in sessionHandlerCtx { implicit ctx =>
       implicit val kcfg = ctx.kcfg
 
       val s = ctx.sh.initSession(WsGroupId("group1"), 2).futureValue.session
@@ -167,7 +166,7 @@ class SessionHandlerSpec
     }
 
     "not allow adding a consumer if the session has reached its limit" in
-      sessionHandlerCtx("n4") { implicit ctx =>
+      sessionHandlerCtx { implicit ctx =>
         implicit val kcfg = ctx.kcfg
 
         val s = ctx.sh.initSession(WsGroupId("group1"), 2).futureValue.session

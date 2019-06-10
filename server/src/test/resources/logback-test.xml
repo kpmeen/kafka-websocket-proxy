@@ -16,10 +16,11 @@
     <appender-ref ref="STDOUT"/>
   </appender>
 
+  <logger name="org.apache.kafka.clients" level="OFF" />
   <logger name="net.scalytica.kafka.wsproxy" level="OFF"/>
 
   <!-- Root loggers catch all other events that are not explicitly handled-->
-  <root level="ERROR">
+  <root level="OFF">
     <appender-ref ref="ASYNC_STDOUT"/>
   </root>
 

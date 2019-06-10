@@ -12,7 +12,11 @@
     <appender-ref ref="STDOUT"/>
   </appender>
 
-  <logger name="akka" level="INFO"/>
+  <logger name="akka.actor" level="WARN"/>
+  <logger name="akka.kafka" level="WARN"/>
+
+  <logger name="org.apache.kafka.clients" level="WARN"/>
+
   <logger name="net.scalytica" level="DEBUG"/>
 
   <!-- Root loggers catch all other events that are not explicitly handled-->

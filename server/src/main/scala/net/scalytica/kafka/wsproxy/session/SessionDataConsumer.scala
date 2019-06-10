@@ -85,7 +85,7 @@ private[session] class SessionDataConsumer(
 
     Consumer
       .plainSource(consumerProps, subscription)
-      .log("New session record for consumer group", cr => cr.key)
+      .log("Session event", cr => cr.key)
       .map { cr =>
         Option(cr.value)
           .map(v => SessionHandlerProtocol.UpdateSession(WsGroupId(cr.key), v))

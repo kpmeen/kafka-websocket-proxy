@@ -18,6 +18,7 @@ trait SocketArgs {
  * @param groupId the groupId to use for the Kafka consumer.
  * @param topic the Kafka topic to subscribe to.
  * @param socketPayload the type of payload to expect through the socket.
+ * @param aclCredentials the Kafka ACL credentials to use with the Kafka client
  * @param keyType optional type for the message keys in the topic.
  * @param valType the type for the message values in the topic.
  * @param offsetResetStrategy the offset strategy to use. Defaults to EARLIEST
@@ -30,13 +31,19 @@ case class OutSocketArgs(
     groupId: Option[WsGroupId],
     topic: TopicName,
     socketPayload: SocketPayload,
+    aclCredentials: Option[AclCredentials] = None,
     keyType: Option[Formats.FormatType] = None,
     valType: Formats.FormatType,
     offsetResetStrategy: OffsetResetStrategy = OffsetResetStrategy.EARLIEST,
     rateLimit: Option[Int] = None,
     batchSize: Option[Int] = None,
     autoCommit: Boolean = true
-) extends SocketArgs
+) extends SocketArgs {
+
+  def withAclCredentials(
+      aclCredentials: Option[AclCredentials]
+  ): OutSocketArgs = copy(aclCredentials = aclCredentials)
+}
 
 object OutSocketArgs {
 
@@ -72,15 +79,22 @@ object OutSocketArgs {
  *
  * @param topic the Kafka topic to subscribe to.
  * @param socketPayload the type of payload to expect through the socket.
+ * @param aclCredentials the Kafka ACL credentials to use with the Kafka client
  * @param keyType optional type for the message keys in the topic.
  * @param valType the type for the message values in the topic.
  */
 case class InSocketArgs(
     topic: TopicName,
     socketPayload: SocketPayload,
+    aclCredentials: Option[AclCredentials] = None,
     keyType: Option[Formats.FormatType] = None,
     valType: Formats.FormatType = Formats.StringType
-) extends SocketArgs
+) extends SocketArgs {
+
+  def withAclCredentials(aclCredentials: Option[AclCredentials]): InSocketArgs =
+    copy(aclCredentials = aclCredentials)
+
+}
 
 object InSocketArgs {
 

@@ -13,10 +13,22 @@ import io.circe.Decoder
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroProducerRecord
 import net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde
+import net.scalytica.kafka.wsproxy.errors.{
+  AuthenticationError,
+  AuthorisationError
+}
 import net.scalytica.kafka.wsproxy.models._
 import net.scalytica.kafka.wsproxy.{mapToProperties, ProducerInterceptorClass}
 import org.apache.kafka.clients.producer.ProducerConfig._
-import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
+import org.apache.kafka.clients.producer.{
+  KafkaProducer,
+  ProducerRecord,
+  Producer => IProducer
+}
+import org.apache.kafka.common.errors.{
+  AuthenticationException,
+  AuthorizationException
+}
 import org.apache.kafka.common.serialization.Serializer
 
 import scala.collection.JavaConverters._
@@ -30,6 +42,12 @@ object WsProducer {
 
   private[this] val logger = Logger(getClass)
 
+  // scalastyle:off
+  private[this] val SASL_JAAS_CONFIG = "sasl.jaas.config"
+  private[this] val PLAIN_LOGIN_MODULE = (uname: String, pass: String) =>
+    s"""org.apache.kafka.common.security.plain.PlainLoginModule required username="$uname" password="$pass";"""
+  // scalastyle:on
+
   implicit def seqToSource[Out](s: Seq[Out]): Source[Out, NotUsed] = {
     val it = new scala.collection.immutable.Iterable[Out] {
       override def iterator: Iterator[Out] = s.toIterator
@@ -38,7 +56,10 @@ object WsProducer {
   }
 
   /** Create producer settings to use for the Kafka producer. */
-  private[this] def baseProducerSettings[K, V](
+  private[this] def producerSettings[K, V](
+      args: InSocketArgs
+  )(
+      implicit
       cfg: AppCfg,
       as: ActorSystem,
       ks: Option[Serializer[K]],
@@ -50,7 +71,7 @@ object WsProducer {
       .withBootstrapServers(kafkaUrl)
       .withProducerFactory { ps =>
         val props: java.util.Properties = {
-          if (cfg.kafkaClient.metricsEnabled) {
+          val metricsProps = if (cfg.kafkaClient.metricsEnabled) {
             // Enables stream monitoring in confluent control center
             Map(INTERCEPTOR_CLASSES_CONFIG -> ProducerInterceptorClass) ++
               cfg.kafkaClient.confluentMetrics
@@ -58,9 +79,20 @@ object WsProducer {
                 .getOrElse(Map.empty[String, AnyRef])
           } else {
             Map.empty[String, AnyRef]
-          } ++
+          }
+
+          val jaasProps = args.aclCredentials
+            .map { c =>
+              Map(
+                SASL_JAAS_CONFIG -> PLAIN_LOGIN_MODULE(c.username, c.password)
+              )
+            }
+            .getOrElse(Map.empty[String, AnyRef])
+
+          metricsProps ++
             cfg.producer.kafkaClientProperties ++
-            ps.getProperties.asScala.toMap
+            ps.getProperties.asScala.toMap ++
+            jaasProps
         }
         new KafkaProducer[K, V](
           props,
@@ -74,12 +106,14 @@ object WsProducer {
    * Creates an instance of producer settings with key and value serializers.
    */
   private[this] def producerSettingsWithKey[K, V](
+      args: InSocketArgs
+  )(
       implicit
       cfg: AppCfg,
       as: ActorSystem,
       ks: Serializer[K],
       vs: Serializer[V]
-  ) = baseProducerSettings(cfg, as, Option(ks), Option(vs))
+  ) = producerSettings(args)(cfg, as, Option(ks), Option(vs))
 
   /**
    * Parses an input message, in the form of a JSON String, into an instance of
@@ -152,6 +186,42 @@ object WsProducer {
   }
 
   /**
+   * Call partitionsFor with the client to validate auth etc. This is a
+   * workaround for the following issues identified in alpakka-kafka client:
+   *
+   * - https://github.com/akka/alpakka-kafka/issues/814
+   * - https://github.com/akka/alpakka-kafka/issues/796
+   *
+   * @param topic the [[TopicName]] to fetch partitions for
+   * @param producerClient the configured [[IProducer]] to use.
+   * @tparam K the key type of the [[IProducer]]
+   * @tparam V the value type of the [[IProducer]]
+   */
+  private[this] def checkClient[K, V](
+      topic: TopicName,
+      producerClient: IProducer[K, V]
+  ): Unit =
+    try {
+      val _ = producerClient.partitionsFor(topic.value)
+    } catch {
+      case ae: AuthenticationException =>
+        producerClient.close()
+        throw AuthenticationError(ae.getMessage, ae)
+
+      case ae: AuthorizationException =>
+        producerClient.close()
+        throw AuthorisationError(ae.getMessage, ae)
+
+      case t: Throwable =>
+        producerClient.close()
+        logger.error(
+          s"Unhandled error fetching topic partitions for topic ${topic.value}",
+          t
+        )
+        throw t
+    }
+
+  /**
    *
    * @param args input arguments defining the base configs for the producer.
    * @param cfg  the [[AppCfg]] containing application configurations.
@@ -179,6 +249,11 @@ object WsProducer {
   ): Flow[Message, WsProducerResult, NotUsed] = {
     implicit val ec: ExecutionContext = as.dispatcher
 
+    val settings       = producerSettingsWithKey[K, V](args)
+    val producerClient = settings.createKafkaProducer()
+
+    checkClient(args.topic, producerClient)
+
     Flow[Message]
       .mapConcat {
         case tm: TextMessage   => TextMessage(tm.textStream) :: Nil
@@ -201,7 +276,7 @@ object WsProducer {
         val record = asKafkaProducerRecord(args.topic, wpr)
         ProducerMessage.Message(record, record)
       }
-      .via(Producer.flexiFlow(producerSettingsWithKey[K, V]))
+      .via(Producer.flexiFlow(settings, producerClient))
       .map(r => WsProducerResult.fromProducerResults(r))
       .flatMapConcat(seqToSource)
   }
@@ -216,6 +291,11 @@ object WsProducer {
     implicit val ec: ExecutionContext = as.dispatcher
 
     import net.scalytica.kafka.wsproxy.codecs.BasicSerdes.ByteArrSerializer
+
+    val settings       = producerSettingsWithKey[Array[Byte], Array[Byte]](args)
+    val producerClient = settings.createKafkaProducer()
+
+    checkClient(args.topic, producerClient)
 
     Flow[Message]
       .mapConcat {
@@ -243,9 +323,7 @@ object WsProducer {
         ProducerMessage.Message(record, record)
 
       }
-      .via(
-        Producer.flexiFlow(producerSettingsWithKey[Array[Byte], Array[Byte]])
-      )
+      .via(Producer.flexiFlow(settings, producerClient))
       .map(r => WsProducerResult.fromProducerResults(r))
       .flatMapConcat(seqToSource)
   }

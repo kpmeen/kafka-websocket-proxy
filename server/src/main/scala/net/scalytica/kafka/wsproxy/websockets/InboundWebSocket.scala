@@ -12,6 +12,7 @@ import io.circe.syntax._
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.SocketProtocol.{AvroPayload, JsonPayload}
 import net.scalytica.kafka.wsproxy.WithSchemaRegistryConfig
+import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
   AvroProducerRecord,
   AvroProducerResult
@@ -61,6 +62,8 @@ trait InboundWebSocket extends WithSchemaRegistryConfig {
       s"Initialising inbound websocket for topic ${args.topic.value}" +
         s" with payload ${args.socketPayload}"
     )
+
+    WsKafkaAdminClient.failIfTopicNotFound(args.topic)
 
     val ktpe = args.keyType.getOrElse(Formats.NoType)
 

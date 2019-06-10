@@ -147,3 +147,17 @@ class WsKafkaAdminClient(cfg: AppCfg) {
     logger.debug("Underlying admin client closed.")
   }
 }
+
+object WsKafkaAdminClient {
+
+  def failIfTopicNotFound(topic: TopicName)(implicit cfg: AppCfg): Unit = {
+    val wsAdminClient = new WsKafkaAdminClient(cfg)
+    try {
+      if (!wsAdminClient.topicExists(topic))
+        throw TopicNotFoundError(s"Topic ${topic.value} does not exist")
+    } finally {
+      wsAdminClient.close()
+    }
+  }
+
+}
