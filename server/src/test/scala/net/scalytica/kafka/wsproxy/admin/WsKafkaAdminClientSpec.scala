@@ -20,8 +20,7 @@ class WsKafkaAdminClientSpec
 
     "return info on brokers in the cluster" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-        val wsCfg = appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = "n1")
-
+        val wsCfg  = appTestConfig(kcfg.kafkaPort)
         val client = new WsKafkaAdminClient(wsCfg)
 
         val res = client.clusterInfo
@@ -36,8 +35,7 @@ class WsKafkaAdminClientSpec
 
     "return number replicas to use for the session topic" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-        val wsCfg = appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = "n1")
-
+        val wsCfg  = appTestConfig(kcfg.kafkaPort)
         val client = new WsKafkaAdminClient(wsCfg)
 
         client.replicationFactor mustBe 1
@@ -47,8 +45,7 @@ class WsKafkaAdminClientSpec
 
     "create and find the session state topic" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-        val wsCfg = appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = "n1")
-
+        val wsCfg  = appTestConfig(kcfg.kafkaPort)
         val client = new WsKafkaAdminClient(wsCfg)
 
         client.createSessionStateTopic()
@@ -62,8 +59,7 @@ class WsKafkaAdminClientSpec
 
     "initialise the session state topic" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-        val wsCfg = appTestConfig(kafkaPort = kcfg.kafkaPort, serverId = "n1")
-
+        val wsCfg  = appTestConfig(kcfg.kafkaPort)
         val client = new WsKafkaAdminClient(wsCfg)
 
         client.initSessionStateTopic()

@@ -341,7 +341,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
     if (args.autoCommit) {
       // if auto-commit is enabled, we don't need to handle manual commits.
       WsConsumer
-        .consumeAutoCommit[Key, Val](args.topic, args.clientId, args.groupId)
+        .consumeAutoCommit[Key, Val](args)
         .map(cr => enrichWithFormatType(args, cr))
         .map(cr => msgConverter(cr))
     } else {
@@ -350,7 +350,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
       val sink = commitHandlerRef.map(manualCommitSink).getOrElse(Sink.ignore)
 
       WsConsumer
-        .consumeManualCommit[Key, Val](args.topic, args.clientId, args.groupId)
+        .consumeManualCommit[Key, Val](args)
         .map(cr => enrichWithFormatType(args, cr))
         .alsoTo(sink) // also send each message to the commit handler sink
         .map(cr => msgConverter(cr))

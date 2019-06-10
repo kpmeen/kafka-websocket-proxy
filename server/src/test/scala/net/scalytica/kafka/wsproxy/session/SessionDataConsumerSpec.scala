@@ -13,7 +13,7 @@ import net.scalytica.kafka.wsproxy.codecs.{
   SessionSerde,
   WsGroupIdSerde
 }
-import net.scalytica.kafka.wsproxy.models.{TopicName, WsGroupId}
+import net.scalytica.kafka.wsproxy.models.WsGroupId
 import net.scalytica.kafka.wsproxy.session.SessionHandlerProtocol.{
   ClientSessionProtocol,
   InternalProtocol,
@@ -60,13 +60,6 @@ class SessionDataConsumerSpec
     super.afterAll()
   }
 
-  private[this] def initTopic(topicName: TopicName, partitions: Int = 1)(
-      implicit kcfg: EmbeddedKafkaConfig
-  ): Unit = createCustomTopic(
-    topic = topicName.value,
-    partitions = partitions
-  )
-
   private[this] def publish(
       s: Session
   )(implicit config: EmbeddedKafkaConfig): Unit = {
@@ -102,7 +95,7 @@ class SessionDataConsumerSpec
         implicit val cfg =
           appTestConfig(kcfg.kafkaPort, Option(kcfg.schemaRegistryPort))
 
-        initTopic(cfg.sessionHandler.sessionStateTopicName)
+        initTopic(cfg.sessionHandler.sessionStateTopicName.value)
 
         val expected = List(session1, session2, session3, session4)
 
