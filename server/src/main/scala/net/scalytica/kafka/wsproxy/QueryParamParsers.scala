@@ -65,6 +65,15 @@ trait QueryParamParsers {
       }
     }
 
+  def paramsOnError: Directive[Tuple1[Option[(WsClientId, WsGroupId)]]] = {
+    parameters(
+      (
+        'clientId.as[WsClientId] ?,
+        'groupId.as[WsGroupId] ?
+      )
+    ).tmap(t => t._1.map(cid => (cid, WsGroupId.fromOption(t._2)(cid))))
+  }
+
   /**
    * @return Directive extracting query parameters for the outbound (consuming)
    *         socket communication.

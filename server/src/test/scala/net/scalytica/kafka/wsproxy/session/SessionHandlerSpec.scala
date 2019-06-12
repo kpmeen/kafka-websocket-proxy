@@ -64,10 +64,10 @@ class SessionHandlerSpec
     withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
       implicit val wsCfg = appTestConfig(kcfg.kafkaPort)
 
-      val (sdcStream, shRef) = SessionHandler.init
-      val ctrl               = sdcStream.run()
+      val shr  = SessionHandler.init
+      val ctrl = shr.stream.run()
 
-      body(Ctx(shRef, wsCfg, kcfg))
+      body(Ctx(shr.shRef, wsCfg, kcfg))
 
       ctrl.shutdown().futureValue mustBe Done
     }

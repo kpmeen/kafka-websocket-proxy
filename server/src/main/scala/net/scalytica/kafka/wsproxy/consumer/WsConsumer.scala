@@ -59,7 +59,7 @@ object WsConsumer {
   ) = {
     val kafkaUrl = cfg.kafkaClient.bootstrapHosts.mkString()
 
-    val gid = args.groupId.getOrElse(WsGroupId(s"${args.clientId}-group")).value
+    val gid = args.groupId.value
 
     ConsumerSettings(as, kd, vd)
       .withBootstrapServers(kafkaUrl)

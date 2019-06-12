@@ -70,6 +70,11 @@ object SessionHandlerProtocol {
 
 object SessionHandler extends SessionHandler {
 
+  case class SessionHandlerRef(
+      stream: RunnableGraph[Consumer.Control],
+      shRef: ActorRef[SessionHandlerProtocol.Protocol]
+  )
+
   implicit class SessionHandlerOpExtensions(
       sh: ActorRef[SessionHandlerProtocol.Protocol]
   ) {
@@ -174,16 +179,16 @@ trait SessionHandler {
    *
    * @param cfg implicit [[AppCfg]] to use
    * @param sys the untyped [[akka.actor.ActorSystem]] to use
-   * @return a tuple containing a reference to the [[RunnableGraph]] that
-   *         executes the [[SessionDataConsumer]] stream. And a typed
-   *         [[ActorRef]] that understands messages from the defined protocol in
-   *         [[SessionHandlerProtocol.Protocol]].
+   * @return a [[SessionHandler.SessionHandlerRef]] containing a reference to
+   *         the [[RunnableGraph]] that executes the [[SessionDataConsumer]]
+   *         stream. And a typed [[ActorRef]] that understands messages from the
+   *         defined protocol in [[SessionHandlerProtocol.Protocol]].
    */
   def init(
       implicit
       cfg: AppCfg,
       sys: akka.actor.ActorSystem
-  ): (RunnableGraph[Consumer.Control], ActorRef[Protocol]) = {
+  ): SessionHandler.SessionHandlerRef = {
     implicit val typedSys = sys.toTyped
 
     val handlerName = s"session-handler-actor-${cfg.server.serverId.value}"
@@ -214,7 +219,7 @@ trait SessionHandler {
         case _ => ()
       })
 
-    (consumerStream, ref)
+    SessionHandler.SessionHandlerRef(consumerStream, ref)
   }
 
   // scalastyle:off method.length cyclomatic.complexity
