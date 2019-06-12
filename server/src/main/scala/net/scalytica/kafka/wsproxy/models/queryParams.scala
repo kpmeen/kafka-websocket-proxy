@@ -28,7 +28,7 @@ trait SocketArgs {
  */
 case class OutSocketArgs(
     clientId: WsClientId,
-    groupId: Option[WsGroupId],
+    groupId: WsGroupId,
     topic: TopicName,
     socketPayload: SocketPayload,
     aclCredentials: Option[AclCredentials] = None,
@@ -61,7 +61,7 @@ object OutSocketArgs {
       autoCommit: Boolean
   ): OutSocketArgs = OutSocketArgs(
     clientId = clientId,
-    groupId = groupId,
+    groupId = WsGroupId.fromOption(groupId)(clientId),
     topic = topic,
     socketPayload = socketPayload,
     keyType = keyTpe,

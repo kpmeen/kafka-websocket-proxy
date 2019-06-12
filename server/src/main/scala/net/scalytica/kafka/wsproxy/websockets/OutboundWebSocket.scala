@@ -31,8 +31,7 @@ import net.scalytica.kafka.wsproxy.models.{
   Formats,
   OutSocketArgs,
   WsCommit,
-  WsConsumerRecord,
-  WsGroupId
+  WsConsumerRecord
 }
 import net.scalytica.kafka.wsproxy.session.SessionHandler._
 import net.scalytica.kafka.wsproxy.session.{Session, SessionHandlerProtocol}
@@ -95,7 +94,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
 
     val serverId = cfg.server.serverId
     val clientId = args.clientId
-    val groupId  = args.groupId.getOrElse(WsGroupId(s"$clientId-group"))
+    val groupId  = args.groupId
 
     val consumerAddResult = for {
       ir     <- sessionHandler.initSession(groupId, topicPartitions)

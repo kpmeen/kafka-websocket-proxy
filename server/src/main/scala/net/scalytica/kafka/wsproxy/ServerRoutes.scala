@@ -10,6 +10,7 @@ import akka.http.scaladsl.server.{ExceptionHandler, RejectionHandler, Route}
 import akka.kafka.scaladsl.Consumer
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.RunnableGraph
+import akka.util.Timeout
 import com.typesafe.scalalogging.Logger
 import io.circe.syntax._
 import io.circe.{Json, Printer}
@@ -33,7 +34,11 @@ import net.scalytica.kafka.wsproxy.models.{
   OutSocketArgs,
   SocketArgs
 }
-import net.scalytica.kafka.wsproxy.session.SessionHandler
+import net.scalytica.kafka.wsproxy.session.SessionHandler.{
+  SessionHandlerOpExtensions,
+  SessionHandlerRef
+}
+import net.scalytica.kafka.wsproxy.session._
 import net.scalytica.kafka.wsproxy.websockets.{
   InboundWebSocket,
   OutboundWebSocket
@@ -42,12 +47,17 @@ import org.apache.avro.Schema
 import org.apache.kafka.common.KafkaException
 
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
 
 /**
  *
  */
 trait BaseRoutes extends QueryParamParsers {
   private[this] val logger = Logger(classOf[BaseRoutes])
+
+  implicit private[this] val timeout: Timeout = 3 seconds
+
+  protected def sessionHandler: Option[SessionHandlerRef] = None
 
   /**
    *
@@ -73,18 +83,38 @@ trait BaseRoutes extends QueryParamParsers {
     )
   }
 
-  /**
-   *
-   * @return
-   */
-  private[this] def rejectAndComplete(m: => ToResponseMarshallable) = {
-    extractRequest { request =>
-      logger.warn(
-        s"Request ${request.method.value} ${request.uri.toString} failed"
-      )
-      extractMaterializer { implicit mat ⇒
-        request.discardEntityBytes()
-        complete(m)
+  private[this] def rejectRequest(
+      request: HttpRequest
+  )(c: => ToResponseMarshallable) = {
+    paramsOnError { args =>
+      extractActorSystem { implicit sys =>
+        extractMaterializer { implicit mat =>
+          implicit val s = sys.scheduler
+          implicit val e = sys.dispatcher
+
+          args.foreach {
+            case (cid, gid) =>
+              sessionHandler.foreach { sh =>
+                sh.shRef.removeConsumer(gid, cid).onComplete {
+                  case util.Success(res) =>
+                    logger.debug(
+                      s"Removing consumer ${cid.value} from group" +
+                        s" ${gid.value} returned: ${res.asString}"
+                    )
+                  case util.Failure(err) =>
+                    logger.warn(
+                      "An error occurred when trying to remove consumer" +
+                        s" ${cid.value} from group" +
+                        s" ${gid.value}",
+                      err
+                    )
+                }
+              }
+          }
+
+          request.discardEntityBytes()
+          complete(c)
+        }
       }
     }
   }
@@ -93,37 +123,53 @@ trait BaseRoutes extends QueryParamParsers {
    *
    * @return
    */
-  implicit def serverErrorHandler: ExceptionHandler = ExceptionHandler {
-    case t: TopicNotFoundError =>
-      extractUri { uri =>
-        logger.info(s"Topic in request $uri was not found.", t)
-        rejectAndComplete(jsonResponseMsg(BadRequest, t.message))
-      }
-
-    case a: AuthenticationError =>
-      extractUri { uri =>
-        logger.info(s"Request to $uri could not be authenticated.", a)
-        rejectAndComplete(jsonResponseMsg(Unauthorized, a.message))
-      }
-
-    case a: AuthorisationError =>
-      extractUri { uri =>
-        logger.info(s"Request to $uri could not be authenticated.", a)
-        rejectAndComplete(jsonResponseMsg(Forbidden, a.message))
-      }
-
-    case k: KafkaException =>
-      extractUri { uri =>
-        logger.warn(s"Request to $uri failed with a KafkaException.", k)
-        rejectAndComplete(jsonResponseMsg(InternalServerError, k.getMessage))
-      }
-
-    case t =>
-      extractUri { uri =>
-        logger.warn(s"Request to $uri could not be handled normally", t)
-        rejectAndComplete(jsonResponseMsg(InternalServerError, t.getMessage))
-      }
+  private[this] def rejectAndComplete(
+      m: => ToResponseMarshallable
+  ) = {
+    extractRequest { request =>
+      logger.warn(
+        s"Request ${request.method.value} ${request.uri.toString} failed"
+      )
+      rejectRequest(request)(m)
+    }
   }
+
+  /**
+   *
+   * @return
+   */
+  implicit def serverErrorHandler: ExceptionHandler =
+    ExceptionHandler {
+      case t: TopicNotFoundError =>
+        extractUri { uri =>
+          logger.info(s"Topic in request $uri was not found.", t)
+          rejectAndComplete(jsonResponseMsg(BadRequest, t.message))
+        }
+
+      case a: AuthenticationError =>
+        extractUri { uri =>
+          logger.info(s"Request to $uri could not be authenticated.", a)
+          rejectAndComplete(jsonResponseMsg(Unauthorized, a.message))
+        }
+
+      case a: AuthorisationError =>
+        extractUri { uri =>
+          logger.info(s"Request to $uri could not be authenticated.", a)
+          rejectAndComplete(jsonResponseMsg(Forbidden, a.message))
+        }
+
+      case k: KafkaException =>
+        extractUri { uri =>
+          logger.warn(s"Request to $uri failed with a KafkaException.", k)
+          rejectAndComplete(jsonResponseMsg(InternalServerError, k.getMessage))
+        }
+
+      case t =>
+        extractUri { uri =>
+          logger.warn(s"Request to $uri could not be handled normally", t)
+          rejectAndComplete(jsonResponseMsg(InternalServerError, t.getMessage))
+        }
+    }
 
   /**
    *
@@ -161,6 +207,11 @@ trait ServerRoutes
     with SchemaRoutes
     with WebSocketRoutes { self =>
 
+  private[this] var sessionHandlerRef: SessionHandlerRef = _
+
+  override protected def sessionHandler: Option[SessionHandlerRef] =
+    Some(sessionHandlerRef)
+
   /**
    *
    * @param cfg
@@ -176,8 +227,10 @@ trait ServerRoutes
       mat: ActorMaterializer,
       ctx: ExecutionContext
   ): (RunnableGraph[Consumer.Control], Route) = {
-    implicit val (sdcStream, sh) = SessionHandler.init
-    (sdcStream, routesWith(inboundWebSocket, outboundWebSocket))
+    sessionHandlerRef = SessionHandler.init
+    implicit val sh = sessionHandlerRef.shRef
+
+    (sessionHandlerRef.stream, routesWith(inboundWebSocket, outboundWebSocket))
   }
 
   /**
