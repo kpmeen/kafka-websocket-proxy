@@ -105,7 +105,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
     lazy val initSocket = () =>
       prepareOutboundWebSocket(args) { () =>
         sessionHandler.removeConsumer(groupId, clientId).map(_ => Done)
-    }
+      }
 
     onSuccess(consumerAddResult) {
       case Session.ConsumerAdded(_) =>
@@ -394,8 +394,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
         )
         BinaryMessage(byteString)
     case JsonPayload =>
-      cr =>
-        TextMessage(cr.asJson.pretty(noSpaces))
+      cr => TextMessage(cr.asJson.pretty(noSpaces))
   }
 
   /**

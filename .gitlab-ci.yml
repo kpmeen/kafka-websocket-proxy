@@ -1,7 +1,7 @@
 ######################################################################
 # GitLab CI build script for the Kafka WebSocket Proxy               #
 ######################################################################
-image: registry.gitlab.com/kpmeen/docker-scala-sbt:scala_2.12
+image: registry.gitlab.com/kpmeen/docker-scala-sbt:scala_2.12_jdk11
 
 variables:
   CI: "true"

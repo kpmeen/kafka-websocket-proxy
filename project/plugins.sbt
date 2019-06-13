@@ -11,19 +11,18 @@ resolvers ++= Seq(
 )
 
 // Dependency handling
-addSbtPlugin("io.get-coursier"  %% "sbt-coursier" % "1.0.2")
-addSbtPlugin("com.timushev.sbt" % "sbt-updates"   % "0.3.4")
+addSbtPlugin("io.get-coursier"  %% "sbt-coursier" % "1.1.0-M13-4")
+addSbtPlugin("com.timushev.sbt" % "sbt-updates"   % "0.4.0")
 
 // Formatting and style checking
-addSbtPlugin("com.geirsson"   % "sbt-scalafmt"           % "1.5.1")
+addSbtPlugin("org.scalameta"  % "sbt-scalafmt"           % "2.0.0")
 addSbtPlugin("org.scalastyle" %% "scalastyle-sbt-plugin" % "1.0.0")
 
 // Code coverage
-addSbtPlugin("org.scoverage" %% "sbt-scoverage"       % "1.5.1")
-addSbtPlugin("com.codacy"    %% "sbt-codacy-coverage" % "1.3.12")
+addSbtPlugin("org.scoverage" %% "sbt-scoverage" % "1.5.1")
 
 // Native packaging plugin
-addSbtPlugin("com.typesafe.sbt" %% "sbt-native-packager" % "1.3.21")
+addSbtPlugin("com.typesafe.sbt" %% "sbt-native-packager" % "1.3.22")
 
 // Release plugin
 addSbtPlugin("com.github.gseitz" % "sbt-release" % "1.0.11")

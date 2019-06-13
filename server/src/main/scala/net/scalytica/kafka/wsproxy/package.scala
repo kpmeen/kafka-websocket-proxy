@@ -1,6 +1,7 @@
 package net.scalytica.kafka
 
 import java.util.concurrent.CompletableFuture
+import java.util.{Properties => JProps}
 
 import com.typesafe.scalalogging.Logger
 import io.confluent.monitoring.clients.interceptor.{
@@ -8,7 +9,6 @@ import io.confluent.monitoring.clients.interceptor.{
   MonitoringProducerInterceptor
 }
 
-import scala.collection.JavaConverters._
 import scala.compat.java8.{FunctionConverters, FutureConverters}
 import scala.concurrent.Future
 
@@ -20,9 +20,9 @@ package object wsproxy {
   val ConsumerInterceptorClass =
     classOf[MonitoringConsumerInterceptor[_, _]].getName
 
-  implicit def mapToProperties(m: Map[String, AnyRef]): java.util.Properties = {
-    val props = new java.util.Properties
-    props.putAll(m.asJava)
+  implicit def mapToProperties(m: Map[String, AnyRef]): JProps = {
+    val props = new JProps()
+    m.foreach(kv => props.put(kv._1, kv._2))
     props
   }
 

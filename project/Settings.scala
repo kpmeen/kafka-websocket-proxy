@@ -64,14 +64,15 @@ object Settings {
     scalaVersion := Versions.ScalaVersion,
     scalacOptions := BaseScalacOpts ++ ExperimentalScalacOpts,
     scalacOptions in Test ++= Seq("-Yrangepos"),
-//    javacOptions ++= Seq("-source", "10", "-target", "10"), // Require compilation against JDK 10.
+    // Require compilation against JDK 11.
+    javacOptions ++= Seq("-source", "11", "-target", "11"),
     javaOptions ++= Seq(
       // Set timezone to UTC
       "-Duser.timezone=UTC",
       // Enable the Graal JIT!!!
-//      "-XX:+UnlockExperimentalVMOptions",
-//      "-XX:+EnableJVMCI",
-//      "-XX:+UseJVMCICompiler"
+      "-XX:+UnlockExperimentalVMOptions",
+      "-XX:+EnableJVMCI",
+      "-XX:+UseJVMCICompiler"
     ),
     fork in run := true,
     javaOptions in Test += "-Dlogger.resource=logback-test.xml",
@@ -128,7 +129,7 @@ object Settings {
         }
       },
       dockerUpdateLatest := !isSnapshot.value,
-      dockerBaseImage := "openjdk:8-slim",
+      dockerBaseImage := "azul/zulu-openjdk-debian:11.0.3",
       dockerExposedPorts in Docker := exposedPort.toSeq
     )
 

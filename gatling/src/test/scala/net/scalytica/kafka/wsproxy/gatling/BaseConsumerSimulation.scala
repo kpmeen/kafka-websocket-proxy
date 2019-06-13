@@ -29,7 +29,8 @@ trait BaseConsumerSimulation extends Simulation {
       s"valType=$valTpe&" +
       s"autoCommit=$autoCommit"
 
-    keyTpe.map(k => s"$uriStr&keyType=$k").getOrElse(uriStr)
+    val uri = keyTpe.map(k => s"$uriStr&keyType=$k").getOrElse(uriStr)
+    uri
   }
 
   def wsCheck(topic: String, hasKey: Boolean = false): WsFrameCheck = {
