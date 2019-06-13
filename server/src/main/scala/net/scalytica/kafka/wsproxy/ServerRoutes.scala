@@ -332,7 +332,9 @@ trait WebSocketRoutes { self: BaseRoutes =>
   )(implicit cfg: AppCfg): Route = {
     val topic = args.topic
     val admin = new WsKafkaAdminClient(cfg)
-    val topicExists = try { admin.topicExists(topic) } finally {
+    val topicExists = try {
+      admin.topicExists(topic)
+    } finally {
       admin.close()
     }
 

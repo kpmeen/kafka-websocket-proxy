@@ -4,18 +4,18 @@ object Versions {
   val ScalaVersion = "2.12.8"
 
   val ConfigVersion     = "1.3.4"
-  val PureConfigVersion = "0.10.2"
+  val PureConfigVersion = "0.11.0"
 
   val Avro4sVersion                 = "2.0.4"
   val ConfluentPlatformVersion      = "5.2.1"
-  val KafkaVersion                  = "2.2.0"
+  val KafkaVersion                  = "2.2.1"
   val EmbeddedKafkaVersion          = "2.2.0"
   val EmbeddedSchemaRegistryVersion = "5.2.1"
   val KafkaStreamsQueryVersion      = "0.1.1"
 
-  val AkkaVersion            = "2.5.22"
+  val AkkaVersion            = "2.5.23"
   val AkkaHttpVersion        = "10.1.8"
-  val AkkaStreamKafkaVersion = "1.0.3"
+  val AkkaStreamKafkaVersion = "1.0.4"
 
   val AlpakkaVersion = "0.20"
 
@@ -27,7 +27,7 @@ object Versions {
   val Slf4JVersion        = "1.7.26"
   val LogbackVersion      = "1.2.3"
 
-  val ScalaTestVersion         = "3.0.7"
+  val ScalaTestVersion         = "3.0.8"
   val ScalaTestPlusPlayVersion = "4.0.1"
 
   val GatlingVersion = "3.1.1"

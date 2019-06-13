@@ -78,7 +78,7 @@ class WsProxyAvroSerde[T <: Product: Decoder: Encoder: SchemaFor] private (
 object WsProxyAvroSerde {
 
   def apply[T <: Product: Decoder: Encoder: SchemaFor]()
-    : WsProxyAvroSerde[T] = {
+      : WsProxyAvroSerde[T] = {
     val cas = new WsProxyAvroSerde[T](
       new KafkaAvroSerializer(),
       new KafkaAvroDeserializer()

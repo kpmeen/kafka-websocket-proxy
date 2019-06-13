@@ -21,3 +21,4 @@ dist
 /.settings
 *.orig
 .DS_Store
+.java-version

@@ -1,25 +1,20 @@
 package net.scalytica.kafka.wsproxy.codecs
 
-import javax.xml.bind.DatatypeConverter
+import java.util.Base64
 
 import scala.util.Try
 
 private[codecs] object Binary {
 
+  private[this] val enc = Base64.getEncoder
+  private[this] val dec = Base64.getDecoder
+
   def decodeBase64(base64: String): Try[Array[Byte]] = {
-    Try(DatatypeConverter.parseBase64Binary(base64))
+    Try(dec.decode(base64))
   }
 
   def encodeBase64(data: Array[Byte]): String = {
-    DatatypeConverter.printBase64Binary(data)
-  }
-
-  def decodeHex(hex: String): Try[Array[Byte]] = {
-    Try(DatatypeConverter.parseHexBinary(hex))
-  }
-
-  def encodeHex(bytes: Array[Byte]): String = {
-    DatatypeConverter.printHexBinary(bytes)
+    enc.encodeToString(data)
   }
 
 }
