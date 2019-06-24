@@ -111,17 +111,21 @@ should be added here. Below is a table containing the properties that are
 currently possible to set using specific environment variables:
   
 
-| Config key                            | Environment                              | Default      |
-|:---                                   |:----                                     |:------------:|
-| security.protocol                     | WSPROXY_KAFKA_SECURITY_PROTOCOL          | `PLAINTEXT`  |
-| sasl.mechanism                        | WSPROXY_KAFKA_SASL_MECHANISM             |  not set     |
-| sasl.jaas.config                      | WSPROXY_KAFKA_SASL_JAAS_CFG              |  not set     |
-| ssl.key.password                      | WSPROXY_KAFKA_SSL_KEY_PASS               |  not set     |
-| ssl.endpoint.identification.algorithm | WSPROXY_KAFKA_SASL_ENDPOINT_ID_ALOGO     |  not set     |
-| ssl.truststore.location               | WSPROXY_KAFKA_SSL_TRUSTSTORE_LOCATION    |  not set     |
-| ssl.truststore.truststore.password    | WSPROXY_KAFKA_SSL_TRUSTSTORE_PASS        |  not set     |
-| ssl.keystore.location                 | WSPROXY_KAFKA_SSL_KEYSTORE_LOCATION      |  not set     |
-| ssl.keystore.password                 | WSPROXY_KAFKA_SSL_KEYSTORE_PASS          |  not set     |
+| Config key                                                                   | Environment                              | Default      |
+|:---                                                                          |:----                                     |:------------:|
+| kafka.ws.proxy.kafka-client.properties.security.protocol                     | WSPROXY_KAFKA_SECURITY_PROTOCOL          | `PLAINTEXT`  |
+| kafka.ws.proxy.kafka-client.properties.sasl.mechanism                        | WSPROXY_KAFKA_SASL_MECHANISM             |  not set     |
+| kafka.ws.proxy.kafka-client.properties.sasl.jaas.config                      | WSPROXY_KAFKA_SASL_JAAS_CFG              |  not set     |
+| kafka.ws.proxy.kafka-client.properties.sasl.kerberos.service.name            | WSPROXY_KAFKA_SASL_KERBEROS_SERVICE_NAME |  not set     |
+| kafka.ws.proxy.kafka-client.properties.ssl.key.password                      | WSPROXY_KAFKA_SSL_KEY_PASS               |  not set     |
+| kafka.ws.proxy.kafka-client.properties.ssl.endpoint.identification.algorithm | WSPROXY_KAFKA_SASL_ENDPOINT_ID_ALOGO     |  not set     |
+| kafka.ws.proxy.kafka-client.properties.ssl.truststore.location               | WSPROXY_KAFKA_SSL_TRUSTSTORE_LOCATION    |  not set     |
+| kafka.ws.proxy.kafka-client.properties.ssl.truststore.truststore.password    | WSPROXY_KAFKA_SSL_TRUSTSTORE_PASS        |  not set     |
+| kafka.ws.proxy.kafka-client.properties.ssl.keystore.location                 | WSPROXY_KAFKA_SSL_KEYSTORE_LOCATION      |  not set     |
+| kafka.ws.proxy.kafka-client.properties.ssl.keystore.password                 | WSPROXY_KAFKA_SSL_KEYSTORE_PASS          |  not set     |
+| kafka.ws.proxy.kafka-client.properties.ssl.provider                          | WSPROXY_KAFKA_SSL_PROVIDER               |  not set     |
+| kafka.ws.proxy.kafka-client.properties.ssl.cipher.suites                     | WSPROXY_KAFKA_SSL_CIPHER_SUITES          |  not set     |
+| kafka.ws.proxy.kafka-client.properties.ssl.enabled.protocols                 | WSPROXY_KAFKA_SSL_ENABLED_PROTOCOLS      |  not set     |
 
 Additionally, each of the different clients (admin, producer and consumer), can
 be configured individually. However, _these configurations are not currently
@@ -149,12 +153,16 @@ provide a distinct client configuration for the metrics reporter.
 | kafka.ws.proxy.kafka-client.confluent-metrics.properties.security.protocol                     | WSPROXY_KAFKA_METRICS_SECURITY_PROTOCOL          | `PLAINTEXT`  |
 | kafka.ws.proxy.kafka-client.confluent-metrics.properties.sasl.mechanism                        | WSPROXY_KAFKA_METRICS_SASL_MECHANISM             |  not set     |
 | kafka.ws.proxy.kafka-client.confluent-metrics.properties.sasl.jaas.config                      | WSPROXY_KAFKA_METRICS_SASL_JAAS_CFG              |  not set     |
+| kafka.ws.proxy.kafka-client.confluent-metrics.properties.sasl.kerberos.service.name            | WSPROXY_KAFKA_METRICS_SASL_KERBEROS_SERVICE_NAME |  not set     |
 | kafka.ws.proxy.kafka-client.confluent-metrics.properties.ssl.key.password                      | WSPROXY_KAFKA_METRICS_SSL_KEY_PASS               |  not set     |
 | kafka.ws.proxy.kafka-client.confluent-metrics.properties.ssl.endpoint.identification.algorithm | WSPROXY_KAFKA_METRICS_SASL_ENDPOINT_ID_ALOGO     |  not set     |
 | kafka.ws.proxy.kafka-client.confluent-metrics.properties.ssl.truststore.location               | WSPROXY_KAFKA_METRICS_SSL_TRUSTSTORE_LOCATION    |  not set     |
 | kafka.ws.proxy.kafka-client.confluent-metrics.properties.ssl.truststore.truststore.password    | WSPROXY_KAFKA_METRICS_SSL_TRUSTSTORE_PASS        |  not set     |
 | kafka.ws.proxy.kafka-client.confluent-metrics.properties.ssl.keystore.location                 | WSPROXY_KAFKA_METRICS_SSL_KEYSTORE_LOCATION      |  not set     |
 | kafka.ws.proxy.kafka-client.confluent-metrics.properties.ssl.keystore.password                 | WSPROXY_KAFKA_METRICS_SSL_KEYSTORE_PASS          |  not set     |
+| kafka.ws.proxy.kafka-client.confluent-metrics.properties.ssl.provider                          | WSPROXY_KAFKA_METRICS_SSL_PROVIDER               |  not set     |
+| kafka.ws.proxy.kafka-client.confluent-metrics.properties.ssl.cipher.suites                     | WSPROXY_KAFKA_METRICS_SSL_CIPHER_SUITES          |  not set     |
+| kafka.ws.proxy.kafka-client.confluent-metrics.properties.ssl.enabled.protocols                 | WSPROXY_KAFKA_METRICS_SSL_ENABLED_PROTOCOLS      |  not set     |
 
 ## Endpoints and API
 
