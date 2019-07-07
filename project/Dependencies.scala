@@ -1,23 +1,26 @@
 import sbt._
 
 object Versions {
+  // TODO:
+  // Cannot upgrade to Scala 2.13 yet, because some libs are only compiled
+  // against 2.12.x.
   val ScalaVersion = "2.12.8"
 
   val ConfigVersion     = "1.3.4"
-  val PureConfigVersion = "0.11.0"
+  val PureConfigVersion = "0.11.1"
 
   val Avro4sVersion                 = "2.0.4"
-  val ConfluentPlatformVersion      = "5.2.1"
-  val KafkaVersion                  = "2.2.1"
-  val EmbeddedKafkaVersion          = "2.2.0"
-  val EmbeddedSchemaRegistryVersion = "5.2.1"
+  val ConfluentPlatformVersion      = "5.2.2"
+  val KafkaVersion                  = "2.3.0"
+  val EmbeddedKafkaVersion          = "2.3.0"
+  val EmbeddedSchemaRegistryVersion = "5.2.2"
   val KafkaStreamsQueryVersion      = "0.1.1"
 
   val AkkaVersion            = "2.5.23"
   val AkkaHttpVersion        = "10.1.8"
   val AkkaStreamKafkaVersion = "1.0.4"
 
-  val AlpakkaVersion = "0.20"
+  val AlpakkaVersion = "1.0.2"
 
   val AkkaHttpCirceVersion = "1.25.2"
   val CirceVersion         = "0.11.1"
