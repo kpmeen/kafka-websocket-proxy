@@ -62,8 +62,7 @@ class ServerRoutesSpec
 
       Get("/schemas/avro/producer/record") ~> testRoutes ~> check {
         status mustBe OK
-        responseAs[String] mustBe AvroProducerRecord.schemaFor.schema
-          .toString(true)
+        responseAs[String] mustBe AvroProducerRecord.schema.toString(true)
       }
     }
 
@@ -72,8 +71,7 @@ class ServerRoutesSpec
 
       Get("/schemas/avro/producer/result") ~> testRoutes ~> check {
         status mustBe OK
-        responseAs[String] mustBe AvroProducerResult.schemaFor.schema
-          .toString(true)
+        responseAs[String] mustBe AvroProducerResult.schema.toString(true)
       }
     }
 
@@ -82,8 +80,7 @@ class ServerRoutesSpec
 
       Get("/schemas/avro/consumer/record") ~> testRoutes ~> check {
         status mustBe OK
-        responseAs[String] mustBe AvroConsumerRecord.schemaFor.schema
-          .toString(true)
+        responseAs[String] mustBe AvroConsumerRecord.schema.toString(true)
       }
     }
 
@@ -92,7 +89,7 @@ class ServerRoutesSpec
 
       Get("/schemas/avro/consumer/commit") ~> testRoutes ~> check {
         status mustBe OK
-        responseAs[String] mustBe AvroCommit.schemaFor.schema.toString(true)
+        responseAs[String] mustBe AvroCommit.schema.toString(true)
       }
     }
 
