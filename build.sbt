@@ -47,6 +47,7 @@ lazy val server = (project in file("server"))
   .settings(scalastyleFailOnWarning := true)
   .settings(libraryDependencies ++= Config.All)
   .settings(libraryDependencies ++= Circe.All)
+  .settings(libraryDependencies ++= Logging.All)
   .settings(
     libraryDependencies ++= Seq(
       Akka.Actor,
@@ -57,11 +58,9 @@ lazy val server = (project in file("server"))
       Akka.Http,
       Akka.AkkaStreamKafka,
       Avro.Avro4sKafka,
-      Kafka.AvroSerializer,
-      Kafka.Kafka,
       Kafka.Clients,
-      Kafka.MonitoringInterceptors,
-      Logging.Logback,
+      ConfluentKafka.AvroSerializer,
+      ConfluentKafka.MonitoringInterceptors,
       Logging.Log4jOverSlf4j         % Test,
       Logging.JulToSlf4j             % Test,
       Testing.ScalaTest              % Test,
@@ -75,6 +74,7 @@ lazy val server = (project in file("server"))
       Testing.Scalactic              % Test
     )
   )
+  .settings(dependencyOverrides ++= Overrides.Deps: _*)
   .dependsOn(avro)
 
 lazy val gatling = (project in file("gatling"))

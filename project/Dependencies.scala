@@ -9,16 +9,16 @@ object Versions {
   val ConfigVersion     = "1.3.4"
   val PureConfigVersion = "0.11.1"
 
-  val Avro4sVersion                 = "2.0.4"
-  val ConfluentPlatformVersion      = "5.2.2"
+  val Avro4sVersion                 = "3.0.0"
+  val ConfluentPlatformVersion      = "5.3.0"
   val KafkaVersion                  = "2.3.0"
   val EmbeddedKafkaVersion          = "2.3.0"
-  val EmbeddedSchemaRegistryVersion = "5.2.2"
+  val EmbeddedSchemaRegistryVersion = "5.3.0"
   val KafkaStreamsQueryVersion      = "0.1.1"
 
-  val AkkaVersion            = "2.5.23"
-  val AkkaHttpVersion        = "10.1.8"
-  val AkkaStreamKafkaVersion = "1.0.4"
+  val AkkaVersion            = "2.5.24"
+  val AkkaHttpVersion        = "10.1.9"
+  val AkkaStreamKafkaVersion = "1.0.5"
 
   val AlpakkaVersion = "1.0.2"
 
@@ -27,7 +27,7 @@ object Versions {
   val CirceOpticsVersion   = "0.11.0"
 
   val ScalaLoggingVersion = "3.9.2"
-  val Slf4JVersion        = "1.7.26"
+  val Slf4JVersion        = "1.7.28"
   val LogbackVersion      = "1.2.3"
 
   val ScalaTestVersion         = "3.0.8"
@@ -48,6 +48,15 @@ object Dependencies {
       MavenRepo("confluent", "http://packages.confluent.io/maven/"),
       Resolver.bintrayRepo("hseeberger", "maven")
     )
+
+  private[this] val LoggerExclusionsTest = Seq(
+    ExclusionRule("log4j", "log4j"),
+    ExclusionRule("org.slf4j", "slf4j-log4j12")
+  )
+
+  private[this] val LoggerExclusions = LoggerExclusionsTest ++ Seq(
+    ExclusionRule("org.apache.zookeeper", "zookeeper")
+  )
 
   object Akka {
 
@@ -71,15 +80,11 @@ object Dependencies {
     val Avro4sKafka  = "com.sksamuel.avro4s" %% "avro4s-kafka"  % Avro4sVersion
     val Avro4sJson   = "com.sksamuel.avro4s" %% "avro4s-json"   % Avro4sVersion
 
-    val All = Seq(Avro4sCore, Avro4sMacros, Avro4sKafka)
+//    val All = Seq(Avro4sCore, Avro4sMacros, Avro4sKafka)
+    val All = Seq(Avro4sCore, Avro4sKafka)
   }
 
   object Kafka {
-    private[this] val LoggerExclusions = Seq(
-      ExclusionRule("log4j", "log4j"),
-      ExclusionRule("org.slf4j", "slf4j-log4j12"),
-      ExclusionRule("org.apache.zookeeper", "zookeeper")
-    )
     // official kafka libs
     val Clients = "org.apache.kafka" % "kafka-clients" % KafkaVersion excludeAll (LoggerExclusions: _*)
     val Streams = "org.apache.kafka" % "kafka-streams" % KafkaVersion excludeAll (LoggerExclusions: _*)
@@ -89,7 +94,9 @@ object Dependencies {
     // kafka-streams-scala libs
     val StreamsScala = "org.apache.kafka" %% "kafka-streams-scala" % KafkaVersion excludeAll (LoggerExclusions: _*)
     val StreamsQuery = "com.lightbend"    %% "kafka-streams-query" % KafkaStreamsQueryVersion excludeAll (LoggerExclusions: _*)
+  }
 
+  object ConfluentKafka {
     val AvroSerializer   = "io.confluent" % "kafka-avro-serializer"    % ConfluentPlatformVersion excludeAll (LoggerExclusions: _*)
     val JsonSerializer   = "io.confluent" % "kafka-json-serializer"    % ConfluentPlatformVersion excludeAll (LoggerExclusions: _*)
     val StreamsAvroSerde = "io.confluent" % "kafka-streams-avro-serde" % ConfluentPlatformVersion excludeAll (LoggerExclusions: _*)
@@ -118,30 +125,24 @@ object Dependencies {
   }
 
   object Testing {
-
-    private[this] val LoggerExclusions = Seq(
-      ExclusionRule("log4j", "log4j"),
-      ExclusionRule("org.slf4j", "slf4j-log4j12")
-    )
-
     val ScalaTest = "org.scalatest" %% "scalatest" % ScalaTestVersion
     val Scalactic = "org.scalactic" %% "scalactic" % ScalaTestVersion
 
     val ScalaTestDeps = Seq(ScalaTest % Test, Scalactic)
 
-    val EmbeddedKafka          = "io.github.embeddedkafka" %% "embedded-kafka"                 % EmbeddedKafkaVersion excludeAll (LoggerExclusions: _*)
-    val EmbeddedKafkaStreams   = "io.github.embeddedkafka" %% "embedded-kafka-streams"         % EmbeddedKafkaVersion excludeAll (LoggerExclusions: _*)
-    val EmbeddedSchemaRegistry = "io.github.embeddedkafka" %% "embedded-kafka-schema-registry" % EmbeddedSchemaRegistryVersion excludeAll (LoggerExclusions: _*)
+    val EmbeddedKafka          = "io.github.embeddedkafka" %% "embedded-kafka"                 % EmbeddedKafkaVersion excludeAll (LoggerExclusionsTest: _*)
+    val EmbeddedKafkaStreams   = "io.github.embeddedkafka" %% "embedded-kafka-streams"         % EmbeddedKafkaVersion excludeAll (LoggerExclusionsTest: _*)
+    val EmbeddedSchemaRegistry = "io.github.embeddedkafka" %% "embedded-kafka-schema-registry" % EmbeddedSchemaRegistryVersion excludeAll (LoggerExclusionsTest: _*)
 
-    val AkkaTestKit            = "com.typesafe.akka" %% "akka-testkit"              % AkkaVersion
-    val AkkaTypedTestKit       = "com.typesafe.akka" %% "akka-actor-testkit-typed"  % AkkaVersion
-    val AkkaHttpTestKit        = "com.typesafe.akka" %% "akka-http-testkit"         % AkkaHttpVersion
-    val AkkaStreamTestKit      = "com.typesafe.akka" %% "akka-stream-testkit"       % AkkaVersion
+    val AkkaTestKit       = "com.typesafe.akka" %% "akka-testkit"             % AkkaVersion
+    val AkkaTypedTestKit  = "com.typesafe.akka" %% "akka-actor-testkit-typed" % AkkaVersion
+    val AkkaHttpTestKit   = "com.typesafe.akka" %% "akka-http-testkit"        % AkkaHttpVersion
+    val AkkaStreamTestKit = "com.typesafe.akka" %% "akka-stream-testkit"      % AkkaVersion
+
     val AkkaStreamKafkaTestKit = "com.typesafe.akka" %% "akka-stream-kafka-testkit" % AkkaStreamKafkaVersion
   }
 
   object GatlingDeps {
-
     val GatlingHighcharts = "io.gatling.highcharts" % "gatling-charts-highcharts" % GatlingVersion % "test"
     val GatlingTest       = "io.gatling"            % "gatling-test-framework"    % GatlingVersion % "test"
 
@@ -158,5 +159,13 @@ object Dependencies {
     val Slf4jNop       = "org.slf4j"                  % "slf4j-nop"        % Slf4JVersion
 
     val All = Seq(ScalaLogging, Slf4j, Logback)
+  }
+
+  object Overrides {
+
+    val Deps = Seq(
+      "org.apache.kafka" % "kafka-clients" % KafkaVersion,
+      "org.apache.kafka" %% "kafka"        % KafkaVersion
+    )
   }
 }
