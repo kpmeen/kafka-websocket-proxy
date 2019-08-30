@@ -48,8 +48,13 @@ Allows for changing things like network interface, port number, etc.
 | Config key                                                      | Environment                              | Default                  | Description   |
 |:---                                                             |:----                                     |:------------------------:|:-----         |
 | kafka.ws.proxy.server.server-id                                 | WSPROXY_SERVER_ID                        | `node-1`                 | A unique identifier for the specific kafka-websocket-proxy instance. |
-| kafka.ws.proxy.server.bind-interface                            | WSPROXY_BIND_INTERFACE                   | `0.0.0.0`                | Network interface to bind the http server. |
-| kafka.ws.proxy.server.port                                      | WSPROXY_PORT                             | `8078`                   | Port where the server endpoints will be exposed |
+| kafka.ws.proxy.server.bind-interface                            | WSPROXY_BIND_INTERFACE                   | `0.0.0.0`                | Network interface to bind unsecured traffic to. |
+| kafka.ws.proxy.server.port                                      | WSPROXY_PORT                             | `8078`                   | Port where the unsecured endpoints will be available. |
+| kafka.ws.proxy.server.ssl.ssl-only                              | WSPROXY_SSL_ONLY                         | `false`                  | Indicates if the server should use SSL/TLS only binding when SSL/TLS is enabled. |
+| kafka.ws.proxy.server.ssl.bind-interface                        | WSPROXY_SSL_BIND_INTERFACE               | `0.0.0.0`                | Network interface to bind the SSL/TLS traffic to.
+| kafka.ws.proxy.server.ssl.port                                  | WSPROXY_SSL_PORT                         | not set                  | Port where the SSL/TLS endpoints will be available. |
+| kafka.ws.proxy.server.ssl.keystore-location                     | WSPROXY_SSL_KEYSTORE_LOCATION            | not set                  | File path to location of key store file. |
+| kafka.ws.proxy.server.ssl.keystore-password                     | WSPROXY_SSL_KEYSTORE_PASS                | not set                  | Password for the key store file. |
 
 
 ### Internal Session Handler

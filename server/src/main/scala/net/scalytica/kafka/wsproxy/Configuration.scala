@@ -64,8 +64,22 @@ object Configuration {
   final case class ServerCfg(
       serverId: WsServerId,
       bindInterface: String,
-      port: Int
+      port: Int,
+      ssl: Option[ServerSslCfg]
   )
+
+  final case class ServerSslCfg(
+      sslOnly: Boolean,
+      bindInterface: Option[String],
+      port: Option[Int],
+      keystoreLocation: Option[String],
+      keystorePassword: Option[String]
+  ) {
+
+    def liftKeystorePassword: Array[Char] =
+      keystorePassword.getOrElse("").toCharArray
+
+  }
 
   final case class KafkaClientCfg(
       brokerResolutionTimeout: FiniteDuration,
