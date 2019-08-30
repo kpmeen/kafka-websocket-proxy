@@ -15,7 +15,7 @@ import net.scalytica.kafka.wsproxy.utils.HostResolver.{
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
 
-object Server extends App with ServerRoutes {
+object Server extends App with ServerRoutes with ServerBindings {
 
   // scalastyle:off
   println(
@@ -47,6 +47,9 @@ object Server extends App with ServerRoutes {
 
   private[this] val logger = Logger(getClass)
 
+  private[this] val evalOpt  = Future.successful(None)
+  private[this] val evalDone = Future.successful(Done)
+
   val config = Configuration.loadTypesafeConfig()
 
   implicit val cfg: AppCfg            = Configuration.loadConfig(config)
@@ -69,18 +72,21 @@ object Server extends App with ServerRoutes {
     System.exit(1)
   }
 
-  private[this] val port = cfg.server.port
+  private[this] val plainPort = cfg.server.port
 
-  val (sessionHandlerStream, routes) = wsProxyRoutes
+  implicit val (sessionHandlerStream, routes) = wsProxyRoutes
 
   val ctrl = sessionHandlerStream.run()
 
+  private[this] def unbindConnection(
+      binding: Future[Http.ServerBinding]
+  ): Future[Done] = {
+    binding.flatMap(_.terminate(10 seconds)).map(_ => Done)
+  }
+
   /** Bind to network interface and port, starting the server */
-  val binding = Http().bindAndHandle(
-    handler = routes,
-    interface = "0.0.0.0",
-    port = port
-  )
+  val bindingPlain  = initialisePlainBinding
+  val bindingSecure = initialiseSslBinding
 
   val shutdown: CoordinatedShutdown = {
     val cs = CoordinatedShutdown(sys)
@@ -90,13 +96,15 @@ object Server extends App with ServerRoutes {
         _ <- ctrl.drainAndShutdown(
               Future.successful(logger.info("Session data consumer shutdown."))
             )
-        _ <- binding.flatMap(_.unbind())
+        _ <- bindingPlain.map(_.flatMap(_.unbind())).getOrElse(evalOpt)
+        _ <- bindingSecure.map(_.flatMap(_.unbind())).getOrElse(evalOpt)
       } yield Done
     }
 
     cs.addTask(PhaseServiceRequestsDone, "http-graceful-terminate") { () =>
       /** Unbind from network interface and port, shutting down the server. */
-      binding.flatMap(_.terminate(10.seconds)).map(_ => Done)
+      bindingPlain.map(unbindConnection).getOrElse(evalDone)
+      bindingSecure.map(unbindConnection).getOrElse(evalDone)
     }
 
     cs.addTask(PhaseServiceStop, "http-shutdown") { () =>
@@ -111,7 +119,7 @@ object Server extends App with ServerRoutes {
   }
 
   // scalastyle:off
-  println(s"""Server online at http://localhost:$port/ ...""")
+  println(s"""Server online at http://localhost:$plainPort/ ...""")
   // scalastyle:on
 
 }
