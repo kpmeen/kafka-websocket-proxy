@@ -3,6 +3,7 @@ package net.scalytica.kafka.wsproxy.consumer
 import akka.actor.testkit.typed.scaladsl.{BehaviorTestKit, TestInbox}
 import akka.kafka.testkit.ConsumerResultFactory
 import net.scalytica.kafka.wsproxy.consumer.CommitHandler._
+import net.scalytica.kafka.wsproxy.consumer.CommitStackTypes._
 import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails
 import net.scalytica.kafka.wsproxy.models._
 import net.scalytica.test.WSProxyKafkaSpec
@@ -55,29 +56,32 @@ class CommitHandlerSpec
     )
   }
 
-  private[this] def validateStack(
+  private[this] def validateCommitStack(
       recs: immutable.Seq[ConsumerKeyValueRecord[String, String]],
       removeIds: Option[Seq[WsMessageId]] = None
   )(
       implicit
       tk: BehaviorTestKit[CommitProtocol],
-      inbox: TestInbox[Stack]
-  ): TestInbox[Stack] = {
+      inbox: TestInbox[CommitStack]
+  ): TestInbox[CommitStack] = {
     val fullStack =
-      recs.foldLeft(Map.empty[Partition, List[CommitHandler.Uncommitted]]) {
+      recs.foldLeft(CommitStack.empty) {
         case (s, r) =>
           val uc = Uncommitted(r.wsProxyMessageId, r.committableOffset.get)
           s.get(r.partition)
             .map(u => s.updated(r.partition, u :+ uc))
-            .getOrElse(s + (r.partition -> List(uc)))
+            .getOrElse(s + (r.partition -> SubStack(uc)))
       }
 
     val stack = removeIds
       .map { remIds =>
-        fullStack.map {
-          case (p, m) => p -> m.filterNot(u => remIds.contains(u.wsProxyMsgId))
+        fullStack.stack.map {
+          case (p, m) =>
+            val rem = m.entries.filterNot(u => remIds.contains(u.wsProxyMsgId))
+            p -> SubStack(rem)
         }
       }
+      .map(CommitStack.apply)
       .getOrElse(fullStack)
 
     tk.run(GetStack(inbox.ref))
@@ -89,7 +93,7 @@ class CommitHandlerSpec
     "add a message to the stack" in {
       implicit val testCfg = defaultTestAppCfg
       implicit val tk      = BehaviorTestKit(commitStack)
-      implicit val inbox   = TestInbox[Stack]()
+      implicit val inbox   = TestInbox[CommitStack]()
 
       val rec =
         createKeyValueRecord("grp1", "topic1", 0, 0, System.currentTimeMillis())
@@ -98,13 +102,13 @@ class CommitHandlerSpec
       // send stash command
       tk.run(stashCommands)
       // ask for updated stack
-      validateStack(immutable.Seq(rec))
+      validateCommitStack(immutable.Seq(rec))
     }
 
     "add messages from different partitions to the stack" in {
       implicit val testCfg = defaultTestAppCfg
       implicit val tk      = BehaviorTestKit(commitStack)
-      implicit val inbox   = TestInbox[Stack]()
+      implicit val inbox   = TestInbox[CommitStack]()
 
       val recs = 0 until 5 map { i =>
         createKeyValueRecord("grp1", "topic1", i, 0, System.currentTimeMillis())
@@ -113,7 +117,7 @@ class CommitHandlerSpec
       // send stash commands
       stashCommands.foreach(cmd => tk.run(cmd))
       // ask for updated stack
-      validateStack(recs)
+      validateCommitStack(recs)
     }
 
     "optionally auto commit and drop messages older than a given age" in {
@@ -127,7 +131,7 @@ class CommitHandlerSpec
         commitHandler = defaultTestAppCfg.commitHandler.copy(maxStackSize = 3)
       )
       implicit val tk    = BehaviorTestKit(commitStack)
-      implicit val inbox = TestInbox[Stack]()
+      implicit val inbox = TestInbox[CommitStack]()
 
       val stackSize = testCfg.commitHandler.maxStackSize
 
@@ -148,29 +152,29 @@ class CommitHandlerSpec
       val removed = recs.flatMap(_.dropRight(stackSize))
 
       insert.foreach(cmd => tk.run(Stash(cmd)))
-      validateStack(insert, Some(removed.map(_.wsProxyMessageId)))
+      validateCommitStack(insert, Some(removed.map(_.wsProxyMessageId)))
     }
 
     "accept a WsCommit command, commit the message and clean up the stack" in {
       implicit val testCfg = defaultTestAppCfg
       implicit val tk      = BehaviorTestKit(commitStack)
-      implicit val inbox   = TestInbox[Stack]()
+      implicit val inbox   = TestInbox[CommitStack]()
 
       val recs = 0 until 3 map { i =>
         createKeyValueRecord("grp1", "topic1", i, 0, System.currentTimeMillis())
       }
 
       recs.foreach(cmd => tk.run(Stash(cmd)))
-      validateStack(recs)
+      validateCommitStack(recs)
 
       tk.run(Commit(WsCommit(recs.head.wsProxyMessageId)))
-      validateStack(recs, Some(Seq(recs.head.wsProxyMessageId)))
+      validateCommitStack(recs, Some(Seq(recs.head.wsProxyMessageId)))
     }
 
     "do nothing if the WsCommit message references a non-existing message" in {
       implicit val testCfg = defaultTestAppCfg
       implicit val tk      = BehaviorTestKit(commitStack)
-      implicit val inbox   = TestInbox[Stack]()
+      implicit val inbox   = TestInbox[CommitStack]()
 
       val recs = 0 until 3 map { i =>
         createKeyValueRecord("grp1", "topic1", i, 0, System.currentTimeMillis())
@@ -183,10 +187,10 @@ class CommitHandlerSpec
       )
 
       recs.foreach(cmd => tk.run(Stash(cmd)))
-      validateStack(recs)
+      validateCommitStack(recs)
 
       tk.run(Commit(WsCommit(bogusId)))
-      validateStack(recs)
+      validateCommitStack(recs)
     }
 
   }
