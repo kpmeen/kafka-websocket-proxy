@@ -18,8 +18,7 @@ import net.scalytica.kafka.wsproxy.errors.{
   AuthorisationError
 }
 import net.scalytica.kafka.wsproxy.models._
-import net.scalytica.kafka.wsproxy.{mapToProperties, ProducerInterceptorClass}
-import org.apache.kafka.clients.producer.ProducerConfig._
+import net.scalytica.kafka.wsproxy.{mapToProperties, producerMetricsProperties}
 import org.apache.kafka.clients.producer.{
   KafkaProducer,
   ProducerRecord,
@@ -71,15 +70,7 @@ object WsProducer {
       .withBootstrapServers(kafkaUrl)
       .withProducerFactory { ps =>
         val props: java.util.Properties = {
-          val metricsProps = if (cfg.kafkaClient.metricsEnabled) {
-            // Enables stream monitoring in confluent control center
-            Map(INTERCEPTOR_CLASSES_CONFIG -> ProducerInterceptorClass) ++
-              cfg.kafkaClient.confluentMetrics
-                .map(cmr => cmr.asPrefixedProperties)
-                .getOrElse(Map.empty[String, AnyRef])
-          } else {
-            Map.empty[String, AnyRef]
-          }
+          val metricsProps = producerMetricsProperties
 
           val jaasProps = args.aclCredentials
             .map { c =>

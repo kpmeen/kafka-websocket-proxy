@@ -10,7 +10,6 @@ import net.scalytica.kafka.wsproxy._
 import net.scalytica.kafka.wsproxy.codecs.Implicits._
 import net.scalytica.kafka.wsproxy.codecs.{BasicSerdes, SessionSerde}
 import net.scalytica.kafka.wsproxy.models.WsGroupId
-import org.apache.kafka.clients.producer.ProducerConfig._
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 
 import scala.collection.JavaConverters._
@@ -42,19 +41,10 @@ private[session] class SessionDataProducer(
     ProducerSettings(sys.toUntyped, Some(kSer), Some(vSer))
       .withBootstrapServers(kafkaUrl)
       .withProducerFactory { ps =>
-        val props: java.util.Properties = {
-          if (cfg.kafkaClient.metricsEnabled) {
-            // Enables stream monitoring in confluent control center
-            Map(INTERCEPTOR_CLASSES_CONFIG -> ProducerInterceptorClass) ++
-              cfg.kafkaClient.confluentMetrics
-                .map(cmr => cmr.asPrefixedProperties)
-                .getOrElse(Map.empty[String, AnyRef])
-          } else {
-            Map.empty[String, AnyRef]
-          } ++
-            cfg.producer.kafkaClientProperties ++
-            ps.getProperties.asScala.toMap
-        }
+        val props = producerMetricsProperties ++
+          cfg.producer.kafkaClientProperties ++
+          ps.getProperties.asScala.toMap
+
         new KafkaProducer[String, Session](
           props,
           ps.keySerializerOpt.orNull,

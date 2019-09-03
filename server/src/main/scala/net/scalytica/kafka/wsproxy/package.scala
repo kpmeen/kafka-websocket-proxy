@@ -8,6 +8,10 @@ import io.confluent.monitoring.clients.interceptor.{
   MonitoringConsumerInterceptor,
   MonitoringProducerInterceptor
 }
+import net.scalytica.kafka.wsproxy.Configuration.AppCfg
+// scalastyle:off
+import org.apache.kafka.clients.consumer.ConsumerConfig.INTERCEPTOR_CLASSES_CONFIG
+// scalastyle:on
 
 import scala.compat.java8.{FunctionConverters, FutureConverters}
 import scala.concurrent.Future
@@ -19,6 +23,26 @@ package object wsproxy {
 
   val ConsumerInterceptorClass =
     classOf[MonitoringConsumerInterceptor[_, _]].getName
+
+  def metricsProperties(
+      interceptorClassStr: String
+  )(implicit cfg: AppCfg): Map[String, AnyRef] = {
+    if (cfg.kafkaClient.metricsEnabled) {
+      // Enables stream monitoring in confluent control center
+      Map(INTERCEPTOR_CLASSES_CONFIG -> interceptorClassStr) ++
+        cfg.kafkaClient.confluentMetrics
+          .map(cmr => cmr.asPrefixedProperties)
+          .getOrElse(Map.empty[String, AnyRef])
+    } else {
+      Map.empty[String, AnyRef]
+    }
+  }
+
+  def producerMetricsProperties(implicit cfg: AppCfg): Map[String, AnyRef] =
+    metricsProperties(ProducerInterceptorClass)
+
+  def consumerMetricsProperties(implicit cfg: AppCfg): Map[String, AnyRef] =
+    metricsProperties(ConsumerInterceptorClass)
 
   implicit def mapToProperties(m: Map[String, AnyRef]): JProps = {
     val props = new JProps()

@@ -12,8 +12,7 @@ import net.scalytica.kafka.wsproxy.codecs.{BasicSerdes, SessionSerde}
 import net.scalytica.kafka.wsproxy.models.WsGroupId
 import org.apache.kafka.clients.consumer.ConsumerConfig.{
   AUTO_OFFSET_RESET_CONFIG,
-  ENABLE_AUTO_COMMIT_CONFIG,
-  _
+  ENABLE_AUTO_COMMIT_CONFIG
 }
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.consumer.OffsetResetStrategy.EARLIEST
@@ -57,19 +56,10 @@ private[session] class SessionDataConsumer(
     .withGroupId(cid)
     .withClientId(cid)
     .withConsumerFactory { cs =>
-      val props: java.util.Properties = {
-        if (cfg.kafkaClient.metricsEnabled) {
-          // Enables stream monitoring in confluent control center
-          Map(INTERCEPTOR_CLASSES_CONFIG -> ConsumerInterceptorClass) ++
-            cfg.kafkaClient.confluentMetrics
-              .map(cmr => cmr.asPrefixedProperties)
-              .getOrElse(Map.empty[String, AnyRef])
-        } else {
-          Map.empty[String, AnyRef]
-        } ++
-          cfg.consumer.kafkaClientProperties ++
-          cs.getProperties.asScala.toMap
-      }
+      val props = consumerMetricsProperties ++
+        cfg.consumer.kafkaClientProperties ++
+        cs.getProperties.asScala.toMap
+
       new KafkaConsumer[String, Session](
         props,
         cs.keyDeserializerOpt.orNull,

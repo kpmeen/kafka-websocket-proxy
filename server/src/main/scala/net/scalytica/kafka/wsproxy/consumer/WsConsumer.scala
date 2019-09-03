@@ -11,9 +11,9 @@ import net.scalytica.kafka.wsproxy.errors.{
   AuthenticationError,
   AuthorisationError
 }
+import net.scalytica.kafka.wsproxy.{consumerMetricsProperties, mapToProperties}
 import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails
 import net.scalytica.kafka.wsproxy.models._
-import net.scalytica.kafka.wsproxy.{mapToProperties, ConsumerInterceptorClass}
 import org.apache.kafka.clients.consumer.ConsumerConfig._
 import org.apache.kafka.clients.consumer.{
   ConsumerRecord,
@@ -87,15 +87,7 @@ object WsConsumer {
       cs: ConsumerSettings[K, V]
   )(implicit cfg: AppCfg): KafkaConsumer[K, V] = {
     val props: java.util.Properties = {
-      val metricsProps = if (cfg.kafkaClient.metricsEnabled) {
-        // Enables stream monitoring in confluent control center
-        Map(INTERCEPTOR_CLASSES_CONFIG -> ConsumerInterceptorClass) ++
-          cfg.kafkaClient.confluentMetrics
-            .map(cmr => cmr.asPrefixedProperties)
-            .getOrElse(Map.empty[String, AnyRef])
-      } else {
-        Map.empty[String, AnyRef]
-      }
+      val metricsProps = consumerMetricsProperties
 
       val jaasProps = aclCredentials
         .map(c => SASL_JAAS_CONFIG -> PLAIN_LOGIN(c.username, c.password))
