@@ -38,11 +38,10 @@ object WsConsumer {
 
   // scalastyle:off
   private[this] val SASL_JAAS_CONFIG = "sasl.jaas.config"
-  private[this] val PLAIN_LOGIN_MODULE = (uname: String, pass: String) =>
+  private[this] val PLAIN_LOGIN = (uname: String, pass: String) =>
     s"""org.apache.kafka.common.security.plain.PlainLoginModule required username="$uname" password="$pass";"""
   // scalastyle:on
 
-  // scalastyle:off
   /**
    * Instantiates an instance of [[ConsumerSettings]] to be used when creating
    * the Kafka consumer [[Source]].
@@ -58,49 +57,60 @@ object WsConsumer {
       vd: Deserializer[V]
   ) = {
     val kafkaUrl = cfg.kafkaClient.bootstrapHosts.mkString()
-
-    val gid = args.groupId.value
+    val gid      = args.groupId.value
 
     ConsumerSettings(as, kd, vd)
       .withBootstrapServers(kafkaUrl)
       .withProperties(
-        AUTO_OFFSET_RESET_CONFIG       -> args.offsetResetStrategy.name.toLowerCase,
+        AUTO_OFFSET_RESET_CONFIG       -> args.offsetResetStrategyString,
         ENABLE_AUTO_COMMIT_CONFIG      -> s"$autoCommit",
         AUTO_COMMIT_INTERVAL_MS_CONFIG -> s"${50.millis.toMillis}"
       )
       .withClientId(args.clientId.value)
       .withGroupId(gid)
-      .withConsumerFactory { cs =>
-        val props: java.util.Properties = {
-          val metricsProps = if (cfg.kafkaClient.metricsEnabled) {
-            // Enables stream monitoring in confluent control center
-            Map(INTERCEPTOR_CLASSES_CONFIG -> ConsumerInterceptorClass) ++
-              cfg.kafkaClient.confluentMetrics
-                .map(cmr => cmr.asPrefixedProperties)
-                .getOrElse(Map.empty[String, AnyRef])
-          } else {
-            Map.empty[String, AnyRef]
-          }
+      .withConsumerFactory(initialiseConsumer(args.aclCredentials))
+  }
 
-          val jaasProps = args.aclCredentials
-            .map { c =>
-              Map(
-                SASL_JAAS_CONFIG -> PLAIN_LOGIN_MODULE(c.username, c.password)
-              )
-            }
+  /**
+   * Initialise a new [[KafkaConsumer]] instance
+   *
+   * @param aclCredentials Option containing the [[AclCredentials]] to use
+   * @param cs the [[ConsumerSettings]] to apply
+   * @param cfg the [[AppCfg]] to use for configurable parameters
+   * @tparam K the type used for configuring the default key serdes.
+   * @tparam V the type used for configuring the default value serdes.
+   * @return a [[KafkaConsumer]] instance for keys of type [[K]] and value [[V]]
+   */
+  private[this] def initialiseConsumer[K, V](
+      aclCredentials: Option[AclCredentials]
+  )(
+      cs: ConsumerSettings[K, V]
+  )(implicit cfg: AppCfg): KafkaConsumer[K, V] = {
+    val props: java.util.Properties = {
+      val metricsProps = if (cfg.kafkaClient.metricsEnabled) {
+        // Enables stream monitoring in confluent control center
+        Map(INTERCEPTOR_CLASSES_CONFIG -> ConsumerInterceptorClass) ++
+          cfg.kafkaClient.confluentMetrics
+            .map(cmr => cmr.asPrefixedProperties)
             .getOrElse(Map.empty[String, AnyRef])
-
-          metricsProps ++
-            cfg.consumer.kafkaClientProperties ++
-            cs.getProperties.asScala.toMap ++
-            jaasProps
-        }
-        new KafkaConsumer[K, V](
-          props,
-          cs.keyDeserializerOpt.orNull,
-          cs.valueDeserializerOpt.orNull
-        )
+      } else {
+        Map.empty[String, AnyRef]
       }
+
+      val jaasProps = aclCredentials
+        .map(c => SASL_JAAS_CONFIG -> PLAIN_LOGIN(c.username, c.password))
+        .toMap
+
+      metricsProps ++
+        cfg.consumer.kafkaClientProperties ++
+        cs.getProperties.asScala.toMap ++
+        jaasProps
+    }
+    new KafkaConsumer[K, V](
+      props,
+      cs.keyDeserializerOpt.orNull,
+      cs.valueDeserializerOpt.orNull
+    )
   }
 
   /** Convenience function for logging a [[ConsumerRecord]]. */

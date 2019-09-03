@@ -45,10 +45,16 @@ class WsKafkaAdminClient(cfg: AppCfg) {
 
   private[this] lazy val underlying = AdminClient.create(admConfig)
 
+  /**
+   * Checks for the existence of the session state topic
+   *
+   * @return an [[Option]] containing the name of the session state topic.
+   */
   private[admin] def findSessionStateTopic: Option[String] = {
     findTopic(cfg.sessionHandler.sessionStateTopicName)
   }
 
+  /** Method for creating the session state topic. */
   private[admin] def createSessionStateTopic(): Unit = {
     val replFactor = replicationFactor
     val tconf = Map[String, String](
@@ -62,6 +68,11 @@ class WsKafkaAdminClient(cfg: AppCfg) {
     logger.info("Session state topic created.")
   }
 
+  /**
+   * Find the topic with the given [[TopicName]]
+   *
+   * @param topic the [[TopicName]] to find
+   */
   def findTopic(topic: TopicName): Option[String] = {
     logger.debug(s"Trying to find topic ${topic.value}...")
     val t = underlying.listTopics().names().get().asScala.find(_ == topic.value)
@@ -71,6 +82,12 @@ class WsKafkaAdminClient(cfg: AppCfg) {
     t
   }
 
+  /**
+   * Check the given topic exists.
+   *
+   * @param topic the [[TopicName]] to check
+   * @return true if the topic exists, else false
+   */
   def topicExists(topic: TopicName): Boolean = findTopic(topic).nonEmpty
 
   /**
@@ -122,6 +139,11 @@ class WsKafkaAdminClient(cfg: AppCfg) {
     }
   }
 
+  /**
+   * Fetch the cluster information for the configured Kafka cluster.
+   *
+   * @return a List of [[BrokerInfo]] data.
+   */
   def clusterInfo: List[BrokerInfo] = {
     logger.debug("Fetching Kafka cluster information...")
     underlying
@@ -133,6 +155,15 @@ class WsKafkaAdminClient(cfg: AppCfg) {
       .map(n => BrokerInfo(n.id, n.host, n.port, Option(n.rack)))
   }
 
+  /**
+   * Calculates the replication factor to use for the session state topic.
+   *
+   * If the configured replication factor value is higher than the number of
+   * brokers available, the replication factor will set to the number of
+   * available brokers in the cluster.
+   *
+   * @return the number of replicas to use for the sesion state topic.
+   */
   def replicationFactor: Short = {
     val numNodes = clusterInfo.size
     logger.debug(s"Calculating number of replicas for $sessionStateTopicStr...")
@@ -142,6 +173,7 @@ class WsKafkaAdminClient(cfg: AppCfg) {
     else configuredReplicas
   }
 
+  /** Close the underlying admin client. */
   def close(): Unit = {
     underlying.close()
     logger.debug("Underlying admin client closed.")
@@ -150,6 +182,12 @@ class WsKafkaAdminClient(cfg: AppCfg) {
 
 object WsKafkaAdminClient {
 
+  /**
+   * Throws an exception if the given [[TopicName]] is not found.
+   *
+   * @param topic the [[TopicName]] to find
+   */
+  @throws(classOf[TopicNotFoundError])
   def failIfTopicNotFound(topic: TopicName)(implicit cfg: AppCfg): Unit = {
     val wsAdminClient = new WsKafkaAdminClient(cfg)
     try {

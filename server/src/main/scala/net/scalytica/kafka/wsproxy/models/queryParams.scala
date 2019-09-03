@@ -40,6 +40,8 @@ case class OutSocketArgs(
     autoCommit: Boolean = true
 ) extends SocketArgs {
 
+  def offsetResetStrategyString: String = offsetResetStrategy.name.toLowerCase
+
   def withAclCredentials(
       aclCredentials: Option[AclCredentials]
   ): OutSocketArgs = copy(aclCredentials = aclCredentials)
