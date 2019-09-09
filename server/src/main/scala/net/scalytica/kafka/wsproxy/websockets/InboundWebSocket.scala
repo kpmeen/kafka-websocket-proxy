@@ -29,16 +29,16 @@ trait InboundWebSocket extends WithSchemaRegistryConfig {
   implicit private[this] def producerRecordSerde(
       implicit cfg: AppCfg
   ): WsProxyAvroSerde[AvroProducerRecord] = {
-    cfg.kafkaClient.schemaRegistryUrl
-      .map(url => WsProxyAvroSerde[AvroProducerRecord](schemaRegistryCfg(url)))
+    schemaRegistryCfg
+      .map(c => WsProxyAvroSerde[AvroProducerRecord](c))
       .getOrElse(WsProxyAvroSerde[AvroProducerRecord]())
   }
 
   implicit private[this] def producerResultSerde(
       implicit cfg: AppCfg
   ): WsProxyAvroSerde[AvroProducerResult] = {
-    cfg.kafkaClient.schemaRegistryUrl
-      .map(url => WsProxyAvroSerde[AvroProducerResult](schemaRegistryCfg(url)))
+    schemaRegistryCfg
+      .map(c => WsProxyAvroSerde[AvroProducerResult](c))
       .getOrElse(WsProxyAvroSerde[AvroProducerResult]())
   }
 

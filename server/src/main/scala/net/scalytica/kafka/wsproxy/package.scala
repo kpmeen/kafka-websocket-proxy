@@ -3,20 +3,52 @@ package net.scalytica.kafka
 import java.util.concurrent.CompletableFuture
 import java.util.{Properties => JProps}
 
+import akka.NotUsed
+import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
+import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.{Flow, Sink}
+import akka.util.ByteString
 import com.typesafe.scalalogging.Logger
 import io.confluent.monitoring.clients.interceptor.{
   MonitoringConsumerInterceptor,
   MonitoringProducerInterceptor
 }
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
+
+import scala.concurrent.ExecutionContext
 // scalastyle:off
 import org.apache.kafka.clients.consumer.ConsumerConfig.INTERCEPTOR_CLASSES_CONFIG
 // scalastyle:on
 
 import scala.compat.java8.{FunctionConverters, FutureConverters}
+import scala.concurrent.duration._
 import scala.concurrent.Future
 
 package object wsproxy {
+
+  def wsMessageToStringFlow(
+      implicit
+      mat: ActorMaterializer,
+      ec: ExecutionContext
+  ): Flow[Message, String, NotUsed] =
+    Flow[Message]
+      .mapConcat {
+        case tm: TextMessage   => TextMessage(tm.textStream) :: Nil
+        case bm: BinaryMessage => bm.dataStream.runWith(Sink.ignore); Nil
+      }
+      .mapAsync(1)(_.toStrict(5 seconds).map(_.text))
+
+  def wsMessageToByteStringFlow(
+      implicit
+      mat: ActorMaterializer,
+      ec: ExecutionContext
+  ): Flow[Message, ByteString, NotUsed] =
+    Flow[Message]
+      .mapConcat {
+        case tm: TextMessage   => tm.textStream.runWith(Sink.ignore); Nil
+        case bm: BinaryMessage => BinaryMessage(bm.dataStream) :: Nil
+      }
+      .mapAsync(1)(_.toStrict(5 seconds).map(_.data))
 
   val ProducerInterceptorClass =
     classOf[MonitoringProducerInterceptor[_, _]].getName
@@ -24,13 +56,13 @@ package object wsproxy {
   val ConsumerInterceptorClass =
     classOf[MonitoringConsumerInterceptor[_, _]].getName
 
-  def metricsProperties(
+  def monitoringProperties(
       interceptorClassStr: String
   )(implicit cfg: AppCfg): Map[String, AnyRef] = {
-    if (cfg.kafkaClient.metricsEnabled) {
+    if (cfg.kafkaClient.monitoringEnabled) {
       // Enables stream monitoring in confluent control center
       Map(INTERCEPTOR_CLASSES_CONFIG -> interceptorClassStr) ++
-        cfg.kafkaClient.confluentMetrics
+        cfg.kafkaClient.confluentMonitoring
           .map(cmr => cmr.asPrefixedProperties)
           .getOrElse(Map.empty[String, AnyRef])
     } else {
@@ -39,10 +71,10 @@ package object wsproxy {
   }
 
   def producerMetricsProperties(implicit cfg: AppCfg): Map[String, AnyRef] =
-    metricsProperties(ProducerInterceptorClass)
+    monitoringProperties(ProducerInterceptorClass)
 
   def consumerMetricsProperties(implicit cfg: AppCfg): Map[String, AnyRef] =
-    metricsProperties(ConsumerInterceptorClass)
+    monitoringProperties(ConsumerInterceptorClass)
 
   implicit def mapToProperties(m: Map[String, AnyRef]): JProps = {
     val props = new JProps()

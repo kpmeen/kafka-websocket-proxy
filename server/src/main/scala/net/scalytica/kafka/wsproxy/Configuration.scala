@@ -84,36 +84,41 @@ object Configuration {
   final case class KafkaClientCfg(
       brokerResolutionTimeout: FiniteDuration,
       bootstrapHosts: KafkaBootstrapHosts,
-      schemaRegistryUrl: Option[String],
-      autoRegisterSchemas: Boolean,
-      metricsEnabled: Boolean,
+      schemaRegistry: Option[SchemaRegistryCfg],
+      monitoringEnabled: Boolean,
       properties: Map[String, AnyRef],
-      confluentMetrics: Option[ConfluentMetricsCfg]
+      confluentMonitoring: Option[ConfluentMonitoringCfg]
   )
 
-  final case class ConfluentMetricsCfg(
+  final case class SchemaRegistryCfg(
+      url: String,
+      autoRegisterSchemas: Boolean,
+      properties: Map[String, AnyRef] = Map.empty
+  )
+
+  final case class ConfluentMonitoringCfg(
       bootstrapHosts: KafkaBootstrapHosts,
       properties: Map[String, AnyRef]
   ) {
 
     def asPrefixedProperties: Map[String, AnyRef] =
-      ConfluentMetricsCfg.withConfluentMetricsPrefix(bootstrapHosts, properties)
+      ConfluentMonitoringCfg
+        .withConfluentMonitoringPrefix(bootstrapHosts, properties)
 
   }
 
-  object ConfluentMetricsCfg {
-    val MetricsPrefix = "confluent.metrics.reporter"
+  object ConfluentMonitoringCfg {
+    val MonitoringPrefix = "confluent.monitoring.interceptor"
 
-    val BootstrapServersKey =
-      s"${ConfluentMetricsCfg.MetricsPrefix}.$BOOTSTRAP_SERVERS_CONFIG"
+    val BootstrapServersKey = s"$MonitoringPrefix.$BOOTSTRAP_SERVERS_CONFIG"
 
-    def withConfluentMetricsPrefix(
+    def withConfluentMonitoringPrefix(
         bootstrapHosts: KafkaBootstrapHosts,
         props: Map[String, AnyRef]
     ): Map[String, AnyRef] = {
       props.map {
         case (key, value) =>
-          s"${ConfluentMetricsCfg.MetricsPrefix}.$key" -> value
+          s"${ConfluentMonitoringCfg.MonitoringPrefix}.$key" -> value
       } + (BootstrapServersKey -> bootstrapHosts.hosts.mkString(","))
     }
   }

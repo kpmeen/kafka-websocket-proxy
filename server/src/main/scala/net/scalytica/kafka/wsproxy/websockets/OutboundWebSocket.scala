@@ -17,6 +17,7 @@ import io.circe.Encoder
 import io.circe.Printer.noSpaces
 import io.circe.parser.parse
 import io.circe.syntax._
+import net.scalytica.kafka.wsproxy.wsMessageToStringFlow
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.SocketProtocol.{AvroPayload, JsonPayload}
 import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
@@ -49,21 +50,21 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
   private[this] def avroCommitSerde(
       implicit cfg: AppCfg
   ): WsProxyAvroSerde[AvroCommit] = {
-    cfg.kafkaClient.schemaRegistryUrl
-      .map(url => WsProxyAvroSerde[AvroCommit](schemaRegistryCfg(url)))
+    schemaRegistryCfg
+      .map(c => WsProxyAvroSerde[AvroCommit](c))
       .getOrElse(WsProxyAvroSerde[AvroCommit]())
   }
 
   private[this] def avroConsumerRecordSerde(
       implicit cfg: AppCfg
   ): WsProxyAvroSerde[AvroConsumerRecord] = {
-    cfg.kafkaClient.schemaRegistryUrl
-      .map(url => WsProxyAvroSerde[AvroConsumerRecord](schemaRegistryCfg(url)))
+    schemaRegistryCfg
+      .map(c => WsProxyAvroSerde[AvroConsumerRecord](c))
       .getOrElse(WsProxyAvroSerde[AvroConsumerRecord]())
   }
 
   /** Convenience function for logging and throwing an error in a Flow */
-  private[this] def logAndThrow[T](message: String, t: Throwable): T = {
+  def logAndThrow[T](message: String, t: Throwable): T = {
     logger.error(message, t)
     throw t
   }
@@ -254,12 +255,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
       mat: ActorMaterializer,
       ec: ExecutionContext
   ): Flow[Message, WsCommit, NotUsed] =
-    Flow[Message]
-      .mapConcat {
-        case tm: TextMessage   => TextMessage(tm.textStream) :: Nil
-        case bm: BinaryMessage => bm.dataStream.runWith(Sink.ignore); Nil
-      }
-      .mapAsync(1)(_.toStrict(5 seconds).map(_.text))
+    wsMessageToStringFlow
       .recover {
         case t: Throwable =>
           logAndThrow("There was an error processing a JSON message", t)
@@ -285,12 +281,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
       mat: ActorMaterializer,
       ec: ExecutionContext
   ): Flow[Message, WsCommit, NotUsed] =
-    Flow[Message]
-      .mapConcat {
-        case tm: TextMessage   => tm.textStream.runWith(Sink.ignore); Nil
-        case bm: BinaryMessage => BinaryMessage(bm.dataStream) :: Nil
-      }
-      .mapAsync(1)(_.toStrict(5 seconds).map(_.data))
+    wsMessageToByteStringFlow
       .recover {
         case t: Throwable =>
           logAndThrow("There was an error processing an Avro message", t)

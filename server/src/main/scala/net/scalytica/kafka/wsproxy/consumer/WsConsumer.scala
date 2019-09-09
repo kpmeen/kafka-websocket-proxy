@@ -86,18 +86,19 @@ object WsConsumer {
   )(
       cs: ConsumerSettings[K, V]
   )(implicit cfg: AppCfg): KafkaConsumer[K, V] = {
-    val props: java.util.Properties = {
-      val metricsProps = consumerMetricsProperties
-
+    val props = {
       val jaasProps = aclCredentials
         .map(c => SASL_JAAS_CONFIG -> PLAIN_LOGIN(c.username, c.password))
         .toMap
 
-      metricsProps ++
-        cfg.consumer.kafkaClientProperties ++
+      cfg.consumer.kafkaClientProperties ++
         cs.getProperties.asScala.toMap ++
+        consumerMetricsProperties ++
         jaasProps
     }
+
+    logger.trace(s"Using consumer configuration:\n${props.mkString("\n")}")
+
     new KafkaConsumer[K, V](
       props,
       cs.keyDeserializerOpt.orNull,

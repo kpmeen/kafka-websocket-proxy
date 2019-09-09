@@ -2,9 +2,9 @@ package net.scalytica.kafka.wsproxy.session
 
 import akka.actor.typed.ActorSystem
 import akka.actor.typed.scaladsl.adapter._
-import akka.event.Logging
 import akka.kafka.scaladsl.Consumer
 import akka.kafka.{ConsumerSettings, Subscriptions}
+import com.typesafe.scalalogging.Logger
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy._
 import net.scalytica.kafka.wsproxy.codecs.Implicits._
@@ -33,8 +33,7 @@ private[session] class SessionDataConsumer(
     sys: ActorSystem[_]
 ) {
 
-  implicit private[this] val loggingAdapter =
-    Logging(sys.toUntyped, classOf[SessionDataConsumer])
+  private[this] val logger = Logger(getClass)
 
   private[this] val kDes = BasicSerdes.StringDeserializer
   private[this] val vDes = new SessionSerde().deserializer()
@@ -47,25 +46,33 @@ private[session] class SessionDataConsumer(
   private[this] val sessionStateTopic =
     cfg.sessionHandler.sessionStateTopicName.value
 
-  private[this] val consumerProps = ConsumerSettings(sys.toUntyped, kDes, vDes)
-    .withBootstrapServers(kafkaUrl)
-    .withProperties(
-      AUTO_OFFSET_RESET_CONFIG  -> EARLIEST.name.toLowerCase,
-      ENABLE_AUTO_COMMIT_CONFIG -> "false"
-    )
-    .withGroupId(cid)
-    .withClientId(cid)
-    .withConsumerFactory { cs =>
-      val props = consumerMetricsProperties ++
-        cfg.consumer.kafkaClientProperties ++
-        cs.getProperties.asScala.toMap
-
-      new KafkaConsumer[String, Session](
-        props,
-        cs.keyDeserializerOpt.orNull,
-        cs.valueDeserializerOpt.orNull
+  private[this] lazy val consumerProps = {
+    ConsumerSettings(sys.toUntyped, kDes, vDes)
+      .withBootstrapServers(kafkaUrl)
+      .withGroupId(cid)
+      .withClientId(cid)
+      .withProperties(
+        AUTO_OFFSET_RESET_CONFIG  -> EARLIEST.name.toLowerCase,
+        ENABLE_AUTO_COMMIT_CONFIG -> "false"
       )
-    }
+      .withConsumerFactory(initialiseConsumer)
+  }
+
+  private[this] def initialiseConsumer(
+      cs: ConsumerSettings[String, Session]
+  )(implicit cfg: AppCfg): KafkaConsumer[String, Session] = {
+    val props = cfg.consumer.kafkaClientProperties ++
+      cs.getProperties.asScala.toMap ++
+      consumerMetricsProperties
+
+    logger.trace(s"Using consumer configuration:\n${props.mkString("\n")}")
+
+    new KafkaConsumer[String, Session](
+      props,
+      cs.keyDeserializerOpt.orNull,
+      cs.valueDeserializerOpt.orNull
+    )
+  }
 
   /**
    * The akka-stream Source consuming messages from the session state topic.

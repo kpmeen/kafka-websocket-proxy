@@ -2,12 +2,12 @@ package net.scalytica.kafka.wsproxy
 
 import com.typesafe.config.ConfigFactory
 import net.scalytica.kafka.wsproxy.Configuration.{AppCfg, KafkaBootstrapHosts}
-import org.scalatest.{MustMatchers, WordSpec}
+import org.scalatest.{MustMatchers, OptionValues, WordSpec}
 import pureconfig.error.ConfigReaderException
 
 import scala.concurrent.duration._
 
-class ConfigurationSpec extends WordSpec with MustMatchers {
+class ConfigurationSpec extends WordSpec with MustMatchers with OptionValues {
 
   val invalidCfg1 = ConfigFactory
     .parseString(
@@ -23,13 +23,13 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
       |    bootstrap-hosts = "localhost:29092"
       |    schema-registry-url = "http://localhost:28081"
       |    auto-register-schemas = true
-      |    metrics-enabled = false
+      |    monitoring-enabled = false
       |
       |    properties {
       |      security.protocol = PLAINTEXT
       |    }
       |
-      |    confluent-metrics {
+      |    confluent-monitoring {
       |      bootstrap-hosts = "localhost:29092"
       |      properties {
       |        security.protocol = PLAINTEXT
@@ -81,13 +81,13 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
       |    kafka-bootstrap-hosts = "localhost:29092"
       |    schema-registry-url = "http://localhost:28081"
       |    auto-register-schemas = true
-      |    metrics-enabled = false
+      |    monitoring-enabled = false
       |
       |    properties {
       |      security.protocol = PLAINTEXT
       |    }
       |
-      |    confluent-metrics {
+      |    confluent-monitoring {
       |      bootstrap-hosts = "localhost:29092"
       |      properties {}
       |    }
@@ -132,12 +132,12 @@ class ConfigurationSpec extends WordSpec with MustMatchers {
       cfg.server.bindInterface mustBe "0.0.0.0"
       cfg.server.port mustBe 8078
 
-      cfg.kafkaClient.bootstrapHosts mustBe KafkaBootstrapHosts(
-        List("localhost:29092")
-      )
-      cfg.kafkaClient.schemaRegistryUrl mustBe Some("http://localhost:28081")
-      cfg.kafkaClient.autoRegisterSchemas mustBe true
-      cfg.kafkaClient.metricsEnabled mustBe false
+      // format: off
+      cfg.kafkaClient.bootstrapHosts mustBe KafkaBootstrapHosts(List("localhost:29092")) // scalastyle:ignore
+      cfg.kafkaClient.schemaRegistry.value.url mustBe "http://localhost:28081"
+      cfg.kafkaClient.schemaRegistry.value.autoRegisterSchemas mustBe true
+      cfg.kafkaClient.monitoringEnabled mustBe false
+      // format: on
 
       cfg.consumer.defaultBatchSize mustBe 0
       cfg.consumer.defaultRateLimit mustBe 0

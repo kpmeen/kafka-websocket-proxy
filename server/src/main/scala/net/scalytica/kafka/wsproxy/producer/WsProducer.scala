@@ -2,11 +2,11 @@ package net.scalytica.kafka.wsproxy.producer
 
 import akka.NotUsed
 import akka.actor.ActorSystem
-import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
+import akka.http.scaladsl.model.ws.Message
 import akka.kafka.scaladsl.Producer
 import akka.kafka.{ProducerMessage, ProducerSettings}
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{Flow, Sink, Source}
+import akka.stream.scaladsl.{Flow, Source}
 import akka.util.ByteString
 import com.typesafe.scalalogging.Logger
 import io.circe.Decoder
@@ -18,7 +18,12 @@ import net.scalytica.kafka.wsproxy.errors.{
   AuthorisationError
 }
 import net.scalytica.kafka.wsproxy.models._
-import net.scalytica.kafka.wsproxy.{mapToProperties, producerMetricsProperties}
+import net.scalytica.kafka.wsproxy.{
+  mapToProperties,
+  producerMetricsProperties,
+  wsMessageToByteStringFlow,
+  wsMessageToStringFlow
+}
 import org.apache.kafka.clients.producer.{
   KafkaProducer,
   ProducerRecord,
@@ -32,7 +37,6 @@ import org.apache.kafka.common.serialization.Serializer
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
 
 /**
  * Functions for initialising Kafka producer sinks and flows.
@@ -43,8 +47,8 @@ object WsProducer {
 
   // scalastyle:off
   private[this] val SASL_JAAS_CONFIG = "sasl.jaas.config"
-  private[this] val PLAIN_LOGIN_MODULE = (uname: String, pass: String) =>
-    s"""org.apache.kafka.common.security.plain.PlainLoginModule required username="$uname" password="$pass";"""
+  private[this] val PLAIN_LOGIN = (u: String, p: String) =>
+    s"""org.apache.kafka.common.security.plain.PlainLoginModule required username="$u" password="$p";"""
   // scalastyle:on
 
   implicit def seqToSource[Out](s: Seq[Out]): Source[Out, NotUsed] = {
@@ -68,29 +72,28 @@ object WsProducer {
 
     ProducerSettings(as, ks, vs)
       .withBootstrapServers(kafkaUrl)
-      .withProducerFactory { ps =>
-        val props: java.util.Properties = {
-          val metricsProps = producerMetricsProperties
+      .withProducerFactory(initialiseProducer(args.aclCredentials))
+  }
 
-          val jaasProps = args.aclCredentials
-            .map { c =>
-              Map(
-                SASL_JAAS_CONFIG -> PLAIN_LOGIN_MODULE(c.username, c.password)
-              )
-            }
-            .getOrElse(Map.empty[String, AnyRef])
+  private[this] def initialiseProducer[K, V](
+      aclCredentials: Option[AclCredentials]
+  )(ps: ProducerSettings[K, V])(implicit cfg: AppCfg): KafkaProducer[K, V] = {
+    val props = {
+      val jaasProps = aclCredentials
+        .map(c => SASL_JAAS_CONFIG -> PLAIN_LOGIN(c.username, c.password))
+        .toMap
 
-          metricsProps ++
-            cfg.producer.kafkaClientProperties ++
-            ps.getProperties.asScala.toMap ++
-            jaasProps
-        }
-        new KafkaProducer[K, V](
-          props,
-          ps.keySerializerOpt.orNull,
-          ps.valueSerializerOpt.orNull
-        )
-      }
+      cfg.producer.kafkaClientProperties ++
+        ps.getProperties.asScala.toMap ++
+        producerMetricsProperties ++
+        jaasProps
+    }
+
+    new KafkaProducer[K, V](
+      props,
+      ps.keySerializerOpt.orNull,
+      ps.valueSerializerOpt.orNull
+    )
   }
 
   /**
@@ -245,12 +248,7 @@ object WsProducer {
 
     checkClient(args.topic, producerClient)
 
-    Flow[Message]
-      .mapConcat {
-        case tm: TextMessage   => TextMessage(tm.textStream) :: Nil
-        case bm: BinaryMessage => bm.dataStream.runWith(Sink.ignore); Nil
-      }
-      .mapAsync(1)(_.toStrict(5 seconds).map(_.text))
+    wsMessageToStringFlow
       .recover {
         case t: Exception =>
           logAndEmpty("There was an error processing a JSON message", t)("")
@@ -288,12 +286,7 @@ object WsProducer {
 
     checkClient(args.topic, producerClient)
 
-    Flow[Message]
-      .mapConcat {
-        case tm: TextMessage   => tm.textStream.runWith(Sink.ignore); Nil
-        case bm: BinaryMessage => BinaryMessage(bm.dataStream) :: Nil
-      }
-      .mapAsync(1)(_.toStrict(5 seconds).map(_.data))
+    wsMessageToByteStringFlow
       .recover {
         case t: Exception =>
           logAndEmpty("There was an error processing an Avro message", t)(

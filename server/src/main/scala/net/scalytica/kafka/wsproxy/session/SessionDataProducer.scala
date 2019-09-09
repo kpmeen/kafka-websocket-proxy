@@ -37,20 +37,27 @@ private[session] class SessionDataProducer(
   private[this] val sessionStateTopic =
     cfg.sessionHandler.sessionStateTopicName.value
 
-  private[this] val producerProps =
+  private[this] lazy val producerProps =
     ProducerSettings(sys.toUntyped, Some(kSer), Some(vSer))
       .withBootstrapServers(kafkaUrl)
-      .withProducerFactory { ps =>
-        val props = producerMetricsProperties ++
-          cfg.producer.kafkaClientProperties ++
-          ps.getProperties.asScala.toMap
+      .withProducerFactory(initialiseProducer)
 
-        new KafkaProducer[String, Session](
-          props,
-          ps.keySerializerOpt.orNull,
-          ps.valueSerializerOpt.orNull
-        )
-      }
+  private[this] def initialiseProducer(
+      ps: ProducerSettings[String, Session]
+  )(implicit cfg: AppCfg): KafkaProducer[String, Session] = {
+    val props =
+      cfg.producer.kafkaClientProperties ++
+        ps.getProperties.asScala.toMap ++
+        producerMetricsProperties
+
+    logger.trace(s"Using producer configuration:\n${props.mkString("\n")}")
+
+    new KafkaProducer[String, Session](
+      props,
+      ps.keySerializerOpt.orNull,
+      ps.valueSerializerOpt.orNull
+    )
+  }
 
   private[this] lazy val producer = producerProps.createKafkaProducer()
 

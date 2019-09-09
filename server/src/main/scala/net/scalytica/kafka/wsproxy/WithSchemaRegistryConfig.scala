@@ -8,10 +8,15 @@ import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 
 trait WithSchemaRegistryConfig {
 
-  protected def schemaRegistryCfg(registryUrl: String)(implicit cfg: AppCfg) =
-    Map[String, Any](
-      SCHEMA_REGISTRY_URL_CONFIG -> registryUrl,
-      AUTO_REGISTER_SCHEMAS      -> cfg.kafkaClient.autoRegisterSchemas
-    )
+  protected def schemaRegistryCfg(
+      implicit cfg: AppCfg
+  ): Option[Map[String, AnyRef]] = {
+    cfg.kafkaClient.schemaRegistry.map { s =>
+      Map[String, AnyRef](
+        SCHEMA_REGISTRY_URL_CONFIG -> s.url,
+        AUTO_REGISTER_SCHEMAS      -> Boolean.box(s.autoRegisterSchemas)
+      ) ++ s.properties
+    }
+  }
 
 }
