@@ -11,17 +11,17 @@ resolvers ++= Seq(
 )
 
 // Dependency handling
-addSbtPlugin("com.timushev.sbt" % "sbt-updates" % "0.4.0")
+addSbtPlugin("com.timushev.sbt" % "sbt-updates" % "0.4.2")
 
 // Formatting and style checking
-addSbtPlugin("org.scalameta"  % "sbt-scalafmt"           % "2.0.0")
+addSbtPlugin("org.scalameta"  % "sbt-scalafmt"           % "2.0.4")
 addSbtPlugin("org.scalastyle" %% "scalastyle-sbt-plugin" % "1.0.0")
 
 // Code coverage
-addSbtPlugin("org.scoverage" %% "sbt-scoverage" % "1.5.1")
+addSbtPlugin("org.scoverage" %% "sbt-scoverage" % "1.6.0")
 
 // Native packaging plugin
-addSbtPlugin("com.typesafe.sbt" %% "sbt-native-packager" % "1.3.22")
+addSbtPlugin("com.typesafe.sbt" %% "sbt-native-packager" % "1.4.1")
 
 // Release plugin
 addSbtPlugin("com.github.gseitz" % "sbt-release" % "1.0.11")
