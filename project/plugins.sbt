@@ -11,8 +11,7 @@ resolvers ++= Seq(
 )
 
 // Dependency handling
-addSbtPlugin("io.get-coursier"  %% "sbt-coursier" % "1.1.0-M13-4")
-addSbtPlugin("com.timushev.sbt" % "sbt-updates"   % "0.4.0")
+addSbtPlugin("com.timushev.sbt" % "sbt-updates" % "0.4.0")
 
 // Formatting and style checking
 addSbtPlugin("org.scalameta"  % "sbt-scalafmt"           % "2.0.0")

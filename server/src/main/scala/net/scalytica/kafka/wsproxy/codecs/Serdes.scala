@@ -93,7 +93,7 @@ object JsonSerde extends StringBasedSerde[Json] {
 
   override def serialize(topic: String, data: Json) =
     Option(data)
-      .map(d => ser.serialize(topic, d.pretty(Printer.noSpaces)))
+      .map(d => ser.serialize(topic, d.printWith(Printer.noSpaces)))
       .orNull
 
   override def deserialize(topic: String, data: Array[Byte]) = {

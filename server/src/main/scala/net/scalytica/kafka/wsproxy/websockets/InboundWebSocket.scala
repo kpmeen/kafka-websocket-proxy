@@ -76,7 +76,7 @@ trait InboundWebSocket extends WithSchemaRegistryConfig {
       case JsonPayload =>
         WsProducer
           .produceJson[ktpe.Aux, args.valType.Aux](args)
-          .map(res => TextMessage.Strict(res.asJson.pretty(noSpaces)))
+          .map(res => TextMessage.Strict(res.asJson.printWith(noSpaces)))
 
       case AvroPayload =>
         WsProducer.produceAvro[ktpe.Aux, args.valType.Aux](args).map { res =>

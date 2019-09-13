@@ -10,7 +10,7 @@ class SessionSerde(implicit enc: Encoder[Session], dec: Decoder[Session])
 
   override def serialize(topic: String, data: Session) =
     Option(data)
-      .map(d => ser.serialize(topic, d.asJson.pretty(Printer.noSpaces)))
+      .map(d => ser.serialize(topic, d.asJson.printWith(Printer.noSpaces)))
       .orNull
 
   override def deserialize(topic: String, data: Array[Byte]) = {

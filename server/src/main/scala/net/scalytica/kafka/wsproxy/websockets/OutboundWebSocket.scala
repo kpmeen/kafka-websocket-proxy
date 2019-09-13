@@ -385,7 +385,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
         )
         BinaryMessage(byteString)
     case JsonPayload =>
-      cr => TextMessage(cr.asJson.pretty(noSpaces))
+      cr => TextMessage(cr.asJson.printWith(noSpaces))
   }
 
   /**

@@ -10,11 +10,12 @@ import net.scalytica.kafka.wsproxy.session.{ConsumerInstance, Session}
 
 trait Encoders {
 
-  implicit val brokerInfoEncoder: Encoder[BrokerInfo] = deriveEncoder
+  implicit val brokerInfoEncoder: Encoder[BrokerInfo] = deriveConfiguredEncoder
 
-  implicit val sessionEncoder: Encoder[Session] = deriveEncoder
+  implicit val sessionEncoder: Encoder[Session] = deriveConfiguredEncoder
 
-  implicit val consumerInstEncoder: Encoder[ConsumerInstance] = deriveEncoder
+  implicit val consumerInstEncoder: Encoder[ConsumerInstance] =
+    deriveConfiguredEncoder
 
   implicit val msgIdEncoder: Encoder[WsMessageId] = { msgId =>
     Json.fromString(msgId.value)
@@ -54,9 +55,11 @@ trait Encoders {
     Json.fromString(a.name)
   }
 
-  implicit val prodResEncoder: Encoder[WsProducerResult] = deriveEncoder
+  implicit val prodResEncoder: Encoder[WsProducerResult] =
+    deriveConfiguredEncoder
 
-  implicit val kafkaHeaderEncoder: Encoder[KafkaHeader] = deriveEncoder
+  implicit val kafkaHeaderEncoder: Encoder[KafkaHeader] =
+    deriveConfiguredEncoder
 
   implicit def outValEncoder[T](
       implicit enc: Encoder[T]

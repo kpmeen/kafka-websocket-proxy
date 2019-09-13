@@ -5,11 +5,11 @@ import java.nio.file.Path
 import com.typesafe.config.{Config, ConfigFactory}
 import net.scalytica.kafka.wsproxy.models.{TopicName, WsServerId}
 import org.apache.kafka.clients.CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG
-import pureconfig.{loadConfigOrThrow, ConfigReader}
 import pureconfig.generic.auto._
+import pureconfig.{ConfigReader, ConfigSource}
 
-import scala.concurrent.duration.FiniteDuration
 import scala.collection.JavaConverters._
+import scala.concurrent.duration.FiniteDuration
 
 object Configuration {
 
@@ -150,7 +150,7 @@ object Configuration {
       autoCommitMaxAge: FiniteDuration
   )
 
-  def load(): AppCfg = loadConfigOrThrow[AppCfg](CfgRootKey)
+  def load(): AppCfg = ConfigSource.default.at(CfgRootKey).loadOrThrow[AppCfg]
 
   def loadFrom(arg: (String, Any)*): AppCfg = {
     loadString(arg.map(t => s"${t._1} = ${t._2}").mkString("\n"))
@@ -162,11 +162,11 @@ object Configuration {
     loadConfig(ConfigFactory.parseString(str))
 
   def loadConfig(cfg: Config): AppCfg =
-    loadConfigOrThrow[AppCfg](cfg, CfgRootKey)
+    ConfigSource.fromConfig(cfg).at(CfgRootKey).loadOrThrow[AppCfg]
 
   def loadFile(file: Path): AppCfg =
     try {
-      loadConfigOrThrow[AppCfg](file, CfgRootKey)
+      ConfigSource.file(file).at(CfgRootKey).loadOrThrow[AppCfg]
     } catch {
       case ex: Throwable =>
         ex.printStackTrace()

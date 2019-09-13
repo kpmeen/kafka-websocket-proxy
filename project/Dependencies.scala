@@ -4,13 +4,13 @@ object Versions {
   // TODO:
   // Cannot upgrade to Scala 2.13 yet, because some libs are only compiled
   // against 2.12.x.
-  val ScalaVersion = "2.12.8"
+  val ScalaVersion = "2.12.10"
 
   val ConfigVersion     = "1.3.4"
-  val PureConfigVersion = "0.11.1"
+  val PureConfigVersion = "0.12.0"
 
-  val Avro4sVersion                 = "3.0.0"
-  val ConfluentPlatformVersion      = "5.3.0"
+  val Avro4sVersion                 = "3.0.1"
+  val ConfluentPlatformVersion      = "5.3.1"
   val KafkaVersion                  = "2.3.0"
   val EmbeddedKafkaVersion          = "2.3.0"
   val EmbeddedSchemaRegistryVersion = "5.3.0"
@@ -22,9 +22,10 @@ object Versions {
 
   val AlpakkaVersion = "1.0.2"
 
-  val AkkaHttpCirceVersion = "1.25.2"
-  val CirceVersion         = "0.11.1"
-  val CirceOpticsVersion   = "0.11.0"
+  val AkkaHttpCirceVersion      = "1.25.2"
+  val CirceVersion              = "0.12.1"
+  val CirceGenericExtrasVersion = "0.12.2"
+  val CirceOpticsVersion        = "0.12.0"
 
   val ScalaLoggingVersion = "3.9.2"
   val Slf4JVersion        = "1.7.28"
@@ -45,7 +46,7 @@ object Dependencies {
     DefaultOptions.resolvers(snapshot = true) ++ Seq(
       Resolver.typesafeRepo("releases"),
       Resolver.jcenterRepo,
-      MavenRepo("confluent", "http://packages.confluent.io/maven/"),
+      MavenRepo("confluent", "https://packages.confluent.io/maven/"),
       Resolver.bintrayRepo("hseeberger", "maven")
     )
 
@@ -75,12 +76,10 @@ object Dependencies {
   }
 
   object Avro {
-    val Avro4sCore   = "com.sksamuel.avro4s" %% "avro4s-core"   % Avro4sVersion
-    val Avro4sMacros = "com.sksamuel.avro4s" %% "avro4s-macros" % Avro4sVersion
-    val Avro4sKafka  = "com.sksamuel.avro4s" %% "avro4s-kafka"  % Avro4sVersion
-    val Avro4sJson   = "com.sksamuel.avro4s" %% "avro4s-json"   % Avro4sVersion
+    val Avro4sCore  = "com.sksamuel.avro4s" %% "avro4s-core"  % Avro4sVersion
+    val Avro4sKafka = "com.sksamuel.avro4s" %% "avro4s-kafka" % Avro4sVersion
+    val Avro4sJson  = "com.sksamuel.avro4s" %% "avro4s-json"  % Avro4sVersion
 
-//    val All = Seq(Avro4sCore, Avro4sMacros, Avro4sKafka)
     val All = Seq(Avro4sCore, Avro4sKafka)
   }
 
@@ -114,14 +113,14 @@ object Dependencies {
   object Circe {
     val AkkaHttpSupport = "de.heikoseeberger" %% "akka-http-circe" % AkkaHttpCirceVersion
 
-    val Optics = "io.circe" %% "circe-optics" % CirceOpticsVersion
+    val Optics = "io.circe" %% "circe-optics"         % CirceOpticsVersion
+    val Extras = "io.circe" %% "circe-generic-extras" % CirceGenericExtrasVersion
 
     val All = Seq(
       "io.circe" %% "circe-core",
       "io.circe" %% "circe-generic",
-      "io.circe" %% "circe-generic-extras",
       "io.circe" %% "circe-parser"
-    ).map(_ % CirceVersion) :+ Optics
+    ).map(_ % CirceVersion) :+ Optics :+ Extras
   }
 
   object Testing {

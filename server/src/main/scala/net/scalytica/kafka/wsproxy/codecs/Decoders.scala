@@ -14,11 +14,12 @@ import scala.util.{Failure, Success}
 
 trait Decoders {
 
-  implicit val brokerInfoDecoder: Decoder[BrokerInfo] = deriveDecoder
+  implicit val brokerInfoDecoder: Decoder[BrokerInfo] = deriveConfiguredDecoder
 
-  implicit val sessionDecoder: Decoder[Session] = deriveDecoder
+  implicit val sessionDecoder: Decoder[Session] = deriveConfiguredDecoder
 
-  implicit val consumerInstDecoder: Decoder[ConsumerInstance] = deriveDecoder
+  implicit val consumerInstDecoder: Decoder[ConsumerInstance] =
+    deriveConfiguredDecoder
 
   implicit val wsMessageIdDecoder: Decoder[WsMessageId] = { json =>
     json.as[String].map(WsMessageId.apply)
@@ -52,7 +53,7 @@ trait Decoders {
     json.as[Long].map(Timestamp.apply)
   }
 
-  implicit val wsCommitDecoder: Decoder[WsCommit] = deriveDecoder
+  implicit val wsCommitDecoder: Decoder[WsCommit] = deriveConfiguredDecoder
 
   implicit val byteArrDecoder: Decoder[Array[Byte]] = { json =>
     json.as[String].flatMap { s =>
@@ -69,9 +70,11 @@ trait Decoders {
     }
   }
 
-  implicit val prodResDecoder: Decoder[WsProducerResult] = deriveDecoder
+  implicit val prodResDecoder: Decoder[WsProducerResult] =
+    deriveConfiguredDecoder
 
-  implicit val kafkaHeaderDecoder: Decoder[KafkaHeader] = deriveDecoder
+  implicit val kafkaHeaderDecoder: Decoder[KafkaHeader] =
+    deriveConfiguredDecoder
 
   implicit def inValDecoder[T](
       implicit dec: Decoder[T]

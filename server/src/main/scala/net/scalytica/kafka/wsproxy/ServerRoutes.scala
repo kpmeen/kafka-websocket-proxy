@@ -78,7 +78,7 @@ trait BaseRoutes extends QueryParamParsers {
       status = statusCode,
       entity = HttpEntity(
         contentType = ContentTypes.`application/json`,
-        string = jsonMessageStr(message).pretty(Printer.noSpaces)
+        string = jsonMessageStr(message).printWith(Printer.noSpaces)
       )
     )
   }
@@ -191,7 +191,7 @@ trait BaseRoutes extends QueryParamParsers {
       .mapRejectionResponse { res =>
         res.entity match {
           case HttpEntity.Strict(ContentTypes.`text/plain(UTF-8)`, body) =>
-            val js = jsonMessageStr(body.utf8String).pretty(Printer.noSpaces)
+            val js = jsonMessageStr(body.utf8String).printWith(Printer.noSpaces)
             res.copy(entity = HttpEntity(ContentTypes.`application/json`, js))
 
           case _ => res
@@ -261,7 +261,7 @@ trait ServerRoutes
                   status = OK,
                   entity = HttpEntity(
                     contentType = ContentTypes.`application/json`,
-                    string = ci.asJson.pretty(Printer.spaces2)
+                    string = ci.asJson.printWith(Printer.spaces2)
                   )
                 )
               } finally {
