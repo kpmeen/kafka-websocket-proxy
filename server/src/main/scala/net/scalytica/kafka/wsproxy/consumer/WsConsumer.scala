@@ -71,23 +71,6 @@ object WsConsumer {
       .withConsumerFactory(initialiseConsumer(args.aclCredentials))
   }
 
-  private[this] def consumerInstance[K, V](
-      args: OutSocketArgs,
-      autoCommit: Boolean
-  )(
-      implicit
-      cfg: AppCfg,
-      as: ActorSystem,
-      kd: Deserializer[K],
-      vd: Deserializer[V]
-  ): (ConsumerSettings[K, V], IConsumer[K, V]) = {
-    val settings = consumerSettings[K, V](args, autoCommit)
-    val consumer = settings.createKafkaConsumer()
-
-    checkClient(args.topic, consumer)
-    (settings, consumer)
-  }
-
   /**
    * Initialise a new [[KafkaConsumer]] instance
    *
