@@ -8,13 +8,15 @@ import net.scalytica.kafka.wsproxy.models.WsGroupId
 import net.scalytica.test.WSProxyKafkaSpec
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Minute, Span}
-import org.scalatest.{BeforeAndAfterAll, MustMatchers, OptionValues, WordSpec}
+import org.scalatest.{BeforeAndAfterAll, OptionValues}
+import org.scalatest.matchers.must.Matchers
+import org.scalatest.wordspec.AnyWordSpec
 
 // scalastyle:off magic.number
 class SessionDataProducerSpec
-    extends WordSpec
+    extends AnyWordSpec
     with WSProxyKafkaSpec
-    with MustMatchers
+    with Matchers
     with OptionValues
     with Eventually
     with ScalaFutures

@@ -1,5 +1,5 @@
 package net.scalytica.kafka.wsproxy
 
-import org.scalatest.WordSpec
+import org.scalatest.wordspec.AnyWordSpec
 
-class QueryParamsParsersSpec extends WordSpec {}
+class QueryParamsParsersSpec extends AnyWordSpec {}

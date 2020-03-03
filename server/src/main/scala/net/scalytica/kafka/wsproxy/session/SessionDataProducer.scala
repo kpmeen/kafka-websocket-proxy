@@ -38,7 +38,7 @@ private[session] class SessionDataProducer(
     cfg.sessionHandler.sessionStateTopicName.value
 
   private[this] lazy val producerProps =
-    ProducerSettings(sys.toUntyped, Some(kSer), Some(vSer))
+    ProducerSettings(sys.toClassic, Some(kSer), Some(vSer))
       .withBootstrapServers(kafkaUrl)
       .withProducerFactory(initialiseProducer)
 

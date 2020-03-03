@@ -1,12 +1,14 @@
 package net.scalytica.kafka.wsproxy.session
 
 import net.scalytica.kafka.wsproxy.models.WsGroupId
-import org.scalatest.{EitherValues, MustMatchers, OptionValues, WordSpec}
+import org.scalatest.{EitherValues, OptionValues}
+import org.scalatest.matchers.must.Matchers
+import org.scalatest.wordspec.AnyWordSpec
 
 // scalastyle:off magic.number
 class ActiveSessionsSpec
-    extends WordSpec
-    with MustMatchers
+    extends AnyWordSpec
+    with Matchers
     with OptionValues
     with EitherValues {
 

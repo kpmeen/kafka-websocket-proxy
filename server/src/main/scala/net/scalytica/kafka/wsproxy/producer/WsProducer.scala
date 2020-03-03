@@ -5,7 +5,7 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.model.ws.Message
 import akka.kafka.scaladsl.Producer
 import akka.kafka.{ProducerMessage, ProducerSettings}
-import akka.stream.ActorMaterializer
+import akka.stream.Materializer
 import akka.stream.scaladsl.{Flow, Source}
 import akka.util.ByteString
 import com.typesafe.scalalogging.Logger
@@ -235,7 +235,7 @@ object WsProducer {
       implicit
       cfg: AppCfg,
       as: ActorSystem,
-      mat: ActorMaterializer,
+      mat: Materializer,
       ks: Serializer[K],
       vs: Serializer[V],
       kd: Decoder[K],
@@ -265,7 +265,7 @@ object WsProducer {
         val record = asKafkaProducerRecord(args.topic, wpr)
         ProducerMessage.Message(record, record)
       }
-      .via(Producer.flexiFlow(settings, producerClient))
+      .via(Producer.flexiFlow(settings.withProducer(producerClient)))
       .map(r => WsProducerResult.fromProducerResults(r))
       .flatMapConcat(seqToSource)
   }
@@ -274,7 +274,7 @@ object WsProducer {
       implicit
       cfg: AppCfg,
       as: ActorSystem,
-      mat: ActorMaterializer,
+      mat: Materializer,
       serde: WsProxyAvroSerde[AvroProducerRecord]
   ): Flow[Message, WsProducerResult, NotUsed] = {
     implicit val ec: ExecutionContext = as.dispatcher
@@ -307,7 +307,7 @@ object WsProducer {
         ProducerMessage.Message(record, record)
 
       }
-      .via(Producer.flexiFlow(settings, producerClient))
+      .via(Producer.flexiFlow(settings.withProducer(producerClient)))
       .map(r => WsProducerResult.fromProducerResults(r))
       .flatMapConcat(seqToSource)
   }

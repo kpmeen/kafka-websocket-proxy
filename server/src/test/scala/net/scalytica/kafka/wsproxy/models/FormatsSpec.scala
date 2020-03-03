@@ -2,9 +2,11 @@ package net.scalytica.kafka.wsproxy.models
 
 import net.scalytica.kafka.wsproxy.models.Formats._
 import net.scalytica.kafka.wsproxy.models.Formats.FormatType._
-import org.scalatest.{MustMatchers, OptionValues, WordSpec}
+import org.scalatest.OptionValues
+import org.scalatest.matchers.must.Matchers
+import org.scalatest.wordspec.AnyWordSpec
 
-class FormatsSpec extends WordSpec with MustMatchers with OptionValues {
+class FormatsSpec extends AnyWordSpec with Matchers with OptionValues {
 
   "Format types" should {
 

@@ -3,13 +3,14 @@ package net.scalytica.kafka.wsproxy.utils
 import net.scalytica.kafka.wsproxy.Configuration.KafkaBootstrapHosts
 import net.scalytica.kafka.wsproxy.utils.HostResolver.resolveKafkaBootstrapHosts
 import net.scalytica.test.WSProxyKafkaSpec
-import org.scalatest.{MustMatchers, WordSpec}
 
 import scala.concurrent.duration._
+import org.scalatest.matchers.must.Matchers
+import org.scalatest.wordspec.AnyWordSpec
 
 class HostResolverSpec
-    extends WordSpec
-    with MustMatchers
+    extends AnyWordSpec
+    with Matchers
     with WSProxyKafkaSpec {
 
   implicit val cfg = defaultTestAppCfg.copy(

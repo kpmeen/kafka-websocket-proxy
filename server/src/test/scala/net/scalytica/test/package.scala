@@ -23,11 +23,12 @@ import net.scalytica.kafka.wsproxy.models.{
   WsProducerResult
 }
 import net.scalytica.test.TestTypes.{Album, TestKey}
-import org.scalatest.{Assertion, MustMatchers, OptionValues}
+import org.scalatest.{Assertion, OptionValues}
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.{Failure, Success}
+import org.scalatest.matchers.must.Matchers
 
 package object test {
 
@@ -58,7 +59,7 @@ package object test {
   }
 
   implicit class WsProbeExtensions(probe: WSProbe)
-      extends MustMatchers
+      extends Matchers
       with OptionValues {
 
     def expectWsProducerResultJson(

@@ -2,11 +2,13 @@ package net.scalytica.kafka.wsproxy.session
 
 import net.scalytica.kafka.wsproxy.models.{WsClientId, WsGroupId, WsServerId}
 import net.scalytica.test.SessionOpResultValues
-import org.scalatest.{MustMatchers, OptionValues, WordSpec}
+import org.scalatest.OptionValues
+import org.scalatest.matchers.must.Matchers
+import org.scalatest.wordspec.AnyWordSpec
 
 class SessionSpec
-    extends WordSpec
-    with MustMatchers
+    extends AnyWordSpec
+    with Matchers
     with SessionOpResultValues
     with OptionValues {
 

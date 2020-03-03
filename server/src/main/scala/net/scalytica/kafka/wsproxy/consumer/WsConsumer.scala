@@ -15,11 +15,7 @@ import net.scalytica.kafka.wsproxy.{consumerMetricsProperties, mapToProperties}
 import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails
 import net.scalytica.kafka.wsproxy.models._
 import org.apache.kafka.clients.consumer.ConsumerConfig._
-import org.apache.kafka.clients.consumer.{
-  ConsumerRecord,
-  KafkaConsumer,
-  Consumer => IConsumer
-}
+import org.apache.kafka.clients.consumer.{ConsumerRecord, KafkaConsumer}
 import org.apache.kafka.common.errors.{
   AuthenticationException,
   AuthorizationException
@@ -28,6 +24,7 @@ import org.apache.kafka.common.serialization.Deserializer
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
+import scala.util.{Failure, Success, Try}
 
 /**
  * Functions for initialising Kafka consumer sources.
@@ -59,7 +56,7 @@ object WsConsumer {
     val kafkaUrl = cfg.kafkaClient.bootstrapHosts.mkString()
     val gid      = args.groupId.value
 
-    ConsumerSettings(as, kd, vd)
+    val cs = ConsumerSettings(as, kd, vd)
       .withBootstrapServers(kafkaUrl)
       .withProperties(
         AUTO_OFFSET_RESET_CONFIG       -> args.offsetResetStrategyString,
@@ -68,12 +65,20 @@ object WsConsumer {
       )
       .withClientId(args.clientId.value)
       .withGroupId(gid)
-      .withConsumerFactory(initialiseConsumer(args.aclCredentials))
+      .withConsumerFactory(initialiseConsumer(args.topic, args.aclCredentials))
+
+    checkClientConfig(args.topic, args.aclCredentials, cs) match {
+      case Success(_)         => logger.debug("Client config verified...")
+      case Failure(exception) => throw exception
+    }
+
+    cs
   }
 
   /**
    * Initialise a new [[KafkaConsumer]] instance
    *
+   * @param topic [[TopicName]] to use for the consumer
    * @param aclCredentials Option containing the [[AclCredentials]] to use
    * @param cs the [[ConsumerSettings]] to apply
    * @param cfg the [[AppCfg]] to use for configurable parameters
@@ -82,6 +87,7 @@ object WsConsumer {
    * @return a [[KafkaConsumer]] instance for keys of type [[K]] and value [[V]]
    */
   private[this] def initialiseConsumer[K, V](
+      topic: TopicName,
       aclCredentials: Option[AclCredentials]
   )(
       cs: ConsumerSettings[K, V]
@@ -99,11 +105,17 @@ object WsConsumer {
 
     logger.trace(s"Using consumer configuration:\n${props.mkString("\n")}")
 
-    new KafkaConsumer[K, V](
+    val consumer = new KafkaConsumer[K, V](
       props,
       cs.keyDeserializerOpt.orNull,
       cs.valueDeserializerOpt.orNull
     )
+
+    checkClient(topic, consumer) match {
+      case Success(c)         => c
+      case Failure(exception) => throw exception
+    }
+
   }
 
   /** Convenience function for logging a [[ConsumerRecord]]. */
@@ -116,6 +128,17 @@ object WsConsumer {
       f"timestamp: $ts%-20s"
   }
 
+  private[this] def checkClientConfig[K, V](
+      topic: TopicName,
+      credentials: Option[AclCredentials],
+      cs: ConsumerSettings[K, V]
+  )(implicit cfg: AppCfg): Try[Unit] = {
+    checkClient(topic, initialiseConsumer(topic, credentials)(cs)) match {
+      case Success(c) => Success(c.close())
+      case Failure(e) => Failure(e)
+    }
+  }
+
   /**
    * Call partitionsFor with the client to validate auth etc. This is a
    * workaround for the following issues identified in alpakka-kafka client:
@@ -124,17 +147,19 @@ object WsConsumer {
    * - https://github.com/akka/alpakka-kafka/issues/796
    *
    * @param topic the [[TopicName]] to fetch partitions for
-   * @param consumerClient the configured [[IConsumer]] to use.
-   * @tparam K the key type of the [[IConsumer]]
-   * @tparam V the value type of the [[IConsumer]]
+   * @param consumerClient the configured [[KafkaConsumer]] to use.
+   * @tparam K the key type of the [[KafkaConsumer]]
+   * @tparam V the value type of the [[KafkaConsumer]]
+   * @return A [[Try]] with the [[KafkaConsumer]] that was passed in if ok
    */
   private[this] def checkClient[K, V](
       topic: TopicName,
-      consumerClient: IConsumer[K, V]
-  ): Unit =
-    try {
+      consumerClient: KafkaConsumer[K, V]
+  ): Try[KafkaConsumer[K, V]] =
+    Try {
       val _ = consumerClient.partitionsFor(topic.value)
-    } catch {
+      consumerClient
+    }.recover {
       case ae: AuthenticationException =>
         consumerClient.close()
         throw AuthenticationError(ae.getMessage, ae)
@@ -179,9 +204,6 @@ object WsConsumer {
   ): Source[WsConsumerRecord[K, V], Consumer.Control] = {
     logger.debug("Setting up consumer with auto-commit ENABLED")
     val settings = consumerSettings[K, V](args, autoCommit = true)
-    val client   = settings.createKafkaConsumer()
-
-    checkClient(args.topic, client)
 
     val subscription = Subscriptions.topics(Set(args.topic.value))
 
@@ -219,9 +241,6 @@ object WsConsumer {
   ): Source[WsConsumerRecord[K, V], Consumer.Control] = {
     logger.debug("Setting up consumer with auto-commit DISABLED")
     val settings = consumerSettings[K, V](args, autoCommit = false)
-    val client   = settings.createKafkaConsumer()
-
-    checkClient(args.topic, client)
 
     val subscription = Subscriptions.topics(Set(args.topic.value))
 

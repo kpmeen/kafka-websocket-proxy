@@ -6,33 +6,32 @@ object Versions {
   // against 2.12.x.
   val ScalaVersion = "2.12.10"
 
-  val ConfigVersion     = "1.3.4"
-  val PureConfigVersion = "0.12.0"
+  val ConfigVersion     = "1.4.0"
+  val PureConfigVersion = "0.12.3"
 
-  val Avro4sVersion                 = "3.0.1"
-  val ConfluentPlatformVersion      = "5.3.1"
-  val KafkaVersion                  = "2.3.0"
-  val EmbeddedKafkaVersion          = "2.3.0"
-  val EmbeddedSchemaRegistryVersion = "5.3.0"
+  val Avro4sVersion                 = "3.0.8"
+  val ConfluentPlatformVersion      = "5.4.0"
+  val KafkaVersion                  = "2.4.0"
+  val EmbeddedKafkaVersion          = "2.4.0"
+  val EmbeddedSchemaRegistryVersion = "5.4.0"
   val KafkaStreamsQueryVersion      = "0.1.1"
 
-  val AkkaVersion            = "2.5.25"
-  val AkkaHttpVersion        = "10.1.9"
-  val AkkaStreamKafkaVersion = "1.0.5"
+  val AkkaVersion            = "2.6.3"
+  val AkkaHttpVersion        = "10.1.11"
+  val AkkaStreamKafkaVersion = "2.0.2"
 
   val AlpakkaVersion = "1.0.2"
 
   val AkkaHttpCirceVersion      = "1.25.2"
-  val CirceVersion              = "0.12.1"
-  val CirceGenericExtrasVersion = "0.12.2"
-  val CirceOpticsVersion        = "0.12.0"
+  val CirceVersion              = "0.13.0"
+  val CirceGenericExtrasVersion = CirceVersion
+  val CirceOpticsVersion        = CirceVersion
 
   val ScalaLoggingVersion = "3.9.2"
-  val Slf4JVersion        = "1.7.28"
+  val Slf4JVersion        = "1.7.30"
   val LogbackVersion      = "1.2.3"
 
-  val ScalaTestVersion         = "3.0.8"
-  val ScalaTestPlusPlayVersion = "4.0.1"
+  val ScalaTestVersion = "3.1.1"
 
   val GatlingVersion = "3.1.1"
 }
@@ -55,9 +54,9 @@ object Dependencies {
     ExclusionRule("org.slf4j", "slf4j-log4j12")
   )
 
-  private[this] val LoggerExclusions = LoggerExclusionsTest ++ Seq(
-    ExclusionRule("org.apache.zookeeper", "zookeeper")
-  )
+  private[this] val Exclusions =
+    LoggerExclusionsTest ++
+      Seq(ExclusionRule("org.apache.zookeeper", "zookeeper"))
 
   object Akka {
 
@@ -85,22 +84,25 @@ object Dependencies {
 
   object Kafka {
     // official kafka libs
-    val Clients = "org.apache.kafka" % "kafka-clients" % KafkaVersion excludeAll (LoggerExclusions: _*)
-    val Streams = "org.apache.kafka" % "kafka-streams" % KafkaVersion excludeAll (LoggerExclusions: _*)
+    val Clients = "org.apache.kafka" % "kafka-clients" % KafkaVersion excludeAll (Exclusions: _*)
+    val Streams = "org.apache.kafka" % "kafka-streams" % KafkaVersion excludeAll (Exclusions: _*)
 
-    val Kafka = "org.apache.kafka" %% "kafka" % KafkaVersion excludeAll (LoggerExclusions: _*)
+    val Kafka = "org.apache.kafka" %% "kafka" % KafkaVersion excludeAll (Exclusions: _*)
 
     // kafka-streams-scala libs
-    val StreamsScala = "org.apache.kafka" %% "kafka-streams-scala" % KafkaVersion excludeAll (LoggerExclusions: _*)
-    val StreamsQuery = "com.lightbend"    %% "kafka-streams-query" % KafkaStreamsQueryVersion excludeAll (LoggerExclusions: _*)
+    val StreamsScala = "org.apache.kafka" %% "kafka-streams-scala" % KafkaVersion excludeAll (Exclusions: _*)
+    val StreamsQuery = "com.lightbend"    %% "kafka-streams-query" % KafkaStreamsQueryVersion excludeAll (Exclusions: _*)
   }
 
   object ConfluentKafka {
-    val AvroSerializer   = "io.confluent" % "kafka-avro-serializer"    % ConfluentPlatformVersion excludeAll (LoggerExclusions: _*)
-    val JsonSerializer   = "io.confluent" % "kafka-json-serializer"    % ConfluentPlatformVersion excludeAll (LoggerExclusions: _*)
-    val StreamsAvroSerde = "io.confluent" % "kafka-streams-avro-serde" % ConfluentPlatformVersion excludeAll (LoggerExclusions: _*)
+    val AvroSerializer   = "io.confluent" % "kafka-avro-serializer"    % ConfluentPlatformVersion excludeAll (Exclusions: _*)
+    val JsonSerializer   = "io.confluent" % "kafka-json-serializer"    % ConfluentPlatformVersion excludeAll (Exclusions: _*)
+    val StreamsAvroSerde = "io.confluent" % "kafka-streams-avro-serde" % ConfluentPlatformVersion excludeAll (Exclusions: _*)
 
-    val MonitoringInterceptors = "io.confluent" % "monitoring-interceptors" % ConfluentPlatformVersion excludeAll (LoggerExclusions: _*)
+    val SchemaRegistry       = "io.confluent" % "kafka-schema-registry"        % ConfluentPlatformVersion excludeAll (Exclusions: _*)
+    val SchemaRegistryClient = "io.confluent" % "kafka-schema-registry-client" % ConfluentPlatformVersion excludeAll (Exclusions: _*)
+
+    val MonitoringInterceptors = "io.confluent" % "monitoring-interceptors" % ConfluentPlatformVersion excludeAll (Exclusions: _*)
   }
 
   object Config {
@@ -162,9 +164,28 @@ object Dependencies {
 
   object Overrides {
 
+    val GlassfishVersion = "2.30.1"
+    val Hk2Version       = "2.6.1"
+
     val Deps = Seq(
       "org.apache.kafka" % "kafka-clients" % KafkaVersion,
-      "org.apache.kafka" %% "kafka"        % KafkaVersion
+      "org.apache.kafka" %% "kafka"        % KafkaVersion,
+      // FIXME: All of these overrides are due to kafka-schema-registry from
+      //        Confluent depending on a SNAPSHOT version of jersey in 5.4.0.
+      "org.glassfish.jersey.containers" % "jersey-container-servlet"  % GlassfishVersion,
+      "org.glassfish.jersey.ext"        % "jersey-bean-validation"    % GlassfishVersion,
+      "org.glassfish.jersey.inject"     % "jersey-hk2"                % GlassfishVersion,
+      "org.glassfish.jersey.media"      % "jersey-media-json-jackson" % GlassfishVersion,
+      "org.glassfish.jersey"            % "jersey-bom"                % GlassfishVersion,
+      "org.glassfish.hk2"               % "hk2"                       % Hk2Version,
+      "org.glassfish.hk2"               % "hk2-api"                   % Hk2Version,
+      "org.glassfish.hk2"               % "hk2-utils"                 % Hk2Version,
+      "org.glassfish.hk2"               % "hk2-core"                  % Hk2Version,
+      "org.glassfish.hk2"               % "hk2-locator"               % Hk2Version,
+      "org.glassfish.hk2"               % "hk2-runlevel"              % Hk2Version,
+      "org.glassfish.hk2"               % "class-model"               % Hk2Version,
+      "org.hibernate.validator"         % "hibernate-validator"       % "6.1.2.Final",
+      "javax.validation"                % "validation-api"            % "2.0.1.Final"
     )
   }
 }

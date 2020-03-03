@@ -4,10 +4,11 @@ import net.manub.embeddedkafka.schemaregistry.EmbeddedKafka
 import net.scalytica.test.WSProxyKafkaSpec
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Minutes, Span}
-import org.scalatest.{OptionValues, WordSpec}
+import org.scalatest.OptionValues
+import org.scalatest.wordspec.AnyWordSpec
 
 class WsKafkaAdminClientSpec
-    extends WordSpec
+    extends AnyWordSpec
     with OptionValues
     with ScalaFutures
     with WSProxyKafkaSpec

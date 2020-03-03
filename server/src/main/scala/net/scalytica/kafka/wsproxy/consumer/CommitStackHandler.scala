@@ -6,9 +6,9 @@ import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.consumer.CommitStackTypes._
 import net.scalytica.kafka.wsproxy.models.{WsCommit, WsConsumerRecord}
 
-object CommitHandler {
+object CommitStackHandler {
 
-  /** ADT defining the valid protocol for the [[CommitHandler]] */
+  /** ADT defining the valid protocol for the [[CommitStackHandler]] */
   sealed trait CommitProtocol
 
   case class Stash(record: WsConsumerRecord[_, _])   extends CommitProtocol
@@ -29,7 +29,7 @@ object CommitHandler {
    * be somewhat controlled.
    *
    * @param stack the message stack of [[Uncommitted]] messages
-   * @return a Behavior describing the [[CommitHandler]].
+   * @return a Behavior describing the [[CommitStackHandler]].
    */
   private[this] def committableStack(
       stack: CommitStack = CommitStack.empty

@@ -28,17 +28,18 @@ import org.apache.kafka.clients.CommonClientConfigs._
 import org.apache.kafka.common.config.SaslConfigs._
 import org.apache.kafka.common.config.SslConfigs._
 import org.apache.kafka.common.security.auth.SecurityProtocol._
-import org.scalatest.{MustMatchers, Suite}
+import org.scalatest.Suite
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.util.Random
+import org.scalatest.matchers.must.Matchers
 
 // scalastyle:off magic.number
 trait WSProxyKafkaSpec
     extends FileLoader
     with ScalatestRouteTest
-    with MustMatchers
+    with Matchers
     with EmbeddedKafka { self: Suite =>
 
   private[this] def availablePort: Int = {

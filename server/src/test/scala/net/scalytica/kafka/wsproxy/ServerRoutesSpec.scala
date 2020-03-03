@@ -21,13 +21,14 @@ import net.scalytica.test._
 import org.scalatest.Inspectors.forAll
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Minutes, Span}
-import org.scalatest.{EitherValues, OptionValues, WordSpec}
+import org.scalatest.{EitherValues, OptionValues}
 
 import scala.concurrent.duration._
+import org.scalatest.wordspec.AnyWordSpec
 
 // scalastyle:off magic.number
 class ServerRoutesSpec
-    extends WordSpec
+    extends AnyWordSpec
     with EitherValues
     with OptionValues
     with ScalaFutures

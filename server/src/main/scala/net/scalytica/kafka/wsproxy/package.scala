@@ -5,7 +5,7 @@ import java.util.{Properties => JProps}
 
 import akka.NotUsed
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
-import akka.stream.ActorMaterializer
+import akka.stream.Materializer
 import akka.stream.scaladsl.{Flow, Sink}
 import akka.util.ByteString
 import com.typesafe.scalalogging.Logger
@@ -28,7 +28,7 @@ package object wsproxy {
 
   def wsMessageToStringFlow(
       implicit
-      mat: ActorMaterializer,
+      mat: Materializer,
       ec: ExecutionContext
   ): Flow[Message, String, NotUsed] =
     Flow[Message]
@@ -40,7 +40,7 @@ package object wsproxy {
 
   def wsMessageToByteStringFlow(
       implicit
-      mat: ActorMaterializer,
+      mat: Materializer,
       ec: ExecutionContext
   ): Flow[Message, ByteString, NotUsed] =
     Flow[Message]

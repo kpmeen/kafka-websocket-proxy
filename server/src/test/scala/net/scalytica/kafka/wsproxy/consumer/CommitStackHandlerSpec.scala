@@ -2,20 +2,22 @@ package net.scalytica.kafka.wsproxy.consumer
 
 import akka.actor.testkit.typed.scaladsl.{BehaviorTestKit, TestInbox}
 import akka.kafka.testkit.ConsumerResultFactory
-import net.scalytica.kafka.wsproxy.consumer.CommitHandler._
+import net.scalytica.kafka.wsproxy.consumer.CommitStackHandler._
 import net.scalytica.kafka.wsproxy.consumer.CommitStackTypes._
 import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails
 import net.scalytica.kafka.wsproxy.models._
 import net.scalytica.test.WSProxyKafkaSpec
 import org.scalatest.concurrent.Eventually
 import org.scalatest.time.{Minute, Span}
-import org.scalatest.{BeforeAndAfter, MustMatchers, WordSpec}
+import org.scalatest.BeforeAndAfter
 
 import scala.collection.immutable
+import org.scalatest.matchers.must.Matchers
+import org.scalatest.wordspec.AnyWordSpec
 
-class CommitHandlerSpec
-    extends WordSpec
-    with MustMatchers
+class CommitStackHandlerSpec
+    extends AnyWordSpec
+    with Matchers
     with BeforeAndAfter
     with Eventually
     with WSProxyKafkaSpec {

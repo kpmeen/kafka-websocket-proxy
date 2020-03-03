@@ -1,6 +1,5 @@
 package net.scalytica.kafka.wsproxy.models
 
-import akka.Done
 import akka.kafka.ConsumerMessage
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
   AvroConsumerRecord,
@@ -8,8 +7,6 @@ import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
 }
 import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails
 import org.apache.kafka.common.serialization.Serializer
-
-import scala.concurrent.Future
 
 /**
  * ADT describing any record that can be sent out from the service through the
@@ -36,9 +33,6 @@ sealed abstract class WsConsumerRecord[+K, +V](
 
   lazy val wsProxyMessageId: WsMessageId =
     WsMessageId(topic, partition, offset, timestamp)
-
-  def commit(): Future[Done] =
-    committableOffset.map(_.commitScaladsl()).getOrElse(Future.successful(Done))
 
   def toAvroRecord[Key >: K, Value >: V](
       implicit

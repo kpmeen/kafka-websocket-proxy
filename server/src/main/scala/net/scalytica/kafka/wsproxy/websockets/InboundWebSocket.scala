@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.model.ws.{BinaryMessage, TextMessage}
 import akka.http.scaladsl.server.Directives.handleWebSocketMessages
 import akka.http.scaladsl.server.Route
-import akka.stream.ActorMaterializer
+import akka.stream.Materializer
 import akka.util.ByteString
 import com.typesafe.scalalogging.Logger
 import io.circe.Printer.noSpaces
@@ -56,7 +56,7 @@ trait InboundWebSocket extends WithSchemaRegistryConfig {
       implicit
       cfg: AppCfg,
       as: ActorSystem,
-      mat: ActorMaterializer
+      mat: Materializer
   ): Route = handleWebSocketMessages {
     logger.debug(
       s"Initialising inbound websocket for topic ${args.topic.value}" +

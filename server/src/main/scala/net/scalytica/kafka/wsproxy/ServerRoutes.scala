@@ -1,6 +1,7 @@
 package net.scalytica.kafka.wsproxy
 
 import akka.actor.ActorSystem
+import akka.actor.typed.scaladsl.adapter._
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model._
@@ -8,7 +9,7 @@ import akka.http.scaladsl.model.headers.{BasicHttpCredentials, HttpCredentials}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.{ExceptionHandler, RejectionHandler, Route}
 import akka.kafka.scaladsl.Consumer
-import akka.stream.ActorMaterializer
+import akka.stream.Materializer
 import akka.stream.scaladsl.RunnableGraph
 import akka.util.Timeout
 import com.typesafe.scalalogging.Logger
@@ -89,7 +90,7 @@ trait BaseRoutes extends QueryParamParsers {
     paramsOnError { args =>
       extractActorSystem { implicit sys =>
         extractMaterializer { implicit mat =>
-          implicit val s = sys.scheduler
+          implicit val s = sys.scheduler.toTyped
           implicit val e = sys.dispatcher
 
           args.foreach {
@@ -224,7 +225,7 @@ trait ServerRoutes
       implicit
       cfg: AppCfg,
       sys: ActorSystem,
-      mat: ActorMaterializer,
+      mat: Materializer,
       ctx: ExecutionContext
   ): (RunnableGraph[Consumer.Control], Route) = {
     sessionHandlerRef = SessionHandler.init

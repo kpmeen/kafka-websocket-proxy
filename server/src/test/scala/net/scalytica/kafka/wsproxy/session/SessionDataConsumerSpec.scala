@@ -1,7 +1,6 @@
 package net.scalytica.kafka.wsproxy.session
 
 import akka.actor.testkit.typed.scaladsl.ActorTestKit
-import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
 import net.manub.embeddedkafka.schemaregistry.{
   EmbeddedKafka,
@@ -24,13 +23,15 @@ import net.scalytica.test.WSProxyKafkaSpec
 import org.scalatest.Inspectors.forAll
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Minute, Span}
-import org.scalatest.{BeforeAndAfterAll, MustMatchers, OptionValues, WordSpec}
+import org.scalatest.{BeforeAndAfterAll, OptionValues}
+import org.scalatest.matchers.must.Matchers
+import org.scalatest.wordspec.AnyWordSpec
 
 // scalastyle:off magic.number
 class SessionDataConsumerSpec
-    extends WordSpec
+    extends AnyWordSpec
     with WSProxyKafkaSpec
-    with MustMatchers
+    with Matchers
     with OptionValues
     with Eventually
     with ScalaFutures
@@ -45,9 +46,9 @@ class SessionDataConsumerSpec
 
   val sessionTopic = testCfg.sessionHandler.sessionStateTopicName
 
-  val atk          = ActorTestKit("session-data-consumer-test", config)
+  val atk = ActorTestKit("session-data-consumer-test", config)
+
   implicit val sys = atk.system
-  implicit val mat = ActorMaterializer()
 
   implicit val groupIdSerde = new WsGroupIdSerde()
   implicit val sessionSerde = new SessionSerde()
@@ -55,7 +56,7 @@ class SessionDataConsumerSpec
   implicit val keySer       = BasicSerdes.StringSerializer
 
   override def afterAll(): Unit = {
-    mat.shutdown()
+    materializer.shutdown()
     atk.shutdownTestKit()
     super.afterAll()
   }

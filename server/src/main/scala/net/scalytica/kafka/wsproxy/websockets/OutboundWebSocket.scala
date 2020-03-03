@@ -7,7 +7,7 @@ import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.{Route, ValidationRejection}
 import akka.kafka.scaladsl.Consumer
-import akka.stream.ActorMaterializer
+import akka.stream.Materializer
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.stream.typed.scaladsl.ActorSink
 import akka.util.{ByteString, Timeout}
@@ -27,7 +27,7 @@ import net.scalytica.kafka.wsproxy.avro.SchemaTypes._
 import net.scalytica.kafka.wsproxy.codecs.Decoders._
 import net.scalytica.kafka.wsproxy.codecs.Encoders._
 import net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde
-import net.scalytica.kafka.wsproxy.consumer.{CommitHandler, WsConsumer}
+import net.scalytica.kafka.wsproxy.consumer.{CommitStackHandler, WsConsumer}
 import net.scalytica.kafka.wsproxy.models.{
   Formats,
   OutSocketArgs,
@@ -82,13 +82,13 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
       implicit
       cfg: AppCfg,
       as: ActorSystem,
-      mat: ActorMaterializer,
+      mat: Materializer,
       ec: ExecutionContext,
       sessionHandler: ActorRef[SessionHandlerProtocol.Protocol]
   ): Route = {
     logger.debug("Initialising outbound websocket")
 
-    implicit val scheduler = as.scheduler
+    implicit val scheduler = as.scheduler.toTyped
 
     val wsAdminClient   = new WsKafkaAdminClient(cfg)
     val topicPartitions = wsAdminClient.topicPartitions(args.topic)
@@ -159,7 +159,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
    * @param terminateConsumer termination logic for current websocket consumer.
    * @param cfg the implicit [[AppCfg]] to use
    * @param as the implicit untyped [[ActorSystem]] to use
-   * @param mat the implicit [[ActorMaterializer]] to use
+   * @param mat the implicit [[Materializer]] to use
    * @param ec the implicit [[ExecutionContext]] to use
    * @return the WebSocket [[Route]]
    */
@@ -169,12 +169,12 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
       implicit
       cfg: AppCfg,
       as: ActorSystem,
-      mat: ActorMaterializer,
+      mat: Materializer,
       ec: ExecutionContext
   ): Route = {
     val commitHandlerRef =
       if (args.autoCommit) None
-      else Some(as.spawn(CommitHandler.commitStack, args.clientId.value))
+      else Some(as.spawn(CommitStackHandler.commitStack, args.clientId.value))
 
     val messageParser = args.socketPayload match {
       case JsonPayload => jsonMessageToWsCommit
@@ -213,28 +213,28 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
    * - If the client requests auto-commit, all incoming messages are ignored.
    * - If the client disables auto-commit, the Sink accepts JSON representation
    *   of [[WsCommit]] messages. These are then passed on to an Actor with
-   *   [[CommitHandler]] behaviour.
+   *   [[CommitStackHandler]] behaviour.
    *
    * @param messageParser parser to use for decoding incoming messages.
-   * @param aref an optional [[ActorRef]] to a [[CommitHandler]].
+   * @param aref          an optional [[ActorRef]] to a [[CommitStackHandler]].
    * @return a [[Sink]] for consuming [[Message]]s
-   * @see [[CommitHandler.commitStack]]
+   * @see [[CommitStackHandler.commitStack]]
    */
   private[this] def prepareSink(
       messageParser: Flow[Message, WsCommit, NotUsed],
-      aref: Option[ActorRef[CommitHandler.CommitProtocol]]
+      aref: Option[ActorRef[CommitStackHandler.CommitProtocol]]
   ): Sink[Message, _] =
     aref
       .map { ar =>
         messageParser
-          .map(wc => CommitHandler.Commit(wc))
+          .map(wc => CommitStackHandler.Commit(wc))
           .to(
-            ActorSink.actorRef[CommitHandler.CommitProtocol](
+            ActorSink.actorRef[CommitStackHandler.CommitProtocol](
               ref = ar,
-              onCompleteMessage = CommitHandler.Stop,
+              onCompleteMessage = CommitStackHandler.Stop,
               onFailureMessage = { t: Throwable =>
                 logger.error("An error occurred processing commit message", t)
-                CommitHandler.Continue
+                CommitStackHandler.Continue
               }
             )
           )
@@ -252,7 +252,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
    */
   private[this] def jsonMessageToWsCommit(
       implicit
-      mat: ActorMaterializer,
+      mat: Materializer,
       ec: ExecutionContext
   ): Flow[Message, WsCommit, NotUsed] =
     wsMessageToStringFlow
@@ -271,14 +271,14 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
    * for down-stream processing.
    *
    * @param cfg the [[AppCfg]] to use
-   * @param mat the [[ActorMaterializer]] to use
+   * @param mat the [[Materializer]] to use
    * @param ec  the [[ExecutionContext]] to use
    * @return a [[Flow]] converting [[Message]] to String
    */
   private[this] def avroMessageToWsCommit(
       implicit
       cfg: AppCfg,
-      mat: ActorMaterializer,
+      mat: Materializer,
       ec: ExecutionContext
   ): Flow[Message, WsCommit, NotUsed] =
     wsMessageToByteStringFlow
@@ -303,7 +303,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
    */
   private[this] def kafkaSource(
       args: OutSocketArgs,
-      commitHandlerRef: Option[ActorRef[CommitHandler.CommitProtocol]]
+      commitHandlerRef: Option[ActorRef[CommitStackHandler.CommitProtocol]]
   )(
       implicit
       cfg: AppCfg,
@@ -390,24 +390,24 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig {
 
   /**
    * Builds a Flow that sends consumed [[WsConsumerRecord]]s to the relevant
-   * instance of [[CommitHandler]] actor Sink, which stashed the record so that
-   * its offset can be committed later.
+   * instance of [[CommitStackHandler]] actor Sink, which stashed the record so
+   * that its offset can be committed later.
    *
-   * @param ref the [[ActorRef]] for the [[CommitHandler]]
+   * @param ref the [[ActorRef]] for the [[CommitStackHandler]]
    * @tparam K the type of the record key
    * @tparam V the type of the record value
    * @return a commit [[Sink]] for [[WsConsumerRecord]] messages
    */
   private[this] def manualCommitSink[K, V](
-      ref: ActorRef[CommitHandler.CommitProtocol]
+      ref: ActorRef[CommitStackHandler.CommitProtocol]
   ): Sink[WsConsumerRecord[K, V], NotUsed] = {
     Flow[WsConsumerRecord[K, V]]
-      .map(rec => CommitHandler.Stash(rec))
+      .map(rec => CommitStackHandler.Stash(rec))
       .to(
-        ActorSink.actorRef[CommitHandler.CommitProtocol](
+        ActorSink.actorRef[CommitStackHandler.CommitProtocol](
           ref = ref,
-          onCompleteMessage = CommitHandler.Continue,
-          onFailureMessage = _ => CommitHandler.Continue
+          onCompleteMessage = CommitStackHandler.Continue,
+          onFailureMessage = _ => CommitStackHandler.Continue
         )
       )
   }

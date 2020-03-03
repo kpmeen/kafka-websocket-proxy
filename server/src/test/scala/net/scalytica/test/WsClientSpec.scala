@@ -10,9 +10,10 @@ import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
 }
 import net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde
 import net.scalytica.kafka.wsproxy.models.Formats.FormatType
-import org.scalatest.{MustMatchers, Suite}
+import org.scalatest.Suite
+import org.scalatest.matchers.must.Matchers
 
-trait WsClientSpec extends ScalatestRouteTest with MustMatchers { self: Suite =>
+trait WsClientSpec extends ScalatestRouteTest with Matchers { self: Suite =>
 
   def avroProducerRecordSerde(
       implicit schemaRegistryPort: Int

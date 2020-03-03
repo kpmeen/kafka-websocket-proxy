@@ -47,7 +47,7 @@ private[session] class SessionDataConsumer(
     cfg.sessionHandler.sessionStateTopicName.value
 
   private[this] lazy val consumerProps = {
-    ConsumerSettings(sys.toUntyped, kDes, vDes)
+    ConsumerSettings(sys.toClassic, kDes, vDes)
       .withBootstrapServers(kafkaUrl)
       .withGroupId(cid)
       .withClientId(cid)

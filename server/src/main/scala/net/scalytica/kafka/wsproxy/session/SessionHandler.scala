@@ -1,6 +1,6 @@
 package net.scalytica.kafka.wsproxy.session
 
-import akka.actor.Scheduler
+import akka.actor.typed.Scheduler
 import akka.actor.typed.scaladsl.AskPattern._
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.scaladsl.adapter._
@@ -230,7 +230,7 @@ trait SessionHandler {
       implicit val sys = ctx.system
       implicit val ec  = sys.executionContext
 
-      val log = ctx.log.withLoggerClass(classOf[SessionHandler])
+      val log = Logger(classOf[SessionHandler])
 
       log.debug("Initialising session data producer...")
       implicit val producer = new SessionDataProducer()
@@ -285,7 +285,7 @@ trait SessionHandler {
                       producer.publish(s).map { _ =>
                         log.debug(
                           s"ADD_CONSUMER: consumer ${cid.value} added to" +
-                            s"session ${gid.value}"
+                            s" session ${gid.value}"
                         )
                         replyTo ! added
                       }

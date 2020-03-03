@@ -1,10 +1,10 @@
 package net.scalytica.kafka.wsproxy
 
 import akka.Done
+import akka.actor.CoordinatedShutdown
 import akka.actor.CoordinatedShutdown._
-import akka.actor.{ActorSystem, CoordinatedShutdown}
 import akka.http.scaladsl.Http
-import akka.stream.ActorMaterializer
+import akka.stream.Materializer
 import com.typesafe.scalalogging.Logger
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.utils.HostResolver.{
@@ -52,10 +52,11 @@ object Server extends App with ServerRoutes with ServerBindings {
 
   val config = Configuration.loadTypesafeConfig()
 
-  implicit val cfg: AppCfg            = Configuration.loadConfig(config)
-  implicit val sys: ActorSystem       = ActorSystem("kafka-ws-proxy", config)
-  implicit val mat: ActorMaterializer = ActorMaterializer()
-  implicit val ctx: ExecutionContext  = sys.dispatcher
+  implicit val cfg: AppCfg = Configuration.loadConfig(config)
+  implicit val classicSys: akka.actor.ActorSystem =
+    akka.actor.ActorSystem("kafka-ws-proxy", config)
+  implicit val mat: Materializer     = Materializer.matFromSystem
+  implicit val ctx: ExecutionContext = classicSys.dispatcher
 
   val resStatus = resolveKafkaBootstrapHosts(cfg.kafkaClient.bootstrapHosts)
   if (!resStatus.hasErrors) {
@@ -68,7 +69,7 @@ object Server extends App with ServerRoutes with ServerBindings {
       "Some hosts could not be resolved. Reasons:" +
         s"\n${reasons.mkString("  - ", "\n", "")}"
     )
-    val _ = Await.result(sys.terminate(), 10 seconds)
+    val _ = Await.result(classicSys.terminate(), 10 seconds)
     System.exit(1)
   }
 
@@ -89,7 +90,7 @@ object Server extends App with ServerRoutes with ServerBindings {
   val bindingSecure = initialiseSslBinding
 
   val shutdown: CoordinatedShutdown = {
-    val cs = CoordinatedShutdown(sys)
+    val cs = CoordinatedShutdown(classicSys)
 
     cs.addTask(PhaseServiceUnbind, "http-unbind") { () =>
       for {

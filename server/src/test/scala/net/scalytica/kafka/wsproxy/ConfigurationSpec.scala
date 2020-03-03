@@ -2,12 +2,14 @@ package net.scalytica.kafka.wsproxy
 
 import com.typesafe.config.ConfigFactory
 import net.scalytica.kafka.wsproxy.Configuration.{AppCfg, KafkaBootstrapHosts}
-import org.scalatest.{MustMatchers, OptionValues, WordSpec}
+import org.scalatest.OptionValues
 import pureconfig.error.ConfigReaderException
 
 import scala.concurrent.duration._
+import org.scalatest.matchers.must.Matchers
+import org.scalatest.wordspec.AnyWordSpec
 
-class ConfigurationSpec extends WordSpec with MustMatchers with OptionValues {
+class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
 
   val invalidCfg1 = ConfigFactory
     .parseString(

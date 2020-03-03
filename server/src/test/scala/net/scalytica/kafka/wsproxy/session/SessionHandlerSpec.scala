@@ -1,7 +1,8 @@
 package net.scalytica.kafka.wsproxy.session
 
 import akka.Done
-import akka.actor.Scheduler
+import akka.actor.typed.scaladsl.adapter._
+import akka.actor.typed.Scheduler
 import akka.actor.typed.ActorRef
 import akka.util.Timeout
 import net.manub.embeddedkafka.schemaregistry._
@@ -20,11 +21,13 @@ import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Minute, Span}
 
 import scala.concurrent.duration._
+import org.scalatest.matchers.must.Matchers
+import org.scalatest.wordspec.AnyWordSpec
 
 // scalastyle:off magic.number
 class SessionHandlerSpec
-    extends WordSpec
-    with MustMatchers
+    extends AnyWordSpec
+    with Matchers
     with BeforeAndAfter
     with Eventually
     with ScalaFutures
@@ -37,7 +40,7 @@ class SessionHandlerSpec
     PatienceConfig(timeout = Span(1, Minute))
 
   implicit val timeout: Timeout     = 3 seconds
-  implicit val scheduler: Scheduler = system.scheduler
+  implicit val scheduler: Scheduler = system.scheduler.toTyped
 
   implicit val keyDes: Deserializer[WsGroupId] =
     new WsGroupIdSerde().deserializer()

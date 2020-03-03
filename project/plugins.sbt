@@ -11,20 +11,25 @@ resolvers ++= Seq(
 )
 
 // Dependency handling
-addSbtPlugin("com.timushev.sbt" % "sbt-updates" % "0.4.2")
+addSbtPlugin("com.timushev.sbt" % "sbt-updates" % "0.5.0")
 
 // Formatting and style checking
-addSbtPlugin("org.scalameta"  % "sbt-scalafmt"           % "2.0.4")
+addSbtPlugin("org.scalameta"  % "sbt-scalafmt"           % "2.2.1")
 addSbtPlugin("org.scalastyle" %% "scalastyle-sbt-plugin" % "1.0.0")
 
 // Code coverage
-addSbtPlugin("org.scoverage" %% "sbt-scoverage" % "1.6.0")
+addSbtPlugin("org.scoverage" %% "sbt-scoverage" % "1.6.1")
 
 // Native packaging plugin
-addSbtPlugin("com.typesafe.sbt" %% "sbt-native-packager" % "1.4.1")
+addSbtPlugin("com.typesafe.sbt" %% "sbt-native-packager" % "1.6.1")
 
 // Release plugin
-addSbtPlugin("com.github.gseitz" % "sbt-release" % "1.0.11")
+addSbtPlugin("com.github.gseitz" % "sbt-release" % "1.0.13")
 
 // Gatling plugin
-addSbtPlugin("io.gatling" % "gatling-sbt" % "3.0.0")
+//addSbtPlugin("io.gatling" % "gatling-sbt" % "3.1.0")
+
+//classpathTypes += "maven-plugin"
+
+// Scalafix for automated code re-writes when updating dependencies
+addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.9.11")
