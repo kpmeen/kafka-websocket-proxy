@@ -16,7 +16,6 @@ becomes more like an extension of the proxy-internal consumer/producer streams.
 
 ## Getting started
 
-TBD...
 
 ## Configuration
 
