@@ -53,6 +53,7 @@ object Server extends App with ServerRoutes with ServerBindings {
   val config = Configuration.loadTypesafeConfig()
 
   implicit val cfg: AppCfg = Configuration.loadConfig(config)
+
   implicit val classicSys: akka.actor.ActorSystem =
     akka.actor.ActorSystem("kafka-ws-proxy", config)
   implicit val mat: Materializer     = Materializer.matFromSystem

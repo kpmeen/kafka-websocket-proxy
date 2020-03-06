@@ -3,6 +3,7 @@ package net.scalytica.kafka.wsproxy
 object SocketProtocol {
 
   sealed trait SocketPayload { self =>
+
     lazy val name: String = self.getClass.getSimpleName
       .stripSuffix("$")
       .stripSuffix("Payload")

@@ -120,6 +120,7 @@ object Formats {
     override val encoder = Encoder.encodeLong
     override val decoder = Decoder.decodeLong
   }
+
   case object DoubleType extends FormatType {
     type Aux = Double
 
@@ -129,6 +130,7 @@ object Formats {
     override val encoder = Encoder.encodeDouble
     override val decoder = Decoder.decodeDouble
   }
+
   case object FloatType extends FormatType {
     type Aux = Float
 
