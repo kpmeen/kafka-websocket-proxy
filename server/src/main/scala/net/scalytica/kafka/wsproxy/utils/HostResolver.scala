@@ -18,9 +18,11 @@ object HostResolver {
     def isSuccess: Boolean
     def isError: Boolean = !isSuccess
   }
+
   case class HostResolved(host: InetAddress) extends HostResolutionResult {
     override def isSuccess = true
   }
+
   case class HostResolutionError(reason: String) extends HostResolutionResult {
     override def isSuccess = false
   }

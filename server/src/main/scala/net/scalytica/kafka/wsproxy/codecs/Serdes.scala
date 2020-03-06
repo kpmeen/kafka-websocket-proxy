@@ -37,26 +37,31 @@ object BasicSerdes {
 
   implicit val IntSerializer =
     KSerdes.Integer().serializer().asInstanceOf[Serializer[Int]]
+
   implicit val IntDeserializer =
     KSerdes.Integer().deserializer().asInstanceOf[Deserializer[Int]]
 
   implicit val ShortSerializer =
     KSerdes.Short().serializer().asInstanceOf[Serializer[Short]]
+
   implicit val ShortDeserializer =
     KSerdes.Short().deserializer().asInstanceOf[Deserializer[Short]]
 
   implicit val LongSerializer =
     KSerdes.Long().serializer().asInstanceOf[Serializer[Long]]
+
   implicit val LongDeserializer =
     KSerdes.Long().deserializer().asInstanceOf[Deserializer[Long]]
 
   implicit val DoubleSerializer =
     KSerdes.Double().serializer().asInstanceOf[Serializer[Double]]
+
   implicit val DoubleDeserializer =
     KSerdes.Double().deserializer().asInstanceOf[Deserializer[Double]]
 
   implicit val FloatSerializer =
     KSerdes.Float().serializer().asInstanceOf[Serializer[Float]]
+
   implicit val FloatDeserializer =
     KSerdes.Float().deserializer().asInstanceOf[Deserializer[Float]]
 

@@ -8,34 +8,43 @@ object SchemaTypes {
 
     implicit val KafkaMessageHeaderSchemaFor: SchemaFor[KafkaMessageHeader] =
       KafkaMessageHeader.schemaFor
+
     implicit val KafkaMessageHeaderToRecord: ToRecord[KafkaMessageHeader] =
       KafkaMessageHeader.toRecord
+
     implicit val KafkaMessageHeaderFromRecord: FromRecord[KafkaMessageHeader] =
       KafkaMessageHeader.fromRecord
 
     implicit val ProducerRecordSchemaFor: SchemaFor[AvroProducerRecord] =
       AvroProducerRecord.schemaFor
+
     implicit val ProducerRecordToRecord: ToRecord[AvroProducerRecord] =
       AvroProducerRecord.toRecord
+
     implicit val ProducerRecordFromRecord: FromRecord[AvroProducerRecord] =
       AvroProducerRecord.fromRecord
 
     implicit val ProducerResultSchemaFor: SchemaFor[AvroProducerResult] =
       AvroProducerResult.schemaFor
+
     implicit val ProducerResultToRecord: ToRecord[AvroProducerResult] =
       AvroProducerResult.toRecord
+
     implicit val ProducerResultFromRecord: FromRecord[AvroProducerResult] =
       AvroProducerResult.fromRecord
 
     implicit val ConsumerRecordSchemaFor: SchemaFor[AvroConsumerRecord] =
       AvroConsumerRecord.schemaFor
+
     implicit val ConsumerRecordToRecord: ToRecord[AvroConsumerRecord] =
       AvroConsumerRecord.toRecord
+
     implicit val ConsumerRecordFromRecord: FromRecord[AvroConsumerRecord] =
       AvroConsumerRecord.fromRecord
 
     implicit val CommitSchemaFor: SchemaFor[AvroCommit] = AvroCommit.schemaFor
     implicit val CommitToRecord: ToRecord[AvroCommit]   = AvroCommit.toRecord
+
     implicit val CommitFromRecord: FromRecord[AvroCommit] =
       AvroCommit.fromRecord
 
@@ -87,6 +96,7 @@ object SchemaTypes {
   }
 
   object AvroProducerRecord {
+
     lazy val empty: AvroProducerRecord =
       AvroProducerRecord(None, Array.empty, None)
 

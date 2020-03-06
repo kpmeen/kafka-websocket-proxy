@@ -37,9 +37,11 @@ class WsKafkaAdminClient(cfg: AppCfg) {
 
   private[this] val sessionStateTopicStr =
     cfg.sessionHandler.sessionStateTopicName.value
+
   private[this] val configuredReplicas =
     cfg.sessionHandler.sessionStateReplicationFactor
   private[this] val maxReplicas = 3
+
   private[this] val retentionDuration =
     cfg.sessionHandler.sessionStateRetention.toMillis
 

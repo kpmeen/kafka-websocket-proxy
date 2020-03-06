@@ -65,6 +65,7 @@ case object Session {
   case class ConsumerExists(session: Session)        extends SessionOpResult
   case class ConsumerLimitReached(session: Session)  extends SessionOpResult
   case class ConsumerDoesNotExists(session: Session) extends SessionOpResult
+
   case class SessionNotFound(groupId: WsGroupId) extends SessionOpResult {
 
     override def session = throw new NoSuchElementException(

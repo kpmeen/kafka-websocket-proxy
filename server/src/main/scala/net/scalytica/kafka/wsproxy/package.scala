@@ -120,6 +120,7 @@ package object wsproxy {
   }
 
   implicit class LoggerExtensions(val logger: Logger) {
+
     private[this] def wrapInFuture(stmnt: => Unit): Future[Unit] =
       Future.successful(stmnt)
 

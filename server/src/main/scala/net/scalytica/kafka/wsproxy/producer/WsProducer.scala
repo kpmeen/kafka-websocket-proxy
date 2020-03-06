@@ -47,6 +47,7 @@ object WsProducer {
 
   // scalastyle:off
   private[this] val SASL_JAAS_CONFIG = "sasl.jaas.config"
+
   private[this] val PLAIN_LOGIN = (u: String, p: String) =>
     s"""org.apache.kafka.common.security.plain.PlainLoginModule required username="$u" password="$p";"""
   // scalastyle:on
