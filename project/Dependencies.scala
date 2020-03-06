@@ -10,7 +10,7 @@ object Versions {
   val PureConfigVersion = "0.12.3"
 
   val Avro4sVersion                 = "3.0.8"
-  val ConfluentPlatformVersion      = "5.4.0"
+  val ConfluentPlatformVersion      = "5.4.1"
   val KafkaVersion                  = "2.4.0"
   val EmbeddedKafkaVersion          = "2.4.0"
   val EmbeddedSchemaRegistryVersion = "5.4.0"
