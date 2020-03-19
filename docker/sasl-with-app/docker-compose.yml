@@ -1,0 +1,128 @@
+---
+version: '3'
+
+services:
+
+  # The ZooKeeper node
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    hostname: zookeeper
+    container_name: zookeeper
+    ports:
+      - "22181:2181"
+    environment:
+      ZOOKEEPER_SERVER_ID: 1
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_SERVERS: zookeeper:2888:3888
+      KAFKA_OPTS: -Djava.security.auth.login.config=/etc/kafka/secrets/zookeeper_jaas.conf -Dzookeeper.authProvider.1=org.apache.zookeeper.server.auth.SASLAuthenticationProvider
+    healthcheck:
+      test: ["CMD-SHELL", "echo ruok | nc -w 2 zookeeper 2181"]
+      interval: 5s
+      timeout: 10s
+      retries: 3
+    volumes:
+      - ./sasl_ssl:/etc/kafka/secrets
+    extra_hosts:
+      - "moby:127.0.0.1"
+    labels:
+      net.scalytica.kafka.wsproxy.container.type: "zookeeper"
+
+  # The Kafka broker
+  broker1:
+    image: confluentinc/cp-kafka:latest
+    hostname: broker1
+    container_name: kafka
+    ports:
+      - "29092:29092"
+      - "29094:29094"
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,SASL_SSL:SASL_SSL,SASL_SSL_HOST:SASL_SSL
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker1:9092,SASL_SSL://broker1:9094,PLAINTEXT_HOST://localhost:29092,SASL_SSL_HOST://localhost:29094
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_SSL_KEYSTORE_FILENAME: broker1.keystore.jks
+      KAFKA_SSL_KEYSTORE_CREDENTIALS: broker1_keystore_creds
+      KAFKA_SSL_KEY_CREDENTIALS: broker1_sslkey_creds
+      KAFKA_SSL_TRUSTSTORE_FILENAME: broker1.truststore.jks
+      KAFKA_SSL_TRUSTSTORE_CREDENTIALS: broker1_truststore_creds
+      KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: ""
+      KAFKA_SASL_ENABLED_MECHANISMS: PLAIN
+      KAFKA_OPTS: -Djava.security.auth.login.config=/etc/kafka/secrets/kafka_server_jaas.conf
+    healthcheck:
+      test: ['CMD-SHELL', 'kafka-configs --bootstrap-server localhost:29092 --describe --entity-type brokers --entity-default --command-config /etc/kafka/secrets/admclient.conf | grep "Default config for brokers in the cluster are"']
+      interval: 5s
+      timeout: 10s
+      retries: 4
+    volumes:
+      - ./sasl_ssl:/etc/kafka/secrets
+    extra_hosts:
+      - "moby:127.0.0.1"
+    labels:
+      net.scalytica.kafka.wsproxy.container.type: "kafka"
+
+  # Confluent Schema Registry
+  schema-registry:
+    image: confluentinc/cp-schema-registry:latest
+    hostname: schema-registry
+    container_name: schema-registry
+    depends_on:
+      - zookeeper
+      - broker1
+    ports:
+      - "28081:8081"
+    environment:
+      SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: zookeeper:2181
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://broker1:9092
+      SCHEMA_REGISTRY_KAFKASTORE_SECURITY_PROTOCOL: PLAINTEXT
+    extra_hosts:
+      - "moby:127.0.0.1"
+    labels:
+      net.scalytica.kafka.wsproxy.container.type: "schema-registry"
+
+  kafka-ws-proxy:
+    image: kpmeen/kafka-websocket-proxy:latest
+    depends_on:
+      - zookeeper
+      - broker1
+      - schema-registry
+    ports:
+      - "8078:8078"
+    environment:
+      # To run the proxy with SSL/TLS enabled (https and wss), remove the
+      # below keys starting with the WSPROXY_SSL_* prefix.
+#      WSPROXY_SSL_ONLY: "true"
+#      WSPROXY_SSL_PORT: 8078
+#      WSPROXY_SSL_KEYSTORE_LOCATION: /etc/kafka/secrets/broker1.keystore.jks
+#      WSPROXY_SSL_KEYSTORE_PASS: scalytica
+      WSPROXY_KAFKA_BOOTSTRAP_URLS: broker1:9094
+      WSPROXY_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      # The session state replication factor must not be larger than the total
+      # number of running kafka brokers. In this compose that is 1.
+      WSPROXY_SESSION_STATE_REPLICATION_FACTOR: 1
+      # Kafka security configs
+      WSPROXY_KAFKA_SECURITY_PROTOCOL: SASL_SSL
+      WSPROXY_KAFKA_SASL_MECHANISM: PLAIN
+      WSPROXY_KAFKA_SASL_JAAS_CFG: "org.apache.kafka.common.security.plain.PlainLoginModule required serviceName=\"kafka-websocket-proxy\" username=\"client\" password=\"client\";"
+      #WSPROXY_KAFKA_SASL_KERBEROS_SERVICE_NAME: ""
+      WSPROXY_KAFKA_SSL_KEY_PASS: scalytica
+      #WSPROXY_KAFKA_SASL_ENDPOINT_ID_ALGO: ""
+      WSPROXY_KAFKA_SSL_TRUSTSTORE_LOCATION: /etc/kafka/secrets/client.truststore.jks
+      WSPROXY_KAFKA_SSL_TRUSTSTORE_PASS: scalytica
+      WSPROXY_KAFKA_SSL_KEYSTORE_LOCATION: /etc/kafka/secrets/client.keystore.jks
+      WSPROXY_KAFKA_SSL_KEYSTORE_PASS: scalytica
+      #WSPROXY_KAFKA_SSL_PROVIDER: ""
+      #WSPROXY_KAFKA_SSL_CIPHER_SUITES: ""
+      #WSPROXY_KAFKA_SSL_ENABLED_PROTOCOLS: ""
+    volumes:
+      - ./sasl_ssl:/etc/kafka/secrets
+    extra_hosts:
+      - "moby:127.0.0.1"
+    labels:
+      net.scalytica.kafka.wsproxy.container.type: "kafka-websocket-proxy"
