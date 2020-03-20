@@ -271,6 +271,17 @@ trait ServerRoutes
             }
           }
         }
+      } ~
+      path("healthcheck") {
+        complete {
+          HttpResponse(
+            status = OK,
+            entity = HttpEntity(
+              contentType = ContentTypes.`application/json`,
+              string = """{ "response": "I'm healthy" }"""
+            )
+          )
+        }
       }
   }
 
