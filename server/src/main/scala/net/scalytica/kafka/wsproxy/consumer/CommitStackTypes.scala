@@ -136,7 +136,7 @@ private[consumer] object CommitStackTypes {
           case (nextStack, maybeCommittable) =>
             maybeCommittable.map { u =>
               // FIXME:
-              //       This deprecation is bad for the current code base, since
+              //       This deprecation is bad for the current design, since
               //       we want to commit single messages and not a stream. Might
               //       need a redesign of OutboundWebSocket.prepareSink.
               u.committable.commitScaladsl().foreach { _ =>

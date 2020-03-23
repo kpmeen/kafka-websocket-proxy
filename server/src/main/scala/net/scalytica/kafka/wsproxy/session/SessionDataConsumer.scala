@@ -4,7 +4,6 @@ import akka.actor.typed.ActorSystem
 import akka.actor.typed.scaladsl.adapter._
 import akka.kafka.scaladsl.Consumer
 import akka.kafka.{ConsumerSettings, Subscriptions}
-import com.typesafe.scalalogging.Logger
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy._
 import net.scalytica.kafka.wsproxy.codecs.Implicits._
@@ -31,9 +30,7 @@ private[session] class SessionDataConsumer(
     implicit
     cfg: AppCfg,
     sys: ActorSystem[_]
-) {
-
-  private[this] val logger = Logger(getClass)
+) extends WithProxyLogger {
 
   private[this] val kDes = BasicSerdes.StringDeserializer
   private[this] val vDes = new SessionSerde().deserializer()

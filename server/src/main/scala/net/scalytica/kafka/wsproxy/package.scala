@@ -115,7 +115,12 @@ package object wsproxy {
 
     def toScalaFuture: Future[A] = {
       val sup = FunctionConverters.asJavaSupplier[A](() => jf.get)
-      FutureConverters.toScala(CompletableFuture.supplyAsync(sup))
+      try {
+        FutureConverters.toScala(CompletableFuture.supplyAsync(sup))
+      } catch {
+        case juce: java.util.concurrent.ExecutionException =>
+          Option(juce.getCause).map(cause => throw cause).getOrElse(throw juce)
+      }
     }
   }
 

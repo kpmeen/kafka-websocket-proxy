@@ -8,7 +8,6 @@ import akka.kafka.{ProducerMessage, ProducerSettings}
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Flow, Source}
 import akka.util.ByteString
-import com.typesafe.scalalogging.Logger
 import io.circe.Decoder
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroProducerRecord
@@ -22,7 +21,8 @@ import net.scalytica.kafka.wsproxy.{
   mapToProperties,
   producerMetricsProperties,
   wsMessageToByteStringFlow,
-  wsMessageToStringFlow
+  wsMessageToStringFlow,
+  WithProxyLogger
 }
 import org.apache.kafka.clients.producer.{
   KafkaProducer,
@@ -41,9 +41,7 @@ import scala.concurrent.ExecutionContext
 /**
  * Functions for initialising Kafka producer sinks and flows.
  */
-object WsProducer {
-
-  private[this] val logger = Logger(getClass)
+object WsProducer extends WithProxyLogger {
 
   // scalastyle:off
   private[this] val SASL_JAAS_CONFIG = "sasl.jaas.config"

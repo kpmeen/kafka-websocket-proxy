@@ -5,13 +5,16 @@ import akka.kafka.ConsumerMessage.CommittableOffset
 import akka.kafka.scaladsl.Consumer
 import akka.kafka.{ConsumerSettings, Subscriptions}
 import akka.stream.scaladsl.Source
-import com.typesafe.scalalogging.Logger
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.errors.{
   AuthenticationError,
   AuthorisationError
 }
-import net.scalytica.kafka.wsproxy.{consumerMetricsProperties, mapToProperties}
+import net.scalytica.kafka.wsproxy.{
+  consumerMetricsProperties,
+  mapToProperties,
+  WithProxyLogger
+}
 import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails
 import net.scalytica.kafka.wsproxy.models._
 import org.apache.kafka.clients.consumer.ConsumerConfig._
@@ -29,9 +32,7 @@ import scala.util.{Failure, Success, Try}
 /**
  * Functions for initialising Kafka consumer sources.
  */
-object WsConsumer {
-
-  private[this] val logger = Logger(getClass)
+object WsConsumer extends WithProxyLogger {
 
   // scalastyle:off
   private[this] val SASL_JAAS_CONFIG = "sasl.jaas.config"

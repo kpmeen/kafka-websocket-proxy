@@ -6,12 +6,10 @@ import akka.http.scaladsl.server.Directives.handleWebSocketMessages
 import akka.http.scaladsl.server.Route
 import akka.stream.Materializer
 import akka.util.ByteString
-import com.typesafe.scalalogging.Logger
 import io.circe.Printer.noSpaces
 import io.circe.syntax._
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.SocketProtocol.{AvroPayload, JsonPayload}
-import net.scalytica.kafka.wsproxy.WithSchemaRegistryConfig
 import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
   AvroProducerRecord,
@@ -21,10 +19,9 @@ import net.scalytica.kafka.wsproxy.codecs.Encoders._
 import net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde
 import net.scalytica.kafka.wsproxy.models.{Formats, InSocketArgs}
 import net.scalytica.kafka.wsproxy.producer.WsProducer
+import net.scalytica.kafka.wsproxy.{WithProxyLogger, WithSchemaRegistryConfig}
 
-trait InboundWebSocket extends WithSchemaRegistryConfig {
-
-  private[this] val logger = Logger(getClass)
+trait InboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
 
   implicit private[this] def producerRecordSerde(
       implicit cfg: AppCfg

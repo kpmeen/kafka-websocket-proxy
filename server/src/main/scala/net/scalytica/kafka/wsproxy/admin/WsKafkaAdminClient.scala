@@ -1,18 +1,25 @@
 package net.scalytica.kafka.wsproxy.admin
 
-import com.typesafe.scalalogging.Logger
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy._
-import net.scalytica.kafka.wsproxy.errors.TopicNotFoundError
+import net.scalytica.kafka.wsproxy.errors.{
+  KafkaFutureErrorHandler,
+  TopicNotFoundError
+}
 import net.scalytica.kafka.wsproxy.models.{BrokerInfo, TopicName}
+import net.scalytica.kafka.wsproxy.utils.BlockingRetry
 import org.apache.kafka.clients.admin.AdminClientConfig._
 import org.apache.kafka.clients.admin._
 import org.apache.kafka.common.KafkaException
 import org.apache.kafka.common.config.TopicConfig._
-import org.apache.kafka.common.errors.UnknownTopicOrPartitionException
+import org.apache.kafka.common.errors.{
+  TopicExistsException,
+  UnknownTopicOrPartitionException
+}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
+import scala.util.Try
 import scala.util.control.NonFatal
 
 /**
@@ -21,9 +28,7 @@ import scala.util.control.NonFatal
  *
  * @param cfg the [[AppCfg]] to use
  */
-class WsKafkaAdminClient(cfg: AppCfg) {
-
-  private[this] val logger = Logger(getClass)
+class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
 
   // scalastyle:off line.size.limit
   private[this] lazy val admConfig = {
@@ -66,7 +71,14 @@ class WsKafkaAdminClient(cfg: AppCfg) {
     val topic = new NewTopic(sessionStateTopicStr, 1, replFactor).configs(tconf)
 
     logger.info("Creating session state topic...")
-    underlying.createTopics(Seq(topic).asJava).all().get()
+    Try {
+      underlying.createTopics(Seq(topic).asJava).all().get()
+    }.recover {
+        KafkaFutureErrorHandler.handle {
+          logger.info("Topic already exists")
+        }(t => logger.error("Could not create the session state topic", t))
+      }
+      .getOrElse(System.exit(1))
     logger.info("Session state topic created.")
   }
 
@@ -96,17 +108,27 @@ class WsKafkaAdminClient(cfg: AppCfg) {
    * Trigger the initialisation of the session state topic. This method will
    * first check if the topic already exists before attempting to create it.
    */
-  def initSessionStateTopic(): Unit =
+  def initSessionStateTopic(): Unit = {
     try {
-      findSessionStateTopic match {
-        case None    => createSessionStateTopic()
-        case Some(_) => logger.info("Session state topic verified.")
+      BlockingRetry.retry(
+        timeout = cfg.sessionHandler.sessionStateTopicInitTimeout,
+        interval = cfg.sessionHandler.sessionStateTopicInitRetryInterval,
+        numRetries = cfg.sessionHandler.sessionStateTopicInitRetries
+      ) { // scalastyle:ignore
+        findSessionStateTopic match {
+          case None    => createSessionStateTopic()
+          case Some(_) => logger.info("Session state topic verified.")
+        }
+      } { _ =>
+        logger.warn("Session state topic not verified, terminating")
+        System.exit(1)
       }
     } catch {
       case ex: Throwable =>
         logger.error("Session state topic verification failed.", ex)
         throw ex
     }
+  }
 
   /**
    * Fetches the configured number of partitions for the given Kafka topic.
@@ -147,7 +169,7 @@ class WsKafkaAdminClient(cfg: AppCfg) {
    * @return a List of [[BrokerInfo]] data.
    */
   def clusterInfo: List[BrokerInfo] = {
-    logger.debug("Fetching Kafka cluster information...")
+    logger.info("Fetching Kafka cluster information...")
     underlying
       .describeCluster()
       .nodes()
@@ -168,11 +190,28 @@ class WsKafkaAdminClient(cfg: AppCfg) {
    */
   def replicationFactor: Short = {
     val numNodes = clusterInfo.size
-    logger.debug(s"Calculating number of replicas for $sessionStateTopicStr...")
+    logger.info(s"Calculating number of replicas for $sessionStateTopicStr...")
     val numReplicas = if (numNodes >= maxReplicas) maxReplicas else numNodes
 
     if (configuredReplicas > numReplicas) numReplicas.toShort
     else configuredReplicas
+  }
+
+  /**
+   * Verify that cluster is ready
+   *
+   * @return true if the cluster is ready, else false
+   */
+  def clusterReady: Boolean = {
+    logger.info("Verifying that cluster is ready...")
+    val timeout  = 5 minutes
+    val interval = 10 seconds
+    val retries  = 30
+    BlockingRetry.retry(
+      timeout = timeout,
+      interval = interval,
+      numRetries = retries
+    )(clusterInfo.nonEmpty)(_ => false)
   }
 
   /** Close the underlying admin client. */

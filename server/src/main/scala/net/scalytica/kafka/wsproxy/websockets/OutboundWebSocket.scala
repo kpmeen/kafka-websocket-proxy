@@ -12,7 +12,6 @@ import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.stream.typed.scaladsl.ActorSink
 import akka.util.{ByteString, Timeout}
 import akka.{Done, NotUsed}
-import com.typesafe.scalalogging.Logger
 import io.circe.Encoder
 import io.circe.Printer.noSpaces
 import io.circe.parser.parse
@@ -41,9 +40,7 @@ import org.apache.kafka.common.serialization.Serializer
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 
-trait OutboundWebSocket extends WithSchemaRegistryConfig {
-
-  private[this] val logger = Logger(getClass)
+trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
 
   implicit private[this] val timeout: Timeout = 3 seconds
 

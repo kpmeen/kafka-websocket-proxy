@@ -58,14 +58,17 @@ object Configuration {
   final case class KafkaBootstrapHosts(hosts: List[String]) {
     def mkString(): String = hosts.mkString(",")
 
-    def hostsString: List[String] = hosts.map(_.takeWhile(_ != ':'))
+    def hostStrings: List[String] = hosts.map(_.takeWhile(_ != ':'))
   }
 
   final case class ServerCfg(
       serverId: WsServerId,
       bindInterface: String,
       port: Int,
-      ssl: Option[ServerSslCfg]
+      ssl: Option[ServerSslCfg],
+      brokerResolutionTimeout: FiniteDuration,
+      brokerResolutionRetries: Int,
+      brokerResolutionRetryInterval: FiniteDuration
   )
 
   final case class ServerSslCfg(
@@ -138,6 +141,9 @@ object Configuration {
   )
 
   final case class SessionHandlerCfg(
+      sessionStateTopicInitTimeout: FiniteDuration,
+      sessionStateTopicInitRetries: Int,
+      sessionStateTopicInitRetryInterval: FiniteDuration,
       sessionStateTopicName: TopicName,
       sessionStateReplicationFactor: Short,
       sessionStateRetention: FiniteDuration

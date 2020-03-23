@@ -15,7 +15,7 @@
   <logger name="akka.actor" level="WARN"/>
   <logger name="akka.kafka" level="WARN"/>
 
-  <logger name="org.apache.kafka.clients" level="WARN"/>
+  <logger name="org.apache.kafka.clients" level="ERROR"/>
 
   <logger name="net.scalytica" level="DEBUG"/>
 

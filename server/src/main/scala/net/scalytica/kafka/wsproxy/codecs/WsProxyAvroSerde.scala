@@ -3,12 +3,12 @@ package net.scalytica.kafka.wsproxy.codecs
 import java.util.{Map => JMap}
 
 import com.sksamuel.avro4s._
-import com.typesafe.scalalogging.Logger
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import io.confluent.kafka.serializers.{
   KafkaAvroDeserializer,
   KafkaAvroSerializer
 }
+import net.scalytica.kafka.wsproxy.WithProxyLogger
 import org.apache.avro.generic.GenericRecord
 import org.apache.kafka.common.serialization.{Deserializer, Serde, Serializer}
 
@@ -22,10 +22,9 @@ class WsProxyAvroSerde[T <: Product: Decoder: Encoder: SchemaFor] private (
 ) extends Serde[T]
     with Serializer[T]
     with Deserializer[T]
-    with Serializable {
+    with Serializable
+    with WithProxyLogger {
   // scalastyle:on
-
-  private[this] val logger = Logger(getClass)
 
   override def configure(configs: JMap[String, _], isKey: Boolean): Unit = {
     avroSer.configure(configs, isKey)

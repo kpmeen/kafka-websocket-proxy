@@ -54,6 +54,9 @@ Allows for changing things like network interface, port number, etc.
 | kafka.ws.proxy.server.ssl.port                                  | WSPROXY_SSL_PORT                         | not set                  | Port where the SSL/TLS endpoints will be available. |
 | kafka.ws.proxy.server.ssl.keystore-location                     | WSPROXY_SSL_KEYSTORE_LOCATION            | not set                  | File path to location of key store file. |
 | kafka.ws.proxy.server.ssl.keystore-password                     | WSPROXY_SSL_KEYSTORE_PASS                | not set                  | Password for the key store file. |
+| kafka.ws.proxy.server.broker-resolution-timeout                 | WSPROXY_BROKER_RESOLUTION_TIMEOUT        | `30 seconds`             | Timeout duration to wait for successful host resolution of Kafka brokers. |
+| kafka.ws.proxy.server.broker-resolution-retries                 | WSPROXY_BROKER_RESOLUTION_RETRIES        | `25`                     | Max number of retries for host resolution of Kafka brokers. |
+| kafka.ws.proxy.server.broker-resolution-retry-interval          | WSPROXY_BROKER_RESOLUTION_RETRY_INTERVAL | `1 second`               | Interval duration between retries when resolving the Kafka broker hosts. |
 
 
 ### Internal Session Handler
@@ -65,11 +68,14 @@ data structure. This allows e.g. controlling the number of open WebSockets in
 a given consumer group, and much more. The below properties gives some
 possibility to change the behaviour of the session handler.
 
-| Config key                                                      | Environment                              | Default                  | Description   |
-|:---                                                             |:----                                     |:------------------------:|:-----         |
-| kafka.ws.proxy.session-handler.session-state-topic-name         | WSPROXY_SESSION_STATE_TOPIC              | `_wsproxy.session.state` | The name of the compacted topic where session state is kept. |
-| kafka.ws.proxy.session-handler.session-state-replication-factor | WSPROXY_SESSION_STATE_REPLICATION_FACTOR | `3`                      | How many replicas to keep for the session state topic. |
-| kafka.ws.proxy.session-handler.session-state-retention          | WSPROXY_SESSION_STATE_RETENTION          | `30 days`                | How long to keep sessions in the session state topic. |
+| Config key                                                             | Environment                                     | Default                  | Description   |
+|:---                                                                    |:----                                            |:------------------------:|:-----         |
+| kafka.ws.proxy.session-handler.session-state-topic-name                | WSPROXY_SESSION_STATE_TOPIC                     | `_wsproxy.session.state` | The name of the compacted topic where session state is kept. |
+| kafka.ws.proxy.session-handler.session-state-replication-factor        | WSPROXY_SESSION_STATE_REPLICATION_FACTOR        | `3`                      | How many replicas to keep for the session state topic. |
+| kafka.ws.proxy.session-handler.session-state-retention                 | WSPROXY_SESSION_STATE_RETENTION                 | `30 days`                | How long to keep sessions in the session state topic. |
+| kafka.ws.proxy.session-handler.session-state-topic-init-timeout        | WSPROXY_SESSION_STATE_TOPIC_INIT_TIMEOUT        | `30 seconds`             | Timeout duration to wait for initialising the session state topic. |
+| kafka.ws.proxy.session-handler.session-state-topic-init-retries        | WSPROXY_SESSION_STATE_TOPIC_INIT_RETRIES        | `25`                     | Max number of retries for initialising the session state topic. |
+| kafka.ws.proxy.session-handler.session-state-topic-init-retry-interval | WSPROXY_SESSION_STATE_TOPIC_INIT_RETRY_INTERVAL | `1 second`               | Interval duration between retries when trying to initialise the session state topic. |
 
 
 ### Internal Message Commit Handler
@@ -440,6 +446,17 @@ in the cluster.
 
 ```
 
+#### `/healthcheck`
+
+Simple endpoint to see if the service is up and running. It _does not_ verify
+connectivity with the Kafka brokers. If this is necessary, use the
+`/kafka/cluster/info` endpoint.
+
+##### Output
+
+```json
+{ "response": "I'm healthy" }
+```
 
 # Development
 

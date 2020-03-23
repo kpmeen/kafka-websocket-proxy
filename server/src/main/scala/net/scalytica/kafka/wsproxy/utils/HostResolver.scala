@@ -2,17 +2,13 @@ package net.scalytica.kafka.wsproxy.utils
 
 import java.net.InetAddress
 
-import com.typesafe.scalalogging.Logger
 import net.scalytica.kafka.wsproxy.Configuration.{AppCfg, KafkaBootstrapHosts}
+import net.scalytica.kafka.wsproxy.WithProxyLogger
+import net.scalytica.kafka.wsproxy.utils.BlockingRetry.retry
 
-import scala.annotation.tailrec
-import scala.concurrent.blocking
-import scala.concurrent.duration._
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
-object HostResolver {
-
-  private[this] val logger = Logger(getClass)
+object HostResolver extends WithProxyLogger {
 
   sealed trait HostResolutionResult {
     def isSuccess: Boolean
@@ -47,46 +43,36 @@ object HostResolver {
   def resolveKafkaBootstrapHosts(
       bootstrapHosts: KafkaBootstrapHosts
   )(implicit cfg: AppCfg): HostResolutionStatus = {
-    val retryInterval = 1 second
-    val retryFor      = cfg.kafkaClient.brokerResolutionTimeout
-    val deadline      = retryFor.fromNow
+    val timeout = cfg.kafkaClient.brokerResolutionTimeout
 
-    @tailrec
-    def resolve(host: String): HostResolutionResult = {
-      Try(InetAddress.getByName(host)) match {
-        case Success(addr) =>
-          logger.info(s"Successfully resolved host $host")
-          HostResolved(addr)
-
-        case Failure(_) =>
-          if (deadline.hasTimeLeft()) {
-            logger.info(s"Resolution of host $host failed, retrying...")
-            sleep(retryInterval)
-            resolve(host)
-          } else {
-            logger.warn(s"Resolution of host $host failed, no more retries.")
-            HostResolutionError(
-              s"$host could not be resolved within time limit of $retryFor."
-            )
-          }
-      }
-    }
+    val resErr = (host: String) =>
+      HostResolutionError(
+        s"$host could not be resolved within time limit of $timeout."
+      )
 
     if (bootstrapHosts.hosts.nonEmpty) {
-      val resolutions = bootstrapHosts.hostsString.map(resolve)
+      val resolutions = bootstrapHosts.hostStrings.map { host =>
+        retry[HostResolutionResult](
+          timeout = timeout,
+          interval = cfg.server.brokerResolutionRetryInterval,
+          numRetries = cfg.server.brokerResolutionRetries
+        ) {
+          Try(InetAddress.getByName(host))
+            .map { addr =>
+              logger.info(s"Successfully resolved host $host")
+              HostResolved(addr)
+            }
+            .getOrElse(resErr(host))
+        } { _ =>
+          logger.warn(s"Resolution of host $host failed, no more retries.")
+          HostResolutionError(
+            s"$host could not be resolved within time limit of $timeout."
+          )
+        }
+      }
       HostResolutionStatus(resolutions)
     } else {
       HostResolutionStatus(List(HostResolutionError("NOT DEFINED")))
     }
   }
-
-  private[this] def sleep(duration: FiniteDuration): Unit =
-    try {
-      blocking(Thread.sleep(duration.toMillis))
-    } catch {
-      case e: InterruptedException =>
-        Thread.currentThread().interrupt()
-        throw e
-    }
-
 }

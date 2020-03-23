@@ -12,7 +12,6 @@ import akka.kafka.scaladsl.Consumer
 import akka.stream.Materializer
 import akka.stream.scaladsl.RunnableGraph
 import akka.util.Timeout
-import com.typesafe.scalalogging.Logger
 import io.circe.syntax._
 import io.circe.{Json, Printer}
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
@@ -53,8 +52,7 @@ import scala.concurrent.duration._
 /**
  *
  */
-trait BaseRoutes extends QueryParamParsers {
-  private[this] val logger = Logger(classOf[BaseRoutes])
+trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
 
   implicit private[this] val timeout: Timeout = 3 seconds
 

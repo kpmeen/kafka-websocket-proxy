@@ -5,7 +5,6 @@ import akka.actor.CoordinatedShutdown
 import akka.actor.CoordinatedShutdown._
 import akka.http.scaladsl.Http
 import akka.stream.Materializer
-import com.typesafe.scalalogging.Logger
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.utils.HostResolver.{
   resolveKafkaBootstrapHosts,
@@ -15,7 +14,11 @@ import net.scalytica.kafka.wsproxy.utils.HostResolver.{
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
 
-object Server extends App with ServerRoutes with ServerBindings {
+object Server
+    extends App
+    with ServerRoutes
+    with ServerBindings
+    with WithProxyLogger {
 
   // scalastyle:off
   println(
@@ -44,8 +47,6 @@ object Server extends App with ServerRoutes with ServerBindings {
       |""".stripMargin
     // scalastyle:on
   )
-
-  private[this] val logger = Logger(getClass)
 
   private[this] val evalOpt  = Future.successful(None)
   private[this] val evalDone = Future.successful(Done)

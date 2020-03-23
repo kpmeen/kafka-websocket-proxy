@@ -8,8 +8,8 @@ import akka.actor.typed.{ActorRef, Behavior}
 import akka.kafka.scaladsl.Consumer
 import akka.stream.scaladsl.{RunnableGraph, Sink}
 import akka.util.Timeout
-import com.typesafe.scalalogging.Logger
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.WithProxyLogger
 import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
 import net.scalytica.kafka.wsproxy.models.{WsClientId, WsGroupId, WsServerId}
 import net.scalytica.kafka.wsproxy.session.Session.SessionOpResult
@@ -151,8 +151,7 @@ object SessionHandler extends SessionHandler {
  * - Possibility to share meta-data across nodes
  * - etc...
  */
-trait SessionHandler {
-  private[this] val logger = Logger(getClass)
+trait SessionHandler extends WithProxyLogger {
 
   /**
    * Calculates the expected next behaviour based on the value of the {{either}}
@@ -196,7 +195,12 @@ trait SessionHandler {
 
     val admin = new WsKafkaAdminClient(cfg)
     try {
-      admin.initSessionStateTopic()
+      val ready = admin.clusterReady
+      if (ready) admin.initSessionStateTopic()
+      else {
+        logger.error("Could not reach Kafka cluster. Terminating service!")
+        System.exit(1)
+      }
     } finally {
       admin.close()
     }
@@ -230,9 +234,7 @@ trait SessionHandler {
       implicit val sys = ctx.system
       implicit val ec  = sys.executionContext
 
-      val log = Logger(classOf[SessionHandler])
-
-      log.debug("Initialising session data producer...")
+      logger.debug("Initialising session data producer...")
       implicit val producer = new SessionDataProducer()
 
       def behavior(
@@ -241,13 +243,13 @@ trait SessionHandler {
         case csp: ClientSessionProtocol =>
           csp match {
             case InitSession(gid, limit, replyTo) =>
-              log.debug(
+              logger.debug(
                 s"INIT_SESSION: initialise session ${gid.value} " +
                   s"with limit $limit"
               )
               active.find(gid) match {
                 case Some(s) =>
-                  log.debug(
+                  logger.debug(
                     s"INIT_SESSION: session ${gid.value} already initialised."
                   )
                   replyTo ! Session.SessionInitialised(s)
@@ -256,8 +258,9 @@ trait SessionHandler {
                 case None =>
                   val s = Session(gid, limit)
                   producer.publish(s).map { _ =>
-                    log
-                      .debug(s"INIT_SESSION: session ${gid.value} initialised.")
+                    logger.debug(
+                      s"INIT_SESSION: session ${gid.value} initialised."
+                    )
                     replyTo ! Session.SessionInitialised(s)
                   }
                   active
@@ -267,13 +270,13 @@ trait SessionHandler {
               }
 
             case AddConsumer(gid, cid, sid, replyTo) =>
-              log.debug(
+              logger.debug(
                 s"ADD_CONSUMER: add consumer ${cid.value} connected to server" +
                   s" ${sid.value} to session ${gid.value}..."
               )
               active.find(gid) match {
                 case None =>
-                  log.debug(
+                  logger.debug(
                     s"ADD_CONSUMER: session ${gid.value} was not found."
                   )
                   replyTo ! Session.SessionNotFound(gid)
@@ -283,7 +286,7 @@ trait SessionHandler {
                   session.addConsumer(cid, sid) match {
                     case added @ Session.ConsumerAdded(s) =>
                       producer.publish(s).map { _ =>
-                        log.debug(
+                        logger.debug(
                           s"ADD_CONSUMER: consumer ${cid.value} added to" +
                             s" session ${gid.value}"
                         )
@@ -292,7 +295,7 @@ trait SessionHandler {
                       Behaviors.same
 
                     case notAdded =>
-                      log.debug(
+                      logger.debug(
                         s"ADD_CONSUMER: session op result for ${gid.value}:" +
                           s" ${notAdded.asString}"
                       )
@@ -302,13 +305,13 @@ trait SessionHandler {
               }
 
             case RemoveConsumer(gid, cid, replyTo) =>
-              log.debug(
+              logger.debug(
                 s"REMOVE_CONSUMER: remove consumer ${cid.value} from " +
                   s"session ${gid.value} on server..."
               )
               active.find(gid) match {
                 case None =>
-                  log.debug(
+                  logger.debug(
                     s"REMOVE_CONSUMER: session ${gid.value} was not found"
                   )
                   replyTo ! Session.SessionNotFound(gid)
@@ -318,7 +321,7 @@ trait SessionHandler {
                   session.removeConsumer(cid) match {
                     case removed @ Session.ConsumerRemoved(s) =>
                       producer.publish(s).map { _ =>
-                        log.debug(
+                        logger.debug(
                           s"REMOVE_CONSUMER: consumer ${cid.value} removed " +
                             s"from session ${gid.value}"
                         )
@@ -327,7 +330,7 @@ trait SessionHandler {
                       Behaviors.same
 
                     case notRemoved =>
-                      log.debug(
+                      logger.debug(
                         "REMOVE_CONSUMER: session op result " +
                           s"for ${gid.value}: ${notRemoved.asString}"
                       )
@@ -341,7 +344,7 @@ trait SessionHandler {
               Behaviors.same
 
             case Stop =>
-              log.debug(
+              logger.debug(
                 s"STOP: stopping session handler for server ${serverId.value}"
               )
               Behaviors.stopped
@@ -350,11 +353,11 @@ trait SessionHandler {
         case ip: InternalProtocol =>
           ip match {
             case UpdateSession(gid, s) =>
-              log.debug(s"INTERNAL: Updating session ${gid.value}...")
+              logger.debug(s"INTERNAL: Updating session ${gid.value}...")
               nextOrSame(active.updateSession(gid, s))(behavior)
 
             case RemoveSession(gid) =>
-              log.debug(s"INTERNAL: Removing session ${gid.value}..")
+              logger.debug(s"INTERNAL: Removing session ${gid.value}..")
               nextOrSame(active.removeSession(gid))(behavior)
           }
       }
