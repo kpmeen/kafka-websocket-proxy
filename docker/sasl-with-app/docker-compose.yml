@@ -18,9 +18,9 @@ services:
       KAFKA_OPTS: -Djava.security.auth.login.config=/etc/kafka/secrets/zookeeper_jaas.conf -Dzookeeper.authProvider.1=org.apache.zookeeper.server.auth.SASLAuthenticationProvider
     healthcheck:
       test: ["CMD-SHELL", "echo ruok | nc -w 2 zookeeper 2181"]
-      interval: 5s
-      timeout: 10s
-      retries: 3
+      interval: 10s
+      timeout: 5s
+      retries: 40
     volumes:
       - ./sasl_ssl:/etc/kafka/secrets
     extra_hosts:
@@ -56,9 +56,9 @@ services:
       KAFKA_OPTS: -Djava.security.auth.login.config=/etc/kafka/secrets/kafka_server_jaas.conf
     healthcheck:
       test: ['CMD-SHELL', 'kafka-configs --bootstrap-server localhost:29092 --describe --entity-type brokers --entity-default --command-config /etc/kafka/secrets/admclient.conf | grep "Default config for brokers in the cluster are"']
-      interval: 5s
-      timeout: 10s
-      retries: 4
+      interval: 10s
+      timeout: 5s
+      retries: 40
     volumes:
       - ./sasl_ssl:/etc/kafka/secrets
     extra_hosts:
@@ -120,6 +120,11 @@ services:
       #WSPROXY_KAFKA_SSL_PROVIDER: ""
       #WSPROXY_KAFKA_SSL_CIPHER_SUITES: ""
       #WSPROXY_KAFKA_SSL_ENABLED_PROTOCOLS: ""
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -f http://localhost:8087/healthcheck || exit 1']
+      interval: 30s
+      timeout: 3s
+      retries: 40
     volumes:
       - ./sasl_ssl:/etc/kafka/secrets
     extra_hosts:

@@ -82,7 +82,7 @@ function start() {
 
   # There's no need to initialise the topics unless they do not exist.
 #  if [[ "$cleanup" = "true" ]]; then
-    sleep 30;
+    sleep 60;
     echo "Initializing topics..."
     createTopics
 #  fi
