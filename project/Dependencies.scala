@@ -16,7 +16,7 @@ object Versions {
   val EmbeddedSchemaRegistryVersion = "5.4.1"
   val KafkaStreamsQueryVersion      = "0.1.1"
 
-  val AkkaVersion            = "2.6.3"
+  val AkkaVersion            = "2.6.4"
   val AkkaHttpVersion        = "10.1.11"
   val AkkaStreamKafkaVersion = "2.0.2"
 
