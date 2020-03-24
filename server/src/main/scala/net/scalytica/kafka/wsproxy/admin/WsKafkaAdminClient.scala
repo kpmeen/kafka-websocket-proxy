@@ -12,10 +12,7 @@ import org.apache.kafka.clients.admin.AdminClientConfig._
 import org.apache.kafka.clients.admin._
 import org.apache.kafka.common.KafkaException
 import org.apache.kafka.common.config.TopicConfig._
-import org.apache.kafka.common.errors.{
-  TopicExistsException,
-  UnknownTopicOrPartitionException
-}
+import org.apache.kafka.common.errors.UnknownTopicOrPartitionException
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
