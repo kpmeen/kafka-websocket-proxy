@@ -13,20 +13,20 @@ import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.util.Try
 
-trait FileLoader {
+trait FileLoader { self =>
 
   def fileSource(p: Path): Source[ByteString, Future[IOResult]] =
     FileIO.fromPath(p)
 
-  def loadFile(f: String): Path = {
-    Paths.get(getClass.getResource(f).toURI)
-  }
+  def loadFile(f: String): Path = Paths.get(self.getClass.getResource(f).toURI)
 
-  def loadConfig(f: String = "application.conf"): Config =
-    ConfigFactory.load(f)
+  def loadConfig(f: String = "/application.conf"): Config =
+    ConfigFactory.parseFile(filePath(f).toFile).resolve()
+
+  def testConfigPath: Path = filePath("/application-test.conf")
 
   def filePath(f: String): Path = {
-    val fileUrl = getClass.getResource(f)
+    val fileUrl = self.getClass.getResource(f)
     val thePath = {
       // Check if we're referencing a file inside a JAR file.
       // If yes, we need (for some reason) to handle that explicitly by

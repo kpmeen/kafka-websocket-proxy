@@ -13,3 +13,5 @@ case class AuthorisationError(message: String, cause: Throwable)
 case class TopicNotFoundError(message: String)
     extends Exception(message)
     with NoStackTrace
+
+case class ConfigurationError(message: String) extends RuntimeException(message)

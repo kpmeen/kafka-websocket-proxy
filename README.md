@@ -132,12 +132,12 @@ behaviour of the commit handler
 Exposed configuration properties for the Kafka clients initialised and used by
 the `kafka-websocket-proxy` whenever a WebSocket connection is established.  
 
-| Config key                                        | Environment                       | Default | Description   |
-|:---                                               |:----                              |:-------:|:-----         |
-| kafka.ws.proxy.kafka-client.bootstrap-hosts       | WSPROXY_KAFKA_BOOTSTRAP_HOSTS     |         | A string with the Kafka brokers to bootstrap against, in the form `<host>:<port>`, separated by comma. |
-| kafka.ws.proxy.kafka-client.schema-registry-url   | WSPROXY_SCHEMA_REGISTRY_URL       |         | URLs for the Confluent Schema Registry. |
-| kafka.ws.proxy.kafka-client.auto-register-schemas | WSPROXY_SCHEMA_AUTO_REGISTER      | `true`  | By default, the proxy will automatically register any internal Avro schemas it needs. If disabled, these schemas must be registered with the schema registry manually. |
-| kafka.ws.proxy.kafka-client.metrics-enabled       | WSPROXY_CONFLUENT_METRICS_ENABLED | `false` | When this flag is set to `true`, it will enable the Confluent Metrics Reporter |
+| Config key                                        | Environment                       | Required | Default  | Description   |
+|:---                                               |:----                              |:--------:|:--------:|:-----         |
+| kafka.ws.proxy.kafka-client.bootstrap-hosts       | WSPROXY_KAFKA_BOOTSTRAP_HOSTS     |    y     | not set  | A string with the Kafka brokers to bootstrap against, in the form `<host>:<port>`, separated by comma. |
+| kafka.ws.proxy.kafka-client.schema-registry-url   | WSPROXY_SCHEMA_REGISTRY_URL       |    n     | not set  | URLs for the Confluent Schema Registry. If _not_ set, any other schema registry configs will be ignored. |
+| kafka.ws.proxy.kafka-client.auto-register-schemas | WSPROXY_SCHEMA_AUTO_REGISTER      |    n     | `true`   | By default, the proxy will automatically register any internal Avro schemas it needs. If disabled, these schemas must be registered with the schema registry manually. |
+| kafka.ws.proxy.kafka-client.metrics-enabled       | WSPROXY_CONFLUENT_METRICS_ENABLED |    n     | `false`  | When this flag is set to `true`, it will enable the Confluent Metrics Reporter |
 
 
 
@@ -207,6 +207,9 @@ provide a distinct client configuration for the metrics reporter.
 
 
 ### WebSocket APIs
+
+
+TODO: Document query parameters for produce/consume
 
 All WebSocket endpoints are available at the following base URL:
 

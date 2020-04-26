@@ -1,5 +1,6 @@
 package net.scalytica.kafka.wsproxy.utils
 
+import net.scalytica.kafka.wsproxy.Configuration
 import net.scalytica.kafka.wsproxy.Configuration.KafkaBootstrapHosts
 import net.scalytica.kafka.wsproxy.utils.HostResolver.resolveKafkaBootstrapHosts
 import net.scalytica.test.WSProxyKafkaSpec
@@ -8,14 +9,12 @@ import scala.concurrent.duration._
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
-class HostResolverSpec
-    extends AnyWordSpec
-    with Matchers
-    with WSProxyKafkaSpec {
+class HostResolverSpec extends AnyWordSpec with Matchers with WSProxyKafkaSpec {
 
-  implicit val cfg = defaultTestAppCfg.copy(
+  implicit lazy val cfg: Configuration.AppCfg = defaultTestAppCfg.copy(
     kafkaClient = defaultTestAppCfg.kafkaClient.copy(
-      brokerResolutionTimeout = 5 seconds
+      brokerResolutionTimeout = 5 seconds,
+      bootstrapHosts = KafkaBootstrapHosts(List("localhost"))
     )
   )
 
