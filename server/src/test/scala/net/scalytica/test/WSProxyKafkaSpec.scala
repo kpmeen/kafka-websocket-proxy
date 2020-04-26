@@ -3,6 +3,7 @@ package net.scalytica.test
 import akka.http.scaladsl.model.headers.BasicHttpCredentials
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
+import com.typesafe.config.Config
 import kafka.server.KafkaConfig._
 import net.manub.embeddedkafka.ConsumerExtensions.ConsumerRetryConfig
 import net.manub.embeddedkafka.schemaregistry.{
@@ -51,38 +52,35 @@ trait WSProxyKafkaSpec
     }
   }
 
-  val testKeyPass = "scalytica"
-  val validCreds  = BasicHttpCredentials("client", "client")
+  val testKeyPass: String         = "scalytica"
+  val creds: BasicHttpCredentials = BasicHttpCredentials("client", "client")
 
   implicit val consumerRetryConfig: ConsumerRetryConfig =
     ConsumerRetryConfig(30, 50 millis)
 
-  val embeddedKafkaConfig = EmbeddedKafkaConfig(
+  val embeddedKafkaConfig: EmbeddedKafkaConfig = EmbeddedKafkaConfig(
     kafkaPort = 0,
     zooKeeperPort = 0,
     schemaRegistryPort = 0,
     customBrokerProperties = Map(AutoCreateTopicsEnableProp -> "false")
   )
 
-  val saslSslPlainJaasConfig = "listener.name.sasl_ssl.plain.sasl.jaas.config"
+  val saslSslPlainJaasConfig: String =
+    "listener.name.sasl_ssl.plain.sasl.jaas.config"
 
-  val secureClientProps = Map(
+  val secureClientProps: Map[String, String] = Map(
     // scalastyle:off line.size.limit
-    SASL_MECHANISM           -> "PLAIN",
-    SECURITY_PROTOCOL_CONFIG -> SASL_SSL.name,
-    SSL_TRUSTSTORE_LOCATION_CONFIG -> FileLoader
-      .filePath("/sasl/kafka/client.truststore.jks")
-      .toAbsolutePath
-      .toString,
+    SASL_MECHANISM                               -> "PLAIN",
+    SECURITY_PROTOCOL_CONFIG                     -> SASL_SSL.name,
+    SSL_ENDPOINT_IDENTIFICATION_ALGORITHM_CONFIG -> "",
+    SSL_TRUSTSTORE_LOCATION_CONFIG -> filePath(
+      "/sasl/kafka/client.truststore.jks"
+    ).toAbsolutePath.toString,
     SSL_TRUSTSTORE_PASSWORD_CONFIG -> testKeyPass,
-    SSL_KEYSTORE_LOCATION_CONFIG -> FileLoader
-      .filePath("/sasl/kafka/client.keystore.jks")
-      .toAbsolutePath
-      .toString,
-    SSL_KEYSTORE_PASSWORD_CONFIG                 -> testKeyPass,
-    SSL_KEY_PASSWORD_CONFIG                      -> testKeyPass,
-    SASL_JAAS_CONFIG                             -> """org.apache.kafka.common.security.plain.PlainLoginModule required username="client" password="client";""",
-    SSL_ENDPOINT_IDENTIFICATION_ALGORITHM_CONFIG -> ""
+    SSL_KEYSTORE_LOCATION_CONFIG   -> filePath("/sasl/kafka/client.keystore.jks").toAbsolutePath.toString,
+    SSL_KEYSTORE_PASSWORD_CONFIG   -> testKeyPass,
+    SSL_KEY_PASSWORD_CONFIG        -> testKeyPass,
+    SASL_JAAS_CONFIG               -> """org.apache.kafka.common.security.plain.PlainLoginModule required username="client" password="client";"""
     // scalastyle:on
   )
 
@@ -133,13 +131,14 @@ trait WSProxyKafkaSpec
     )
   }
 
-  lazy val defaultTypesafeConfig =
-    FileLoader.loadConfig("/application-test.conf")
+  override def testConfig = defaultTypesafeConfig
 
-  lazy val defaultTestAppCfg =
+  lazy val defaultTypesafeConfig: Config = loadConfig("/application-test.conf")
+
+  lazy val defaultTestAppCfg: AppCfg =
     Configuration.loadFile(filePath("/application-test.conf"))
 
-  lazy val defaultTestAppCfgWithServerId = (sid: String) =>
+  lazy val defaultTestAppCfgWithServerId: String => AppCfg = (sid: String) =>
     defaultTestAppCfg.copy(
       server = defaultTestAppCfg.server.copy(serverId = WsServerId(sid))
   )

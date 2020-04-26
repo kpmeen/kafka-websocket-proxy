@@ -1,13 +1,15 @@
 package net.scalytica.kafka.wsproxy
 
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import net.scalytica.kafka.wsproxy.Configuration.{AppCfg, KafkaBootstrapHosts}
+import net.scalytica.kafka.wsproxy.errors.ConfigurationError
+import net.scalytica.test.FileLoader.testConfigPath
 import org.scalatest.OptionValues
+import org.scalatest.matchers.must.Matchers
+import org.scalatest.wordspec.AnyWordSpec
 import pureconfig.error.ConfigReaderException
 
 import scala.concurrent.duration._
-import org.scalatest.matchers.must.Matchers
-import org.scalatest.wordspec.AnyWordSpec
 
 class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
 
@@ -127,8 +129,76 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
 
   "The Configuration" should {
 
-    "successfully load the default configuration" in {
-      val cfg = Configuration.load()
+    "successfully load the application-test.conf configuration" in {
+      val cfg = Configuration.loadFile(testConfigPath)
+
+      cfg.server.serverId.value mustBe "node-1"
+      cfg.server.bindInterface mustBe "0.0.0.0"
+      cfg.server.port mustBe 8078
+
+      // format: off
+      cfg.kafkaClient.bootstrapHosts mustBe KafkaBootstrapHosts(List("localhost:29092")) // scalastyle:ignore
+      cfg.kafkaClient.schemaRegistry.value.url mustBe "http://localhost:28081"
+      cfg.kafkaClient.schemaRegistry.value.autoRegisterSchemas mustBe true
+      cfg.kafkaClient.monitoringEnabled mustBe false
+      // format: on
+
+      cfg.consumer.defaultBatchSize mustBe 0
+      cfg.consumer.defaultRateLimit mustBe 0
+
+      cfg.sessionHandler.sessionStateTopicName.value mustBe "_wsproxy.session.state" // scalastyle:ignore
+      cfg.sessionHandler.sessionStateReplicationFactor mustBe 3
+      cfg.sessionHandler.sessionStateRetention mustBe 30.days
+
+      cfg.commitHandler.maxStackSize mustBe 20
+      cfg.commitHandler.autoCommitEnabled mustBe false
+      cfg.commitHandler.autoCommitInterval mustBe 1.second
+      cfg.commitHandler.autoCommitMaxAge mustBe 20.seconds
+    }
+
+    "successfully load the default configuration without the" +
+      "schema-registry-url key set" in {
+      val tcfg = ConfigFactory.defaultApplication.withValue(
+        "kafka.ws.proxy.kafka-client.bootstrap-hosts",
+        ConfigValueFactory.fromAnyRef("localhost:29092")
+      )
+      val cfg = Configuration.loadConfig(tcfg)
+
+      cfg.server.serverId.value mustBe "node-1"
+      cfg.server.bindInterface mustBe "0.0.0.0"
+      cfg.server.port mustBe 8078
+
+      // format: off
+      cfg.kafkaClient.bootstrapHosts mustBe KafkaBootstrapHosts(List("localhost:29092")) // scalastyle:ignore
+      cfg.kafkaClient.schemaRegistry mustBe empty
+      cfg.kafkaClient.monitoringEnabled mustBe false
+      // format: on
+
+      cfg.consumer.defaultBatchSize mustBe 0
+      cfg.consumer.defaultRateLimit mustBe 0
+
+      cfg.sessionHandler.sessionStateTopicName.value mustBe "_wsproxy.session.state" // scalastyle:ignore
+      cfg.sessionHandler.sessionStateReplicationFactor mustBe 3
+      cfg.sessionHandler.sessionStateRetention mustBe 30.days
+
+      cfg.commitHandler.maxStackSize mustBe 100
+      cfg.commitHandler.autoCommitEnabled mustBe false
+      cfg.commitHandler.autoCommitInterval mustBe 1.second
+      cfg.commitHandler.autoCommitMaxAge mustBe 20.seconds
+    }
+
+    "successfully load the application.conf configuration" in {
+      // Set required, unset, props
+      val tcfg = ConfigFactory.defaultApplication
+        .withValue(
+          "kafka.ws.proxy.kafka-client.bootstrap-hosts",
+          ConfigValueFactory.fromAnyRef("localhost:29092")
+        )
+        .withValue(
+          "kafka.ws.proxy.kafka-client.schema-registry.url",
+          ConfigValueFactory.fromAnyRef("http://localhost:28081")
+        )
+      val cfg = Configuration.loadConfig(tcfg)
 
       cfg.server.serverId.value mustBe "node-1"
       cfg.server.bindInterface mustBe "0.0.0.0"
@@ -152,6 +222,12 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
       cfg.commitHandler.autoCommitEnabled mustBe false
       cfg.commitHandler.autoCommitInterval mustBe 1.second
       cfg.commitHandler.autoCommitMaxAge mustBe 20.seconds
+    }
+
+    "fail when trying to load the default config without providing the " +
+      "bootstrap-hosts with a value" in {
+      a[ConfigurationError] should be thrownBy Configuration
+        .loadTypesafeConfig()
     }
 
     "fail when trying to load an invalid configuration" in {

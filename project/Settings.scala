@@ -76,19 +76,15 @@ object Settings {
       "-XX:+EnableJVMCI",
       "-XX:+UseJVMCICompiler"
     ),
-    fork in run := true,
-    javaOptions in Test += "-Dlogger.resource=logback-test.xml",
-    fork in Test := true,
-    logBuffered in Test := true,
-    testOptions in Test ++= Seq(
-      Tests.Argument(ScalaTest, "-oD"),
-      Tests.Argument(ScalaTest, "-y", "org.scalatest.wordspec.AnyWordSpec"),
-      Tests.Argument(ScalaTest, "-y", "org.scalatest.propspec.AnyPropSpec")
-    ),
+    run / fork := true,
+    Test / javaOptions += "-Dlogger.resource=logback-test.xml",
+    Test / fork := true,
+    Test / logBuffered := true,
+    Test / testOptions ++= Seq(Tests.Argument(ScalaTest, "-oD")),
     updateOptions := updateOptions.value.withCachedResolution(true),
     // Disable ScalaDoc generation
     publishArtifact in (Compile, packageDoc) := false,
-    publishArtifact in packageDoc := false,
+    packageDoc / publishArtifact := false,
     sources in (Compile, doc) := Seq.empty,
     turbo := true,
     resolvers ++= Dependencies.Resolvers

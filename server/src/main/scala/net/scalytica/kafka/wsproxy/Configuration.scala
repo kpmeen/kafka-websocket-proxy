@@ -3,39 +3,75 @@ package net.scalytica.kafka.wsproxy
 import java.nio.file.Path
 
 import com.typesafe.config.{Config, ConfigFactory}
+import net.scalytica.kafka.wsproxy.errors.ConfigurationError
 import net.scalytica.kafka.wsproxy.models.{TopicName, WsServerId}
 import org.apache.kafka.clients.CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG
+import pureconfig.error.ConfigReaderFailures
 import pureconfig.generic.auto._
 import pureconfig.{ConfigReader, ConfigSource}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.FiniteDuration
 
-object Configuration {
+object Configuration extends WithProxyLogger {
 
   private[this] val CfgRootKey = "kafka.ws.proxy"
 
-  implicit val configAsMap: ConfigReader[Map[String, AnyRef]] =
-    ConfigReader.fromCursor(_.asObjectCursor.right.map(_.value.toConfig)).map {
-      cfg =>
-        cfg
-          .entrySet()
-          .asScala
-          .map(e => e.getKey -> e.getValue.unwrapped())
-          .toMap
-    }
+  private[this] def typesafeConfigToMap(cfg: Config): Map[String, AnyRef] = {
+    cfg.entrySet().asScala.map(e => e.getKey -> e.getValue.unwrapped).toMap
+  }
 
-  implicit val stringAsKafkaBootstrapUrls: ConfigReader[KafkaBootstrapHosts] =
-    ConfigReader.fromString { str =>
+  implicit lazy val configAsMap: ConfigReader[Map[String, AnyRef]] =
+    ConfigReader
+      .fromCursor(_.asObjectCursor.map(_.value.toConfig))
+      .map(typesafeConfigToMap)
+
+  implicit lazy val stringAsKafkaUrls: ConfigReader[KafkaBootstrapHosts] =
+    ConfigReader.fromNonEmptyString { str =>
       val urls = str.split(",").map(_.trim).toList
       Right(KafkaBootstrapHosts(urls))
     }
 
-  implicit val stringAsServerId: ConfigReader[WsServerId] =
+  implicit lazy val stringAsServerId: ConfigReader[WsServerId] =
     ConfigReader.fromString(str => Right(WsServerId(str)))
 
-  implicit val stringAsTopicName: ConfigReader[TopicName] =
+  implicit lazy val stringAsTopicName: ConfigReader[TopicName] =
     ConfigReader.fromString(str => Right(TopicName(str)))
+
+  implicit lazy val schemaRegistryCfgReader = {
+    ConfigReader.fromCursor[Option[SchemaRegistryCfg]] { cursor =>
+      val urlCursor = cursor.fluent.at("url").asString
+      urlCursor match {
+        case Left(_) =>
+          Right[ConfigReaderFailures, Option[SchemaRegistryCfg]](None)
+
+        case Right(url) =>
+          if (url.nonEmpty) {
+            val autoReg = cursor.fluent
+              .at("auto-register-schemas")
+              .asBoolean
+              .getOrElse(true)
+            val props = cursor.fluent
+              .at("properties")
+              .asObjectCursor
+              .map(coc => typesafeConfigToMap(coc.value.toConfig))
+              .getOrElse(Map.empty)
+
+            Right[ConfigReaderFailures, Option[SchemaRegistryCfg]](
+              Option(
+                SchemaRegistryCfg(
+                  url = url,
+                  autoRegisterSchemas = autoReg,
+                  properties = props
+                )
+              )
+            )
+          } else {
+            Right[ConfigReaderFailures, Option[SchemaRegistryCfg]](None)
+          }
+      }
+    }
+  }
 
   final case class AppCfg(
       server: ServerCfg,
@@ -156,21 +192,40 @@ object Configuration {
       autoCommitMaxAge: FiniteDuration
   )
 
-  def load(): AppCfg = ConfigSource.default.at(CfgRootKey).loadOrThrow[AppCfg]
+  def load(): AppCfg = {
+    logger.debug("Loading default config")
+    ConfigSource.default.at(CfgRootKey).loadOrThrow[AppCfg]
+  }
 
   def loadFrom(arg: (String, Any)*): AppCfg = {
+    logger.debug("Loading config from key/value pairs")
     loadString(arg.map(t => s"${t._1} = ${t._2}").mkString("\n"))
   }
 
-  def loadTypesafeConfig(): Config = ConfigFactory.load()
+  /**
+   * Loads and resolves the default application.conf
+   * @return The a resolved instance of Typesafe Config
+   */
+  def loadTypesafeConfig(): Config = {
+    logger.debug("Loading default typesafe configuration")
+    ConfigSource.default.config() match {
+      case Right(config) => config
+      case Left(errors)  => throw ConfigurationError(errors.prettyPrint())
+    }
+  }
 
-  def loadString(str: String): AppCfg =
+  def loadString(str: String): AppCfg = {
+    logger.debug(s"Loading configuration from string")
     loadConfig(ConfigFactory.parseString(str))
+  }
 
-  def loadConfig(cfg: Config): AppCfg =
+  def loadConfig(cfg: Config): AppCfg = {
+    logger.debug(s"Loading configuration from ${classOf[Config]} instance")
     ConfigSource.fromConfig(cfg).at(CfgRootKey).loadOrThrow[AppCfg]
+  }
 
-  def loadFile(file: Path): AppCfg =
+  def loadFile(file: Path): AppCfg = {
+    logger.debug(s"Loading configuration file at path $file")
     try {
       ConfigSource.file(file).at(CfgRootKey).loadOrThrow[AppCfg]
     } catch {
@@ -178,4 +233,5 @@ object Configuration {
         ex.printStackTrace()
         throw ex
     }
+  }
 }

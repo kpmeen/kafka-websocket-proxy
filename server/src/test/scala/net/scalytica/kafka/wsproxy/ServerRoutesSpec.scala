@@ -511,7 +511,7 @@ class ServerRoutesSpec
             routes = Route.seal(testRoutes),
             keyType = None,
             messages = messages,
-            basicCreds = Some(validCreds)
+            basicCreds = Some(creds)
           )
       }
 
@@ -528,7 +528,7 @@ class ServerRoutesSpec
             valType = StringType,
             routes = routes,
             messages = messages,
-            basicCreds = Some(validCreds)
+            basicCreds = Some(creds)
           )(wsProducerClient)
 
           import net.manub.embeddedkafka.Codecs.stringDeserializer
@@ -545,7 +545,7 @@ class ServerRoutesSpec
           implicit val wsConsumerClient = WSProbe()
 
           WS(outPath, wsConsumerClient.flow) ~>
-            addCredentials(validCreds) ~>
+            addCredentials(creds) ~>
             routes ~>
             check {
               isWebSocketUpgrade mustBe true
