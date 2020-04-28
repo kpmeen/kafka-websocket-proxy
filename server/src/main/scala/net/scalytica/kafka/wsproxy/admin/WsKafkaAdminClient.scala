@@ -30,9 +30,8 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
   // scalastyle:off line.size.limit
   private[this] lazy val admConfig = {
     cfg.adminClient.kafkaClientProperties ++ Map[String, AnyRef](
-      BOOTSTRAP_SERVERS_CONFIG  -> cfg.kafkaClient.bootstrapHosts.mkString(),
-      CLIENT_ID_CONFIG          -> "kafka-websocket-proxy-admin",
-      REQUEST_TIMEOUT_MS_CONFIG -> s"${(10 seconds).toMillis}"
+      BOOTSTRAP_SERVERS_CONFIG -> cfg.kafkaClient.bootstrapHosts.mkString(),
+      CLIENT_ID_CONFIG         -> "kafka-websocket-proxy-admin"
     )
   }
   // scalastyle:on line.size.limit
@@ -216,24 +215,4 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
     underlying.close()
     logger.debug("Underlying admin client closed.")
   }
-}
-
-object WsKafkaAdminClient {
-
-  /**
-   * Throws an exception if the given [[TopicName]] is not found.
-   *
-   * @param topic the [[TopicName]] to find
-   */
-  @throws(classOf[TopicNotFoundError])
-  def failIfTopicNotFound(topic: TopicName)(implicit cfg: AppCfg): Unit = {
-    val wsAdminClient = new WsKafkaAdminClient(cfg)
-    try {
-      if (!wsAdminClient.topicExists(topic))
-        throw TopicNotFoundError(s"Topic ${topic.value} does not exist")
-    } finally {
-      wsAdminClient.close()
-    }
-  }
-
 }

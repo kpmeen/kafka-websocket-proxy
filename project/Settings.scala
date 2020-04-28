@@ -77,7 +77,6 @@ object Settings {
       "-XX:+UseJVMCICompiler"
     ),
     run / fork := true,
-    Test / javaOptions += "-Dlogger.resource=logback-test.xml",
     Test / fork := true,
     Test / logBuffered := true,
     Test / testOptions ++= Seq(Tests.Argument(ScalaTest, "-oD")),
