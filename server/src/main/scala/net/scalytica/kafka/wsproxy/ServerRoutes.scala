@@ -7,7 +7,12 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers.{BasicHttpCredentials, HttpCredentials}
 import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.{ExceptionHandler, RejectionHandler, Route}
+import akka.http.scaladsl.server.{
+  ExceptionHandler,
+  RejectionHandler,
+  Route,
+  ValidationRejection
+}
 import akka.kafka.scaladsl.Consumer
 import akka.stream.Materializer
 import akka.stream.scaladsl.RunnableGraph
@@ -48,6 +53,7 @@ import org.apache.kafka.common.KafkaException
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
+import scala.util.Try
 
 /**
  *
@@ -184,6 +190,15 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
             message = "This is not the resource you are looking for."
           )
         )
+      }
+      .handle {
+        case ValidationRejection(msg, _) =>
+          rejectAndComplete(
+            jsonResponseMsg(
+              statusCode = BadRequest,
+              message = msg
+            )
+          )
       }
       .result()
       .withFallback(RejectionHandler.default)
@@ -330,27 +345,30 @@ trait WebSocketRoutes { self: BaseRoutes =>
 
   /**
    *
-   * @param args
-   * @param webSocketHandler
-   * @param cfg
-   * @return
+   * @param args The socket args provided
+   * @param webSocketHandler lazy initializer for the websocket handler to use
+   * @param cfg The configured [[AppCfg]]
+   * @return Route that validates and handles websocket connections
    */
   private[this] def validateAndHandleWebSocket(
       args: SocketArgs
   )(
-      webSocketHandler: Route
+      webSocketHandler: => Route
   )(implicit cfg: AppCfg): Route = {
     val topic = args.topic
+    logger.trace(s"Verifying if topic $topic exists...")
     val admin = new WsKafkaAdminClient(cfg)
-    val topicExists =
-      try {
-        admin.topicExists(topic)
-      } finally {
-        admin.close()
-      }
+    val topicExists = Try(admin.topicExists(topic)) match {
+      case scala.util.Success(v) => v
+      case scala.util.Failure(t) =>
+        logger
+          .warn(s"An error occurred while checking if topic $topic exists", t)
+        false
+    }
+    admin.close()
 
     if (topicExists) webSocketHandler
-    else failWith(TopicNotFoundError(s"Topic ${topic.value} does not exist"))
+    else reject(ValidationRejection(s"Topic ${topic.value} does not exist"))
   }
 
   /**

@@ -203,6 +203,20 @@ provide a distinct client configuration for the metrics reporter.
 | kafka.ws.proxy.kafka-client.confluent-metrics.properties.ssl.cipher.suites                     | WSPROXY_KAFKA_METRICS_SSL_CIPHER_SUITES          |  not set     |
 | kafka.ws.proxy.kafka-client.confluent-metrics.properties.ssl.enabled.protocols                 | WSPROXY_KAFKA_METRICS_SSL_ENABLED_PROTOCOLS      |  not set     |
 
+### Logging
+
+It is possible to set the log levels of some important loggers through environment
+variables. The below table shows which are available, and what their default values are.
+
+| Logger                       | Environment                      | Default |
+|:---                          |:----                             |:-------:|
+| akka.actor                   | WS_PROXY_AKKA_ACTOR_LOG_LEVEL    |  WARN   |
+| akka.kafka                   | WS_PROXY_AKKA_KAFKA_LOG_LEVEL    |  WARN   |
+| org.apache.kafka.clients     | WS_PROXY_KAFKA_CLIENTS_LOG_LEVEL |  ERROR  |
+| net.scalytica.kafka.wsproxy  | WS_PROXY_APP_LOG_LEVEL           |  DEBUG  |
+| root                         | WS_PROXY_ROOT_LOG_LEVEL          |  ERROR  |
+
+
 ## Endpoints and API
 
 
