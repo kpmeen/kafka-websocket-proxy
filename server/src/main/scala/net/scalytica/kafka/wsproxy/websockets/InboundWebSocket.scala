@@ -18,7 +18,8 @@ import net.scalytica.kafka.wsproxy.codecs.Encoders._
 import net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde
 import net.scalytica.kafka.wsproxy.models.{Formats, InSocketArgs}
 import net.scalytica.kafka.wsproxy.producer.WsProducer
-import net.scalytica.kafka.wsproxy.{WithProxyLogger, WithSchemaRegistryConfig}
+import net.scalytica.kafka.wsproxy.WithSchemaRegistryConfig
+import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 
 trait InboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
 

@@ -132,12 +132,14 @@ behaviour of the commit handler
 Exposed configuration properties for the Kafka clients initialised and used by
 the `kafka-websocket-proxy` whenever a WebSocket connection is established.  
 
-| Config key                                        | Environment                       | Required | Default  | Description   |
-|:---                                               |:----                              |:--------:|:--------:|:-----         |
-| kafka.ws.proxy.kafka-client.bootstrap-hosts       | WSPROXY_KAFKA_BOOTSTRAP_HOSTS     |    y     | not set  | A string with the Kafka brokers to bootstrap against, in the form `<host>:<port>`, separated by comma. |
-| kafka.ws.proxy.kafka-client.schema-registry-url   | WSPROXY_SCHEMA_REGISTRY_URL       |    n     | not set  | URLs for the Confluent Schema Registry. If _not_ set, any other schema registry configs will be ignored. |
-| kafka.ws.proxy.kafka-client.auto-register-schemas | WSPROXY_SCHEMA_AUTO_REGISTER      |    n     | `true`   | By default, the proxy will automatically register any internal Avro schemas it needs. If disabled, these schemas must be registered with the schema registry manually. |
-| kafka.ws.proxy.kafka-client.metrics-enabled       | WSPROXY_CONFLUENT_METRICS_ENABLED |    n     | `false`  | When this flag is set to `true`, it will enable the Confluent Metrics Reporter |
+| Config key                                                | Environment                             | Required | Default  | Description   |
+|:---                                                       |:----                                    |:--------:|:--------:|:-----         |
+| kafka.ws.proxy.kafka-client.bootstrap-hosts               | WSPROXY_KAFKA_BOOTSTRAP_HOSTS           |    y     | not set  | A string with the Kafka brokers to bootstrap against, in the form `<host>:<port>`, separated by comma. |
+| kafka.ws.proxy.kafka-client.schema-registry-url           | WSPROXY_SCHEMA_REGISTRY_URL             |    n     | not set  | URLs for the Confluent Schema Registry. If _not_ set, any other schema registry configs will be ignored. |
+| kafka.ws.proxy.kafka-client.auto-register-schemas         | WSPROXY_SCHEMA_AUTO_REGISTER            |    n     | `true`   | By default, the proxy will automatically register any internal Avro schemas it needs. If disabled, these schemas must be registered with the schema registry manually. |
+| kafka.ws.proxy.kafka-client.properties.request.timeout.ms | WSPROXY_KAFKA_CLIENT_REQUEST_TIMEOUT_MS |    n     | `20000`  | Defines the request timeout period for the kafka clients. |
+| kafka.ws.proxy.kafka-client.properties.retry.backoff.ms   | WSPROXY_KAFKA_CLIENT_RETRY_BACKOFF_MS   |    n     | `500`    | Defines the amount of time to wait before retrying a request. | 
+| kafka.ws.proxy.kafka-client.metrics-enabled               | WSPROXY_CONFLUENT_METRICS_ENABLED       |    n     | `false`  | When this flag is set to `true`, it will enable the Confluent Metrics Reporter |
 
 
 
@@ -205,6 +207,24 @@ provide a distinct client configuration for the metrics reporter.
 
 ### Logging
 
+The `kafka-websocket-proxy` uses Logback for logging, and comes pre-packaged
+with a configuration file with reasonable defaults. If there is a need to use a
+different configuration, there are 3 recommended options.
+
+**1. Providing an external log configuration file**
+
+If it is necessary for any reason to use a different log configuration, the
+most common way of doing so is to pass in a JVM argument when starting the
+application.
+
+The application accepts the standard Logback argument
+`-Dlogback.configurationFile=<file_path>` to reference a different config file.
+
+This argument can either be set explicitly in the `bin/server` that comes with
+the distribution. Or, more easily, added to the `JAVA_OPTS` environment variable.  
+
+**2. Overriding log levels for predefined loggers**
+
 It is possible to set the log levels of some important loggers through environment
 variables. The below table shows which are available, and what their default values are.
 
@@ -216,6 +236,17 @@ variables. The below table shows which are available, and what their default val
 | net.scalytica.kafka.wsproxy  | WS_PROXY_APP_LOG_LEVEL           |  DEBUG  |
 | root                         | WS_PROXY_ROOT_LOG_LEVEL          |  ERROR  |
 
+**2. Overriding full configuration through environment** 
+
+Another option that is useful when running the application is in a docker
+container, or another environment where configuration is primarily done through
+environment variables, is the environment variable `WSPROXY_LOGBACK_XML_CONFIG`.
+
+When the `WSPROXY_LOGBACK_XML_CONFIG` variable has a value, all other log
+configurations are ignored. So if e.g. both `WSPROXY_LOGBACK_XML_CONFIG` and
+`WS_PROXY_KAFKA_CLIENTS_LOG_LEVEL` are set, the latter is ignored completely.
+The same applies if an external logback configuration file is provided through
+`-Dlogback.configurationFile=<file_path>`.
 
 ## Endpoints and API
 
@@ -259,7 +290,7 @@ both inbound and outbound messages.
 | keyType | format type |     n    |               |
 | valType | format type |     y    |               |
 
-##### Input
+##### Input (JSON)
 
 ```json
 {
@@ -274,7 +305,7 @@ both inbound and outbound messages.
 }
 ```
 
-##### Output
+##### Output (JSON)
 
 ```json
 {
@@ -301,7 +332,7 @@ both inbound and outbound messages.
 | batchSize           | integer     |    n     |               |
 | autoCommit          | boolean     |    n     | true          |
 
-##### Output
+##### Output (JSON)
 
 ```json
 {
@@ -321,7 +352,7 @@ both inbound and outbound messages.
 }
 ```
 
-##### Input
+##### Input (JSON)
 
 ```json
 {"wsProxyMessageId":"foo-0-1-1554402266846"}

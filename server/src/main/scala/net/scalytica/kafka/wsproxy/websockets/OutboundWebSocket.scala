@@ -27,6 +27,7 @@ import net.scalytica.kafka.wsproxy.codecs.Decoders._
 import net.scalytica.kafka.wsproxy.codecs.Encoders._
 import net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde
 import net.scalytica.kafka.wsproxy.consumer.{CommitStackHandler, WsConsumer}
+import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models.{
   Formats,
   OutSocketArgs,

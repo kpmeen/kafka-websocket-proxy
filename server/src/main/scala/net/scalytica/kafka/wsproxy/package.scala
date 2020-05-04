@@ -107,6 +107,9 @@ package object wsproxy {
         }
       }
     }
+
+    def safeNonEmpty: Boolean =
+      Option(underlying).filterNot(_.isBlank).map(_.nonEmpty).nonEmpty
   }
 
   implicit class JavaFutureConverter[A](

@@ -9,8 +9,8 @@ import akka.kafka.scaladsl.Consumer
 import akka.stream.scaladsl.{RunnableGraph, Sink}
 import akka.util.Timeout
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
-import net.scalytica.kafka.wsproxy.WithProxyLogger
 import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
+import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models.{WsClientId, WsGroupId, WsServerId}
 import net.scalytica.kafka.wsproxy.session.Session.SessionOpResult
 import net.scalytica.kafka.wsproxy.session.SessionHandlerProtocol._

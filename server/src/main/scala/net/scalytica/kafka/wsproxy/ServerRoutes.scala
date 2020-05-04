@@ -33,6 +33,7 @@ import net.scalytica.kafka.wsproxy.errors.{
   AuthorisationError,
   TopicNotFoundError
 }
+import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models.{
   AclCredentials,
   InSocketArgs,

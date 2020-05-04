@@ -16,13 +16,13 @@ import net.scalytica.kafka.wsproxy.errors.{
   AuthenticationError,
   AuthorisationError
 }
+import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models._
 import net.scalytica.kafka.wsproxy.{
   mapToProperties,
   producerMetricsProperties,
   wsMessageToByteStringFlow,
-  wsMessageToStringFlow,
-  WithProxyLogger
+  wsMessageToStringFlow
 }
 import org.apache.kafka.clients.producer.{
   KafkaProducer,

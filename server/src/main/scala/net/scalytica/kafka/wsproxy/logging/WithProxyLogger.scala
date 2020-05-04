@@ -1,4 +1,4 @@
-package net.scalytica.kafka.wsproxy
+package net.scalytica.kafka.wsproxy.logging
 
 import com.typesafe.scalalogging.Logger
 
