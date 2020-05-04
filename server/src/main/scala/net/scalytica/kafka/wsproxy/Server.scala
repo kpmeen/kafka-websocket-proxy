@@ -6,6 +6,10 @@ import akka.actor.CoordinatedShutdown._
 import akka.http.scaladsl.Http
 import akka.stream.Materializer
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.logging.{
+  WithProxyLogger,
+  WsProxyEnvLoggerConfigurator
+}
 import net.scalytica.kafka.wsproxy.utils.HostResolver.{
   resolveKafkaBootstrapHosts,
   HostResolutionError
@@ -47,6 +51,8 @@ object Server
       |""".stripMargin
     // scalastyle:on
   )
+
+  WsProxyEnvLoggerConfigurator.load()
 
   private[this] val evalOpt  = Future.successful(None)
   private[this] val evalDone = Future.successful(Done)

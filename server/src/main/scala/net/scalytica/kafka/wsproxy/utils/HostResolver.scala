@@ -3,7 +3,7 @@ package net.scalytica.kafka.wsproxy.utils
 import java.net.InetAddress
 
 import net.scalytica.kafka.wsproxy.Configuration.{AppCfg, KafkaBootstrapHosts}
-import net.scalytica.kafka.wsproxy.WithProxyLogger
+import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.utils.BlockingRetry.retry
 
 import scala.util.Try

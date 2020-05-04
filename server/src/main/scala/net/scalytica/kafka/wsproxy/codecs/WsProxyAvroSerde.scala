@@ -8,7 +8,7 @@ import io.confluent.kafka.serializers.{
   KafkaAvroDeserializer,
   KafkaAvroSerializer
 }
-import net.scalytica.kafka.wsproxy.WithProxyLogger
+import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import org.apache.avro.generic.GenericRecord
 import org.apache.kafka.common.serialization.{Deserializer, Serde, Serializer}
 

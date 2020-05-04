@@ -4,6 +4,7 @@ import java.nio.file.Path
 
 import com.typesafe.config.{Config, ConfigFactory}
 import net.scalytica.kafka.wsproxy.errors.ConfigurationError
+import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models.{TopicName, WsServerId}
 import org.apache.kafka.clients.CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG
 import pureconfig.error.ConfigReaderFailures

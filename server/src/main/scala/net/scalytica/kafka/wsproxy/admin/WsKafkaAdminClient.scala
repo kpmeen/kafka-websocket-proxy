@@ -6,6 +6,7 @@ import net.scalytica.kafka.wsproxy.errors.{
   KafkaFutureErrorHandler,
   TopicNotFoundError
 }
+import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models.{BrokerInfo, TopicName}
 import net.scalytica.kafka.wsproxy.utils.BlockingRetry
 import org.apache.kafka.clients.admin.AdminClientConfig._

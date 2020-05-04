@@ -7,7 +7,7 @@
   <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
     <encoder>
       <pattern>
-        %date{HH:mm:ss.SSS} %highlight(%-5level) %cyan(%logger{0}) - %msg%n
+        %date{HH:mm:ss.SSS} %highlight(%-5level) %cyan(%logger{30}) - %msg%n
       </pattern>
     </encoder>
   </appender>
@@ -16,22 +16,15 @@
     <appender-ref ref="STDOUT"/>
   </appender>
 
-  <variable name="WS_PROXY_AKKA_ACTOR_LOG_LEVEL" value="${WS_PROXY_AKKA_ACTOR_LOG_LEVEL:-WARN}" />
-  <variable name="WS_PROXY_AKKA_KAFKA_LOG_LEVEL" value="${WS_PROXY_AKKA_KAFKA_LOG_LEVEL:-WARN}" />
-  <variable name="WS_PROXY_KAFKA_CLIENTS_LOG_LEVEL" value="${WS_PROXY_KAFKA_CLIENTS_LOG_LEVEL:-ERROR}" />
+  <logger name="akka.actor" level="OFF"/>
+  <logger name="akka.kafka" level="OFF"/>
 
-  <variable name="WS_PROXY_APP_LOG_LEVEL" value="${WS_PROXY_APP_LOG_LEVEL:-DEBUG}" />
-  <variable name="WS_PROXY_ROOT_LOG_LEVEL" value="${WS_PROXY_ROOT_LOG_LEVEL:-ERROR}" />
+  <logger name="org.apache.kafka.clients" level="OFF"/>
 
-  <logger name="akka.actor" level="${WS_PROXY_AKKA_ACTOR_LOG_LEVEL}"/>
-  <logger name="akka.kafka" level="${WS_PROXY_AKKA_KAFKA_LOG_LEVEL}"/>
-
-  <logger name="org.apache.kafka.clients" level="${WS_PROXY_KAFKA_CLIENTS_LOG_LEVEL}"/>
-
-  <logger name="net.scalytica" level="${WS_PROXY_APP_LOG_LEVEL}"/>
+  <logger name="net.scalytica" level="OFF"/>
 
   <!-- Root loggers catch all other events that are not explicitly handled-->
-  <root level="${WS_PROXY_ROOT_LOG_LEVEL}">
+  <root level="OFF">
     <appender-ref ref="ASYNC_STDOUT"/>
   </root>
 

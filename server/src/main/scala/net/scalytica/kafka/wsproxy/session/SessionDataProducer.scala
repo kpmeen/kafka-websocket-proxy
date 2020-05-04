@@ -8,6 +8,7 @@ import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy._
 import net.scalytica.kafka.wsproxy.codecs.Implicits._
 import net.scalytica.kafka.wsproxy.codecs.{BasicSerdes, SessionSerde}
+import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models.WsGroupId
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 

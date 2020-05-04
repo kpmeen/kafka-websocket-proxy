@@ -10,11 +10,8 @@ import net.scalytica.kafka.wsproxy.errors.{
   AuthenticationError,
   AuthorisationError
 }
-import net.scalytica.kafka.wsproxy.{
-  consumerMetricsProperties,
-  mapToProperties,
-  WithProxyLogger
-}
+import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
+import net.scalytica.kafka.wsproxy.{consumerMetricsProperties, mapToProperties}
 import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails
 import net.scalytica.kafka.wsproxy.models._
 import org.apache.kafka.clients.consumer.ConsumerConfig._

@@ -1,16 +1,18 @@
 package net.scalytica.test
 
 import java.net.URI
+import java.nio.charset.Charset
 import java.nio.file.FileSystems.{getFileSystem, newFileSystem}
 import java.nio.file.{Path, Paths}
 
-import akka.stream.IOResult
+import akka.stream.{IOResult, Materializer}
 import akka.stream.scaladsl.{FileIO, Source}
 import akka.util.ByteString
 import com.typesafe.config.{Config, ConfigFactory}
 
 import scala.collection.JavaConverters._
-import scala.concurrent.Future
+import scala.concurrent.{Await, Future}
+import scala.concurrent.duration._
 import scala.util.Try
 
 trait FileLoader { self =>
@@ -24,6 +26,14 @@ trait FileLoader { self =>
     ConfigFactory.parseFile(filePath(f).toFile).resolve()
 
   def testConfigPath: Path = filePath("/application-test.conf")
+
+  def testLogbackConfig(implicit mat: Materializer): String = Await.result(
+    FileIO.fromPath(filePath("/logback-test.xml")).runFold("") {
+      case (str, bs) =>
+        str + bs.decodeString(Charset.forName("UTF-8"))
+    },
+    2 seconds
+  )
 
   def filePath(f: String): Path = {
     val fileUrl = self.getClass.getResource(f)
