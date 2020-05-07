@@ -227,12 +227,6 @@ object Configuration extends WithProxyLogger {
 
   def loadFile(file: Path): AppCfg = {
     logger.debug(s"Loading configuration file at path $file")
-    try {
-      ConfigSource.file(file).at(CfgRootKey).loadOrThrow[AppCfg]
-    } catch {
-      case ex: Throwable =>
-        ex.printStackTrace()
-        throw ex
-    }
+    ConfigSource.file(file).at(CfgRootKey).loadOrThrow[AppCfg]
   }
 }
