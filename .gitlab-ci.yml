@@ -48,8 +48,10 @@ run test suites:
   artifacts:
     paths:
       - target/scala-2.12/scoverage-report/
+      - ./**/target/scala-2.12/scoverage-report/
+      - ./**/target/test-reports/TEST-*.xml
     reports:
-      junit: target/test-reports/TEST-*.xml
+      junit: ./**/target/test-reports/TEST-*.xml
 
 publish docker containers:
   stage: publish-docker
