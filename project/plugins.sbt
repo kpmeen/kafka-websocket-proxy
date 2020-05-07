@@ -10,6 +10,9 @@ resolvers ++= Seq(
   "JBoss" at "https://repository.jboss.org/"
 )
 
+// sbt-git plugin to get access to git commands from the build scripts
+addSbtPlugin("com.typesafe.sbt" % "sbt-git" % "1.0.0")
+
 // Dependency handling
 addSbtPlugin("com.timushev.sbt" % "sbt-updates" % "0.5.0")
 

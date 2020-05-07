@@ -1,3 +1,4 @@
+import com.typesafe.sbt.SbtGit
 import com.typesafe.sbt.packager.Keys._
 import com.typesafe.sbt.packager.docker.{Cmd, DockerAlias}
 import com.typesafe.sbt.packager.docker.DockerPlugin.autoImport.Docker
@@ -106,6 +107,7 @@ object Settings {
         )
       },
       dockerAliases ++= {
+        val commitSha = SbtGit.git.gitHeadCommit.value
         val gitLab = dockerAlias.value
         val dockerHub = DockerAlias(
           registryHost = None,
@@ -118,13 +120,17 @@ object Settings {
           // Push to both the GitLab and DockerHub registries.
           Seq(
             gitLab,
+            gitLab.withTag(commitSha),
             gitLab.withTag(Option("latest")),
             dockerHub,
             dockerHub.withTag(Option("latest"))
           )
         } else {
           // Snapshots are only pushed to the GitLab registry.
-          Seq(gitLab)
+          Seq(
+            gitLab,
+            gitLab.withTag(commitSha)
+          )
         }
       },
       dockerUpdateLatest := !isSnapshot.value,
