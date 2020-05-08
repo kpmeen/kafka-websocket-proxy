@@ -102,13 +102,15 @@ container_scanning:
       when: always
     - if: '$CI_MERGE_REQUEST_ID'
       when: never
-    - if: $GITLAB_FEATURES =~ /\bcontainer_scanning\b/
+    - if: '$GITLAB_FEATURES =~ /\bcontainer_scanning\b/'
       when: always
+    - if: '$CONTAINER_SCANNING_DISABLED'
+      when: never
 #  only:
 #    refs:
 #      - branches
 #    variables:
 #      - $GITLAB_FEATURES =~ /\bcontainer_scanning\b/
-  except:
-    variables:
-      - $CONTAINER_SCANNING_DISABLED
+#  except:
+#    variables:
+#      - $CONTAINER_SCANNING_DISABLED
