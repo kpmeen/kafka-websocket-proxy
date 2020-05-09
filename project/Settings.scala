@@ -2,6 +2,7 @@ import com.typesafe.sbt.SbtGit
 import com.typesafe.sbt.packager.Keys._
 import com.typesafe.sbt.packager.docker.{Cmd, DockerAlias}
 import com.typesafe.sbt.packager.docker.DockerPlugin.autoImport.Docker
+import org.scalafmt.sbt.ScalafmtPlugin.autoImport.scalafmtOnCompile
 import sbt.Keys._
 import sbt.TestFrameworks.ScalaTest
 import sbt._
@@ -87,7 +88,8 @@ object Settings {
     packageDoc / publishArtifact := false,
     sources in (Compile, doc) := Seq.empty,
     turbo := true,
-    resolvers ++= Dependencies.Resolvers
+    resolvers ++= Dependencies.Resolvers,
+    scalafmtOnCompile := true
   )
 
   val GitLabRegistry = "registry.gitlab.com"
@@ -108,7 +110,7 @@ object Settings {
       },
       dockerAliases ++= {
         val commitSha = SbtGit.git.gitHeadCommit.value
-        val gitLab = dockerAlias.value
+        val gitLab    = dockerAlias.value
         val dockerHub = DockerAlias(
           registryHost = None,
           username = Option(DockerHubUser),

@@ -37,6 +37,7 @@ lazy val avro = (project in file("avro"))
     coverageExcludedPackages := "<empty>;net.scalytica.kafka.wsproxy.avro.*;"
   )
   .settings(libraryDependencies ++= Avro.All)
+  .settings(dependencyOverrides ++= Overrides.Deps: _*)
 
 lazy val server = (project in file("server"))
   .enablePlugins(JavaServerAppPackaging, DockerPlugin)
