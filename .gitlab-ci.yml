@@ -106,11 +106,3 @@ container_scanning:
       when: always
     - if: '$CONTAINER_SCANNING_DISABLED'
       when: never
-#  only:
-#    refs:
-#      - branches
-#    variables:
-#      - $GITLAB_FEATURES =~ /\bcontainer_scanning\b/
-#  except:
-#    variables:
-#      - $CONTAINER_SCANNING_DISABLED
