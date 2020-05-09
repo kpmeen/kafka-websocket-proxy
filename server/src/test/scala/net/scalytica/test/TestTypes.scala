@@ -15,13 +15,17 @@ trait TestTypes {
 
   object Serdes {
 
-    def keySerdes(implicit schemaRegistryPort: Int) = {
-      val srCfg = registryConfig(schemaRegistryPort)
+    def keySerdes(
+        implicit schemaRegistryPort: Int
+    ): WsProxyAvroSerde[TestKey] = {
+      val srCfg = registryConfig()
       WsProxyAvroSerde[TestKey](srCfg, isKey = true)
     }
 
-    def valueSerdes(implicit schemaRegistryPort: Int) = {
-      val srCfg = registryConfig(schemaRegistryPort)
+    def valueSerdes(
+        implicit schemaRegistryPort: Int
+    ): WsProxyAvroSerde[Album] = {
+      val srCfg = registryConfig()
       WsProxyAvroSerde[Album](srCfg, isKey = false)
     }
   }
@@ -42,7 +46,7 @@ trait TestTypes {
   case class Album(
       artist: String,
       title: String,
-      tracks: Seq[Track],
+      tracks: Seq[Track]
   )
 
   object Album {

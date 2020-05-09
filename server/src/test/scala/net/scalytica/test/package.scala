@@ -6,10 +6,12 @@ import akka.stream.Materializer
 import akka.stream.scaladsl.Sink
 import io.circe.Decoder
 import io.circe.parser.parse
-import io.confluent.kafka.serializers.AbstractKafkaAvroSerDeConfig.{
+import io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig.{
   AUTO_REGISTER_SCHEMAS,
   SCHEMA_REGISTRY_URL_CONFIG
 }
+import io.confluent.kafka.serializers.subject.TopicNameStrategy
+import io.confluent.kafka.serializers.subject.strategy._
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
   AvroConsumerRecord,
   AvroProducerResult
@@ -35,11 +37,22 @@ package object test {
   def serverHost(port: Int): String = s"localhost:$port"
 
   implicit def registryConfig(
+      keySubjNameStrategy: Class[_ <: SubjectNameStrategy] =
+        classOf[TopicNameStrategy],
+      valSubjNameStrategy: Class[_ <: SubjectNameStrategy] =
+        classOf[TopicNameStrategy]
+  )(
       implicit schemaRegistryPort: Int
-  ): Map[String, _] = Map(
-    SCHEMA_REGISTRY_URL_CONFIG -> s"http://${serverHost(schemaRegistryPort)}",
-    AUTO_REGISTER_SCHEMAS      -> true
-  )
+  ): Map[String, _] = {
+    val hostUrl = s"http://${serverHost(schemaRegistryPort)}"
+
+    Map(
+      SCHEMA_REGISTRY_URL_CONFIG    -> hostUrl,
+      AUTO_REGISTER_SCHEMAS         -> true,
+      "key.subject.name.strategy"   -> keySubjNameStrategy.getCanonicalName,
+      "value.subject.name.strategy" -> valSubjNameStrategy.getCanonicalName
+    )
+  }
 
   implicit class AddFutureAwaitResult[T](future: Future[T]) {
 
@@ -105,7 +118,7 @@ package object test {
             .awaitResult(5 seconds)
             .reduce(_ ++ _)
 
-          val actual = resultSerde.deserialize("", collected.toArray)
+          val actual = resultSerde.deserialize(collected.toArray)
 
           actual.topic mustBe expectedTopic
           actual.offset mustBe >=(0L)
@@ -200,7 +213,7 @@ package object test {
             .reduce(_ ++ _)
 
           val actual = WsConsumerRecord.fromAvro(
-            crSerde.deserialize("", collected.toArray)
+            crSerde.deserialize(collected.toArray)
           )
 
           actual.topic.value mustBe expectedTopic
@@ -218,8 +231,8 @@ package object test {
 
           actual match {
             case ConsumerKeyValueRecord(_, _, _, _, _, keyOut, valOut, _) =>
-              val k = keySerdes.deserialize("", keyOut.value)
-              val v = valSerdes.deserialize("", valOut.value)
+              val k = keySerdes.deserialize(expectedTopic, keyOut.value)
+              val v = valSerdes.deserialize(expectedTopic, valOut.value)
               k.username mustBe expectedKey.get.username
               v.title mustBe expectedValue.title
               v.artist mustBe expectedValue.artist
@@ -227,7 +240,7 @@ package object test {
               v.tracks must contain allElementsOf expectedValue.tracks
 
             case ConsumerValueRecord(_, _, _, _, _, valOut, _) =>
-              val v = valSerdes.deserialize("", valOut.value)
+              val v = valSerdes.deserialize(expectedTopic, valOut.value)
               v mustBe expectedValue
           }
 

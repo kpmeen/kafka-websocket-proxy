@@ -84,7 +84,7 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
       isWebSocketUpgrade mustBe true
 
       forAll(messages) { msg =>
-        val bytes = serializer.serialize("", msg)
+        val bytes = serializer.serialize(msg)
         wsClient.sendMessage(ByteString(bytes))
         wsClient.expectWsProducerResultAvro(topic)
       }

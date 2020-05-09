@@ -3,6 +3,7 @@ package net.scalytica.test
 import akka.http.scaladsl.model.headers.BasicHttpCredentials
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
+import io.confluent.kafka.serializers.subject.RecordNameStrategy
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
   AvroConsumerRecord,
   AvroProducerRecord,
@@ -18,17 +19,32 @@ trait WsClientSpec extends ScalatestRouteTest with Matchers { self: Suite =>
   def avroProducerRecordSerde(
       implicit schemaRegistryPort: Int
   ): WsProxyAvroSerde[AvroProducerRecord] =
-    WsProxyAvroSerde[AvroProducerRecord](registryConfig)
+    WsProxyAvroSerde[AvroProducerRecord](
+      registryConfig(
+        keySubjNameStrategy = classOf[RecordNameStrategy],
+        valSubjNameStrategy = classOf[RecordNameStrategy]
+      )
+    )
 
   implicit def avroProducerResultSerde(
       implicit schemaRegistryPort: Int
   ): WsProxyAvroSerde[AvroProducerResult] =
-    WsProxyAvroSerde[AvroProducerResult](registryConfig)
+    WsProxyAvroSerde[AvroProducerResult](
+      registryConfig(
+        keySubjNameStrategy = classOf[RecordNameStrategy],
+        valSubjNameStrategy = classOf[RecordNameStrategy]
+      )
+    )
 
   implicit def avroConsumerRecordSerde(
       implicit schemaRegistryPort: Int
   ): WsProxyAvroSerde[AvroConsumerRecord] =
-    WsProxyAvroSerde[AvroConsumerRecord](registryConfig)
+    WsProxyAvroSerde[AvroConsumerRecord](
+      registryConfig(
+        keySubjNameStrategy = classOf[RecordNameStrategy],
+        valSubjNameStrategy = classOf[RecordNameStrategy]
+      )
+    )
 
   /**
    *

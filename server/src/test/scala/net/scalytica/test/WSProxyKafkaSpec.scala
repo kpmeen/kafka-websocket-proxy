@@ -4,6 +4,7 @@ import akka.http.scaladsl.model.headers.BasicHttpCredentials
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
 import com.typesafe.config.Config
+import io.confluent.kafka.schemaregistry.rest.SchemaRegistryConfig._
 import kafka.server.KafkaConfig._
 import net.manub.embeddedkafka.ConsumerExtensions.ConsumerRetryConfig
 import net.manub.embeddedkafka.schemaregistry.{
@@ -62,7 +63,10 @@ trait WSProxyKafkaSpec
     kafkaPort = 0,
     zooKeeperPort = 0,
     schemaRegistryPort = 0,
-    customBrokerProperties = Map(AutoCreateTopicsEnableProp -> "false")
+    customBrokerProperties = Map(AutoCreateTopicsEnableProp -> "false"),
+    customSchemaRegistryProperties = Map(
+      KAFKASTORE_TOPIC_REPLICATION_FACTOR_CONFIG -> "1"
+    )
   )
 
   val saslSslPlainJaasConfig: String =
@@ -141,7 +145,7 @@ trait WSProxyKafkaSpec
   lazy val defaultTestAppCfgWithServerId: String => AppCfg = (sid: String) =>
     defaultTestAppCfg.copy(
       server = defaultTestAppCfg.server.copy(serverId = WsServerId(sid))
-  )
+    )
 
   def appTestConfig(
       kafkaPort: Int,
