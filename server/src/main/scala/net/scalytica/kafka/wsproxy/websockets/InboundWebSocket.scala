@@ -26,7 +26,7 @@ trait InboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
   implicit private[this] def producerRecordSerde(
       implicit cfg: AppCfg
   ): WsProxyAvroSerde[AvroProducerRecord] = {
-    schemaRegistryCfg
+    schemaRegistryCfgWithRecordNameStrategy
       .map(c => WsProxyAvroSerde[AvroProducerRecord](c))
       .getOrElse(WsProxyAvroSerde[AvroProducerRecord]())
   }
@@ -34,7 +34,7 @@ trait InboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
   implicit private[this] def producerResultSerde(
       implicit cfg: AppCfg
   ): WsProxyAvroSerde[AvroProducerResult] = {
-    schemaRegistryCfg
+    schemaRegistryCfgWithRecordNameStrategy
       .map(c => WsProxyAvroSerde[AvroProducerResult](c))
       .getOrElse(WsProxyAvroSerde[AvroProducerResult]())
   }
@@ -75,8 +75,9 @@ trait InboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
 
       case AvroPayload =>
         WsProducer.produceAvro[ktpe.Aux, args.valType.Aux](args).map { res =>
-          val bs =
-            ByteString.fromArray(producerResultSerde.serialize("", res.toAvro))
+          val bs = ByteString.fromArray(
+            producerResultSerde.serialize(args.topic.value, res.toAvro)
+          )
           BinaryMessage.Strict(bs)
         }
     }

@@ -108,6 +108,8 @@ package object wsproxy {
       }
     }
 
+    def asOption: Option[String] = Option(underlying).filterNot(_.isBlank)
+
     def safeNonEmpty: Boolean =
       Option(underlying).filterNot(_.isBlank).map(_.nonEmpty).nonEmpty
   }

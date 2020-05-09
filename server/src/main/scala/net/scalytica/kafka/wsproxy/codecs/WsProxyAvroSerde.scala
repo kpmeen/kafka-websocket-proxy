@@ -8,15 +8,17 @@ import io.confluent.kafka.serializers.{
   KafkaAvroDeserializer,
   KafkaAvroSerializer
 }
+import net.scalytica.kafka.wsproxy.StringExtensions
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import org.apache.avro.generic.GenericRecord
 import org.apache.kafka.common.serialization.{Deserializer, Serde, Serializer}
 
 import scala.collection.JavaConverters._
+import scala.reflect._
 import scala.util.control.NonFatal
 
 // scalastyle:off
-class WsProxyAvroSerde[T <: Product: Decoder: Encoder: SchemaFor] private (
+class WsProxyAvroSerde[T <: Product: Decoder: Encoder: SchemaFor: ClassTag] private (
     avroSer: KafkaAvroSerializer,
     avroDes: KafkaAvroDeserializer
 ) extends Serde[T]
@@ -34,10 +36,16 @@ class WsProxyAvroSerde[T <: Product: Decoder: Encoder: SchemaFor] private (
   override def serializer(): Serializer[T]     = this
   override def deserializer(): Deserializer[T] = this
 
+  // scalastyle:off null
+  def serialize(data: T): Array[Byte]   = serialize(null, data)
+  def deserialize(data: Array[Byte]): T = deserialize(null, data)
+  // scalastyle:on null
+
   override def serialize(topic: String, data: T): Array[Byte] = {
     val topicStr = Option(topic).getOrElse("NA")
     logger.trace(
-      s"Attempting to serialize ${data.getClass.getSimpleName} to for $topicStr"
+      s"Attempting to serialize ${data.getClass.getSimpleName}" +
+        s"${topicStr.asOption.map(t => s" for $t").getOrElse("")}"
     )
     val res = Option(data).map { d =>
       val record = RecordFormat[T].to(d)
@@ -74,94 +82,71 @@ class WsProxyAvroSerde[T <: Product: Decoder: Encoder: SchemaFor] private (
 
 }
 
-object WsProxyAvroSerde {
+object WsProxyAvroSerde extends WithProxyLogger {
 
-  def apply[T <: Product: Decoder: Encoder: SchemaFor]()
-      : WsProxyAvroSerde[T] = {
-    val cas = new WsProxyAvroSerde[T](
-      new KafkaAvroSerializer(),
-      new KafkaAvroDeserializer()
-    )
-    cas.configure(Map.empty[String, Any].asJava, isKey = false)
-    cas
-  }
-
-  def apply[T <: Product: Decoder: Encoder: SchemaFor](
-      configs: Map[String, _]
-  ): WsProxyAvroSerde[T] = {
-    val cas = new WsProxyAvroSerde[T](
-      new KafkaAvroSerializer(),
-      new KafkaAvroDeserializer()
-    )
-    cas.configure(configs.asJava, isKey = false)
-    cas
-  }
-
-  def apply[T <: Product: Decoder: Encoder: SchemaFor](
+  private[this] def init[T <: Product: Decoder: Encoder: SchemaFor: ClassTag](
+      client: Option[SchemaRegistryClient],
       configs: Map[String, _],
       isKey: Boolean
   ): WsProxyAvroSerde[T] = {
-    val cas = new WsProxyAvroSerde[T](
-      new KafkaAvroSerializer(),
-      new KafkaAvroDeserializer()
+    val serde = client match {
+      case Some(c) =>
+        new WsProxyAvroSerde[T](
+          new KafkaAvroSerializer(c),
+          new KafkaAvroDeserializer(c)
+        )
+
+      case None =>
+        new WsProxyAvroSerde[T](
+          new KafkaAvroSerializer(),
+          new KafkaAvroDeserializer()
+        )
+    }
+    serde.configure(configs.asJava, isKey)
+
+    logger.debug(
+      s"Initialised ${serde.getClass} with for ${classTag[T].runtimeClass}" +
+        s" configuration:${configs.mkString("\n", "\n", "")}"
     )
-    cas.configure(configs.asJava, isKey)
-    cas
+
+    serde
   }
 
-  def apply[T <: Product: Decoder: Encoder: SchemaFor](
+  def apply[T <: Product: Decoder: Encoder: SchemaFor: ClassTag]()
+      : WsProxyAvroSerde[T] =
+    init[T](None, Map.empty[String, Any], isKey = false)
+
+  def apply[T <: Product: Decoder: Encoder: SchemaFor: ClassTag](
+      configs: Map[String, _]
+  ): WsProxyAvroSerde[T] = init[T](None, configs, isKey = false)
+
+  def apply[T <: Product: Decoder: Encoder: SchemaFor: ClassTag](
+      configs: Map[String, _],
+      isKey: Boolean
+  ): WsProxyAvroSerde[T] = init[T](None, configs, isKey)
+
+  def apply[T <: Product: Decoder: Encoder: SchemaFor: ClassTag](
       client: SchemaRegistryClient,
       configs: Map[String, _]
-  ): WsProxyAvroSerde[T] = {
-    val cas = new WsProxyAvroSerde[T](
-      new KafkaAvroSerializer(client),
-      new KafkaAvroDeserializer(client)
-    )
-    cas.configure(configs.asJava, isKey = false)
-    cas
-  }
+  ): WsProxyAvroSerde[T] = init[T](Option(client), configs, isKey = false)
 
-  def apply[T <: Product: Decoder: Encoder: SchemaFor](
+  def apply[T <: Product: Decoder: Encoder: SchemaFor: ClassTag](
       client: SchemaRegistryClient,
       configs: Map[String, _],
       isKey: Boolean
-  ): WsProxyAvroSerde[T] = {
-    val cas = new WsProxyAvroSerde[T](
-      new KafkaAvroSerializer(client),
-      new KafkaAvroDeserializer(client)
-    )
-    cas.configure(configs.asJava, isKey)
-    cas
-  }
+  ): WsProxyAvroSerde[T] = init[T](Option(client), configs, isKey)
 
-  def apply[T <: Product: Decoder: Encoder: SchemaFor](
+  def apply[T <: Product: Decoder: Encoder: SchemaFor: ClassTag](
       isKey: Boolean
   )(
       implicit
       client: Option[SchemaRegistryClient],
       configs: Map[String, _]
-  ): WsProxyAvroSerde[T] =
-    client
-      .map { rc =>
-        WsProxyAvroSerde[T](
-          client = rc,
-          configs = configs,
-          isKey = isKey
-        )
-      }
-      .getOrElse {
-        WsProxyAvroSerde[T](
-          configs = configs,
-          isKey = isKey
-        )
-      }
+  ): WsProxyAvroSerde[T] = init[T](client, configs, isKey)
 
-  def apply[T <: Product: Decoder: Encoder: SchemaFor](
+  def apply[T <: Product: Decoder: Encoder: SchemaFor: ClassTag](
       isKey: Boolean
   )(implicit configs: Map[String, _]): WsProxyAvroSerde[T] =
-    WsProxyAvroSerde[T](
-      configs = configs,
-      isKey = isKey
-    )
+    init[T](None, configs, isKey)
 
 }

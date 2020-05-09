@@ -43,12 +43,11 @@ import scala.concurrent.ExecutionContext
  */
 object WsProducer extends WithProxyLogger {
 
-  // scalastyle:off
-  private[this] val SASL_JAAS_CONFIG = "sasl.jaas.config"
+  private[this] val SaslJaasConfig: String = "sasl.jaas.config"
 
-  private[this] val PLAIN_LOGIN = (u: String, p: String) =>
-    s"""org.apache.kafka.common.security.plain.PlainLoginModule required username="$u" password="$p";"""
-  // scalastyle:on
+  private[this] val PlainLogin = (u: String, p: String) =>
+    "org.apache.kafka.common.security.plain.PlainLoginModule required " +
+      s"""username="$u" password="$p";"""
 
   implicit def seqToSource[Out](s: Seq[Out]): Source[Out, NotUsed] = {
     val it = new scala.collection.immutable.Iterable[Out] {
@@ -79,7 +78,7 @@ object WsProducer extends WithProxyLogger {
   )(ps: ProducerSettings[K, V])(implicit cfg: AppCfg): KafkaProducer[K, V] = {
     val props = {
       val jaasProps = aclCredentials
-        .map(c => SASL_JAAS_CONFIG -> PLAIN_LOGIN(c.username, c.password))
+        .map(c => SaslJaasConfig -> PlainLogin(c.username, c.password))
         .toMap
 
       cfg.producer.kafkaClientProperties ++
@@ -292,7 +291,7 @@ object WsProducer extends WithProxyLogger {
             ByteString.empty
           )
       }
-      .map(bs => serde.deserialize("", bs.toArray))
+      .map(bs => serde.deserialize(bs.toArray))
       .recover {
         case t: Exception =>
           logAndEmpty(s"Avro message could not be deserialised", t)(

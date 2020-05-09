@@ -48,7 +48,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
   private[this] def avroCommitSerde(
       implicit cfg: AppCfg
   ): WsProxyAvroSerde[AvroCommit] = {
-    schemaRegistryCfg
+    schemaRegistryCfgWithRecordNameStrategy
       .map(c => WsProxyAvroSerde[AvroCommit](c))
       .getOrElse(WsProxyAvroSerde[AvroCommit]())
   }
@@ -56,7 +56,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
   private[this] def avroConsumerRecordSerde(
       implicit cfg: AppCfg
   ): WsProxyAvroSerde[AvroConsumerRecord] = {
-    schemaRegistryCfg
+    schemaRegistryCfgWithRecordNameStrategy
       .map(c => WsProxyAvroSerde[AvroConsumerRecord](c))
       .getOrElse(WsProxyAvroSerde[AvroConsumerRecord]())
   }
@@ -284,7 +284,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
         case t: Throwable =>
           logAndThrow("There was an error processing an Avro message", t)
       }
-      .map(msg => avroCommitSerde.deserialize("", msg.toArray[Byte]))
+      .map(msg => avroCommitSerde.deserialize(msg.toArray[Byte]))
       .recover {
         case t: Throwable =>
           logAndThrow(s"Avro message could not be deserialised", t)
