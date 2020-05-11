@@ -17,7 +17,6 @@ variables:
   SAST_EXCLUDED_PATHS: target
   # Dependency scan properties
   DS_DEFAULT_ANALYZERS: "gemnasium-maven"
-  CI_DEBUG_TRACE: "true"
 
 cache:
   untracked: true
@@ -73,6 +72,11 @@ publish docker containers:
 include:
   - template: SAST.gitlab-ci.yml
   - template: Dependency-Scanning.gitlab-ci.yml
+
+dependency_scanning:
+  variables:
+    CI_DEBUG_TRACE: "true"
+    SBT_CLI_OPTS: "--debug"
 
 # To have the container scanning execute in the desired stage, the below is copied
 # directly from https://gitlab.com/gitlab-org/gitlab/blob/master/lib/gitlab/ci/templates/Security/Container-Scanning.gitlab-ci.yml
