@@ -3,6 +3,10 @@
 ######################################################################
 image: registry.gitlab.com/kpmeen/docker-scala-sbt:scala_2.12_jdk11
 
+include:
+  - template: SAST.gitlab-ci.yml
+  - template: Dependency-Scanning.gitlab-ci.yml
+
 variables:
   CI: "true"
   DOCKER_DRIVER: overlay
@@ -17,6 +21,7 @@ variables:
   SAST_EXCLUDED_PATHS: target
   # Dependency scan properties
   DS_DEFAULT_ANALYZERS: "gemnasium-maven"
+  DS_DISABLE_DIND: "true"
 
 cache:
   untracked: true
@@ -68,10 +73,6 @@ publish docker containers:
       when: always
     - if: '$CI_MERGE_REQUEST_ID'
       when: never
-
-include:
-  - template: SAST.gitlab-ci.yml
-  - template: Dependency-Scanning.gitlab-ci.yml
 
 # To have the container scanning execute in the desired stage, the below is copied
 # directly from https://gitlab.com/gitlab-org/gitlab/blob/master/lib/gitlab/ci/templates/Security/Container-Scanning.gitlab-ci.yml
