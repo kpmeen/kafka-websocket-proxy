@@ -76,7 +76,7 @@ include:
 dependency_scanning:
   variables:
     CI_DEBUG_TRACE: "true"
-    SBT_CLI_OPTS: "--debug"
+    SBT_CLI_OPTS: "-Dsbt.coursier=false -Dsbt.ivy=true"
   artifacts:
     paths:
       - gl-dependency-scanning-report.json
