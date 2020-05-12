@@ -77,6 +77,10 @@ dependency_scanning:
   variables:
     CI_DEBUG_TRACE: "true"
     SBT_CLI_OPTS: "--debug"
+  artifacts:
+    paths:
+      - gl-dependency-scanning-report.json
+
 
 # To have the container scanning execute in the desired stage, the below is copied
 # directly from https://gitlab.com/gitlab-org/gitlab/blob/master/lib/gitlab/ci/templates/Security/Container-Scanning.gitlab-ci.yml
