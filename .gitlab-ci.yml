@@ -72,6 +72,12 @@ publish docker containers:
 include:
   - template: SAST.gitlab-ci.yml
   - template: Dependency-Scanning.gitlab-ci.yml
+  - template: Code-Quality.gitlab-ci.yml
+
+code_quality:
+  artifacts:
+    paths:
+      - gl-code-quality-report.json
 
 dependency_scanning:
   variables:
