@@ -68,9 +68,10 @@ case object Session {
 
   case class SessionNotFound(groupId: WsGroupId) extends SessionOpResult {
 
-    override def session = throw new NoSuchElementException(
-      "Cannot access session value when it's not found"
-    )
+    override def session =
+      throw new NoSuchElementException(
+        "Cannot access session value when it's not found"
+      )
   }
 
 }

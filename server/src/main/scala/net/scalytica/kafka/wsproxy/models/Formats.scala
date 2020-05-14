@@ -172,9 +172,10 @@ object Formats {
       }
     // scalastyle:on cyclomatic.complexity
 
-    def unsafeFromString(s: String): FormatType = fromString(s).getOrElse {
-      throw new IllegalArgumentException(s"$s is not a valid format type")
-    }
+    def unsafeFromString(s: String): FormatType =
+      fromString(s).getOrElse {
+        throw new IllegalArgumentException(s"$s is not a valid format type")
+      }
 
   }
 

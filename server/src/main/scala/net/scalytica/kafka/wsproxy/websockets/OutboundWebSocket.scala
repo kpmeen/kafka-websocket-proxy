@@ -45,16 +45,16 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
 
   implicit private[this] val timeout: Timeout = 3 seconds
 
-  private[this] def avroCommitSerde(
-      implicit cfg: AppCfg
+  private[this] def avroCommitSerde(implicit
+      cfg: AppCfg
   ): WsProxyAvroSerde[AvroCommit] = {
     schemaRegistryCfgWithRecordNameStrategy
       .map(c => WsProxyAvroSerde[AvroCommit](c))
       .getOrElse(WsProxyAvroSerde[AvroCommit]())
   }
 
-  private[this] def avroConsumerRecordSerde(
-      implicit cfg: AppCfg
+  private[this] def avroConsumerRecordSerde(implicit
+      cfg: AppCfg
   ): WsProxyAvroSerde[AvroConsumerRecord] = {
     schemaRegistryCfgWithRecordNameStrategy
       .map(c => WsProxyAvroSerde[AvroConsumerRecord](c))
@@ -76,8 +76,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
    */
   def outboundWebSocket(
       args: OutSocketArgs
-  )(
-      implicit
+  )(implicit
       cfg: AppCfg,
       as: ActorSystem,
       mat: Materializer,
@@ -163,8 +162,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
    */
   private[this] def prepareOutboundWebSocket(
       args: OutSocketArgs
-  )(terminateConsumer: () => Future[Done])(
-      implicit
+  )(terminateConsumer: () => Future[Done])(implicit
       cfg: AppCfg,
       as: ActorSystem,
       mat: Materializer,
@@ -248,8 +246,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
    * @param ec  the ExecutionContext to use
    * @return a [[Flow]] converting [[Message]] to String
    */
-  private[this] def jsonMessageToWsCommit(
-      implicit
+  private[this] def jsonMessageToWsCommit(implicit
       mat: Materializer,
       ec: ExecutionContext
   ): Flow[Message, WsCommit, NotUsed] =
@@ -273,8 +270,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
    * @param ec  the [[ExecutionContext]] to use
    * @return a [[Flow]] converting [[Message]] to String
    */
-  private[this] def avroMessageToWsCommit(
-      implicit
+  private[this] def avroMessageToWsCommit(implicit
       cfg: AppCfg,
       mat: Materializer,
       ec: ExecutionContext
@@ -302,8 +298,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
   private[this] def kafkaSource(
       args: OutSocketArgs,
       commitHandlerRef: Option[ActorRef[CommitStackHandler.CommitProtocol]]
-  )(
-      implicit
+  )(implicit
       cfg: AppCfg,
       as: ActorSystem
   ): Source[Message, Consumer.Control] = {
@@ -368,23 +363,23 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
    */
   private[this] def socketFormatConverter[K, V](
       args: OutSocketArgs
-  )(
-      implicit
+  )(implicit
       cfg: AppCfg,
       keySer: Serializer[K],
       valSer: Serializer[V],
       recEnc: Encoder[WsConsumerRecord[K, V]]
-  ): WsConsumerRecord[K, V] => Message = args.socketPayload match {
-    case AvroPayload =>
-      cr =>
-        val byteString = ByteString(
-          avroConsumerRecordSerde
-            .serialize(args.topic.value, cr.toAvroRecord[K, V])
-        )
-        BinaryMessage(byteString)
-    case JsonPayload =>
-      cr => TextMessage(cr.asJson.printWith(noSpaces))
-  }
+  ): WsConsumerRecord[K, V] => Message =
+    args.socketPayload match {
+      case AvroPayload =>
+        cr =>
+          val byteString = ByteString(
+            avroConsumerRecordSerde
+              .serialize(args.topic.value, cr.toAvroRecord[K, V])
+          )
+          BinaryMessage(byteString)
+      case JsonPayload =>
+        cr => TextMessage(cr.asJson.printWith(noSpaces))
+    }
 
   /**
    * Builds a Flow that sends consumed [[WsConsumerRecord]]s to the relevant

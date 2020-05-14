@@ -18,7 +18,9 @@ import scala.reflect._
 import scala.util.control.NonFatal
 
 // scalastyle:off
-class WsProxyAvroSerde[T <: Product: Decoder: Encoder: SchemaFor: ClassTag] private (
+class WsProxyAvroSerde[
+    T <: Product: Decoder: Encoder: SchemaFor: ClassTag
+] private (
     avroSer: KafkaAvroSerializer,
     avroDes: KafkaAvroDeserializer
 ) extends Serde[T]
@@ -138,8 +140,7 @@ object WsProxyAvroSerde extends WithProxyLogger {
 
   def apply[T <: Product: Decoder: Encoder: SchemaFor: ClassTag](
       isKey: Boolean
-  )(
-      implicit
+  )(implicit
       client: Option[SchemaRegistryClient],
       configs: Map[String, _]
   ): WsProxyAvroSerde[T] = init[T](client, configs, isKey)

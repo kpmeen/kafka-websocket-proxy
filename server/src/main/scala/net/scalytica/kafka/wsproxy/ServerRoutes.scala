@@ -235,8 +235,7 @@ trait ServerRoutes
    * @param ctx
    * @return
    */
-  def wsProxyRoutes(
-      implicit
+  def wsProxyRoutes(implicit
       cfg: AppCfg,
       sys: ActorSystem,
       mat: Materializer,
@@ -258,8 +257,7 @@ trait ServerRoutes
   def routesWith(
       inbound: InSocketArgs => Route,
       outbound: OutSocketArgs => Route
-  )(
-      implicit
+  )(implicit
       cfg: AppCfg
   ): Route = {
     schemaRoutes ~
@@ -395,8 +393,7 @@ trait WebSocketRoutes { self: BaseRoutes =>
   def websocketRoutes(
       inbound: InSocketArgs => Route,
       outbound: OutSocketArgs => Route
-  )(
-      implicit
+  )(implicit
       cfg: AppCfg
   ): Route = {
     pathPrefix("socket") {

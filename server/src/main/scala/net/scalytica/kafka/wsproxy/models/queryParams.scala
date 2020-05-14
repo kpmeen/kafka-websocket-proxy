@@ -61,18 +61,19 @@ object OutSocketArgs {
       rateLimit: Option[Int],
       batchSize: Option[Int],
       autoCommit: Boolean
-  ): OutSocketArgs = OutSocketArgs(
-    clientId = clientId,
-    groupId = WsGroupId.fromOption(groupId)(clientId),
-    topic = topic,
-    socketPayload = socketPayload,
-    keyType = keyTpe,
-    valType = valTpe,
-    offsetResetStrategy = offsetResetStrategy,
-    rateLimit = rateLimit,
-    batchSize = batchSize,
-    autoCommit = autoCommit
-  )
+  ): OutSocketArgs =
+    OutSocketArgs(
+      clientId = clientId,
+      groupId = WsGroupId.fromOption(groupId)(clientId),
+      topic = topic,
+      socketPayload = socketPayload,
+      keyType = keyTpe,
+      valType = valTpe,
+      offsetResetStrategy = offsetResetStrategy,
+      rateLimit = rateLimit,
+      batchSize = batchSize,
+      autoCommit = autoCommit
+    )
   // scalastyle:on
 }
 

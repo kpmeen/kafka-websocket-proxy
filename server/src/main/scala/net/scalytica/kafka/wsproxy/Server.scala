@@ -103,8 +103,8 @@ object Server
     cs.addTask(PhaseServiceUnbind, "http-unbind") { () =>
       for {
         _ <- ctrl.drainAndShutdown(
-              Future.successful(logger.info("Session data consumer shutdown."))
-            )
+               Future.successful(logger.info("Session data consumer shutdown."))
+             )
         _ <- bindingPlain.map(_.flatMap(_.unbind())).getOrElse(evalOpt)
         _ <- bindingSecure.map(_.flatMap(_.unbind())).getOrElse(evalOpt)
       } yield Done

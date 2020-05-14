@@ -34,8 +34,7 @@ sealed abstract class WsConsumerRecord[+K, +V](
   lazy val wsProxyMessageId: WsMessageId =
     WsMessageId(topic, partition, offset, timestamp)
 
-  def toAvroRecord[Key >: K, Value >: V](
-      implicit
+  def toAvroRecord[Key >: K, Value >: V](implicit
       keySer: Serializer[Key],
       valSer: Serializer[Value]
   ): AvroConsumerRecord = {

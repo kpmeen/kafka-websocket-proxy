@@ -23,16 +23,16 @@ import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 
 trait InboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
 
-  implicit private[this] def producerRecordSerde(
-      implicit cfg: AppCfg
+  implicit private[this] def producerRecordSerde(implicit
+      cfg: AppCfg
   ): WsProxyAvroSerde[AvroProducerRecord] = {
     schemaRegistryCfgWithRecordNameStrategy
       .map(c => WsProxyAvroSerde[AvroProducerRecord](c))
       .getOrElse(WsProxyAvroSerde[AvroProducerRecord]())
   }
 
-  implicit private[this] def producerResultSerde(
-      implicit cfg: AppCfg
+  implicit private[this] def producerResultSerde(implicit
+      cfg: AppCfg
   ): WsProxyAvroSerde[AvroProducerResult] = {
     schemaRegistryCfgWithRecordNameStrategy
       .map(c => WsProxyAvroSerde[AvroProducerResult](c))
@@ -49,38 +49,38 @@ trait InboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
    */
   def inboundWebSocket(
       args: InSocketArgs
-  )(
-      implicit
+  )(implicit
       cfg: AppCfg,
       as: ActorSystem,
       mat: Materializer
-  ): Route = handleWebSocketMessages {
-    logger.debug(
-      s"Initialising inbound websocket for topic ${args.topic.value}" +
-        s" with payload ${args.socketPayload}"
-    )
+  ): Route =
+    handleWebSocketMessages {
+      logger.debug(
+        s"Initialising inbound websocket for topic ${args.topic.value}" +
+          s" with payload ${args.socketPayload}"
+      )
 
-    val ktpe = args.keyType.getOrElse(Formats.NoType)
+      val ktpe = args.keyType.getOrElse(Formats.NoType)
 
-    implicit val keySer = ktpe.serializer
-    implicit val valSer = args.valType.serializer
-    implicit val keyDec = ktpe.decoder
-    implicit val valDec = args.valType.decoder
+      implicit val keySer = ktpe.serializer
+      implicit val valSer = args.valType.serializer
+      implicit val keyDec = ktpe.decoder
+      implicit val valDec = args.valType.decoder
 
-    args.socketPayload match {
-      case JsonPayload =>
-        WsProducer
-          .produceJson[ktpe.Aux, args.valType.Aux](args)
-          .map(res => TextMessage.Strict(res.asJson.printWith(noSpaces)))
+      args.socketPayload match {
+        case JsonPayload =>
+          WsProducer
+            .produceJson[ktpe.Aux, args.valType.Aux](args)
+            .map(res => TextMessage.Strict(res.asJson.printWith(noSpaces)))
 
-      case AvroPayload =>
-        WsProducer.produceAvro[ktpe.Aux, args.valType.Aux](args).map { res =>
-          val bs = ByteString.fromArray(
-            producerResultSerde.serialize(args.topic.value, res.toAvro)
-          )
-          BinaryMessage.Strict(bs)
-        }
+        case AvroPayload =>
+          WsProducer.produceAvro[ktpe.Aux, args.valType.Aux](args).map { res =>
+            val bs = ByteString.fromArray(
+              producerResultSerde.serialize(args.topic.value, res.toAvro)
+            )
+            BinaryMessage.Strict(bs)
+          }
+      }
     }
-  }
 
 }

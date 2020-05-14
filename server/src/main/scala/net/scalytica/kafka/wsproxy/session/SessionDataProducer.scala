@@ -21,8 +21,7 @@ import scala.util.{Failure, Success}
  * @param cfg
  * @param sys
  */
-private[session] class SessionDataProducer(
-    implicit
+private[session] class SessionDataProducer(implicit
     cfg: AppCfg,
     sys: ActorSystem[_]
 ) extends WithProxyLogger {
