@@ -76,8 +76,8 @@ trait Decoders {
   implicit val kafkaHeaderDecoder: Decoder[KafkaHeader] =
     deriveConfiguredDecoder
 
-  implicit def inValDecoder[T](
-      implicit dec: Decoder[T]
+  implicit def inValDecoder[T](implicit
+      dec: Decoder[T]
   ): Decoder[InValueDetails[T]] = { json =>
     for {
       v <- json.downField("value").as[T]
@@ -87,8 +87,8 @@ trait Decoders {
     }
   }
 
-  implicit def outValDecoder[T](
-      implicit dec: Decoder[T]
+  implicit def outValDecoder[T](implicit
+      dec: Decoder[T]
   ): Decoder[OutValueDetails[T]] = { json =>
     for {
       v <- json.downField("value").as[T]
@@ -98,8 +98,7 @@ trait Decoders {
     }
   }
 
-  implicit def wsProducerRecordDecoder[K, V](
-      implicit
+  implicit def wsProducerRecordDecoder[K, V](implicit
       keyDec: Decoder[K],
       valDec: Decoder[V]
   ): Decoder[WsProducerRecord[K, V]] = { cursor =>
@@ -123,8 +122,7 @@ trait Decoders {
     }
   }
 
-  implicit def wsConsumerRecordDecoder[K, V](
-      implicit
+  implicit def wsConsumerRecordDecoder[K, V](implicit
       keyDec: Decoder[K],
       valDec: Decoder[V]
   ): Decoder[WsConsumerRecord[K, V]] = { cursor =>

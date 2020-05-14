@@ -15,8 +15,9 @@ object WsMessageId {
       partition: Partition,
       offset: Offset,
       timestamp: Timestamp
-  ): WsMessageId = WsMessageId(
-    s"${topic.value}-${partition.value}-${offset.value}-${timestamp.value}"
-  )
+  ): WsMessageId =
+    WsMessageId(
+      s"${topic.value}-${partition.value}-${offset.value}-${timestamp.value}"
+    )
 
 }

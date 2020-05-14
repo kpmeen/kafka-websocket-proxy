@@ -27,8 +27,7 @@ import scala.collection.JavaConverters._
  * @param cfg the [[AppCfg]] to use
  * @param sys the [[ActorSystem]] to use
  */
-private[session] class SessionDataConsumer(
-    implicit
+private[session] class SessionDataConsumer(implicit
     cfg: AppCfg,
     sys: ActorSystem[_]
 ) extends WithProxyLogger {

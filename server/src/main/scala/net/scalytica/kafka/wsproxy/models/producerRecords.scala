@@ -81,8 +81,9 @@ case class ProducerValueRecord[V](
 case object ProducerEmptyMessage extends WsProducerRecord[Nothing, Nothing] {
   override val maybeKey = None
 
-  override def value = throw new NoSuchElementException(
-    "Trying to access value of empty message."
-  )
+  override def value =
+    throw new NoSuchElementException(
+      "Trying to access value of empty message."
+    )
   override def isEmpty = true
 }

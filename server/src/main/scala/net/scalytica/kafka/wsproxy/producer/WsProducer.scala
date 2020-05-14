@@ -59,8 +59,7 @@ object WsProducer extends WithProxyLogger {
   /** Create producer settings to use for the Kafka producer. */
   private[this] def producerSettings[K, V](
       args: InSocketArgs
-  )(
-      implicit
+  )(implicit
       cfg: AppCfg,
       as: ActorSystem,
       ks: Option[Serializer[K]],
@@ -99,8 +98,7 @@ object WsProducer extends WithProxyLogger {
    */
   private[this] def producerSettingsWithKey[K, V](
       args: InSocketArgs
-  )(
-      implicit
+  )(implicit
       cfg: AppCfg,
       as: ActorSystem,
       ks: Serializer[K],
@@ -119,8 +117,7 @@ object WsProducer extends WithProxyLogger {
    * @return an instance of [[WsProducerRecord]]
    * @throws Throwable when the underlying parser fails.
    */
-  private[this] def parseInput[K, V](jsonStr: String)(
-      implicit
+  private[this] def parseInput[K, V](jsonStr: String)(implicit
       keyDec: Decoder[K],
       valDec: Decoder[V]
   ): WsProducerRecord[K, V] = {
@@ -157,19 +154,20 @@ object WsProducer extends WithProxyLogger {
   private[this] def asKafkaProducerRecord[K, V](
       topic: TopicName,
       msg: WsProducerRecord[K, V]
-  ): ProducerRecord[K, V] = msg match {
-    case kvm: ProducerKeyValueRecord[K, V] =>
-      new ProducerRecord[K, V](topic.value, kvm.key.value, kvm.value.value)
+  ): ProducerRecord[K, V] =
+    msg match {
+      case kvm: ProducerKeyValueRecord[K, V] =>
+        new ProducerRecord[K, V](topic.value, kvm.key.value, kvm.value.value)
 
-    case vm: ProducerValueRecord[V] =>
-      new ProducerRecord[K, V](topic.value, vm.value.value)
+      case vm: ProducerValueRecord[V] =>
+        new ProducerRecord[K, V](topic.value, vm.value.value)
 
-    case ProducerEmptyMessage =>
-      throw new IllegalStateException(
-        "EmptyMessage passed through stream pipeline, but should have" +
-          " been filtered out."
-      )
-  }
+      case ProducerEmptyMessage =>
+        throw new IllegalStateException(
+          "EmptyMessage passed through stream pipeline, but should have" +
+            " been filtered out."
+        )
+    }
 
   /** Convenience function for logging and throwing an error in a Flow */
   private[this] def logAndEmpty[T](msg: String, t: Throwable)(empty: T): T = {
@@ -229,8 +227,7 @@ object WsProducer extends WithProxyLogger {
    *         down-stream for further processing. For example sending the
    *         metadata to the external web client for it to process locally.
    */
-  def produceJson[K, V](args: InSocketArgs)(
-      implicit
+  def produceJson[K, V](args: InSocketArgs)(implicit
       cfg: AppCfg,
       as: ActorSystem,
       mat: Materializer,
@@ -268,8 +265,7 @@ object WsProducer extends WithProxyLogger {
       .flatMapConcat(seqToSource)
   }
 
-  def produceAvro[K, V](args: InSocketArgs)(
-      implicit
+  def produceAvro[K, V](args: InSocketArgs)(implicit
       cfg: AppCfg,
       as: ActorSystem,
       mat: Materializer,
