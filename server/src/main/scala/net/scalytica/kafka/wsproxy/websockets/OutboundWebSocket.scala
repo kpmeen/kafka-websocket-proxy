@@ -16,11 +16,9 @@ import io.circe.Encoder
 import io.circe.Printer.noSpaces
 import io.circe.parser.parse
 import io.circe.syntax._
-import net.scalytica.kafka.wsproxy.wsMessageToStringFlow
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.SocketProtocol.{AvroPayload, JsonPayload}
 import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
-import net.scalytica.kafka.wsproxy.{WithSchemaRegistryConfig, _}
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.Implicits._
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes._
 import net.scalytica.kafka.wsproxy.codecs.Decoders._
@@ -36,6 +34,11 @@ import net.scalytica.kafka.wsproxy.models.{
 }
 import net.scalytica.kafka.wsproxy.session.SessionHandler._
 import net.scalytica.kafka.wsproxy.session.{Session, SessionHandlerProtocol}
+import net.scalytica.kafka.wsproxy.{
+  WithSchemaRegistryConfig,
+  wsMessageToStringFlow,
+  _
+}
 import org.apache.kafka.common.serialization.Serializer
 
 import scala.concurrent.duration._
@@ -45,21 +48,10 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
 
   implicit private[this] val timeout: Timeout = 3 seconds
 
-  private[this] def avroCommitSerde(
-      implicit cfg: AppCfg
-  ): WsProxyAvroSerde[AvroCommit] = {
-    schemaRegistryCfgWithRecordNameStrategy
-      .map(c => WsProxyAvroSerde[AvroCommit](c))
-      .getOrElse(WsProxyAvroSerde[AvroCommit]())
-  }
+  private[this] val avroCommitSerde = WsProxyAvroSerde[AvroCommit]()
 
-  private[this] def avroConsumerRecordSerde(
-      implicit cfg: AppCfg
-  ): WsProxyAvroSerde[AvroConsumerRecord] = {
-    schemaRegistryCfgWithRecordNameStrategy
-      .map(c => WsProxyAvroSerde[AvroConsumerRecord](c))
-      .getOrElse(WsProxyAvroSerde[AvroConsumerRecord]())
-  }
+  private[this] val avroConsumerRecordSerde =
+    WsProxyAvroSerde[AvroConsumerRecord]()
 
   /** Convenience function for logging and throwing an error in a Flow */
   def logAndThrow[T](message: String, t: Throwable): T = {
@@ -71,7 +63,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
   /**
    * Request handler for the outbound Kafka WebSocket connection.
    *
-   * @param args the output arguments to pass on to the consumer.
+    * @param args the output arguments to pass on to the consumer.
    * @return a [[Route]] for accessing the outbound WebSocket functionality.
    */
   def outboundWebSocket(
@@ -152,7 +144,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
   /**
    * Actual preparation and setup of the outbound WebSocket [[Route]].
    *
-   * @param args the [[OutSocketArgs]]
+    * @param args the [[OutSocketArgs]]
    * @param terminateConsumer termination logic for current websocket consumer.
    * @param cfg the implicit [[AppCfg]] to use
    * @param as the implicit untyped [[ActorSystem]] to use
@@ -206,12 +198,12 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
    * Prepares the appropriate Sink to use for incoming messages on the outbound
    * socket. The Sink is set up based on the desire to auto-commit or not.
    *
-   * - If the client requests auto-commit, all incoming messages are ignored.
+    * - If the client requests auto-commit, all incoming messages are ignored.
    * - If the client disables auto-commit, the Sink accepts JSON representation
    *   of [[WsCommit]] messages. These are then passed on to an Actor with
    *   [[CommitStackHandler]] behaviour.
    *
-   * @param messageParser parser to use for decoding incoming messages.
+    * @param messageParser parser to use for decoding incoming messages.
    * @param aref          an optional [[ActorRef]] to a [[CommitStackHandler]].
    * @return a [[Sink]] for consuming [[Message]]s
    * @see [[CommitStackHandler.commitStack]]
@@ -242,7 +234,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
    * Converts a WebSocket [[Message]] with a JSON String payload into a
    * [[WsCommit]] for down-stream processing.
    *
-   * @param mat the Materializer to use
+    * @param mat the Materializer to use
    * @param ec  the ExecutionContext to use
    * @return a [[Flow]] converting [[Message]] to String
    */
@@ -265,14 +257,12 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
    * Converts a WebSocket [[Message]] with an Avro payload into a [[WsCommit]]
    * for down-stream processing.
    *
-   * @param cfg the [[AppCfg]] to use
-   * @param mat the [[Materializer]] to use
+    * @param mat the [[Materializer]] to use
    * @param ec  the [[ExecutionContext]] to use
    * @return a [[Flow]] converting [[Message]] to String
    */
   private[this] def avroMessageToWsCommit(
-      implicit cfg: AppCfg,
-      mat: Materializer,
+      implicit mat: Materializer,
       ec: ExecutionContext
   ): Flow[Message, WsCommit, NotUsed] =
     wsMessageToByteStringFlow
@@ -290,7 +280,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
   /**
    * The Kafka [[Source]] where messages are consumed from the topic.
    *
-   * @param args the output arguments to pass on to the consumer.
+    * @param args the output arguments to pass on to the consumer.
    * @param cfg the application configuration.
    * @param as the actor system to use.
    * @return a [[Source]] producing [[TextMessage]]s for the outbound WebSocket.
@@ -353,7 +343,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
    * Helper function that translates a [[WsConsumerRecord]] into the correct
    * type of [[Message]], based on the {{{args}}}.
    *
-   * @param args [[OutSocketArgs]] for building the outbound WebSocket.
+    * @param args [[OutSocketArgs]] for building the outbound WebSocket.
    * @param keySer the key serializer
    * @param valSer the value serializer
    * @param recEnc JSON encoder for [[WsConsumerRecord]]
@@ -364,8 +354,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
   private[this] def socketFormatConverter[K, V](
       args: OutSocketArgs
   )(
-      implicit cfg: AppCfg,
-      keySer: Serializer[K],
+      implicit keySer: Serializer[K],
       valSer: Serializer[V],
       recEnc: Encoder[WsConsumerRecord[K, V]]
   ): WsConsumerRecord[K, V] => Message =
@@ -386,7 +375,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
    * instance of [[CommitStackHandler]] actor Sink, which stashed the record so
    * that its offset can be committed later.
    *
-   * @param ref the [[ActorRef]] for the [[CommitStackHandler]]
+    * @param ref the [[ActorRef]] for the [[CommitStackHandler]]
    * @tparam K the type of the record key
    * @tparam V the type of the record value
    * @return a commit [[Sink]] for [[WsConsumerRecord]] messages

@@ -10,40 +10,30 @@ import io.circe.Printer.noSpaces
 import io.circe.syntax._
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.SocketProtocol.{AvroPayload, JsonPayload}
+import net.scalytica.kafka.wsproxy.WithSchemaRegistryConfig
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
   AvroProducerRecord,
   AvroProducerResult
 }
 import net.scalytica.kafka.wsproxy.codecs.Encoders._
 import net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde
+import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models.{Formats, InSocketArgs}
 import net.scalytica.kafka.wsproxy.producer.WsProducer
-import net.scalytica.kafka.wsproxy.WithSchemaRegistryConfig
-import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 
 trait InboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
 
-  implicit private[this] def producerRecordSerde(
-      implicit cfg: AppCfg
-  ): WsProxyAvroSerde[AvroProducerRecord] = {
-    schemaRegistryCfgWithRecordNameStrategy
-      .map(c => WsProxyAvroSerde[AvroProducerRecord](c))
-      .getOrElse(WsProxyAvroSerde[AvroProducerRecord]())
-  }
+  implicit private[this] val producerRecordSerde =
+    WsProxyAvroSerde[AvroProducerRecord]()
 
-  implicit private[this] def producerResultSerde(
-      implicit cfg: AppCfg
-  ): WsProxyAvroSerde[AvroProducerResult] = {
-    schemaRegistryCfgWithRecordNameStrategy
-      .map(c => WsProxyAvroSerde[AvroProducerResult](c))
-      .getOrElse(WsProxyAvroSerde[AvroProducerResult]())
-  }
+  implicit private[this] val producerResultSerde =
+    WsProxyAvroSerde[AvroProducerResult]()
 
   /**
    * Request handler for the inbound Kafka WebSocket connection, with a Kafka
    * producer as the Sink.
    *
-   * @param args the input arguments to pass on to the producer.
+    * @param args the input arguments to pass on to the producer.
    * @return a [[Route]] for accessing the inbound WebSocket functionality.
    * @see [[WsProducer.produceJson]]
    */

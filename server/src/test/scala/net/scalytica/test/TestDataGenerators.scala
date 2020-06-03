@@ -77,9 +77,6 @@ trait TestDataGenerators extends TestTypes { self =>
   )(implicit cfg: EmbeddedKafkaConfig): Seq[AvroProducerRecord] = {
     val now = java.time.Instant.now().toEpochMilli
 
-    val keySerdes = Serdes.keySerdes(cfg.schemaRegistryPort)
-    val valSerdes = Serdes.valueSerdes(cfg.schemaRegistryPort)
-
     (1 to num).map { i =>
       val headers =
         if (withHeaders) Option(Seq(KafkaMessageHeader(s"key$i", s"value$i")))
@@ -95,6 +92,10 @@ trait TestDataGenerators extends TestTypes { self =>
           )
         }
       )
+
+      val keySerdes = Serdes.keySerdes(cfg.schemaRegistryPort)
+      val valSerdes = Serdes.valueSerdes(cfg.schemaRegistryPort)
+
       AvroProducerRecord(
         key = Option(keySerdes.serialize("", key)),
         value = valSerdes.serialize("", value),
