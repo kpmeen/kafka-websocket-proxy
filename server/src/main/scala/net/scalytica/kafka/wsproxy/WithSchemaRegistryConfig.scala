@@ -1,6 +1,6 @@
 package net.scalytica.kafka.wsproxy
 
-import io.confluent.kafka.serializers.AbstractKafkaAvroSerDeConfig.{
+import io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig.{
   AUTO_REGISTER_SCHEMAS,
   SCHEMA_REGISTRY_URL_CONFIG
 }

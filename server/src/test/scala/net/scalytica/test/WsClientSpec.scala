@@ -3,7 +3,6 @@ package net.scalytica.test
 import akka.http.scaladsl.model.headers.BasicHttpCredentials
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
-import io.confluent.kafka.serializers.subject.RecordNameStrategy
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
   AvroConsumerRecord,
   AvroProducerRecord,
@@ -16,39 +15,18 @@ import org.scalatest.matchers.must.Matchers
 
 trait WsClientSpec extends ScalatestRouteTest with Matchers { self: Suite =>
 
-  def avroProducerRecordSerde(
-      implicit schemaRegistryPort: Int
-  ): WsProxyAvroSerde[AvroProducerRecord] =
-    WsProxyAvroSerde[AvroProducerRecord](
-      registryConfig(
-        keySubjNameStrategy = classOf[RecordNameStrategy],
-        valSubjNameStrategy = classOf[RecordNameStrategy]
-      )
-    )
+  implicit val avroProducerRecordSerde: WsProxyAvroSerde[AvroProducerRecord] =
+    WsProxyAvroSerde[AvroProducerRecord]()
 
-  implicit def avroProducerResultSerde(
-      implicit schemaRegistryPort: Int
-  ): WsProxyAvroSerde[AvroProducerResult] =
-    WsProxyAvroSerde[AvroProducerResult](
-      registryConfig(
-        keySubjNameStrategy = classOf[RecordNameStrategy],
-        valSubjNameStrategy = classOf[RecordNameStrategy]
-      )
-    )
+  implicit val avroProducerResultSerde: WsProxyAvroSerde[AvroProducerResult] =
+    WsProxyAvroSerde[AvroProducerResult]()
 
-  implicit def avroConsumerRecordSerde(
-      implicit schemaRegistryPort: Int
-  ): WsProxyAvroSerde[AvroConsumerRecord] =
-    WsProxyAvroSerde[AvroConsumerRecord](
-      registryConfig(
-        keySubjNameStrategy = classOf[RecordNameStrategy],
-        valSubjNameStrategy = classOf[RecordNameStrategy]
-      )
-    )
+  implicit val avroConsumerRecordSerde: WsProxyAvroSerde[AvroConsumerRecord] =
+    WsProxyAvroSerde[AvroConsumerRecord]()
 
   /**
    *
-   * @param uri
+    * @param uri
    * @param routes
    * @param body
    * @param wsClient
@@ -64,7 +42,7 @@ trait WsClientSpec extends ScalatestRouteTest with Matchers { self: Suite =>
 
   /**
    *
-   * @param uri
+    * @param uri
    * @param routes
    * @param creds
    * @param body
@@ -86,7 +64,7 @@ trait WsClientSpec extends ScalatestRouteTest with Matchers { self: Suite =>
   // scalastyle:off
   /**
    *
-   * @param baseUri
+    * @param baseUri
    * @param routes
    * @param keyType
    * @param basicCreds

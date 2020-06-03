@@ -323,7 +323,7 @@ class ServerRoutesSpec
           routes = routes,
           keyType = Some(AvroType),
           messages = messages
-        )(producerProbe, kcfg)
+        )(producerProbe)
 
         val outPath = "/socket/out?" +
           "clientId=test-7" +

@@ -4,7 +4,6 @@ import akka.http.scaladsl.model.headers.BasicHttpCredentials
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.WSProbe
 import akka.util.ByteString
-import net.manub.embeddedkafka.schemaregistry.EmbeddedKafkaConfig
 import net.scalytica.kafka.wsproxy.SocketProtocol.{
   AvroPayload,
   JsonPayload,
@@ -61,12 +60,8 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
       messages: Seq[AvroProducerRecord],
       basicCreds: Option[BasicHttpCredentials] = None
   )(
-      implicit wsClient: WSProbe,
-      kafkaCfg: EmbeddedKafkaConfig
+      implicit wsClient: WSProbe
   ): Unit = {
-    implicit val schemaRegPort = kafkaCfg.schemaRegistryPort
-
-    val serializer = avroProducerRecordSerde(kafkaCfg.schemaRegistryPort)
     val baseUri = baseProducerUri(
       topic = topic,
       payloadType = AvroPayload,
@@ -83,7 +78,7 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
       isWebSocketUpgrade mustBe true
 
       forAll(messages) { msg =>
-        val bytes = serializer.serialize(msg)
+        val bytes = avroProducerRecordSerde.serialize(msg)
         wsClient.sendMessage(ByteString(bytes))
         wsClient.expectWsProducerResultAvro(topic)
       }

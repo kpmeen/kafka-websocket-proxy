@@ -11,7 +11,7 @@ import io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig.{
   SCHEMA_REGISTRY_URL_CONFIG
 }
 import io.confluent.kafka.serializers.subject.TopicNameStrategy
-import io.confluent.kafka.serializers.subject.strategy._
+import io.confluent.kafka.serializers.subject.strategy.SubjectNameStrategy
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
   AvroConsumerRecord,
   AvroProducerResult
@@ -25,18 +25,18 @@ import net.scalytica.kafka.wsproxy.models.{
   WsProducerResult
 }
 import net.scalytica.test.TestTypes.{Album, TestKey}
+import org.scalatest.matchers.must.Matchers
 import org.scalatest.{Assertion, OptionValues}
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.{Failure, Success}
-import org.scalatest.matchers.must.Matchers
 
 package object test {
 
   def serverHost(port: Int): String = s"localhost:$port"
 
-  implicit def registryConfig(
+  def registryConfig(
       keySubjNameStrategy: Class[_ <: SubjectNameStrategy] =
         classOf[TopicNameStrategy],
       valSubjNameStrategy: Class[_ <: SubjectNameStrategy] =
