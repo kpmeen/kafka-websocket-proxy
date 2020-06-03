@@ -63,8 +63,8 @@ trait Encoders {
   implicit val kafkaHeaderEncoder: Encoder[KafkaHeader] =
     deriveConfiguredEncoder
 
-  implicit def outValEncoder[T](implicit
-      enc: Encoder[T]
+  implicit def outValEncoder[T](
+      implicit enc: Encoder[T]
   ): Encoder[OutValueDetails[T]] = { ovd =>
     Json.obj(
       "value"  -> ovd.value.asJson,
@@ -72,8 +72,8 @@ trait Encoders {
     )
   }
 
-  implicit def wsConsumerRecordEncoder[K, V](implicit
-      keyEnc: Encoder[OutValueDetails[K]],
+  implicit def wsConsumerRecordEncoder[K, V](
+      implicit keyEnc: Encoder[OutValueDetails[K]],
       valEnc: Encoder[OutValueDetails[V]]
   ): Encoder[WsConsumerRecord[K, V]] = {
     case ckvr: ConsumerKeyValueRecord[K, V] =>

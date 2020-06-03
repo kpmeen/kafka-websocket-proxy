@@ -9,8 +9,8 @@ import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 
 trait WithSchemaRegistryConfig {
 
-  protected def schemaRegistryCfg(implicit
-      cfg: AppCfg
+  protected def schemaRegistryCfg(
+      implicit cfg: AppCfg
   ): Option[Map[String, AnyRef]] = {
     cfg.kafkaClient.schemaRegistry.map { s =>
       Map[String, AnyRef](
@@ -20,8 +20,8 @@ trait WithSchemaRegistryConfig {
     }
   }
 
-  protected def schemaRegistryCfgWithRecordNameStrategy(implicit
-      cfg: AppCfg
+  protected def schemaRegistryCfgWithRecordNameStrategy(
+      implicit cfg: AppCfg
   ): Option[Map[String, AnyRef]] = {
     val rnsClassName = classOf[RecordNameStrategy].getCanonicalName
     schemaRegistryCfg.map { c =>

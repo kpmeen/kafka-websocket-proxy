@@ -81,10 +81,12 @@ trait WSProxyKafkaSpec
       "/sasl/kafka/client.truststore.jks"
     ).toAbsolutePath.toString,
     SSL_TRUSTSTORE_PASSWORD_CONFIG -> testKeyPass,
-    SSL_KEYSTORE_LOCATION_CONFIG   -> filePath("/sasl/kafka/client.keystore.jks").toAbsolutePath.toString,
-    SSL_KEYSTORE_PASSWORD_CONFIG   -> testKeyPass,
-    SSL_KEY_PASSWORD_CONFIG        -> testKeyPass,
-    SASL_JAAS_CONFIG               -> """org.apache.kafka.common.security.plain.PlainLoginModule required username="client" password="client";"""
+    SSL_KEYSTORE_LOCATION_CONFIG -> filePath(
+      "/sasl/kafka/client.keystore.jks"
+    ).toAbsolutePath.toString,
+    SSL_KEYSTORE_PASSWORD_CONFIG -> testKeyPass,
+    SSL_KEY_PASSWORD_CONFIG      -> testKeyPass,
+    SASL_JAAS_CONFIG             -> """org.apache.kafka.common.security.plain.PlainLoginModule required username="client" password="client";"""
     // scalastyle:on
   )
 
@@ -238,11 +240,12 @@ trait WSProxyKafkaSpec
       isSecure: Boolean = false
   )(
       implicit kcfg: EmbeddedKafkaConfig
-  ): Unit = initialiseTopic(
-    topic = topicName,
-    partitions = partitions,
-    isSecure = isSecure
-  )
+  ): Unit =
+    initialiseTopic(
+      topic = topicName,
+      partitions = partitions,
+      isSecure = isSecure
+    )
 
   def defaultProducerContext[T](
       topic: String = "test-topic"

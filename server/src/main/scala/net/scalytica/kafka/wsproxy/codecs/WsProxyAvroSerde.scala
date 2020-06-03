@@ -140,8 +140,8 @@ object WsProxyAvroSerde extends WithProxyLogger {
 
   def apply[T <: Product: Decoder: Encoder: SchemaFor: ClassTag](
       isKey: Boolean
-  )(implicit
-      client: Option[SchemaRegistryClient],
+  )(
+      implicit client: Option[SchemaRegistryClient],
       configs: Map[String, _]
   ): WsProxyAvroSerde[T] = init[T](client, configs, isKey)
 

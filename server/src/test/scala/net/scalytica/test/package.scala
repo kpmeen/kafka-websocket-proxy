@@ -106,8 +106,7 @@ package object test {
     def expectWsProducerResultAvro(
         expectedTopic: String
     )(
-        implicit
-        mat: Materializer,
+        implicit mat: Materializer,
         resultSerde: WsProxyAvroSerde[AvroProducerResult]
     ): Assertion = {
       probe.expectMessage() match {
@@ -136,8 +135,7 @@ package object test {
         expectedValue: V,
         expectHeaders: Boolean = false
     )(
-        implicit
-        mat: Materializer,
+        implicit mat: Materializer,
         kdec: Decoder[K],
         vdec: Decoder[V]
     ): Assertion = {
@@ -196,8 +194,7 @@ package object test {
         expectedValue: Album,
         expectHeaders: Boolean = false
     )(
-        implicit
-        mat: Materializer,
+        implicit mat: Materializer,
         schemaRegPort: Int,
         crSerde: WsProxyAvroSerde[AvroConsumerRecord]
     ): Assertion = {
@@ -256,8 +253,7 @@ package object test {
         expectedTopic: String,
         expectedValue: V
     )(
-        implicit
-        mat: Materializer,
+        implicit mat: Materializer,
         vdec: Decoder[V]
     ): Assertion = {
       expectWsConsumerKeyValueResultJson[Unit, V](
@@ -271,8 +267,7 @@ package object test {
         expectedTopic: String,
         expectedValue: Album
     )(
-        implicit
-        mat: Materializer,
+        implicit mat: Materializer,
         schemaRegPort: Int,
         crSerde: WsProxyAvroSerde[AvroConsumerRecord]
     ): Assertion = {

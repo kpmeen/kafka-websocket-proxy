@@ -59,8 +59,8 @@ object WsProducer extends WithProxyLogger {
   /** Create producer settings to use for the Kafka producer. */
   private[this] def producerSettings[K, V](
       args: InSocketArgs
-  )(implicit
-      cfg: AppCfg,
+  )(
+      implicit cfg: AppCfg,
       as: ActorSystem,
       ks: Option[Serializer[K]],
       vs: Option[Serializer[V]]
@@ -98,8 +98,8 @@ object WsProducer extends WithProxyLogger {
    */
   private[this] def producerSettingsWithKey[K, V](
       args: InSocketArgs
-  )(implicit
-      cfg: AppCfg,
+  )(
+      implicit cfg: AppCfg,
       as: ActorSystem,
       ks: Serializer[K],
       vs: Serializer[V]
@@ -117,10 +117,9 @@ object WsProducer extends WithProxyLogger {
    * @return an instance of [[WsProducerRecord]]
    * @throws Throwable when the underlying parser fails.
    */
-  private[this] def parseInput[K, V](jsonStr: String)(implicit
-      keyDec: Decoder[K],
-      valDec: Decoder[V]
-  ): WsProducerRecord[K, V] = {
+  private[this] def parseInput[K, V](
+      jsonStr: String
+  )(implicit keyDec: Decoder[K], valDec: Decoder[V]): WsProducerRecord[K, V] = {
     import io.circe._
     import io.circe.parser._
     import net.scalytica.kafka.wsproxy.codecs.Decoders._
@@ -227,8 +226,8 @@ object WsProducer extends WithProxyLogger {
    *         down-stream for further processing. For example sending the
    *         metadata to the external web client for it to process locally.
    */
-  def produceJson[K, V](args: InSocketArgs)(implicit
-      cfg: AppCfg,
+  def produceJson[K, V](args: InSocketArgs)(
+      implicit cfg: AppCfg,
       as: ActorSystem,
       mat: Materializer,
       ks: Serializer[K],
@@ -265,8 +264,8 @@ object WsProducer extends WithProxyLogger {
       .flatMapConcat(seqToSource)
   }
 
-  def produceAvro[K, V](args: InSocketArgs)(implicit
-      cfg: AppCfg,
+  def produceAvro[K, V](args: InSocketArgs)(
+      implicit cfg: AppCfg,
       as: ActorSystem,
       mat: Materializer,
       serde: WsProxyAvroSerde[AvroProducerRecord]

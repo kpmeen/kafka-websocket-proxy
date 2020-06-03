@@ -128,10 +128,10 @@ class WsProxyEnvLoggerConfiguratorSpec
     "udpate level for pre-configured logger" in
       testContext(s"$loggerEnvPrefix$scalyticaLogger" -> "DEBUG") {
         configuredLevels =>
-          configuredLevels must contain(scalyticaLogger    -> Some("DEBUG"))
-          configuredLevels must contain(rootLogger         -> Some("OFF"))
-          configuredLevels must contain(akkaActorLogger    -> Some("OFF"))
-          configuredLevels must contain(akkaKafkaLogger    -> Some("OFF"))
+          configuredLevels must contain(scalyticaLogger -> Some("DEBUG"))
+          configuredLevels must contain(rootLogger -> Some("OFF"))
+          configuredLevels must contain(akkaActorLogger -> Some("OFF"))
+          configuredLevels must contain(akkaKafkaLogger -> Some("OFF"))
           configuredLevels must contain(kafkaClientsLogger -> Some("OFF"))
       }
 

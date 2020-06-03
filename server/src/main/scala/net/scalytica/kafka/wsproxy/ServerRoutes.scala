@@ -235,8 +235,8 @@ trait ServerRoutes
    * @param ctx
    * @return
    */
-  def wsProxyRoutes(implicit
-      cfg: AppCfg,
+  def wsProxyRoutes(
+      implicit cfg: AppCfg,
       sys: ActorSystem,
       mat: Materializer,
       ctx: ExecutionContext
@@ -257,9 +257,7 @@ trait ServerRoutes
   def routesWith(
       inbound: InSocketArgs => Route,
       outbound: OutSocketArgs => Route
-  )(implicit
-      cfg: AppCfg
-  ): Route = {
+  )(implicit cfg: AppCfg): Route = {
     schemaRoutes ~
       websocketRoutes(inbound, outbound) ~
       pathPrefix("kafka") {
@@ -393,9 +391,7 @@ trait WebSocketRoutes { self: BaseRoutes =>
   def websocketRoutes(
       inbound: InSocketArgs => Route,
       outbound: OutSocketArgs => Route
-  )(implicit
-      cfg: AppCfg
-  ): Route = {
+  )(implicit cfg: AppCfg): Route = {
     pathPrefix("socket") {
       path("in") {
         extractCredentials { creds =>

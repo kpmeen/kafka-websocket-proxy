@@ -104,9 +104,9 @@ private[consumer] object CommitStackTypes {
      * @param record the [[WsConsumerRecord]] to derive an [[Uncommitted]] from.
      * @return An option with the new stack or empty if no offset was found.
      */
-    def stash(record: WsConsumerRecord[_, _])(implicit
-        cfg: AppCfg
-    ): Option[CommitStack] =
+    def stash(
+        record: WsConsumerRecord[_, _]
+    )(implicit cfg: AppCfg): Option[CommitStack] =
       record.committableOffset.map { co =>
         addToStack(record.partition, Uncommitted(record.wsProxyMessageId, co))
       }

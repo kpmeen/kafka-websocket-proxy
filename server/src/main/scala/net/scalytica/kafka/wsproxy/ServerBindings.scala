@@ -14,8 +14,8 @@ import scala.concurrent.Future
 
 trait ServerBindings {
 
-  def initialisePlainBinding(implicit
-      cfg: AppCfg,
+  def initialisePlainBinding(
+      implicit cfg: AppCfg,
       routes: Route,
       sys: ActorSystem,
       mat: Materializer
@@ -32,8 +32,8 @@ trait ServerBindings {
   }
 
   // scalastyle:off
-  def initialiseSslBinding(implicit
-      cfg: AppCfg,
+  def initialiseSslBinding(
+      implicit cfg: AppCfg,
       routes: Route,
       sys: ActorSystem,
       mat: Materializer

@@ -62,8 +62,7 @@ class CommitStackHandlerSpec
       recs: immutable.Seq[ConsumerKeyValueRecord[String, String]],
       removeIds: Option[Seq[WsMessageId]] = None
   )(
-      implicit
-      tk: BehaviorTestKit[CommitProtocol],
+      implicit tk: BehaviorTestKit[CommitProtocol],
       inbox: TestInbox[CommitStack]
   ): TestInbox[CommitStack] = {
     val fullStack =

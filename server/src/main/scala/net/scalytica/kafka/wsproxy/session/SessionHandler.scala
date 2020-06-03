@@ -80,8 +80,8 @@ object SessionHandler extends SessionHandler {
       sh: ActorRef[SessionHandlerProtocol.Protocol]
   ) {
 
-    def initSession(groupId: WsGroupId, consumerLimit: Int)(implicit
-        timeout: Timeout,
+    def initSession(groupId: WsGroupId, consumerLimit: Int)(
+        implicit timeout: Timeout,
         scheduler: Scheduler
     ): Future[SessionOpResult] = {
       sh.ask[SessionOpResult] { ref =>
@@ -97,8 +97,8 @@ object SessionHandler extends SessionHandler {
         groupId: WsGroupId,
         clientId: WsClientId,
         serverId: WsServerId
-    )(implicit
-        timeout: Timeout,
+    )(
+        implicit timeout: Timeout,
         scheduler: Scheduler
     ): Future[SessionOpResult] = {
       sh.ask[SessionOpResult] { ref =>
@@ -111,8 +111,8 @@ object SessionHandler extends SessionHandler {
       }
     }
 
-    def removeConsumer(groupId: WsGroupId, clientId: WsClientId)(implicit
-        timeout: Timeout,
+    def removeConsumer(groupId: WsGroupId, clientId: WsClientId)(
+        implicit timeout: Timeout,
         scheduler: Scheduler
     ): Future[SessionOpResult] = {
       sh.ask[SessionOpResult] { ref =>
@@ -120,8 +120,8 @@ object SessionHandler extends SessionHandler {
       }
     }
 
-    def getSession(groupId: WsGroupId)(implicit
-        timeout: Timeout,
+    def getSession(groupId: WsGroupId)(
+        implicit timeout: Timeout,
         scheduler: Scheduler
     ): Future[Option[Session]] = {
       sh.ask[Option[Session]] { ref =>
@@ -180,8 +180,8 @@ trait SessionHandler extends WithProxyLogger {
    *         stream. And a typed [[ActorRef]] that understands messages from the
    *         defined protocol in [[SessionHandlerProtocol.Protocol]].
    */
-  def init(implicit
-      cfg: AppCfg,
+  def init(
+      implicit cfg: AppCfg,
       sys: akka.actor.ActorSystem
   ): SessionHandler.SessionHandlerRef = {
     implicit val typedSys = sys.toTyped

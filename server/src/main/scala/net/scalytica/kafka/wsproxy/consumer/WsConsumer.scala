@@ -45,8 +45,8 @@ object WsConsumer extends WithProxyLogger {
   private[this] def consumerSettings[K, V](
       args: OutSocketArgs,
       autoCommit: Boolean
-  )(implicit
-      cfg: AppCfg,
+  )(
+      implicit cfg: AppCfg,
       as: ActorSystem,
       kd: Deserializer[K],
       vd: Deserializer[V]
@@ -193,8 +193,8 @@ object WsConsumer extends WithProxyLogger {
    */
   def consumeAutoCommit[K, V](
       args: OutSocketArgs
-  )(implicit
-      cfg: AppCfg,
+  )(
+      implicit cfg: AppCfg,
       as: ActorSystem,
       kd: Deserializer[K],
       vd: Deserializer[V]
@@ -229,8 +229,8 @@ object WsConsumer extends WithProxyLogger {
    */
   def consumeManualCommit[K, V](
       args: OutSocketArgs
-  )(implicit
-      cfg: AppCfg,
+  )(
+      implicit cfg: AppCfg,
       as: ActorSystem,
       kd: Deserializer[K],
       vd: Deserializer[V]

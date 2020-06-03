@@ -26,8 +26,8 @@ import scala.concurrent.Future
 
 package object wsproxy {
 
-  def wsMessageToStringFlow(implicit
-      mat: Materializer,
+  def wsMessageToStringFlow(
+      implicit mat: Materializer,
       ec: ExecutionContext
   ): Flow[Message, String, NotUsed] =
     Flow[Message]
@@ -37,8 +37,8 @@ package object wsproxy {
       }
       .mapAsync(1)(_.toStrict(5 seconds).map(_.text))
 
-  def wsMessageToByteStringFlow(implicit
-      mat: Materializer,
+  def wsMessageToByteStringFlow(
+      implicit mat: Materializer,
       ec: ExecutionContext
   ): Flow[Message, ByteString, NotUsed] =
     Flow[Message]

@@ -61,8 +61,7 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
       messages: Seq[AvroProducerRecord],
       basicCreds: Option[BasicHttpCredentials] = None
   )(
-      implicit
-      wsClient: WSProbe,
+      implicit wsClient: WSProbe,
       kafkaCfg: EmbeddedKafkaConfig
   ): Unit = {
     implicit val schemaRegPort = kafkaCfg.schemaRegistryPort

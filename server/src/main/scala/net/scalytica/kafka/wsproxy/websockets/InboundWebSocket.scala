@@ -23,16 +23,16 @@ import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 
 trait InboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
 
-  implicit private[this] def producerRecordSerde(implicit
-      cfg: AppCfg
+  implicit private[this] def producerRecordSerde(
+      implicit cfg: AppCfg
   ): WsProxyAvroSerde[AvroProducerRecord] = {
     schemaRegistryCfgWithRecordNameStrategy
       .map(c => WsProxyAvroSerde[AvroProducerRecord](c))
       .getOrElse(WsProxyAvroSerde[AvroProducerRecord]())
   }
 
-  implicit private[this] def producerResultSerde(implicit
-      cfg: AppCfg
+  implicit private[this] def producerResultSerde(
+      implicit cfg: AppCfg
   ): WsProxyAvroSerde[AvroProducerResult] = {
     schemaRegistryCfgWithRecordNameStrategy
       .map(c => WsProxyAvroSerde[AvroProducerResult](c))
@@ -49,11 +49,7 @@ trait InboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
    */
   def inboundWebSocket(
       args: InSocketArgs
-  )(implicit
-      cfg: AppCfg,
-      as: ActorSystem,
-      mat: Materializer
-  ): Route =
+  )(implicit cfg: AppCfg, as: ActorSystem, mat: Materializer): Route =
     handleWebSocketMessages {
       logger.debug(
         s"Initialising inbound websocket for topic ${args.topic.value}" +
