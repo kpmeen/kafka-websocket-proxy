@@ -31,7 +31,7 @@ object Versions {
   val Slf4JVersion        = "1.7.30"
   val LogbackVersion      = "1.2.3"
 
-  val ScalaTestVersion = "3.1.2"
+  val ScalaTestVersion = "3.2.0"
 
   val GatlingVersion = "3.1.1"
 }
