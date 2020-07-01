@@ -57,7 +57,6 @@ import scala.concurrent.duration._
 import scala.util.Try
 
 /**
- *
  */
 trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
 
@@ -66,14 +65,12 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
   protected def sessionHandler: Option[SessionHandlerRef] = None
 
   /**
-   *
    * @return
    */
   private[this] def jsonMessageStr(msg: String): Json =
     Json.obj("message" -> Json.fromString(msg))
 
   /**
-   *
    * @return
    */
   private[this] def jsonResponseMsg(
@@ -126,7 +123,6 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
   }
 
   /**
-   *
    * @return
    */
   private[this] def rejectAndComplete(
@@ -141,7 +137,6 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
   }
 
   /**
-   *
    * @return
    */
   implicit def serverErrorHandler: ExceptionHandler =
@@ -178,7 +173,6 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
     }
 
   /**
-   *
    * @return
    */
   implicit def serverRejectionHandler: RejectionHandler = {
@@ -228,7 +222,6 @@ trait ServerRoutes
     Some(sessionHandlerRef)
 
   /**
-   *
    * @param cfg
    * @param sys
    * @param mat
@@ -248,7 +241,6 @@ trait ServerRoutes
   }
 
   /**
-   *
    * @param inbound
    * @param outbound
    * @param cfg
@@ -298,7 +290,6 @@ trait ServerRoutes
 }
 
 /**
- *
  */
 trait SchemaRoutes { self: BaseRoutes =>
 
@@ -310,7 +301,6 @@ trait SchemaRoutes { self: BaseRoutes =>
   }
 
   /**
-   *
    * @return
    */
   def schemaRoutes: Route = {
@@ -336,12 +326,10 @@ trait SchemaRoutes { self: BaseRoutes =>
 }
 
 /**
- *
  */
 trait WebSocketRoutes { self: BaseRoutes =>
 
   /**
-   *
    * @param args The socket args provided
    * @param webSocketHandler lazy initializer for the websocket handler to use
    * @param cfg The configured [[AppCfg]]
@@ -369,7 +357,6 @@ trait WebSocketRoutes { self: BaseRoutes =>
   }
 
   /**
-   *
    * @param creds
    * @return
    */
@@ -382,7 +369,6 @@ trait WebSocketRoutes { self: BaseRoutes =>
     }
 
   /**
-   *
    * @param inbound
    * @param outbound
    * @param cfg

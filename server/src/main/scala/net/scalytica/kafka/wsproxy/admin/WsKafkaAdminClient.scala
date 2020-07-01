@@ -71,11 +71,10 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
     Try {
       underlying.createTopics(Seq(topic).asJava).all().get()
     }.recover {
-        KafkaFutureErrorHandler.handle {
-          logger.info("Topic already exists")
-        }(t => logger.error("Could not create the session state topic", t))
-      }
-      .getOrElse(System.exit(1))
+      KafkaFutureErrorHandler.handle {
+        logger.info("Topic already exists")
+      }(t => logger.error("Could not create the session state topic", t))
+    }.getOrElse(System.exit(1))
     logger.info("Session state topic created.")
   }
 

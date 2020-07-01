@@ -136,14 +136,14 @@ object SessionHandler extends SessionHandler {
 /**
  * Logic for building a clustered session handler using Kafka.
  *
-  * The idea is to use a compacted Kafka topic as the source of truth for
+ * The idea is to use a compacted Kafka topic as the source of truth for
  * consumer group session state. Each instance of the kafka-websocket-proxy will
  * have a single actor that can read and write from/to that topic. The topic
  * data should always be the up-to-date version of the state for all proxy
  * instances, and we can therefore implement some nice features on top of that
  * capability.
  *
-  * - Keeping track of number of sockets per consumer group
+ * - Keeping track of number of sockets per consumer group
  * - Keeping track of which consumers are part of the consumer group
  * - Possibility to share meta-data across nodes
  * - etc...
@@ -154,7 +154,7 @@ trait SessionHandler extends WithProxyLogger {
    * Calculates the expected next behaviour based on the value of the {{either}}
    * argument.
    *
-    * @param either the value to calculate the next behaviour from.
+   * @param either the value to calculate the next behaviour from.
    * @param behavior the behaviour to use in the case of a rhs value.
    * @return the next behaviour to use.
    */
@@ -173,7 +173,7 @@ trait SessionHandler extends WithProxyLogger {
    * Initialises a new SessionHandler actor. The [[ActorRef]] is named so there
    * will only be 1 instance per proxy server instance.
    *
-    * @param cfg implicit [[AppCfg]] to use
+   * @param cfg implicit [[AppCfg]] to use
    * @param sys the untyped [[akka.actor.ActorSystem]] to use
    * @return a [[SessionHandler.SessionHandlerRef]] containing a reference to
    *         the [[RunnableGraph]] that executes the [[SessionDataConsumer]]

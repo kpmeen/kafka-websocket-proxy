@@ -211,7 +211,6 @@ object WsProducer extends WithProxyLogger {
     }
 
   /**
-   *
    * @param args input arguments defining the base configs for the producer.
    * @param cfg  the [[AppCfg]] containing application configurations.
    * @param as   actor system to use
