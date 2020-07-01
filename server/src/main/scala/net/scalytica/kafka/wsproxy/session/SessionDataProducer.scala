@@ -17,7 +17,6 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 /**
- *
  * @param cfg
  * @param sys
  */
