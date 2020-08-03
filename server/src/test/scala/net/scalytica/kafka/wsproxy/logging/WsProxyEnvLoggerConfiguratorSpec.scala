@@ -14,6 +14,7 @@ import scala.collection.JavaConverters._
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
+// INFO: This class is prefixed with capital A to enforce being executed first
 class WsProxyEnvLoggerConfiguratorSpec
     extends AnyWordSpec
     with Matchers
@@ -150,7 +151,6 @@ class WsProxyEnvLoggerConfiguratorSpec
         configuredLevels.get(proxyLogger).value mustBe Some("DEBUG")
         // assert non-existing keys
         configuredLevels.get("io.confluent") mustBe None
-        configuredLevels.get("org.apache.avro") mustBe None
       }
 
   }

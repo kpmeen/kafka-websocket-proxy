@@ -14,6 +14,7 @@ import io.confluent.monitoring.clients.interceptor.{
   MonitoringProducerInterceptor
 }
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.logging.DefaultProxyLogger
 
 import scala.concurrent.ExecutionContext
 // scalastyle:off
@@ -40,13 +41,21 @@ package object wsproxy {
   def wsMessageToByteStringFlow(
       implicit mat: Materializer,
       ec: ExecutionContext
-  ): Flow[Message, ByteString, NotUsed] =
+  ): Flow[Message, ByteString, NotUsed] = {
     Flow[Message]
+      .log("wsMessageToByteStringFlow", _ => "Concatenating incoming bytes...")
       .mapConcat {
-        case tm: TextMessage   => tm.textStream.runWith(Sink.ignore); Nil
-        case bm: BinaryMessage => BinaryMessage(bm.dataStream) :: Nil
+        case tm: TextMessage =>
+          DefaultProxyLogger.debug("Received TextMessage through socket")
+          tm.textStream.runWith(Sink.ignore); Nil
+
+        case bm: BinaryMessage =>
+          DefaultProxyLogger.debug("Received BinaryMessage through socket")
+          BinaryMessage(bm.dataStream) :: Nil
       }
+      .log("wsMessageToByteStringFlow", m => s"Aggregated message: $m")
       .mapAsync(1)(_.toStrict(5 seconds).map(_.data))
+  }
 
   val ProducerInterceptorClass =
     classOf[MonitoringProducerInterceptor[_, _]].getName

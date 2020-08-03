@@ -13,19 +13,25 @@ import scala.reflect._
 import scala.util.control.NonFatal
 
 // scalastyle:off
-class WsProxyAvroSerde[
-    T >: Null: SchemaFor: Encoder: Decoder
-] extends Serde[T]
+class WsProxyAvroSerde[T >: Null: SchemaFor: Encoder: Decoder: ClassTag]
+    extends Serde[T]
     with Serializer[T]
     with Deserializer[T]
     with Serializable
     with WithProxyLogger {
   // scalastyle:on
 
-  val innerSerde = new GenericSerde[T](BinaryFormat)
+  private[this] val inner = new GenericSerde[T](BinaryFormat)
+
+  private val schema = SchemaFor[T].schema
+
+  private val cls = classTag[T].runtimeClass.getName
+
+  logger.info(s"Init SerDes for $cls with schema:\n${schema.toString(true)}")
 
   override def configure(configs: JMap[String, _], isKey: Boolean): Unit = {
     // DO NOTHING
+//    inner.configure(configs, isKey)
   }
 
   override def serializer(): Serializer[T]     = this
@@ -37,37 +43,40 @@ class WsProxyAvroSerde[
   // scalastyle:on null
 
   override def serialize(topic: String, data: T): Array[Byte] = {
-    val topicStr = Option(topic).getOrElse("NA")
-    logger.trace(
-      s"Attempting to serialize ${data.getClass.getSimpleName}" +
-        s"${topicStr.asOption.map(t => s" for $t").getOrElse("")}"
-    )
-    val res = Option(data).map(d => innerSerde.serialize(topic, d))
+    val tstr = topic.asOption.map(t => s"for topic $t").getOrElse("")
 
-    res.orNull
+    logger.trace(s"Serializing $cls $tstr")
+    logger.trace(s"Data to serialize: $data")
+
+    Option(data).map(d => inner.serialize(topic, d)).orNull
   }
 
   override def deserialize(topic: String, data: Array[Byte]): T = {
-    val topicStr = Option(topic).getOrElse("NA")
-    logger.trace(
-      s"Attempting to deserialize message from topic $topicStr"
-    )
-    logger.trace(
-      s"Data array has length ${Option(data).map(_.length).orNull}"
-    )
-    try {
-      val record = innerSerde.deserialize(topic, data)
-      logger.trace(s"Record is:\n$record")
-      record
-    } catch {
-      case NonFatal(ex) =>
-        logger.error(s"Could not deserialize data from $topicStr", ex)
-        throw ex
-    }
+    val tstr = topic.asOption.map(t => s" from topic $t").getOrElse("")
+
+    logger.trace(s"Deserializing $cls $tstr")
+    logger.trace(s"Data to deserialize: $data")
+
+    Option(data).flatMap {
+      case d if d.nonEmpty =>
+        logger.debug(s"Data array has length ${d.length}")
+        try {
+          val record = inner.deserialize(topic, data)
+          logger.trace(s"Record is: $record")
+          Some(record)
+        } catch {
+          case NonFatal(ex) =>
+            logger.error(s"Could not deserialize $cls from $tstr", ex)
+            throw ex
+        }
+      case _ =>
+        logger.debug("Data array is empty")
+        None
+    }.orNull
   }
 
   override def close(): Unit = {
-    innerSerde.close()
+    inner.close()
   }
 
 }
@@ -81,9 +90,9 @@ object WsProxyAvroSerde extends WithProxyLogger {
     val serde = new WsProxyAvroSerde[T]
     serde.configure(configs.asJava, isKey)
 
-    logger.debug(
-      s"Initialised ${serde.getClass} with for ${classTag[T].runtimeClass}" +
-        s" configuration:${configs.mkString("\n", "\n", "")}"
+    logger.trace(
+      s"Initializing ${serde.getClass} for ${classTag[T].runtimeClass} with" +
+        s" config: ${configs.mkString("\n", "\n", "")}"
     )
 
     serde

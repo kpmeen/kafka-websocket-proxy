@@ -2,34 +2,34 @@ import sbt._
 
 object Versions {
   // TODO:
-  // Cannot upgrade to Scala 2.13 yet, because some libs are only compiled
-  // against 2.12.x.
+  //  Cannot upgrade to Scala 2.13 yet, because some libs are only compiled
+  //  against 2.12.x.
   val ScalaVersion = "2.12.11"
 
-  val ConfigVersion     = "1.4.0"
+  val ConfigVersion = "1.4.0"
   val PureConfigVersion = "0.13.0"
 
-  val Avro4sVersion                 = "3.1.0"
-  val ConfluentPlatformVersion      = "5.5.1"
-  val KafkaVersion                  = "2.5.0"
-  val EmbeddedKafkaVersion          = "2.5.0"
+  val Avro4sVersion = "4.0.0-RC2"
+  val ConfluentPlatformVersion = "5.5.1"
+  val KafkaVersion = "2.5.0"
+  val EmbeddedKafkaVersion = "2.5.0"
   val EmbeddedSchemaRegistryVersion = "5.5.0.1"
-  val KafkaStreamsQueryVersion      = "0.1.1"
+  val KafkaStreamsQueryVersion = "0.1.1"
 
-  val AkkaVersion            = "2.6.6"
-  val AkkaHttpVersion        = "10.1.12"
+  val AkkaVersion = "2.6.6"
+  val AkkaHttpVersion = "10.1.12"
   val AkkaStreamKafkaVersion = "2.0.3"
 
   val AlpakkaVersion = "1.0.2"
 
-  val AkkaHttpCirceVersion      = "1.25.2"
-  val CirceVersion              = "0.13.0"
+  val AkkaHttpCirceVersion = "1.25.2"
+  val CirceVersion = "0.13.0"
   val CirceGenericExtrasVersion = CirceVersion
-  val CirceOpticsVersion        = CirceVersion
+  val CirceOpticsVersion = CirceVersion
 
   val ScalaLoggingVersion = "3.9.2"
-  val Slf4JVersion        = "1.7.30"
-  val LogbackVersion      = "1.2.3"
+  val Slf4JVersion = "1.7.30"
+  val LogbackVersion = "1.2.3"
 
   val ScalaTestVersion = "3.2.0"
 
@@ -50,6 +50,10 @@ object Dependencies {
       MavenRepo(
         "MuleSoft",
         "https://repository.mulesoft.org/nexus/content/repositories/public/"
+      ),
+      MavenRepo(
+        "Avro4s-Snapshots",
+        "https://oss.sonatype.org/content/repositories/snapshots"
       )
     )
 
@@ -64,16 +68,16 @@ object Dependencies {
 
   object Akka {
 
-    val Actor        = "com.typesafe.akka" %% "akka-actor"         % AkkaVersion
-    val Stream       = "com.typesafe.akka" %% "akka-stream"        % AkkaVersion
-    val ActorTyped   = "com.typesafe.akka" %% "akka-actor-typed"   % AkkaVersion
-    val StreamTyped  = "com.typesafe.akka" %% "akka-stream-typed"  % AkkaVersion
+    val Actor = "com.typesafe.akka" %% "akka-actor" % AkkaVersion
+    val Stream = "com.typesafe.akka" %% "akka-stream" % AkkaVersion
+    val ActorTyped = "com.typesafe.akka" %% "akka-actor-typed" % AkkaVersion
+    val StreamTyped = "com.typesafe.akka" %% "akka-stream-typed" % AkkaVersion
     val ClusterTyped = "com.typesafe.akka" %% "akka-cluster-typed" % AkkaVersion
 
     val DistDataTyped =
       "com.typesafe.akka" %% "akka-cluster-typed" % AkkaVersion
     val Slf4j = "com.typesafe.akka" %% "akka-slf4j" % AkkaVersion
-    val Http  = "com.typesafe.akka" %% "akka-http"  % AkkaHttpVersion
+    val Http = "com.typesafe.akka" %% "akka-http" % AkkaHttpVersion
 
     val AkkaStreamKafka =
       "com.typesafe.akka" %% "akka-stream-kafka" % AkkaStreamKafkaVersion
@@ -83,9 +87,9 @@ object Dependencies {
   }
 
   object Avro {
-    val Avro4sCore  = "com.sksamuel.avro4s" %% "avro4s-core"  % Avro4sVersion
+    val Avro4sCore = "com.sksamuel.avro4s" %% "avro4s-core" % Avro4sVersion
     val Avro4sKafka = "com.sksamuel.avro4s" %% "avro4s-kafka" % Avro4sVersion
-    val Avro4sJson  = "com.sksamuel.avro4s" %% "avro4s-json"  % Avro4sVersion
+    val Avro4sJson = "com.sksamuel.avro4s" %% "avro4s-json" % Avro4sVersion
 
     val All = Seq(Avro4sCore, Avro4sKafka)
   }
@@ -132,8 +136,8 @@ object Dependencies {
   }
 
   object Config {
-    val TypeSafeConfig = "com.typesafe"          % "config"      % ConfigVersion
-    val PureConfig     = "com.github.pureconfig" %% "pureconfig" % PureConfigVersion
+    val TypeSafeConfig = "com.typesafe" % "config" % ConfigVersion
+    val PureConfig = "com.github.pureconfig" %% "pureconfig" % PureConfigVersion
 
     val All = Seq(TypeSafeConfig, PureConfig)
   }
@@ -200,12 +204,12 @@ object Dependencies {
 
     val ScalaLogging =
       "com.typesafe.scala-logging" %% "scala-logging" % ScalaLoggingVersion
-    val Logback        = "ch.qos.logback" % "logback-classic"  % LogbackVersion
-    val Slf4j          = "org.slf4j"      % "slf4j-api"        % Slf4JVersion
-    val Log4jOverSlf4j = "org.slf4j"      % "log4j-over-slf4j" % Slf4JVersion
-    val Slf4jLog4j     = "org.slf4j"      % "slf4j-log4j12"    % Slf4JVersion
-    val JulToSlf4j     = "org.slf4j"      % "jul-to-slf4j"     % Slf4JVersion
-    val Slf4jNop       = "org.slf4j"      % "slf4j-nop"        % Slf4JVersion
+    val Logback = "ch.qos.logback" % "logback-classic" % LogbackVersion
+    val Slf4j = "org.slf4j" % "slf4j-api" % Slf4JVersion
+    val Log4jOverSlf4j = "org.slf4j" % "log4j-over-slf4j" % Slf4JVersion
+    val Slf4jLog4j = "org.slf4j" % "slf4j-log4j12" % Slf4JVersion
+    val JulToSlf4j = "org.slf4j" % "jul-to-slf4j" % Slf4JVersion
+    val Slf4jNop = "org.slf4j" % "slf4j-nop" % Slf4JVersion
 
     val All = Seq(ScalaLogging, Slf4j, Logback)
   }
@@ -213,15 +217,15 @@ object Dependencies {
   object Overrides {
 
     val Deps = Seq(
-      "org.apache.kafka"  % "kafka-clients"      % KafkaVersion,
-      "org.apache.kafka"  % "kafka-streams"      % KafkaVersion,
-      "org.apache.kafka"  %% "kafka"             % KafkaVersion,
+      "org.apache.kafka" % "kafka-clients" % KafkaVersion,
+      "org.apache.kafka" % "kafka-streams" % KafkaVersion,
+      "org.apache.kafka" %% "kafka" % KafkaVersion,
       "com.typesafe.akka" %% "akka-stream-kafka" % AkkaStreamKafkaVersion,
-      "org.slf4j"         % "slf4j-api"          % Slf4JVersion,
-      "org.slf4j"         % "log4j-over-slf4j"   % Slf4JVersion,
-      "org.slf4j"         % "slf4j-log4j12"      % Slf4JVersion,
-      "org.slf4j"         % "jul-to-slf4j"       % Slf4JVersion,
-      "org.slf4j"         % "slf4j-nop"          % Slf4JVersion
+      "org.slf4j" % "slf4j-api" % Slf4JVersion,
+      "org.slf4j" % "log4j-over-slf4j" % Slf4JVersion,
+      "org.slf4j" % "slf4j-log4j12" % Slf4JVersion,
+      "org.slf4j" % "jul-to-slf4j" % Slf4JVersion,
+      "org.slf4j" % "slf4j-nop" % Slf4JVersion
     )
   }
 }

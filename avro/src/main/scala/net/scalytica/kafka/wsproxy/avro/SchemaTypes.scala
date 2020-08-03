@@ -1,56 +1,10 @@
 package net.scalytica.kafka.wsproxy.avro
 
 import com.sksamuel.avro4s._
+import org.apache.avro.Schema
+import shapeless.{:+:, CNil}
 
 object SchemaTypes {
-
-  object Implicits {
-
-    implicit val KafkaMessageHeaderSchemaFor: SchemaFor[KafkaMessageHeader] =
-      KafkaMessageHeader.schemaFor
-
-    implicit val KafkaMessageHeaderToRecord: ToRecord[KafkaMessageHeader] =
-      KafkaMessageHeader.toRecord
-
-    implicit val KafkaMessageHeaderFromRecord: FromRecord[KafkaMessageHeader] =
-      KafkaMessageHeader.fromRecord
-
-    implicit val ProducerRecordSchemaFor: SchemaFor[AvroProducerRecord] =
-      AvroProducerRecord.schemaFor
-
-    implicit val ProducerRecordToRecord: ToRecord[AvroProducerRecord] =
-      AvroProducerRecord.toRecord
-
-    implicit val ProducerRecordFromRecord: FromRecord[AvroProducerRecord] =
-      AvroProducerRecord.fromRecord
-
-    implicit val ProducerResultSchemaFor: SchemaFor[AvroProducerResult] =
-      AvroProducerResult.schemaFor
-
-    implicit val ProducerResultToRecord: ToRecord[AvroProducerResult] =
-      AvroProducerResult.toRecord
-
-    implicit val ProducerResultFromRecord: FromRecord[AvroProducerResult] =
-      AvroProducerResult.fromRecord
-
-    implicit val ConsumerRecordSchemaFor: SchemaFor[AvroConsumerRecord] =
-      AvroConsumerRecord.schemaFor
-
-    implicit val ConsumerRecordToRecord: ToRecord[AvroConsumerRecord] =
-      AvroConsumerRecord.toRecord
-
-    implicit val ConsumerRecordFromRecord: FromRecord[AvroConsumerRecord] =
-      AvroConsumerRecord.fromRecord
-
-    implicit val CommitSchemaFor: SchemaFor[AvroCommit] = AvroCommit.schemaFor
-    implicit val CommitToRecord: ToRecord[AvroCommit]   = AvroCommit.toRecord
-
-    implicit val CommitFromRecord: FromRecord[AvroCommit] =
-      AvroCommit.fromRecord
-
-  }
-
-  trait WsProxyAvroRecord
 
   /**
    * Simple representation of Kafka message headers. Currently there is only
@@ -60,22 +14,20 @@ object SchemaTypes {
    * @param value The header value
    */
   @AvroDoc("Schema definition for simple Kafka message headers.")
+  @AvroNamespace("net.scalytica.kafka.wsproxy.avro")
   case class KafkaMessageHeader(key: String, value: String)
-      extends WsProxyAvroRecord
 
-  object KafkaMessageHeader {
-    val schemaFor  = SchemaFor[KafkaMessageHeader]
-    val toRecord   = ToRecord[KafkaMessageHeader]
-    val fromRecord = FromRecord[KafkaMessageHeader]
-
-    lazy val schema = AvroSchema[KafkaMessageHeader]
-  }
+  // format: off
+  type AvroValueTypesCoproduct =
+    Array[Byte] :+: String :+: Int :+: Long :+: Double :+: Float :+: CNil
+  // format: on
 
   /**
    * Wrapper schema for messages to produce into Kafka topics via the WebSocket
    * Proxy.
    *
-   * @param key The message key.
+   * @param key The message key. Defined as a union type using shapeless
+   *            co-products with a subset of available types that can be used.
    * @param value The message value.
    * @param headers The headers to apply to the message in Kafka.
    */
@@ -85,11 +37,14 @@ object SchemaTypes {
        key and value before adding them to this message. This is because Avro
        does not support referencing external/remote schemas."""
   )
+  @AvroNamespace("net.scalytica.kafka.wsproxy.avro")
   case class AvroProducerRecord(
-      key: Option[Array[Byte]],
+      // format: off
+      key: Option[AvroValueTypesCoproduct] = None,
+      // format: on
       value: Array[Byte],
-      headers: Option[Seq[KafkaMessageHeader]]
-  ) extends WsProxyAvroRecord {
+      headers: Option[Seq[KafkaMessageHeader]] = None
+  ) {
 
     def isEmpty: Boolean = AvroProducerRecord.empty == this
 
@@ -98,18 +53,18 @@ object SchemaTypes {
   object AvroProducerRecord {
 
     lazy val empty: AvroProducerRecord =
-      AvroProducerRecord(None, Array.empty, None)
+      AvroProducerRecord(value = Array.empty[Byte])
 
-    val schemaFor  = SchemaFor[AvroProducerRecord]
-    val toRecord   = ToRecord[AvroProducerRecord]
-    val fromRecord = FromRecord[AvroProducerRecord]
+    implicit val schemaFor = SchemaFor[AvroProducerRecord]
+    implicit val encoder   = Encoder[AvroProducerRecord]
+    implicit val decoder   = Decoder[AvroProducerRecord]
 
-    lazy val schema = AvroSchema[AvroProducerRecord]
+    val schema: Schema = AvroSchema[AvroProducerRecord]
   }
 
   /**
-   * Schema for confirmation messages sent back through the producer socket when
-   * a message has been successfully sent to Kafka.
+   * Schema for confirmation messages sent back through the producer socket
+   * when a message has been successfully sent to Kafka.
    *
    * @param topic The topic the message was written to.
    * @param partition The topic partition the message was written to.
@@ -117,19 +72,20 @@ object SchemaTypes {
    * @param timestamp The timestamp for when the message was written to Kafka.
    */
   @AvroDoc("Outbound schema for responding to produced messages.")
+  @AvroNamespace("net.scalytica.kafka.wsproxy.avro")
   case class AvroProducerResult(
       topic: String,
       partition: Int,
       offset: Long,
       timestamp: Long
-  ) extends WsProxyAvroRecord
+  )
 
   object AvroProducerResult {
-    val schemaFor  = SchemaFor[AvroProducerResult]
-    val toRecord   = ToRecord[AvroProducerResult]
-    val fromRecord = FromRecord[AvroProducerResult]
+    implicit val schemaFor = SchemaFor[AvroProducerResult]
+    implicit val encoder   = Encoder[AvroProducerResult]
+    implicit val decoder   = Decoder[AvroProducerResult]
 
-    lazy val schema = AvroSchema[AvroProducerResult]
+    val schema: Schema = AvroSchema[AvroProducerResult]
   }
 
   /**
@@ -151,39 +107,41 @@ object SchemaTypes {
        client to deserialize the key and value using the correct schemas, since
        these are passed through as raw byte arrays in this wrapper message."""
   )
+  @AvroNamespace("net.scalytica.kafka.wsproxy.avro")
   case class AvroConsumerRecord(
       wsProxyMessageId: String,
       topic: String,
       partition: Int,
       offset: Long,
       timestamp: Long,
-      key: Option[Array[Byte]],
+      key: Option[AvroValueTypesCoproduct],
       value: Array[Byte],
       headers: Option[Seq[KafkaMessageHeader]]
-  ) extends WsProxyAvroRecord
+  )
 
   object AvroConsumerRecord {
-    val schemaFor  = SchemaFor[AvroConsumerRecord]
-    val toRecord   = ToRecord[AvroConsumerRecord]
-    val fromRecord = FromRecord[AvroConsumerRecord]
+    implicit val schemaFor = SchemaFor[AvroConsumerRecord]
+    implicit val encoder   = Encoder[AvroConsumerRecord]
+    implicit val decoder   = Decoder[AvroConsumerRecord]
 
-    lazy val schema = AvroSchema[AvroConsumerRecord]
+    val schema: Schema = AvroSchema[AvroConsumerRecord]
   }
 
   /**
    * Schema to use when committing consumed Kafka messages through an outbound
-   * websocket.
+   * WebSocket.
    *
    * @param wsProxyMessageId The message ID to commit.
    */
   @AvroDoc("Inbound schema for committing the offset of consumed messages.")
-  case class AvroCommit(wsProxyMessageId: String) extends WsProxyAvroRecord
+  @AvroNamespace("net.scalytica.kafka.wsproxy.avro")
+  case class AvroCommit(wsProxyMessageId: String)
 
   object AvroCommit {
-    val schemaFor  = SchemaFor[AvroCommit]
-    val toRecord   = ToRecord[AvroCommit]
-    val fromRecord = FromRecord[AvroCommit]
+    implicit val schemaFor = SchemaFor[AvroCommit]
+    implicit val encoder   = Encoder[AvroCommit]
+    implicit val decoder   = Decoder[AvroCommit]
 
-    lazy val schema = AvroSchema[AvroCommit]
+    val schema: Schema = AvroSchema[AvroCommit]
   }
 }

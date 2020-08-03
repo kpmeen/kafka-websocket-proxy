@@ -5,14 +5,15 @@ import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
   AvroConsumerRecord,
   KafkaMessageHeader
 }
+import net.scalytica.kafka.wsproxy.models.Formats.FormatType
 import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails
 import org.apache.kafka.common.serialization.Serializer
 
 /**
  * ADT describing any record that can be sent out from the service through the
  * WebSocket connection. Basically there are two types of messages; those with
- * a defined key of type {{{K}}} _and_ a value of type {{{V}}}. And records that
- * only contain a value of type {{{V}}}.
+ * a defined key of type {{{K}}} _and_ a value of type {{{V}}}. And records
+ * that only contain a value of type {{{V}}}.
  *
  * @param key   The [[OutValueDetails]] describing the message key
  * @param value The [[OutValueDetails]] describing the message value
@@ -38,6 +39,13 @@ sealed abstract class WsConsumerRecord[+K, +V](
       implicit keySer: Serializer[Key],
       valSer: Serializer[Value]
   ): AvroConsumerRecord = {
+    val k = key.flatMap { det =>
+      det.format.flatMap { fmt =>
+        val v = det.value.asInstanceOf[fmt.Tpe]
+        fmt.toCoproduct(v)
+      }
+    }
+    // FIXME: There's something odd about this code 🤔
     AvroConsumerRecord(
       wsProxyMessageId = wsProxyMessageId.value,
       topic = topic.value,
@@ -45,7 +53,7 @@ sealed abstract class WsConsumerRecord[+K, +V](
       offset = offset.value,
       timestamp = timestamp.value,
       headers = headers.map(_.map(h => KafkaMessageHeader(h.key, h.value))),
-      key = key.map(ovd => keySer.serialize(topic.value, ovd.value)),
+      key = k,
       value = valSer.serialize(topic.value, value.value)
     )
   }
@@ -56,18 +64,21 @@ sealed abstract class WsConsumerRecord[+K, +V](
 
 object WsConsumerRecord {
 
-  def fromAvro(
+  def fromAvro[K](
       avro: AvroConsumerRecord
-  ): WsConsumerRecord[Array[Byte], Array[Byte]] = {
+  )(
+      formatType: FormatType
+  ): WsConsumerRecord[K, Array[Byte]] = {
     avro.key match {
       case Some(key) =>
+        val k: K = formatType.unsafeFromCoproduct[K](key)
         ConsumerKeyValueRecord(
           topic = TopicName(avro.topic),
           partition = Partition(avro.partition),
           offset = Offset(avro.offset),
           timestamp = Timestamp(avro.timestamp),
           headers = avro.headers.map(_.map(KafkaHeader.fromAvro)),
-          key = OutValueDetails(key, Option(Formats.AvroType)),
+          key = OutValueDetails(k, Option(formatType)),
           value = OutValueDetails(avro.value, Option(Formats.AvroType)),
           committableOffset = None
         )
@@ -95,8 +106,8 @@ object WsConsumerRecord {
  * @param offset            The topic offset of the message
  * @param timestamp         The timestamp for when Kafka received the record
  * @param headers           The [[KafkaHeader]]s found on the message.
- * @param key               The [[OutValueDetails]] describing the message key
- * @param value             The [[OutValueDetails]] describing the message value
+ * @param key               The [[OutValueDetails]] for the message key
+ * @param value             The [[OutValueDetails]] for the message value
  * @param committableOffset An optional handle to the mechanism that allows
  *                          committing the message offset back to Kafka.
  * @tparam K the type of the key
@@ -129,7 +140,7 @@ case class ConsumerKeyValueRecord[K, V](
  * @param offset            The topic offset of the message
  * @param timestamp         The timestamp for when Kafka received the record
  * @param headers           The [[KafkaHeader]]s found on the message.
- * @param value             The [[OutValueDetails]] describing the message value
+ * @param value             The [[OutValueDetails]] for the message value
  * @param committableOffset An optional handle to the mechanism that allows
  *                          committing the message offset back to Kafka.
  * @tparam V the type of the value

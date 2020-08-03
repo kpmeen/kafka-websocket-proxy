@@ -30,10 +30,6 @@ class FormatsSpec extends AnyWordSpec with Matchers with OptionValues {
       fromString("int").value mustBe IntType
     }
 
-    "be possible to initialise a ShortType using a string value" in {
-      fromString("short").value mustBe ShortType
-    }
-
     "be possible to initialise a LongType using a string value" in {
       fromString("long").value mustBe LongType
     }

@@ -1,7 +1,7 @@
 package net.scalytica.test
 
-import net.manub.embeddedkafka.schemaregistry.EmbeddedKafkaConfig
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes._
+import shapeless.Coproduct
 
 import scala.concurrent.duration._
 
@@ -22,7 +22,7 @@ trait TestDataGenerators extends TestTypes { self =>
       |}""".stripMargin
   }
 
-  def producerKeyValueJson(
+  def produceKeyValueJson(
       num: Int,
       withHeaders: Boolean = false
   ): Seq[String] = {
@@ -37,6 +37,7 @@ trait TestDataGenerators extends TestTypes { self =>
              |    }
              |  ],""".stripMargin
         else ""
+
       s"""{$headers
          |  "key": {
          |    "value": "foo-$i",
@@ -50,7 +51,7 @@ trait TestDataGenerators extends TestTypes { self =>
     }
   }
 
-  def producerValueJson(num: Int, withHeaders: Boolean = false): Seq[String] = {
+  def produceValueJson(num: Int, withHeaders: Boolean = false): Seq[String] = {
     (1 to num).map { i =>
       val headers =
         if (withHeaders)
@@ -62,6 +63,7 @@ trait TestDataGenerators extends TestTypes { self =>
              |    }
              |  ],""".stripMargin
         else ""
+
       s"""{$headers
          |  "value": {
          |    "value": "bar-$i",
@@ -71,10 +73,10 @@ trait TestDataGenerators extends TestTypes { self =>
     }
   }
 
-  def producerKeyValueAvro(
+  def produceKeyValueAvro(
       num: Int,
       withHeaders: Boolean = false
-  )(implicit cfg: EmbeddedKafkaConfig): Seq[AvroProducerRecord] = {
+  ): Seq[AvroProducerRecord] = {
     val now = java.time.Instant.now().toEpochMilli
 
     (1 to num).map { i =>
@@ -93,23 +95,46 @@ trait TestDataGenerators extends TestTypes { self =>
         }
       )
 
-      val keySerdes = Serdes.keySerdes(cfg.schemaRegistryPort)
-      val valSerdes = Serdes.valueSerdes(cfg.schemaRegistryPort)
+      val sk = TestSerdes.keySerdes.serialize(key)
+      val k  = Coproduct[AvroValueTypesCoproduct](sk)
+      val v  = TestSerdes.valueSerdes.serialize(value)
+
+      AvroProducerRecord(key = Option(k), value = v, headers = headers)
+    }
+  }
+
+  def produceKeyStringValueAvro(
+      num: Int,
+      withHeaders: Boolean = false
+  ): Seq[AvroProducerRecord] = {
+    (1 to num).map { i =>
+      val headers =
+        if (withHeaders) Option(Seq(KafkaMessageHeader(s"key$i", s"value$i")))
+        else None
+      val key = s"foo-$i"
+      val value = Album(
+        artist = s"artist-$i",
+        title = s"title-$i",
+        tracks = (1 to 3).map { tnum =>
+          Track(
+            name = s"track-$tnum",
+            duration = (120 seconds).toMillis
+          )
+        }
+      )
 
       AvroProducerRecord(
-        key = Option(keySerdes.serialize("", key)),
-        value = valSerdes.serialize("", value),
+        key = Option(Coproduct[AvroValueTypesCoproduct](key)),
+        value = TestSerdes.valueSerdes.serialize(value),
         headers = headers
       )
     }
   }
 
-  def producerValueAvro(
+  def produceValueAvro(
       num: Int,
       withHeaders: Boolean = false
-  )(implicit cfg: EmbeddedKafkaConfig): Seq[AvroProducerRecord] = {
-    val valSerdes = Serdes.valueSerdes(cfg.schemaRegistryPort)
-
+  ): Seq[AvroProducerRecord] = {
     (1 to num).map { i =>
       val headers =
         if (withHeaders) Option(Seq(KafkaMessageHeader(s"key$i", s"value$i")))
@@ -126,7 +151,7 @@ trait TestDataGenerators extends TestTypes { self =>
       )
       AvroProducerRecord(
         key = None,
-        value = valSerdes.serialize("", value),
+        value = TestSerdes.valueSerdes.serialize("", value),
         headers = headers
       )
     }

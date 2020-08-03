@@ -10,3 +10,13 @@ trait WithProxyLogger { self =>
   protected lazy val logger = Logger(self.getClass.getName.stripSuffix("$"))
 
 }
+
+object DefaultProxyLogger extends WithProxyLogger {
+
+  def trace(msg: String): Unit = logger.trace(msg)
+  def debug(msg: String): Unit = logger.debug(msg)
+  def info(msg: String): Unit  = logger.info(msg)
+  def warn(msg: String): Unit  = logger.warn(msg)
+  def error(msg: String): Unit = logger.error(msg)
+
+}

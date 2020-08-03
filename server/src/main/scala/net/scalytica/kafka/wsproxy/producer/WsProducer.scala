@@ -273,8 +273,13 @@ object WsProducer extends WithProxyLogger {
 
     import net.scalytica.kafka.wsproxy.codecs.BasicSerdes.ByteArrSerializer
 
-    val settings       = producerSettingsWithKey[Array[Byte], Array[Byte]](args)
+    val keyType                = args.keyType.getOrElse(Formats.AvroType)
+    implicit val keySerializer = keyType.serializer
+
+    val settings       = producerSettingsWithKey[keyType.Aux, Array[Byte]](args)
     val producerClient = settings.createKafkaProducer()
+
+    logger.debug(s"Using serde $serde")
 
     checkClient(args.topic, producerClient)
 
@@ -285,17 +290,22 @@ object WsProducer extends WithProxyLogger {
             ByteString.empty
           )
       }
-      .map(bs => serde.deserialize(bs.toArray))
+      .log("produceAvro", m => s"Trying to deserialize bytes: $m")
+      .map(bs => serde.deserialize(bs.toArray)) // FIXME: Test fails here
+      .log("produceAvro", m => s"Deserialized bytes into: $m")
       .recover {
         case t: Exception =>
-          logAndEmpty(s"Avro message could not be deserialised", t)(
+          logAndEmpty(s"Avro message could not be deserialized", t)(
             AvroProducerRecord.empty
           )
       }
       .filterNot(_.isEmpty)
       .map { wpr =>
         val record =
-          asKafkaProducerRecord(args.topic, WsProducerRecord.fromAvro(wpr))
+          asKafkaProducerRecord(
+            topic = args.topic,
+            msg = WsProducerRecord.fromAvro[keyType.Aux](wpr)(keyType)
+          )
         ProducerMessage.Message(record, record)
 
       }

@@ -2,6 +2,7 @@ package net.scalytica.test
 
 import com.sksamuel.avro4s._
 import net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde
+import org.apache.kafka.common.serialization.Serdes
 
 trait TestTypes {
 
@@ -13,19 +14,17 @@ trait TestTypes {
   implicit lazy val albumToRecord   = Album.toRecord
   implicit lazy val albumFromRecord = Album.fromRecord
 
-  object Serdes {
+  object TestSerdes {
 
-    def keySerdes(
-        implicit schemaRegistryPort: Int
-    ): WsProxyAvroSerde[TestKey] = {
-      val srCfg = registryConfig()
+    val stringSerdes = Serdes.String()
+
+    val keySerdes: WsProxyAvroSerde[TestKey] = {
+      val srCfg = registryConfig()(None)
       WsProxyAvroSerde[TestKey](srCfg, isKey = true)
     }
 
-    def valueSerdes(
-        implicit schemaRegistryPort: Int
-    ): WsProxyAvroSerde[Album] = {
-      val srCfg = registryConfig()
+    val valueSerdes: WsProxyAvroSerde[Album] = {
+      val srCfg = registryConfig()(None)
       WsProxyAvroSerde[Album](srCfg, isKey = false)
     }
   }

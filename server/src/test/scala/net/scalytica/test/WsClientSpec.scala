@@ -3,26 +3,15 @@ package net.scalytica.test
 import akka.http.scaladsl.model.headers.BasicHttpCredentials
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
-import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
-  AvroConsumerRecord,
-  AvroProducerRecord,
-  AvroProducerResult
-}
-import net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde
+import net.scalytica.kafka.wsproxy.codecs.ProtocolSerdes
 import net.scalytica.kafka.wsproxy.models.Formats.FormatType
 import org.scalatest.Suite
 import org.scalatest.matchers.must.Matchers
 
-trait WsClientSpec extends ScalatestRouteTest with Matchers { self: Suite =>
-
-  implicit val avroProducerRecordSerde: WsProxyAvroSerde[AvroProducerRecord] =
-    WsProxyAvroSerde[AvroProducerRecord]()
-
-  implicit val avroProducerResultSerde: WsProxyAvroSerde[AvroProducerResult] =
-    WsProxyAvroSerde[AvroProducerResult]()
-
-  implicit val avroConsumerRecordSerde: WsProxyAvroSerde[AvroConsumerRecord] =
-    WsProxyAvroSerde[AvroConsumerRecord]()
+trait WsClientSpec
+    extends ScalatestRouteTest
+    with Matchers
+    with ProtocolSerdes { self: Suite =>
 
   /**
    *

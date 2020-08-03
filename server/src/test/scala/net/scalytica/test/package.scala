@@ -18,6 +18,7 @@ import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
 }
 import net.scalytica.kafka.wsproxy.codecs.Decoders._
 import net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde
+import net.scalytica.kafka.wsproxy.models.Formats.AvroType
 import net.scalytica.kafka.wsproxy.models.{
   ConsumerKeyValueRecord,
   ConsumerValueRecord,
@@ -34,7 +35,8 @@ import scala.util.{Failure, Success}
 
 package object test {
 
-  def serverHost(port: Int): String = s"localhost:$port"
+  def serverHost(port: Option[Int] = None): String =
+    s"localhost${port.map(p => s":$p").getOrElse("")}"
 
   def registryConfig(
       keySubjNameStrategy: Class[_ <: SubjectNameStrategy] =
@@ -42,16 +44,18 @@ package object test {
       valSubjNameStrategy: Class[_ <: SubjectNameStrategy] =
         classOf[TopicNameStrategy]
   )(
-      implicit schemaRegistryPort: Int
+      implicit schemaRegistryPort: Option[Int] = None
   ): Map[String, _] = {
-    val hostUrl = s"http://${serverHost(schemaRegistryPort)}"
-
-    Map(
-      SCHEMA_REGISTRY_URL_CONFIG    -> hostUrl,
-      AUTO_REGISTER_SCHEMAS         -> true,
-      "key.subject.name.strategy"   -> keySubjNameStrategy.getCanonicalName,
-      "value.subject.name.strategy" -> valSubjNameStrategy.getCanonicalName
-    )
+    schemaRegistryPort
+      .map { _ =>
+        Map(
+          SCHEMA_REGISTRY_URL_CONFIG    -> s"http://${serverHost(schemaRegistryPort)}",
+          AUTO_REGISTER_SCHEMAS         -> true,
+          "key.subject.name.strategy"   -> keySubjNameStrategy.getCanonicalName,
+          "value.subject.name.strategy" -> valSubjNameStrategy.getCanonicalName
+        )
+      }
+      .getOrElse(Map.empty)
   }
 
   implicit class AddFutureAwaitResult[T](future: Future[T]) {
@@ -195,11 +199,10 @@ package object test {
         expectHeaders: Boolean = false
     )(
         implicit mat: Materializer,
-        schemaRegPort: Int,
         crSerde: WsProxyAvroSerde[AvroConsumerRecord]
     ): Assertion = {
-      val keySerdes = TestTypes.Serdes.keySerdes
-      val valSerdes = TestTypes.Serdes.valueSerdes
+      val keySerdes = TestTypes.TestSerdes.keySerdes
+      val valSerdes = TestTypes.TestSerdes.valueSerdes
 
       probe.inProbe.requestNext(20 seconds) match {
         case bm: BinaryMessage =>
@@ -211,7 +214,7 @@ package object test {
 
           val actual = WsConsumerRecord.fromAvro(
             crSerde.deserialize(collected.toArray)
-          )
+          )(AvroType)
 
           actual.topic.value mustBe expectedTopic
           actual.offset.value mustBe >=(0L)
@@ -268,7 +271,6 @@ package object test {
         expectedValue: Album
     )(
         implicit mat: Materializer,
-        schemaRegPort: Int,
         crSerde: WsProxyAvroSerde[AvroConsumerRecord]
     ): Assertion = {
       expectWsConsumerKeyValueResultAvro(
