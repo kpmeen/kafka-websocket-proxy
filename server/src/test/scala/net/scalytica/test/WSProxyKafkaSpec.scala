@@ -154,7 +154,8 @@ trait WSProxyKafkaSpec
       schemaRegistryPort: Option[Int] = None
   ): Configuration.AppCfg = {
     val serverId = s"test-server-${Random.nextInt(50000)}"
-    val srUrl    = schemaRegistryPort.map(u => s"http://${serverHost(u)}")
+    val srUrl =
+      schemaRegistryPort.map(_ => s"http://${serverHost(schemaRegistryPort)}")
     val srCfg: Option[SchemaRegistryCfg] =
       defaultTestAppCfg.kafkaClient.schemaRegistry.fold(
         srUrl.map(u => SchemaRegistryCfg(u, autoRegisterSchemas = true))
@@ -163,7 +164,7 @@ trait WSProxyKafkaSpec
     defaultTestAppCfg.copy(
       server = defaultTestAppCfg.server.copy(serverId = WsServerId(serverId)),
       kafkaClient = defaultTestAppCfg.kafkaClient.copy(
-        bootstrapHosts = KafkaBootstrapHosts(List(serverHost(kafkaPort))),
+        bootstrapHosts = KafkaBootstrapHosts(List(serverHost(Some(kafkaPort)))),
         schemaRegistry = srCfg
       )
     )
@@ -174,7 +175,8 @@ trait WSProxyKafkaSpec
       schemaRegistryPort: Option[Int] = None
   ): Configuration.AppCfg = {
     val serverId = s"test-server-${Random.nextInt(50000)}"
-    val srUrl    = schemaRegistryPort.map(u => s"http://${serverHost(u)}")
+    val srUrl =
+      schemaRegistryPort.map(_ => s"http://${serverHost(schemaRegistryPort)}")
     val srCfg: Option[SchemaRegistryCfg] =
       defaultTestAppCfg.kafkaClient.schemaRegistry.fold(
         srUrl.map(u => SchemaRegistryCfg(u, autoRegisterSchemas = true))
@@ -183,7 +185,7 @@ trait WSProxyKafkaSpec
     defaultTestAppCfg.copy(
       server = defaultTestAppCfg.server.copy(serverId = WsServerId(serverId)),
       kafkaClient = defaultTestAppCfg.kafkaClient.copy(
-        bootstrapHosts = KafkaBootstrapHosts(List(serverHost(kafkaPort))),
+        bootstrapHosts = KafkaBootstrapHosts(List(serverHost(Some(kafkaPort)))),
         schemaRegistry = srCfg,
         properties = secureClientProps
       ),

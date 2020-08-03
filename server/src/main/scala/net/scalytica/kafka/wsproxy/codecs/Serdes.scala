@@ -4,6 +4,12 @@ import java.util.{Map => JMap}
 
 import io.circe.parser._
 import io.circe.{Json, Printer}
+import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
+  AvroCommit,
+  AvroConsumerRecord,
+  AvroProducerRecord,
+  AvroProducerResult
+}
 import org.apache.kafka.common.serialization.{
   Deserializer,
   Serde,
@@ -68,6 +74,23 @@ object BasicSerdes {
   implicit val JsonSerializer   = JsonSerde.serializer()
   implicit val JsonDeserializer = JsonSerde.deserializer()
 }
+
+trait ProtocolSerdes {
+
+  implicit val avroProducerRecordSerde: WsProxyAvroSerde[AvroProducerRecord] =
+    WsProxyAvroSerde[AvroProducerRecord]()
+
+  implicit val avroProducerResultSerde: WsProxyAvroSerde[AvroProducerResult] =
+    WsProxyAvroSerde[AvroProducerResult]()
+
+  implicit val avroConsumerRecordSerde: WsProxyAvroSerde[AvroConsumerRecord] =
+    WsProxyAvroSerde[AvroConsumerRecord]()
+
+  implicit val avroCommitSerde: WsProxyAvroSerde[AvroCommit] =
+    WsProxyAvroSerde[AvroCommit]()
+}
+
+object ProtocolSerdes extends ProtocolSerdes
 
 /**
  * Serde definition for cases where the incoming type is not defined. For

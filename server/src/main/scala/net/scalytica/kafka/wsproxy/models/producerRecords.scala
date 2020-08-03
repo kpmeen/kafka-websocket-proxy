@@ -1,6 +1,7 @@
 package net.scalytica.kafka.wsproxy.models
 
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroProducerRecord
+import net.scalytica.kafka.wsproxy.models.Formats.FormatType
 import net.scalytica.kafka.wsproxy.models.ValueDetails.InValueDetails
 
 /**
@@ -24,13 +25,16 @@ sealed trait WsProducerRecord[+K, +V] {
 
 object WsProducerRecord {
 
-  def fromAvro(
+  def fromAvro[K](
       avro: AvroProducerRecord
-  ): WsProducerRecord[Array[Byte], Array[Byte]] = {
+  )(
+      formatType: FormatType
+  ): WsProducerRecord[K, Array[Byte]] = {
     avro.key
-      .map { k =>
-        ProducerKeyValueRecord[Array[Byte], Array[Byte]](
-          key = InValueDetails(k, Formats.AvroType),
+      .map { key =>
+        val k: K = formatType.unsafeFromCoproduct[K](key)
+        ProducerKeyValueRecord[K, Array[Byte]](
+          key = InValueDetails(k, formatType),
           value = InValueDetails(avro.value, Formats.AvroType),
           headers = avro.headers.map(_.map(KafkaHeader.fromAvro))
         )

@@ -99,7 +99,7 @@ class ServerRoutesSpec
         case (_, _, testRoutes, wsc) =>
           implicit val wsClient = wsc
 
-          val msgs = producerKeyValueJson(1)
+          val msgs = produceKeyValueJson(1)
 
           produceAndCheckJson(
             topic = "test-topic-1",
@@ -115,7 +115,7 @@ class ServerRoutesSpec
         case (_, _, testRoutes, wsc) =>
           implicit val wsClient = wsc
 
-          val msgs = producerValueJson(1)
+          val msgs = produceValueJson(1)
 
           produceAndCheckJson(
             topic = "test-topic-2",
@@ -132,7 +132,7 @@ class ServerRoutesSpec
           implicit val wsClient = wsc
           implicit val kcfg     = ekc
 
-          val msgs = producerKeyValueJson(1, withHeaders = true)
+          val msgs = produceKeyValueJson(1, withHeaders = true)
 
           produceAndCheckJson(
             topic = "test-topic-3",
@@ -155,7 +155,7 @@ class ServerRoutesSpec
           implicit val wsClient = wsc
           implicit val kcfg     = ekc
 
-          val msgs = producerValueJson(1, withHeaders = true)
+          val msgs = produceValueJson(1, withHeaders = true)
 
           produceAndCheckJson(
             topic = "test-topic-4",
@@ -187,7 +187,7 @@ class ServerRoutesSpec
           keyType = StringType,
           valType = StringType,
           routes = routes,
-          messages = producerKeyValueJson(10, withHeaders = true)
+          messages = produceKeyValueJson(10, withHeaders = true)
         )(producerProbe)
 
         val outPath = "/socket/out?" +
@@ -242,7 +242,7 @@ class ServerRoutesSpec
           keyType = NoType,
           valType = StringType,
           routes = routes,
-          messages = producerValueJson(10)
+          messages = produceValueJson(10)
         )(producerProbe)
 
         val outPath = "/socket/out?" +
@@ -272,11 +272,10 @@ class ServerRoutesSpec
 
     "set up a WebSocket for producing Avro key value messages" in
       defaultProducerContext("test-topic-7") {
-        case (ekc, _, testRoutes, wsc) =>
+        case (_, _, testRoutes, wsc) =>
           implicit val wsClient = wsc
-          implicit val kcfg     = ekc
 
-          val messages = producerKeyValueAvro(1)
+          val messages = produceKeyValueAvro(1)
 
           produceAndCheckAvro(
             topic = "test-topic-7",
@@ -286,13 +285,28 @@ class ServerRoutesSpec
           )
       }
 
+    "set up a WebSocket for producing Avro messages with String keys" in {
+      defaultProducerContext("test-topic-10") {
+        case (_, _, testRoutes, wsc) =>
+          implicit val wsClient = wsc
+
+          val messages = produceKeyStringValueAvro(1)
+
+          produceAndCheckAvro(
+            topic = "test-topic-10",
+            routes = Route.seal(testRoutes),
+            keyType = Some(StringType),
+            messages = messages
+          )
+      }
+    }
+
     "set up a WebSocket for producing Avro value messages" in
       defaultProducerContext("test-topic-8") {
-        case (ekc, _, testRoutes, wsc) =>
+        case (_, _, testRoutes, wsc) =>
           implicit val wsClient = wsc
-          implicit val kcfg     = ekc
 
-          val messages = producerValueAvro(1)
+          val messages = produceValueAvro(1)
 
           produceAndCheckAvro(
             topic = "test-topic-8",
@@ -315,7 +329,7 @@ class ServerRoutesSpec
         val producerProbe            = WSProbe()
         val (sdcStream, testRoutes)  = TestServerRoutes.wsProxyRoutes
         val ctrl                     = sdcStream.run()
-        val messages                 = producerKeyValueAvro(10)
+        val messages                 = produceKeyValueAvro(10)
         val routes                   = Route.seal(testRoutes)
 
         produceAndCheckAvro(
@@ -334,8 +348,8 @@ class ServerRoutesSpec
           "&valType=avro" +
           "&autoCommit=false"
 
-        implicit val keySerdes = Serdes.keySerdes.deserializer()
-        implicit val valSerdes = Serdes.valueSerdes.deserializer()
+        implicit val keySerdes = TestSerdes.keySerdes.deserializer()
+        implicit val valSerdes = TestSerdes.valueSerdes.deserializer()
 
         val (rk, rv) = consumeFirstKeyedMessageFrom[TestKey, Album](topicName)
         rk.username mustBe "foo-1"
@@ -500,11 +514,10 @@ class ServerRoutesSpec
 
     "set up a WebSocket for producing messages to a secured cluster" in
       secureProducerContext("secure-topic-1") {
-        case (ekc, _, testRoutes, wsc) =>
+        case (_, _, testRoutes, wsc) =>
           implicit val wsClient = wsc
-          implicit val kcfg     = ekc
 
-          val messages = producerValueAvro(1)
+          val messages = produceValueAvro(1)
 
           produceAndCheckAvro(
             topic = "secure-topic-1",
@@ -520,7 +533,7 @@ class ServerRoutesSpec
         case (ekc, _, testRoutes, wsProducerClient) =>
           implicit val kcfg = ekc
           val routes        = Route.seal(testRoutes)
-          val messages      = producerValueJson(10)
+          val messages      = produceValueJson(10)
 
           produceAndCheckJson(
             topic = "secure-topic-2",

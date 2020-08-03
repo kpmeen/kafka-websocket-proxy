@@ -74,61 +74,11 @@ object Configuration extends WithProxyLogger {
     }
   }
 
-  final case class AppCfg(
-      server: ServerCfg,
-      kafkaClient: KafkaClientCfg,
-      adminClient: AdminClientCfg,
-      consumer: ConsumerCfg,
-      producer: ProducerCfg,
-      sessionHandler: SessionHandlerCfg,
-      commitHandler: CommitHandlerCfg
-  ) {
-
-    lazy val isRateLimitEnabled: Boolean = consumer.defaultRateLimit > 0
-    lazy val isBatchingEnabled: Boolean  = consumer.defaultBatchSize > 0
-
-    lazy val isRateLimitAndBatchEnabled: Boolean =
-      isRateLimitEnabled && isBatchingEnabled
-
-  }
-
   final case class KafkaBootstrapHosts(hosts: List[String]) {
     def mkString(): String = hosts.mkString(",")
 
     def hostStrings: List[String] = hosts.map(_.takeWhile(_ != ':'))
   }
-
-  final case class ServerCfg(
-      serverId: WsServerId,
-      bindInterface: String,
-      port: Int,
-      ssl: Option[ServerSslCfg],
-      brokerResolutionTimeout: FiniteDuration,
-      brokerResolutionRetries: Int,
-      brokerResolutionRetryInterval: FiniteDuration
-  )
-
-  final case class ServerSslCfg(
-      sslOnly: Boolean,
-      bindInterface: Option[String],
-      port: Option[Int],
-      keystoreLocation: Option[String],
-      keystorePassword: Option[String]
-  ) {
-
-    def liftKeystorePassword: Array[Char] =
-      keystorePassword.getOrElse("").toCharArray
-
-  }
-
-  final case class KafkaClientCfg(
-      brokerResolutionTimeout: FiniteDuration,
-      bootstrapHosts: KafkaBootstrapHosts,
-      schemaRegistry: Option[SchemaRegistryCfg],
-      monitoringEnabled: Boolean,
-      properties: Map[String, AnyRef],
-      confluentMonitoring: Option[ConfluentMonitoringCfg]
-  )
 
   final case class SchemaRegistryCfg(
       url: String,
@@ -163,6 +113,15 @@ object Configuration extends WithProxyLogger {
     }
   }
 
+  final case class KafkaClientCfg(
+      brokerResolutionTimeout: FiniteDuration,
+      bootstrapHosts: KafkaBootstrapHosts,
+      schemaRegistry: Option[SchemaRegistryCfg],
+      monitoringEnabled: Boolean,
+      properties: Map[String, AnyRef],
+      confluentMonitoring: Option[ConfluentMonitoringCfg]
+  )
+
   final case class AdminClientCfg(
       kafkaClientProperties: Map[String, AnyRef]
   )
@@ -192,6 +151,47 @@ object Configuration extends WithProxyLogger {
       autoCommitInterval: FiniteDuration,
       autoCommitMaxAge: FiniteDuration
   )
+
+  final case class ServerSslCfg(
+      sslOnly: Boolean,
+      bindInterface: Option[String],
+      port: Option[Int],
+      keystoreLocation: Option[String],
+      keystorePassword: Option[String]
+  ) {
+
+    def liftKeystorePassword: Array[Char] =
+      keystorePassword.getOrElse("").toCharArray
+
+  }
+
+  final case class ServerCfg(
+      serverId: WsServerId,
+      bindInterface: String,
+      port: Int,
+      ssl: Option[ServerSslCfg],
+      brokerResolutionTimeout: FiniteDuration,
+      brokerResolutionRetries: Int,
+      brokerResolutionRetryInterval: FiniteDuration
+  )
+
+  final case class AppCfg(
+      server: ServerCfg,
+      kafkaClient: KafkaClientCfg,
+      adminClient: AdminClientCfg,
+      consumer: ConsumerCfg,
+      producer: ProducerCfg,
+      sessionHandler: SessionHandlerCfg,
+      commitHandler: CommitHandlerCfg
+  ) {
+
+    lazy val isRateLimitEnabled: Boolean = consumer.defaultRateLimit > 0
+    lazy val isBatchingEnabled: Boolean  = consumer.defaultBatchSize > 0
+
+    lazy val isRateLimitAndBatchEnabled: Boolean =
+      isRateLimitEnabled && isBatchingEnabled
+
+  }
 
   def load(): AppCfg = {
     logger.debug("Loading default config")

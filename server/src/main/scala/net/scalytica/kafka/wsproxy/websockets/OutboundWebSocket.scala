@@ -19,11 +19,12 @@ import io.circe.syntax._
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.SocketProtocol.{AvroPayload, JsonPayload}
 import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
-import net.scalytica.kafka.wsproxy.avro.SchemaTypes.Implicits._
-import net.scalytica.kafka.wsproxy.avro.SchemaTypes._
 import net.scalytica.kafka.wsproxy.codecs.Decoders._
 import net.scalytica.kafka.wsproxy.codecs.Encoders._
-import net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde
+import net.scalytica.kafka.wsproxy.codecs.ProtocolSerdes.{
+  avroCommitSerde,
+  avroConsumerRecordSerde
+}
 import net.scalytica.kafka.wsproxy.consumer.{CommitStackHandler, WsConsumer}
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models.{
@@ -47,11 +48,6 @@ import scala.concurrent.{ExecutionContext, Future}
 trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
 
   implicit private[this] val timeout: Timeout = 3 seconds
-
-  private[this] val avroCommitSerde = WsProxyAvroSerde[AvroCommit]()
-
-  private[this] val avroConsumerRecordSerde =
-    WsProxyAvroSerde[AvroConsumerRecord]()
 
   /** Convenience function for logging and throwing an error in a Flow */
   def logAndThrow[T](message: String, t: Throwable): T = {
