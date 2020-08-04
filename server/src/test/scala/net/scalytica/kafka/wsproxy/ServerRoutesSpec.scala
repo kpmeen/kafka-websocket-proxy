@@ -139,7 +139,7 @@ class ServerRoutesSpec
       " String key and value" in defaultProducerContext("test-topic-3") {
       case (ekc, _, testRoutes, wsc) =>
         implicit val wsClient = wsc
-        implicit val kcfg = ekc
+        implicit val kcfg     = ekc
 
         val msgs = produceKeyValueJson(1, withHeaders = true)
 
@@ -162,7 +162,7 @@ class ServerRoutesSpec
       " String values" in defaultProducerContext("test-topic-4") {
       case (ekc, _, testRoutes, wsc) =>
         implicit val wsClient = wsc
-        implicit val kcfg = ekc
+        implicit val kcfg     = ekc
 
         val msgs = produceValueJson(1, withHeaders = true)
 
@@ -187,10 +187,10 @@ class ServerRoutesSpec
         initTopic(topicName)
 
         implicit val wsConsumerProbe = WSProbe()
-        val producerProbe = WSProbe()
-        val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
-        val ctrl = sdcStream.run()
-        val routes = Route.seal(testRoutes)
+        val producerProbe            = WSProbe()
+        val (sdcStream, testRoutes)  = TestServerRoutes.wsProxyRoutes
+        val ctrl                     = sdcStream.run()
+        val routes                   = Route.seal(testRoutes)
 
         produceAndCheckJson(
           topic = topicName,
@@ -242,10 +242,10 @@ class ServerRoutesSpec
         initTopic(topicName)
 
         implicit val wsConsumerProbe = WSProbe()
-        val producerProbe = WSProbe()
-        val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
-        val ctrl = sdcStream.run()
-        val routes = Route.seal(testRoutes)
+        val producerProbe            = WSProbe()
+        val (sdcStream, testRoutes)  = TestServerRoutes.wsProxyRoutes
+        val ctrl                     = sdcStream.run()
+        val routes                   = Route.seal(testRoutes)
 
         produceAndCheckJson(
           topic = topicName,
@@ -339,11 +339,11 @@ class ServerRoutesSpec
         initTopic(topicName)
 
         implicit val wsConsumerProbe = WSProbe()
-        val producerProbe = WSProbe()
-        val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
-        val ctrl = sdcStream.run()
-        val messages = produceKeyValueAvro(10)
-        val routes = Route.seal(testRoutes)
+        val producerProbe            = WSProbe()
+        val (sdcStream, testRoutes)  = TestServerRoutes.wsProxyRoutes
+        val ctrl                     = sdcStream.run()
+        val messages                 = produceKeyValueAvro(10)
+        val routes                   = Route.seal(testRoutes)
 
         produceAndCheckAvro(
           topic = topicName,
@@ -406,11 +406,11 @@ class ServerRoutesSpec
         initTopic(topicName)
 
         implicit val wsConsumerProbe = WSProbe()
-        val producerProbe = WSProbe()
-        val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
-        val ctrl = sdcStream.run()
-        val messages = produceKeyStringValueString(10)
-        val routes = Route.seal(testRoutes)
+        val producerProbe            = WSProbe()
+        val (sdcStream, testRoutes)  = TestServerRoutes.wsProxyRoutes
+        val ctrl                     = sdcStream.run()
+        val messages                 = produceKeyStringValueString(10)
+        val routes                   = Route.seal(testRoutes)
 
         produceAndCheckAvro(
           topic = topicName,
@@ -466,11 +466,11 @@ class ServerRoutesSpec
         initTopic(topicName)
 
         implicit val wsConsumerProbe = WSProbe()
-        val producerProbe = WSProbe()
-        val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
-        val ctrl = sdcStream.run()
-        val messages = produceAvroWithStringValue(10)
-        val routes = Route.seal(testRoutes)
+        val producerProbe            = WSProbe()
+        val (sdcStream, testRoutes)  = TestServerRoutes.wsProxyRoutes
+        val ctrl                     = sdcStream.run()
+        val messages                 = produceAvroWithStringValue(10)
+        val routes                   = Route.seal(testRoutes)
 
         produceAndCheckAvro(
           topic = topicName,
@@ -523,11 +523,11 @@ class ServerRoutesSpec
         initTopic(topicName)
 
         implicit val wsConsumerProbe = WSProbe()
-        val producerProbe = WSProbe()
-        val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
-        val ctrl = sdcStream.run()
-        val messages = produceKeyLongValueString(10)
-        val routes = Route.seal(testRoutes)
+        val producerProbe            = WSProbe()
+        val (sdcStream, testRoutes)  = TestServerRoutes.wsProxyRoutes
+        val ctrl                     = sdcStream.run()
+        val messages                 = produceKeyLongValueString(10)
+        val routes                   = Route.seal(testRoutes)
 
         produceAndCheckAvro(
           topic = topicName,
@@ -579,7 +579,7 @@ class ServerRoutesSpec
         implicit val wsCfg = appTestConfig(kcfg.kafkaPort)
 
         val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
-        val ctrl = sdcStream.run()
+        val ctrl                    = sdcStream.run()
 
         Get("/kafka/cluster/info") ~> Route.seal(testRoutes) ~> check {
           status mustBe OK
@@ -636,9 +636,9 @@ class ServerRoutesSpec
           "&valType=avro" +
           "&autoCommit=false"
 
-        implicit val wsClient = WSProbe()
+        implicit val wsClient       = WSProbe()
         val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
-        val ctrl = sdcStream.run()
+        val ctrl                    = sdcStream.run()
 
         WS(outPath, wsClient.flow) ~> Route.seal(testRoutes) ~> check {
           status mustBe StatusCodes.BadRequest
@@ -666,10 +666,10 @@ class ServerRoutesSpec
           "&valType=avro" +
           "&autoCommit=false"
 
-        implicit val wsClient = WSProbe()
+        implicit val wsClient       = WSProbe()
         val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
-        val ctrl = sdcStream.run()
-        val routes = Route.seal(testRoutes)
+        val ctrl                    = sdcStream.run()
+        val routes                  = Route.seal(testRoutes)
 
         val wrongCreds = addCredentials(BasicHttpCredentials("bad", "user"))
 
@@ -689,9 +689,9 @@ class ServerRoutesSpec
         val topicName = "restricted-topic"
         initTopic(topicName, isSecure = true)
 
-        implicit val wsClient = WSProbe()
+        implicit val wsClient       = WSProbe()
         val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
-        val ctrl = sdcStream.run()
+        val ctrl                    = sdcStream.run()
 
         val baseUri = baseProducerUri(
           topic = topicName,
@@ -730,8 +730,8 @@ class ServerRoutesSpec
       secureProducerContext("secure-topic-2") {
         case (ekc, _, testRoutes, wsProducerClient) =>
           implicit val kcfg = ekc
-          val routes = Route.seal(testRoutes)
-          val messages = produceValueJson(10)
+          val routes        = Route.seal(testRoutes)
+          val messages      = produceValueJson(10)
 
           produceAndCheckJson(
             topic = "secure-topic-2",

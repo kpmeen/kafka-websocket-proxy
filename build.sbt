@@ -37,6 +37,8 @@ lazy val avro = (project in file("avro"))
     coverageExcludedPackages := "<empty>;net.scalytica.kafka.wsproxy.avro.*;"
   )
   .settings(libraryDependencies ++= Avro.All)
+  .settings(libraryDependencies += Testing.ScalaTest % Test)
+  .settings(libraryDependencies += Logging.Slf4jNop % Test)
   .settings(dependencyOverrides ++= Overrides.Deps: _*)
 
 lazy val server = (project in file("server"))
