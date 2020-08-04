@@ -29,8 +29,11 @@ class WsProxyAvroSerdeSpec
 
       rkInst mustBe okInst
 
-      val ovInst = TestSerdes.valueSerdes.deserialize(o.value)
-      val rvInst = TestSerdes.valueSerdes.deserialize(res.value)
+      val ovb = o.value.select[Array[Byte]].value
+      val rvb = res.value.select[Array[Byte]].value
+
+      val ovInst = TestSerdes.valueSerdes.deserialize(ovb)
+      val rvInst = TestSerdes.valueSerdes.deserialize(rvb)
 
       rvInst mustBe ovInst
 
@@ -47,10 +50,13 @@ class WsProxyAvroSerdeSpec
       res.key mustBe o.key
       res.headers mustBe o.headers
 
-      val ovb = TestSerdes.valueSerdes.deserialize(o.value)
-      val rvb = TestSerdes.valueSerdes.deserialize(res.value)
+      val ovb = o.value.select[Array[Byte]].value
+      val rvb = res.value.select[Array[Byte]].value
 
-      rvb mustBe ovb
+      val ovInst = TestSerdes.valueSerdes.deserialize(ovb)
+      val rvInst = TestSerdes.valueSerdes.deserialize(rvb)
+
+      rvInst mustBe ovInst
     }
   }
 

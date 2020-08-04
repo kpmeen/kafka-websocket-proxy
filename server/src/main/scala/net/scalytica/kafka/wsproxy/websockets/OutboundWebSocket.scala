@@ -40,7 +40,6 @@ import net.scalytica.kafka.wsproxy.{
   wsMessageToStringFlow,
   _
 }
-import org.apache.kafka.common.serialization.Serializer
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
@@ -295,8 +294,6 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
     type Val = valTpe.Aux
 
     // Kafka serdes
-    implicit val keySer = keyTpe.serializer
-    implicit val valSer = valTpe.serializer
     implicit val keyDes = keyTpe.deserializer
     implicit val valDes = valTpe.deserializer
     // JSON encoders
@@ -340,8 +337,6 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
    * type of [[Message]], based on the {{{args}}}.
    *
    * @param args [[OutSocketArgs]] for building the outbound WebSocket.
-   * @param keySer the key serializer
-   * @param valSer the value serializer
    * @param recEnc JSON encoder for [[WsConsumerRecord]]
    * @tparam K the key type
    * @tparam V the value type
@@ -350,9 +345,7 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
   private[this] def socketFormatConverter[K, V](
       args: OutSocketArgs
   )(
-      implicit keySer: Serializer[K],
-      valSer: Serializer[V],
-      recEnc: Encoder[WsConsumerRecord[K, V]]
+      implicit recEnc: Encoder[WsConsumerRecord[K, V]]
   ): WsConsumerRecord[K, V] => Message =
     args.socketPayload match {
       case AvroPayload =>

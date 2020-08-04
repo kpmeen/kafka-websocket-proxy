@@ -4,7 +4,6 @@ import akka.http.scaladsl.model.headers.BasicHttpCredentials
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
 import net.scalytica.kafka.wsproxy.codecs.ProtocolSerdes
-import net.scalytica.kafka.wsproxy.models.Formats.FormatType
 import org.scalatest.Suite
 import org.scalatest.matchers.must.Matchers
 
@@ -14,8 +13,7 @@ trait WsClientSpec
     with ProtocolSerdes { self: Suite =>
 
   /**
-   *
-    * @param uri
+   * @param uri
    * @param routes
    * @param body
    * @param wsClient
@@ -30,8 +28,7 @@ trait WsClientSpec
     WS(uri, wsClient.flow) ~> routes ~> check(body)
 
   /**
-   *
-    * @param uri
+   * @param uri
    * @param routes
    * @param creds
    * @param body
@@ -52,10 +49,8 @@ trait WsClientSpec
 
   // scalastyle:off
   /**
-   *
-    * @param baseUri
+   * @param uri
    * @param routes
-   * @param keyType
    * @param basicCreds
    * @param body
    * @param wsClient
@@ -64,13 +59,10 @@ trait WsClientSpec
    * @return
    */
   def checkWebSocket[T, M](
-      baseUri: String,
+      uri: String,
       routes: Route,
-      keyType: Option[FormatType],
       basicCreds: Option[BasicHttpCredentials] = None
   )(body: => T)(implicit wsClient: WSProbe): T = {
-    val uri = keyType.fold(baseUri)(kt => baseUri + s"&keyType=${kt.name}")
-
     basicCreds
       .map(c => secureRouteCheck(uri, routes, c)(body))
       .getOrElse(defaultRouteCheck(uri, routes)(body))

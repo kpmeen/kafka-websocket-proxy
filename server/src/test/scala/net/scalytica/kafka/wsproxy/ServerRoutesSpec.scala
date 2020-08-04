@@ -15,16 +15,25 @@ import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
   AvroProducerResult
 }
 import net.scalytica.kafka.wsproxy.codecs.Decoders.brokerInfoDecoder
-import net.scalytica.kafka.wsproxy.models.BrokerInfo
-import net.scalytica.kafka.wsproxy.models.Formats.{AvroType, NoType, StringType}
+import net.scalytica.kafka.wsproxy.models.Formats.{
+  AvroType,
+  LongType,
+  NoType,
+  StringType
+}
+import net.scalytica.kafka.wsproxy.models.{
+  BrokerInfo,
+  ConsumerKeyValueRecord,
+  ConsumerValueRecord
+}
 import net.scalytica.test._
 import org.scalatest.Inspectors.forAll
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Minutes, Span}
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.{EitherValues, OptionValues}
 
 import scala.concurrent.duration._
-import org.scalatest.wordspec.AnyWordSpec
 
 // scalastyle:off magic.number
 class ServerRoutesSpec
@@ -94,23 +103,23 @@ class ServerRoutesSpec
       }
     }
 
-    "set up a WebSocket for producing JSON key value messages" in
-      defaultProducerContext("test-topic-1") {
-        case (_, _, testRoutes, wsc) =>
-          implicit val wsClient = wsc
+    "set up a JSON payload WebSocket producer for messages with String key" +
+      " and value" in defaultProducerContext("test-topic-1") {
+      case (_, _, testRoutes, wsc) =>
+        implicit val wsClient = wsc
 
-          val msgs = produceKeyValueJson(1)
+        val msgs = produceKeyValueJson(1)
 
-          produceAndCheckJson(
-            topic = "test-topic-1",
-            keyType = StringType,
-            valType = StringType,
-            routes = Route.seal(testRoutes),
-            messages = msgs
-          )
-      }
+        produceAndCheckJson(
+          topic = "test-topic-1",
+          keyType = StringType,
+          valType = StringType,
+          routes = Route.seal(testRoutes),
+          messages = msgs
+        )
+    }
 
-    "set up a WebSocket for producing JSON value messages" in
+    "set up a JSON payload WebSocket producer for messages with String value" in
       defaultProducerContext("test-topic-2") {
         case (_, _, testRoutes, wsc) =>
           implicit val wsClient = wsc
@@ -126,50 +135,51 @@ class ServerRoutesSpec
           )
       }
 
-    "set up a WebSocket for producing JSON key value messages with headers" in
-      defaultProducerContext("test-topic-3") {
-        case (ekc, _, testRoutes, wsc) =>
-          implicit val wsClient = wsc
-          implicit val kcfg     = ekc
+    "set up a JSON payload WebSocket producer for messages with headers and" +
+      " String key and value" in defaultProducerContext("test-topic-3") {
+      case (ekc, _, testRoutes, wsc) =>
+        implicit val wsClient = wsc
+        implicit val kcfg = ekc
 
-          val msgs = produceKeyValueJson(1, withHeaders = true)
+        val msgs = produceKeyValueJson(1, withHeaders = true)
 
-          produceAndCheckJson(
-            topic = "test-topic-3",
-            keyType = StringType,
-            valType = StringType,
-            routes = Route.seal(testRoutes),
-            messages = msgs
-          )
+        produceAndCheckJson(
+          topic = "test-topic-3",
+          keyType = StringType,
+          valType = StringType,
+          routes = Route.seal(testRoutes),
+          messages = msgs
+        )
 
-          // validate the topic contents
-          val (k, v) =
-            consumeFirstKeyedMessageFrom[String, String]("test-topic-3")
-          k mustBe "foo-1"
-          v mustBe "bar-1"
-      }
+        // validate the topic contents
+        val (k, v) =
+          consumeFirstKeyedMessageFrom[String, String]("test-topic-3")
+        k mustBe "foo-1"
+        v mustBe "bar-1"
+    }
 
-    "set up a WebSocket for producing JSON value messages with headers" in
-      defaultProducerContext("test-topic-4") {
-        case (ekc, _, testRoutes, wsc) =>
-          implicit val wsClient = wsc
-          implicit val kcfg     = ekc
+    "set up a JSON payload WebSocket producer for messages with headers and" +
+      " String values" in defaultProducerContext("test-topic-4") {
+      case (ekc, _, testRoutes, wsc) =>
+        implicit val wsClient = wsc
+        implicit val kcfg = ekc
 
-          val msgs = produceValueJson(1, withHeaders = true)
+        val msgs = produceValueJson(1, withHeaders = true)
 
-          produceAndCheckJson(
-            topic = "test-topic-4",
-            keyType = NoType,
-            valType = StringType,
-            routes = Route.seal(testRoutes),
-            messages = msgs
-          )
+        produceAndCheckJson(
+          topic = "test-topic-4",
+          keyType = NoType,
+          valType = StringType,
+          routes = Route.seal(testRoutes),
+          messages = msgs
+        )
 
-          // validate the topic contents
-          consumeFirstMessageFrom[String]("test-topic-4") mustBe "bar-1"
-      }
+        // validate the topic contents
+        consumeFirstMessageFrom[String]("test-topic-4") mustBe "bar-1"
+    }
 
-    "set up a WebSocket for consuming JSON key value messages" in
+    "set up a JSON payload WebSocket consumer for messages with " +
+      "String key and value" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val wsCfg = appTestConfig(kcfg.kafkaPort)
 
@@ -177,10 +187,10 @@ class ServerRoutesSpec
         initTopic(topicName)
 
         implicit val wsConsumerProbe = WSProbe()
-        val producerProbe            = WSProbe()
-        val (sdcStream, testRoutes)  = TestServerRoutes.wsProxyRoutes
-        val ctrl                     = sdcStream.run()
-        val routes                   = Route.seal(testRoutes)
+        val producerProbe = WSProbe()
+        val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
+        val ctrl = sdcStream.run()
+        val routes = Route.seal(testRoutes)
 
         produceAndCheckJson(
           topic = topicName,
@@ -191,11 +201,11 @@ class ServerRoutesSpec
         )(producerProbe)
 
         val outPath = "/socket/out?" +
-          "clientId=test-3" +
-          "&groupId=test-group-3" +
+          "clientId=test-5" +
+          "&groupId=test-group-5" +
           s"&topic=$topicName" +
-          "&keyType=string" +
-          "&valType=string" +
+          s"&keyType=${StringType.name}" +
+          s"&valType=${StringType.name}" +
           "&autoCommit=false"
 
         import net.manub.embeddedkafka.Codecs.stringDeserializer
@@ -224,7 +234,7 @@ class ServerRoutesSpec
         ctrl.shutdown()
       }
 
-    "set up a WebSocket for consuming JSON value messages" in
+    "set up a JSON payload WebSocket consumer for messages with String value" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val wsCfg = appTestConfig(kcfg.kafkaPort)
 
@@ -232,10 +242,10 @@ class ServerRoutesSpec
         initTopic(topicName)
 
         implicit val wsConsumerProbe = WSProbe()
-        val producerProbe            = WSProbe()
-        val (sdcStream, testRoutes)  = TestServerRoutes.wsProxyRoutes
-        val ctrl                     = sdcStream.run()
-        val routes                   = Route.seal(testRoutes)
+        val producerProbe = WSProbe()
+        val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
+        val ctrl = sdcStream.run()
+        val routes = Route.seal(testRoutes)
 
         produceAndCheckJson(
           topic = topicName,
@@ -246,10 +256,10 @@ class ServerRoutesSpec
         )(producerProbe)
 
         val outPath = "/socket/out?" +
-          "clientId=test-4" +
-          "&groupId=test-group-4" +
+          "clientId=test-6" +
+          "&groupId=test-group-6" +
           s"&topic=$topicName" +
-          "&valType=string" +
+          s"&valType=${StringType.name}" +
           "&autoCommit=false"
 
         import net.manub.embeddedkafka.Codecs.stringDeserializer
@@ -270,82 +280,86 @@ class ServerRoutesSpec
         ctrl.shutdown()
       }
 
-    "set up a WebSocket for producing Avro key value messages" in
-      defaultProducerContext("test-topic-7") {
-        case (_, _, testRoutes, wsc) =>
-          implicit val wsClient = wsc
+    "set up an Avro payload WebSocket producer for messages with Avro key " +
+      "and value" in defaultProducerContext("test-topic-7") {
+      case (_, _, testRoutes, wsc) =>
+        implicit val wsClient = wsc
 
-          val messages = produceKeyValueAvro(1)
+        val messages = produceKeyValueAvro(1)
 
-          produceAndCheckAvro(
-            topic = "test-topic-7",
-            routes = Route.seal(testRoutes),
-            keyType = Some(AvroType),
-            messages = messages
-          )
-      }
-
-    "set up a WebSocket for producing Avro messages with String keys" in {
-      defaultProducerContext("test-topic-10") {
-        case (_, _, testRoutes, wsc) =>
-          implicit val wsClient = wsc
-
-          val messages = produceKeyStringValueAvro(1)
-
-          produceAndCheckAvro(
-            topic = "test-topic-10",
-            routes = Route.seal(testRoutes),
-            keyType = Some(StringType),
-            messages = messages
-          )
-      }
+        produceAndCheckAvro(
+          topic = "test-topic-7",
+          routes = Route.seal(testRoutes),
+          keyType = Some(AvroType),
+          valType = AvroType,
+          messages = messages
+        )
     }
 
-    "set up a WebSocket for producing Avro value messages" in
-      defaultProducerContext("test-topic-8") {
+    "set up an Avro payload WebSocket producer for messages with String key" +
+      " and Avro value" in defaultProducerContext("test-topic-8") {
+      case (_, _, testRoutes, wsc) =>
+        implicit val wsClient = wsc
+
+        val messages = produceKeyStringValueAvro(1)
+
+        produceAndCheckAvro(
+          topic = "test-topic-8",
+          routes = Route.seal(testRoutes),
+          keyType = Some(StringType),
+          valType = AvroType,
+          messages = messages
+        )
+    }
+
+    "set up an Avro payload WebSocket producer for messages with Avro value" in
+      defaultProducerContext("test-topic-9") {
         case (_, _, testRoutes, wsc) =>
           implicit val wsClient = wsc
 
           val messages = produceValueAvro(1)
 
           produceAndCheckAvro(
-            topic = "test-topic-8",
+            topic = "test-topic-9",
             routes = Route.seal(testRoutes),
             keyType = None,
+            valType = AvroType,
             messages = messages
           )
       }
 
-    "set up a WebSocket for consuming Avro key value messages" in
+    "set up an Avro payload WebSocket consumer for messages with Avro" +
+      " key and value" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val schemaRegPort = kcfg.schemaRegistryPort
 
         implicit val wsCfg = appTestConfig(kcfg.kafkaPort, Some(schemaRegPort))
 
-        val topicName = "test-topic-9"
+        val topicName = "test-topic-10"
         initTopic(topicName)
 
         implicit val wsConsumerProbe = WSProbe()
-        val producerProbe            = WSProbe()
-        val (sdcStream, testRoutes)  = TestServerRoutes.wsProxyRoutes
-        val ctrl                     = sdcStream.run()
-        val messages                 = produceKeyValueAvro(10)
-        val routes                   = Route.seal(testRoutes)
+        val producerProbe = WSProbe()
+        val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
+        val ctrl = sdcStream.run()
+        val messages = produceKeyValueAvro(10)
+        val routes = Route.seal(testRoutes)
 
         produceAndCheckAvro(
           topic = topicName,
           routes = routes,
           keyType = Some(AvroType),
+          valType = AvroType,
           messages = messages
         )(producerProbe)
 
         val outPath = "/socket/out?" +
-          "clientId=test-7" +
-          "&groupId=test-group-7" +
+          "clientId=test-10" +
+          "&groupId=test-group-10" +
           s"&topic=$topicName" +
           s"&socketPayload=${AvroPayload.name}" +
-          "&keyType=avro" +
-          "&valType=avro" +
+          s"&keyType=${AvroType.name}" +
+          s"&valType=${AvroType.name}" +
           "&autoCommit=false"
 
         implicit val keySerdes = TestSerdes.keySerdes.deserializer()
@@ -381,12 +395,191 @@ class ServerRoutesSpec
         ctrl.shutdown()
       }
 
+    "set up an Avro payload WebSocket consumer for messages with String" +
+      " key and value" in
+      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
+        implicit val schemaRegPort = kcfg.schemaRegistryPort
+
+        implicit val wsCfg = appTestConfig(kcfg.kafkaPort, Some(schemaRegPort))
+
+        val topicName = "test-topic-11"
+        initTopic(topicName)
+
+        implicit val wsConsumerProbe = WSProbe()
+        val producerProbe = WSProbe()
+        val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
+        val ctrl = sdcStream.run()
+        val messages = produceKeyStringValueString(10)
+        val routes = Route.seal(testRoutes)
+
+        produceAndCheckAvro(
+          topic = topicName,
+          routes = routes,
+          keyType = Some(StringType),
+          valType = StringType,
+          messages = messages
+        )(producerProbe)
+
+        val outPath = "/socket/out?" +
+          "clientId=test-11" +
+          "&groupId=test-group-11" +
+          s"&topic=$topicName" +
+          s"&socketPayload=${AvroPayload.name}" +
+          s"&keyType=${StringType.name}" +
+          s"&valType=${StringType.name}" +
+          "&autoCommit=false"
+
+        val (rk, rv) = consumeFirstKeyedMessageFrom[String, String](topicName)
+        rk mustBe "foo-1"
+        rv mustBe "artist-1"
+
+        WS(outPath, wsConsumerProbe.flow) ~> routes ~> check {
+          isWebSocketUpgrade mustBe true
+
+          forAll(1 to 10) { i =>
+            wsConsumerProbe.expectWsConsumerResultAvro[String, String](
+              expectedTopic = topicName,
+              keyFormat = StringType,
+              valFormat = StringType
+            ) {
+              case ConsumerKeyValueRecord(_, _, _, _, _, key, value, _) =>
+                key.value mustBe s"foo-$i"
+                value.value mustBe s"artist-$i"
+
+              case _ =>
+                fail("Unexpected ConsumerValueRecord")
+            }
+          }
+        }
+
+        ctrl.shutdown()
+      }
+
+    "set up an Avro payload WebSocket consumer for messages with" +
+      " String value" in
+      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
+        implicit val schemaRegPort = kcfg.schemaRegistryPort
+
+        implicit val wsCfg = appTestConfig(kcfg.kafkaPort, Some(schemaRegPort))
+
+        val topicName = "test-topic-12"
+        initTopic(topicName)
+
+        implicit val wsConsumerProbe = WSProbe()
+        val producerProbe = WSProbe()
+        val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
+        val ctrl = sdcStream.run()
+        val messages = produceAvroWithStringValue(10)
+        val routes = Route.seal(testRoutes)
+
+        produceAndCheckAvro(
+          topic = topicName,
+          routes = routes,
+          keyType = None,
+          valType = StringType,
+          messages = messages
+        )(producerProbe)
+
+        val outPath = "/socket/out?" +
+          "clientId=test-12" +
+          "&groupId=test-group-12" +
+          s"&topic=$topicName" +
+          s"&socketPayload=${AvroPayload.name}" +
+          s"&valType=${StringType.name}" +
+          "&autoCommit=false"
+
+        val rv = consumeFirstMessageFrom[String](topicName)
+        rv mustBe "artist-1"
+
+        WS(outPath, wsConsumerProbe.flow) ~> routes ~> check {
+          isWebSocketUpgrade mustBe true
+
+          forAll(1 to 10) { i =>
+            wsConsumerProbe.expectWsConsumerResultAvro[String, String](
+              expectedTopic = topicName,
+              keyFormat = NoType,
+              valFormat = StringType
+            ) {
+              case ConsumerValueRecord(_, _, _, _, _, value, _) =>
+                value.value mustBe s"artist-$i"
+
+              case _ =>
+                fail("Unexpected ConsumerKeyValueRecord.")
+            }
+          }
+        }
+
+        ctrl.shutdown()
+      }
+
+    "set up an Avro payload WebSocket consumer for messages with Long key and" +
+      " String value" in
+      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
+        implicit val schemaRegPort = kcfg.schemaRegistryPort
+
+        implicit val wsCfg = appTestConfig(kcfg.kafkaPort, Some(schemaRegPort))
+
+        val topicName = "test-topic-13"
+        initTopic(topicName)
+
+        implicit val wsConsumerProbe = WSProbe()
+        val producerProbe = WSProbe()
+        val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
+        val ctrl = sdcStream.run()
+        val messages = produceKeyLongValueString(10)
+        val routes = Route.seal(testRoutes)
+
+        produceAndCheckAvro(
+          topic = topicName,
+          routes = routes,
+          keyType = Some(LongType),
+          valType = StringType,
+          messages = messages
+        )(producerProbe)
+
+        val outPath = "/socket/out?" +
+          "clientId=test-13" +
+          "&groupId=test-group-13" +
+          s"&topic=$topicName" +
+          s"&socketPayload=${AvroPayload.name}" +
+          s"&keyType=${LongType.name}" +
+          s"&valType=${StringType.name}" +
+          "&autoCommit=false"
+
+        implicit val longDeserializer = TestSerdes.longSerdes.deserializer()
+
+        val (rk, rv) = consumeFirstKeyedMessageFrom[Long, String](topicName)
+        rk mustBe 1L
+        rv mustBe "artist-1"
+
+        WS(outPath, wsConsumerProbe.flow) ~> routes ~> check {
+          isWebSocketUpgrade mustBe true
+
+          forAll(1 to 10) { i =>
+            wsConsumerProbe.expectWsConsumerResultAvro[Long, String](
+              expectedTopic = topicName,
+              keyFormat = LongType,
+              valFormat = StringType
+            ) {
+              case ConsumerKeyValueRecord(_, _, _, _, _, key, value, _) =>
+                key.value mustBe i.toLong
+                value.value mustBe s"artist-$i"
+
+              case _ =>
+                fail("Unexpected ConsumerValueRecord")
+            }
+          }
+        }
+
+        ctrl.shutdown()
+      }
+
     "return the kafka cluster info" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val wsCfg = appTestConfig(kcfg.kafkaPort)
 
         val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
-        val ctrl                    = sdcStream.run()
+        val ctrl = sdcStream.run()
 
         Get("/kafka/cluster/info") ~> Route.seal(testRoutes) ~> check {
           status mustBe OK
@@ -435,17 +628,17 @@ class ServerRoutesSpec
 
         val topicName = "non-existing-topic"
         val outPath = "/socket/out?" +
-          "clientId=test-8" +
-          "&groupId=test-group-8" +
+          "clientId=test-100" +
+          "&groupId=test-group-100" +
           s"&topic=$topicName" +
           s"&socketPayload=${AvroPayload.name}" +
           "&keyType=avro" +
           "&valType=avro" +
           "&autoCommit=false"
 
-        implicit val wsClient       = WSProbe()
+        implicit val wsClient = WSProbe()
         val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
-        val ctrl                    = sdcStream.run()
+        val ctrl = sdcStream.run()
 
         WS(outPath, wsClient.flow) ~> Route.seal(testRoutes) ~> check {
           status mustBe StatusCodes.BadRequest
@@ -454,63 +647,67 @@ class ServerRoutesSpec
         ctrl.shutdown()
       }
 
-    "return a HTTP 401 when using wrong credentials to establish an outbound" +
-      " connection to a secured cluster" in secureContext { implicit kcfg =>
-      implicit val wsCfg =
-        secureAppTestConfig(kcfg.kafkaPort, Some(kcfg.schemaRegistryPort))
+    // scalastyle:off line.size.limit
+    "return a HTTP 401 when using wrong credentials to establish an outbound connection to a secured cluster" in
+      // scalastyle:on line.size.limit
+      secureContext { implicit kcfg =>
+        implicit val wsCfg =
+          secureAppTestConfig(kcfg.kafkaPort, Some(kcfg.schemaRegistryPort))
 
-      val topicName = "restricted-topic"
-      initTopic(topicName, isSecure = true)
+        val topicName = "restricted-topic"
+        initTopic(topicName, isSecure = true)
 
-      val outPath = "/socket/out?" +
-        "clientId=test-9" +
-        "&groupId=test-group-9" +
-        s"&topic=$topicName" +
-        s"&socketPayload=${AvroPayload.name}" +
-        "&keyType=avro" +
-        "&valType=avro" +
-        "&autoCommit=false"
+        val outPath = "/socket/out?" +
+          "clientId=test-101" +
+          "&groupId=test-group-101" +
+          s"&topic=$topicName" +
+          s"&socketPayload=${AvroPayload.name}" +
+          "&keyType=avro" +
+          "&valType=avro" +
+          "&autoCommit=false"
 
-      implicit val wsClient       = WSProbe()
-      val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
-      val ctrl                    = sdcStream.run()
-      val routes                  = Route.seal(testRoutes)
+        implicit val wsClient = WSProbe()
+        val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
+        val ctrl = sdcStream.run()
+        val routes = Route.seal(testRoutes)
 
-      val wrongCreds = addCredentials(BasicHttpCredentials("bad", "user"))
+        val wrongCreds = addCredentials(BasicHttpCredentials("bad", "user"))
 
-      WS(outPath, wsClient.flow) ~> wrongCreds ~> routes ~> check {
-        status mustBe StatusCodes.Unauthorized
+        WS(outPath, wsClient.flow) ~> wrongCreds ~> routes ~> check {
+          status mustBe StatusCodes.Unauthorized
+        }
+
+        ctrl.shutdown()
       }
 
-      ctrl.shutdown()
-    }
+    // scalastyle:off line.size.limit
+    "return a HTTP 401 when using wrong credentials to establish an inbound connection to a secured cluster" in
+      // scalastyle:on line.size.limit
+      secureContext { implicit kcfg =>
+        implicit val wsCfg = secureAppTestConfig(kcfg.kafkaPort)
 
-    "return a HTTP 401 when using wrong credentials to establish an inbound" +
-      " connection to a secured cluster" in secureContext { implicit kcfg =>
-      implicit val wsCfg = secureAppTestConfig(kcfg.kafkaPort)
+        val topicName = "restricted-topic"
+        initTopic(topicName, isSecure = true)
 
-      val topicName = "restricted-topic"
-      initTopic(topicName, isSecure = true)
+        implicit val wsClient = WSProbe()
+        val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
+        val ctrl = sdcStream.run()
 
-      implicit val wsClient       = WSProbe()
-      val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
-      val ctrl                    = sdcStream.run()
+        val baseUri = baseProducerUri(
+          topic = topicName,
+          payloadType = JsonPayload,
+          keyType = NoType,
+          valType = StringType
+        )
 
-      val baseUri = baseProducerUri(
-        topic = topicName,
-        payloadType = JsonPayload,
-        keyType = NoType,
-        valType = StringType
-      )
+        val wrongCreds = BasicHttpCredentials("bad", "user")
 
-      val wrongCreds = BasicHttpCredentials("bad", "user")
+        checkWebSocket(baseUri, Route.seal(testRoutes), Some(wrongCreds)) {
+          status mustBe StatusCodes.Unauthorized
+        }
 
-      checkWebSocket(baseUri, Route.seal(testRoutes), None, Some(wrongCreds)) {
-        status mustBe StatusCodes.Unauthorized
+        ctrl.shutdown()
       }
-
-      ctrl.shutdown()
-    }
 
     "set up a WebSocket for producing messages to a secured cluster" in
       secureProducerContext("secure-topic-1") {
@@ -523,6 +720,7 @@ class ServerRoutesSpec
             topic = "secure-topic-1",
             routes = Route.seal(testRoutes),
             keyType = None,
+            valType = AvroType,
             messages = messages,
             basicCreds = Some(creds)
           )
@@ -532,8 +730,8 @@ class ServerRoutesSpec
       secureProducerContext("secure-topic-2") {
         case (ekc, _, testRoutes, wsProducerClient) =>
           implicit val kcfg = ekc
-          val routes        = Route.seal(testRoutes)
-          val messages      = produceValueJson(10)
+          val routes = Route.seal(testRoutes)
+          val messages = produceValueJson(10)
 
           produceAndCheckJson(
             topic = "secure-topic-2",
@@ -547,8 +745,8 @@ class ServerRoutesSpec
           import net.manub.embeddedkafka.Codecs.stringDeserializer
 
           val outPath = "/socket/out?" +
-            "clientId=test-10" +
-            "&groupId=test-group-10" +
+            "clientId=test-102" +
+            "&groupId=test-group-102" +
             s"&topic=secure-topic-2" +
             "&valType=string" +
             "&autoCommit=false"

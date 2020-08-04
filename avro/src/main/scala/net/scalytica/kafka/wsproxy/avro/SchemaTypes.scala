@@ -2,7 +2,7 @@ package net.scalytica.kafka.wsproxy.avro
 
 import com.sksamuel.avro4s._
 import org.apache.avro.Schema
-import shapeless.{:+:, CNil}
+import shapeless.{:+:, CNil, Coproduct}
 
 object SchemaTypes {
 
@@ -21,6 +21,9 @@ object SchemaTypes {
   type AvroValueTypesCoproduct =
     Array[Byte] :+: String :+: Int :+: Long :+: Double :+: Float :+: CNil
   // format: on
+
+  val EmptyValueType: AvroValueTypesCoproduct =
+    Coproduct[AvroValueTypesCoproduct](Array.empty[Byte])
 
   /**
    * Wrapper schema for messages to produce into Kafka topics via the WebSocket
@@ -42,18 +45,18 @@ object SchemaTypes {
       // format: off
       key: Option[AvroValueTypesCoproduct] = None,
       // format: on
-      value: Array[Byte],
+      value: AvroValueTypesCoproduct,
       headers: Option[Seq[KafkaMessageHeader]] = None
   ) {
 
-    def isEmpty: Boolean = AvroProducerRecord.empty == this
+    def isEmpty: Boolean = AvroProducerRecord.Empty == this
 
   }
 
   object AvroProducerRecord {
 
-    lazy val empty: AvroProducerRecord =
-      AvroProducerRecord(value = Array.empty[Byte])
+    lazy val Empty: AvroProducerRecord =
+      AvroProducerRecord(value = EmptyValueType)
 
     implicit val schemaFor = SchemaFor[AvroProducerRecord]
     implicit val encoder   = Encoder[AvroProducerRecord]
@@ -115,7 +118,7 @@ object SchemaTypes {
       offset: Long,
       timestamp: Long,
       key: Option[AvroValueTypesCoproduct],
-      value: Array[Byte],
+      value: AvroValueTypesCoproduct,
       headers: Option[Seq[KafkaMessageHeader]]
   )
 

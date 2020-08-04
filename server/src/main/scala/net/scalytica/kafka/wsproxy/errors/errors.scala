@@ -15,3 +15,5 @@ case class TopicNotFoundError(message: String)
     with NoStackTrace
 
 case class ConfigurationError(message: String) extends RuntimeException(message)
+
+case class IllegalFormatTypeError(message: String) extends Exception(message)

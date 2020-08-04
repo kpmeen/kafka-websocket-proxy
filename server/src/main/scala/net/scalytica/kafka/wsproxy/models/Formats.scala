@@ -1,11 +1,16 @@
 package net.scalytica.kafka.wsproxy.models
 
 import io.circe.{Decoder, Encoder}
-import net.scalytica.kafka.wsproxy.StringExtensions
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroValueTypesCoproduct
 import net.scalytica.kafka.wsproxy.codecs.{BasicSerdes, Decoders, Encoders}
+import net.scalytica.kafka.wsproxy.errors.IllegalFormatTypeError
+import net.scalytica.kafka.wsproxy.logging.DefaultProxyLogger
+import net.scalytica.kafka.wsproxy.{OptionExtensions, StringExtensions}
 import org.apache.kafka.common.serialization.{Deserializer, Serializer}
 import shapeless.Coproduct
+
+import scala.util.Try
+import scala.util.control.NonFatal
 
 object Formats {
 
@@ -18,12 +23,30 @@ object Formats {
 
     def unsafeFromCoproduct[T](co: AvroValueTypesCoproduct): T =
       fromCoproduct[T](co).getOrElse(
-        throw new IllegalArgumentException(
-          s"Wrong key type for key $co"
-        )
+        throw new IllegalArgumentException(s"Wrong type for $co")
       )
 
     def toCoproduct(v: Tpe): Option[AvroValueTypesCoproduct]
+
+    def typeToCoproduct(v: Tpe): AvroValueTypesCoproduct
+
+    def anyToCoproduct(v: Any): AvroValueTypesCoproduct =
+      Try(v.asInstanceOf[Tpe])
+        .recover {
+          case NonFatal(e) =>
+            DefaultProxyLogger.warn(
+              s"Could not cast ${v.getClass} to ${self.getClass}",
+              e
+            )
+            throw e
+        }
+        .toOption
+        .map(typeToCoproduct)
+        .orThrow(
+          IllegalFormatTypeError(
+            s"The Type ${v.getClass} is not a valid String."
+          )
+        )
 
     lazy val name: String = self.getClass.getSimpleName
       .stripSuffix("$")
@@ -50,6 +73,11 @@ object Formats {
     def fromCoproduct[T](co: AvroValueTypesCoproduct): Option[T] = None
     def toCoproduct(v: Tpe): Option[AvroValueTypesCoproduct]     = None
 
+    def typeToCoproduct(v: Tpe): AvroValueTypesCoproduct =
+      throw new IllegalAccessError(
+        s"$getClass cannot be converted to Coproduct."
+      )
+
     override val serializer   = BasicSerdes.EmptySerializer
     override val deserializer = BasicSerdes.EmptyDeserializer
 
@@ -68,6 +96,9 @@ object Formats {
     def toCoproduct(v: Tpe): Option[AvroValueTypesCoproduct] =
       Some(Coproduct[AvroValueTypesCoproduct](v))
 
+    def typeToCoproduct(v: Tpe): AvroValueTypesCoproduct =
+      Coproduct[AvroValueTypesCoproduct](v)
+
     override val serializer   = BasicSerdes.JsonSerializer
     override val deserializer = BasicSerdes.JsonDeserializer
 
@@ -75,7 +106,7 @@ object Formats {
     override val decoder = Decoder.decodeJson
   }
 
-  case object AvroType extends FormatType {
+  sealed trait BaseBinaryType extends FormatType {
     type Aux = Array[Byte]
     type Tpe = Array[Byte]
 
@@ -85,22 +116,8 @@ object Formats {
     def toCoproduct(v: Tpe): Option[AvroValueTypesCoproduct] =
       Some(Coproduct[AvroValueTypesCoproduct](v))
 
-    override val serializer   = BasicSerdes.ByteArrSerializer
-    override val deserializer = BasicSerdes.ByteArrDeserializer
-
-    override val encoder = Encoders.byteArrEncoder
-    override val decoder = Decoders.byteArrDecoder
-  }
-
-  case object ProtobufType extends FormatType {
-    type Aux = Array[Byte]
-    type Tpe = Array[Byte]
-
-    def fromCoproduct[T](co: AvroValueTypesCoproduct): Option[T] =
-      co.select[Tpe].map(_.asInstanceOf[T])
-
-    def toCoproduct(v: Tpe): Option[AvroValueTypesCoproduct] =
-      Some(Coproduct[AvroValueTypesCoproduct](v))
+    def typeToCoproduct(v: Tpe): AvroValueTypesCoproduct =
+      Coproduct[AvroValueTypesCoproduct](v)
 
     override val serializer   = BasicSerdes.ByteArrSerializer
     override val deserializer = BasicSerdes.ByteArrDeserializer
@@ -108,24 +125,13 @@ object Formats {
     override val encoder = Encoders.byteArrEncoder
     override val decoder = Decoders.byteArrDecoder
   }
+
+  case object AvroType extends BaseBinaryType
+
+  case object ProtobufType extends BaseBinaryType
 
   // "Primitives"
-  case object ByteArrayType extends FormatType {
-    type Aux = Array[Byte]
-    type Tpe = Array[Byte]
-
-    def fromCoproduct[T](co: AvroValueTypesCoproduct): Option[T] =
-      co.select[Tpe].map(_.asInstanceOf[T])
-
-    def toCoproduct(v: Tpe): Option[AvroValueTypesCoproduct] =
-      Some(Coproduct[AvroValueTypesCoproduct](v))
-
-    override val serializer   = BasicSerdes.ByteArrSerializer
-    override val deserializer = BasicSerdes.ByteArrDeserializer
-
-    override val encoder = Encoders.byteArrEncoder
-    override val decoder = Decoders.byteArrDecoder
-  }
+  case object ByteArrayType extends BaseBinaryType
 
   case object StringType extends FormatType {
     type Aux = String
@@ -136,6 +142,9 @@ object Formats {
 
     def toCoproduct(v: Tpe): Option[AvroValueTypesCoproduct] =
       Some(Coproduct[AvroValueTypesCoproduct](v))
+
+    def typeToCoproduct(v: Tpe): AvroValueTypesCoproduct =
+      Coproduct[AvroValueTypesCoproduct](v)
 
     override val serializer   = BasicSerdes.StringSerializer
     override val deserializer = BasicSerdes.StringDeserializer
@@ -154,6 +163,9 @@ object Formats {
     def toCoproduct(v: Tpe): Option[AvroValueTypesCoproduct] =
       Some(Coproduct[AvroValueTypesCoproduct](v))
 
+    def typeToCoproduct(v: Tpe): AvroValueTypesCoproduct =
+      Coproduct[AvroValueTypesCoproduct](v)
+
     override val serializer   = BasicSerdes.IntSerializer
     override val deserializer = BasicSerdes.IntDeserializer
 
@@ -170,6 +182,9 @@ object Formats {
 
     def toCoproduct(v: Tpe): Option[AvroValueTypesCoproduct] =
       Some(Coproduct[AvroValueTypesCoproduct](v))
+
+    def typeToCoproduct(v: Tpe): AvroValueTypesCoproduct =
+      Coproduct[AvroValueTypesCoproduct](v)
 
     override val serializer   = BasicSerdes.LongSerializer
     override val deserializer = BasicSerdes.LongDeserializer
@@ -188,6 +203,9 @@ object Formats {
     def toCoproduct(v: Tpe): Option[AvroValueTypesCoproduct] =
       Some(Coproduct[AvroValueTypesCoproduct](v))
 
+    def typeToCoproduct(v: Tpe): AvroValueTypesCoproduct =
+      Coproduct[AvroValueTypesCoproduct](v)
+
     override val serializer   = BasicSerdes.DoubleSerializer
     override val deserializer = BasicSerdes.DoubleDeserializer
 
@@ -204,6 +222,9 @@ object Formats {
 
     def toCoproduct(v: Tpe): Option[AvroValueTypesCoproduct] =
       Some(Coproduct[AvroValueTypesCoproduct](v))
+
+    def typeToCoproduct(v: Tpe): AvroValueTypesCoproduct =
+      Coproduct[AvroValueTypesCoproduct](v)
 
     override val serializer   = BasicSerdes.FloatSerializer
     override val deserializer = BasicSerdes.FloatDeserializer

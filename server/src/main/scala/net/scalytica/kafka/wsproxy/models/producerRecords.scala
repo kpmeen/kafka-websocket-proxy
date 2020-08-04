@@ -25,23 +25,25 @@ sealed trait WsProducerRecord[+K, +V] {
 
 object WsProducerRecord {
 
-  def fromAvro[K](
+  def fromAvro[K, V](
       avro: AvroProducerRecord
   )(
-      formatType: FormatType
-  ): WsProducerRecord[K, Array[Byte]] = {
+      keyFormatType: FormatType,
+      valueFormatType: FormatType
+  ): WsProducerRecord[K, V] = {
+    val v: V = valueFormatType.unsafeFromCoproduct[V](avro.value)
     avro.key
       .map { key =>
-        val k: K = formatType.unsafeFromCoproduct[K](key)
-        ProducerKeyValueRecord[K, Array[Byte]](
-          key = InValueDetails(k, formatType),
-          value = InValueDetails(avro.value, Formats.AvroType),
+        val k: K = keyFormatType.unsafeFromCoproduct[K](key)
+        ProducerKeyValueRecord[K, V](
+          key = InValueDetails(k, keyFormatType),
+          value = InValueDetails(v, valueFormatType),
           headers = avro.headers.map(_.map(KafkaHeader.fromAvro))
         )
       }
       .getOrElse {
-        ProducerValueRecord[Array[Byte]](
-          value = InValueDetails(avro.value, Formats.AvroType),
+        ProducerValueRecord[V](
+          value = InValueDetails(v, valueFormatType),
           headers = avro.headers.map(_.map(KafkaHeader.fromAvro))
         )
       }
