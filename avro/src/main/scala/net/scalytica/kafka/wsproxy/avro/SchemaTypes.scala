@@ -35,10 +35,10 @@ object SchemaTypes {
    * @param headers The headers to apply to the message in Kafka.
    */
   @AvroDoc(
-    """Inbound schema for producing messages with a key and value to Kafka
-       topics via the WebSocket proxy. It is up to the client to serialize the
-       key and value before adding them to this message. This is because Avro
-       does not support referencing external/remote schemas."""
+    "Inbound schema for producing messages with a key and value to Kafka " +
+      "topics via the WebSocket proxy. It is up to the client to serialize " +
+      "the key and value before adding them to this message. This is because " +
+      "Avro does not support referencing external/remote schemas."
   )
   @AvroNamespace("net.scalytica.kafka.wsproxy.avro")
   case class AvroProducerRecord(
@@ -106,9 +106,10 @@ object SchemaTypes {
    * @param headers The headers applied to the message in Kafka.
    */
   @AvroDoc(
-    """Outbound schema for messages with Avro key and value. It is up to the
-       client to deserialize the key and value using the correct schemas, since
-       these are passed through as raw byte arrays in this wrapper message."""
+    "Outbound schema for messages with Avro key and value. It is up to the " +
+      "client to deserialize the key and value using the correct schemas, " +
+      "since these are passed through as raw byte arrays in this wrapper " +
+      "message."
   )
   @AvroNamespace("net.scalytica.kafka.wsproxy.avro")
   case class AvroConsumerRecord(

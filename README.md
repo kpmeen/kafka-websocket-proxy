@@ -132,16 +132,16 @@ behaviour of the commit handler
 Exposed configuration properties for the Kafka clients initialised and used by
 the `kafka-websocket-proxy` whenever a WebSocket connection is established.  
 
-| Config key                                                | Environment                             | Required | Default  | Description   |
-|:---                                                       |:----                                    |:--------:|:--------:|:-----         |
-| kafka.ws.proxy.kafka-client.bootstrap-hosts               | WSPROXY_KAFKA_BOOTSTRAP_HOSTS           |    y     | not set  | A string with the Kafka brokers to bootstrap against, in the form `<host>:<port>`, separated by comma. |
-| kafka.ws.proxy.kafka-client.schema-registry-url           | WSPROXY_SCHEMA_REGISTRY_URL             |    n     | not set  | URLs for the Confluent Schema Registry. If _not_ set, any other schema registry configs will be ignored. |
-| kafka.ws.proxy.kafka-client.auto-register-schemas         | WSPROXY_SCHEMA_AUTO_REGISTER            |    n     | `true`   | By default, the proxy will automatically register any internal Avro schemas it needs. If disabled, these schemas must be registered with the schema registry manually. |
-| kafka.ws.proxy.kafka-client.properties.request.timeout.ms | WSPROXY_KAFKA_CLIENT_REQUEST_TIMEOUT_MS |    n     | `20000`  | Defines the request timeout period for the kafka clients. |
-| kafka.ws.proxy.kafka-client.properties.retry.backoff.ms   | WSPROXY_KAFKA_CLIENT_RETRY_BACKOFF_MS   |    n     | `500`    | Defines the amount of time to wait before retrying a request. | 
-| kafka.ws.proxy.kafka-client.metrics-enabled               | WSPROXY_CONFLUENT_METRICS_ENABLED       |    n     | `false`  | When this flag is set to `true`, it will enable the Confluent Metrics Reporter |
-
-
+| Config key                                                                                           | Environment                              | Required | Default       | Description   |
+|:---                                                                                                  |:----                                     |:--------:|:-------------:|:-----         |
+| kafka.ws.proxy.kafka-client.bootstrap-hosts                                                          | WSPROXY_KAFKA_BOOTSTRAP_HOSTS            |    y     | not set       | A string with the Kafka brokers to bootstrap against, in the form `<host>:<port>`, separated by comma. |
+| kafka.ws.proxy.kafka-client.schema-registry.url                                                      | WSPROXY_SCHEMA_REGISTRY_URL              |    n     | not set       | URLs for the Confluent Schema Registry. If _not_ set, any other schema registry configs will be ignored. |
+| kafka.ws.proxy.kafka-client.schema-registry.auto-register-schemas                                    | WSPROXY_SCHEMA_AUTO_REGISTER             |    n     | `true`        | By default, the proxy will automatically register any internal Avro schemas it needs. If disabled, these schemas must be registered with the schema registry manually. |
+| kafka.ws.proxy.kafka-client.schema-registry.properties.schema.registry.basic.auth.credentials.source | WSPROXY_SCHEMA_BASIC_AUTH_CREDS_SRC      |    n     | `USER_INFO`   | Basic auth mechanism to use for Confluent Schema Registry. |
+| kafka.ws.proxy.kafka-client.schema-registry.properties.schema.registry.basic.auth.user.info          | WSPROXY_SCHEMA_BASIC_AUTH_USER_INFO      |    n     | `true`        | User info for basic auth against Confluent Schema Registry. |
+| kafka.ws.proxy.kafka-client.properties.request.timeout.ms                                            | WSPROXY_KAFKA_CLIENT_REQUEST_TIMEOUT_MS  |    n     | `20000`       | Defines the request timeout period for the kafka clients. |
+| kafka.ws.proxy.kafka-client.properties.retry.backoff.ms                                              | WSPROXY_KAFKA_CLIENT_RETRY_BACKOFF_MS    |    n     | `500`         | Defines the amount of time to wait before retrying a request. | 
+| kafka.ws.proxy.kafka-client.metrics-enabled                                                          | WSPROXY_CONFLUENT_MONITORING_ENABLED     |    n     | `false`       | When this flag is set to `true`, it will enable the Confluent Metrics Reporter |
 
 ### Kafka Security
 
@@ -238,14 +238,14 @@ variables. The below table shows which are available, and what their default val
 
 **2. Overriding full configuration through environment** 
 
-Another option that is useful when running the application is in a docker
-container, or another environment where configuration is primarily done through
+Another option that is useful when running the application in a docker container,
+or another environment where configuration is primarily done through
 environment variables, is the environment variable `WSPROXY_LOGBACK_XML_CONFIG`.
 
 When the `WSPROXY_LOGBACK_XML_CONFIG` variable has a value, all other log
-configurations are ignored. So if e.g. both `WSPROXY_LOGBACK_XML_CONFIG` and
-`WS_PROXY_KAFKA_CLIENTS_LOG_LEVEL` are set, the latter is ignored completely.
-The same applies if an external logback configuration file is provided through
+configurations will be ignored. So if e.g. both `WSPROXY_LOGBACK_XML_CONFIG` and
+`WS_PROXY_KAFKA_CLIENTS_LOG_LEVEL` are set, the latter will be ignored completely.
+The same applies when an external logback configuration file is provided through
 `-Dlogback.configurationFile=<file_path>`.
 
 ## Endpoints and API
@@ -374,23 +374,36 @@ the key and value are captured in a single message through the socket.
 
 ```json
 {
-  "doc": "Inbound schema for producing messages with a key and value to Kafka topics via the WebSocket proxy. It is up to the client to serialize the key and value before adding them to this message. This is because Avro does not support referencing external/remote schemas.",
-  "fields": [
-    {
-      "name": "key",
-      "type": [
-        "null",
-        "bytes"
-      ]
-    },
-    {
-      "name": "value",
-      "type": "bytes"
-    }
-  ],
-  "name": "AvroProducerRecord",
-  "namespace": "net.scalytica.kafka.wsproxy.avro.SchemaTypes",
-  "type": "record"
+  "type" : "record",
+  "name" : "AvroProducerRecord",
+  "namespace" : "net.scalytica.kafka.wsproxy.avro",
+  "doc" : "Inbound schema for producing messages with a key and value to Kafka topics via the WebSocket proxy. It is up to the client to serialize the key and value before adding them to this message. This is because Avro does not support referencing external/remote schemas.",
+  "fields" : [ {
+    "name" : "key",
+    "type" : [ "null", "bytes", "string", "int", "long", "double", "float" ],
+    "default" : null
+  }, {
+    "name" : "value",
+    "type" : [ "bytes", "string", "int", "long", "double", "float" ]
+  }, {
+    "name" : "headers",
+    "type" : [ "null", {
+      "type" : "array",
+      "items" : {
+        "type" : "record",
+        "name" : "KafkaMessageHeader",
+        "doc" : "Schema definition for simple Kafka message headers.",
+        "fields" : [ {
+          "name" : "key",
+          "type" : "string"
+        }, {
+          "name" : "value",
+          "type" : "string"
+        } ]
+      }
+    } ],
+    "default" : null
+  } ]
 }
 ```
 
@@ -400,28 +413,23 @@ Returns the Avro result schema containing metadata about the produced message.
 
 ```json
 {
-  "doc": "Outbound schema for responding to produced messages.",
-  "fields": [
-    {
-      "name": "topic",
-      "type": "string"
-    },
-    {
-      "name": "partition",
-      "type": "int"
-    },
-    {
-      "name": "offset",
-      "type": "long"
-    },
-    {
-      "name": "timestamp",
-      "type": "long"
-    }
-  ],
-  "name": "AvroProducerResult",
-  "namespace": "net.scalytica.kafka.wsproxy.avro.SchemaTypes",
-  "type": "record"
+  "type" : "record",
+  "name" : "AvroProducerResult",
+  "namespace" : "net.scalytica.kafka.wsproxy.avro",
+  "doc" : "Outbound schema for responding to produced messages.",
+  "fields" : [ {
+    "name" : "topic",
+    "type" : "string"
+  }, {
+    "name" : "partition",
+    "type" : "int"
+  }, {
+    "name" : "offset",
+    "type" : "long"
+  }, {
+    "name" : "timestamp",
+    "type" : "long"
+  } ]
 }
 ```
 
@@ -432,43 +440,49 @@ WebSocket.
 
 ```json
 {
-  "doc": "Outbound schema for messages with Avro key and value. It is up to the client to deserialize the key and value using the correct schemas, since these are passed through as raw byte arrays in this wrapper message.",
-  "fields": [
-    {
-      "name": "wsProxyMessageId",
-      "type": "string"
-    },
-    {
-      "name": "topic",
-      "type": "string"
-    },
-    {
-      "name": "partition",
-      "type": "int"
-    },
-    {
-      "name": "offset",
-      "type": "long"
-    },
-    {
-      "name": "timestamp",
-      "type": "long"
-    },
-    {
-      "name": "key",
-      "type": [
-        "null",
-        "bytes"
-      ]
-    },
-    {
-      "name": "value",
-      "type": "bytes"
-    }
-  ],
-  "name": "AvroConsumerRecord",
-  "namespace": "net.scalytica.kafka.wsproxy.avro.SchemaTypes",
-  "type": "record"
+  "type" : "record",
+  "name" : "AvroConsumerRecord",
+  "namespace" : "net.scalytica.kafka.wsproxy.avro",
+  "doc" : "Outbound schema for messages with Avro key and value. It is up to the client to deserialize the key and value using the correct schemas, since these are passed through as raw byte arrays in this wrapper message.",
+  "fields" : [ {
+    "name" : "wsProxyMessageId",
+    "type" : "string"
+  }, {
+    "name" : "topic",
+    "type" : "string"
+  }, {
+    "name" : "partition",
+    "type" : "int"
+  }, {
+    "name" : "offset",
+    "type" : "long"
+  }, {
+    "name" : "timestamp",
+    "type" : "long"
+  }, {
+    "name" : "key",
+    "type" : [ "null", "bytes", "string", "int", "long", "double", "float" ]
+  }, {
+    "name" : "value",
+    "type" : [ "bytes", "string", "int", "long", "double", "float" ]
+  }, {
+    "name" : "headers",
+    "type" : [ "null", {
+      "type" : "array",
+      "items" : {
+        "type" : "record",
+        "name" : "KafkaMessageHeader",
+        "doc" : "Schema definition for simple Kafka message headers.",
+        "fields" : [ {
+          "name" : "key",
+          "type" : "string"
+        }, {
+          "name" : "value",
+          "type" : "string"
+        } ]
+      }
+    } ]
+  } ]
 }
 ```
 
@@ -479,16 +493,14 @@ parameter option `autoCommit` set to `false`.
 
 ```json
 {
-  "doc": "Inbound schema for committing the offset of consumed messages.",
-  "fields": [
-    {
-      "name": "wsProxyMessageId",
-      "type": "string"
-    }
-  ],
-  "name": "AvroCommit",
-  "namespace": "net.scalytica.kafka.wsproxy.avro.SchemaTypes",
-  "type": "record"
+  "type" : "record",
+  "name" : "AvroCommit",
+  "namespace" : "net.scalytica.kafka.wsproxy.avro",
+  "doc" : "Inbound schema for committing the offset of consumed messages.",
+  "fields" : [ {
+    "name" : "wsProxyMessageId",
+    "type" : "string"
+  } ]
 }
 ```
 
