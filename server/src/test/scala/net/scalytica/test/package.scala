@@ -18,7 +18,7 @@ import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
 }
 import net.scalytica.kafka.wsproxy.codecs.Decoders._
 import net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde
-import net.scalytica.kafka.wsproxy.models.Formats.AvroType
+import net.scalytica.kafka.wsproxy.models.Formats.{AvroType, FormatType}
 import net.scalytica.kafka.wsproxy.models.{
   ConsumerKeyValueRecord,
   ConsumerValueRecord,
@@ -48,12 +48,14 @@ package object test {
   ): Map[String, _] = {
     schemaRegistryPort
       .map { _ =>
+        // scalastyle: off
         Map(
           SCHEMA_REGISTRY_URL_CONFIG    -> s"http://${serverHost(schemaRegistryPort)}",
           AUTO_REGISTER_SCHEMAS         -> true,
           "key.subject.name.strategy"   -> keySubjNameStrategy.getCanonicalName,
           "value.subject.name.strategy" -> valSubjNameStrategy.getCanonicalName
         )
+        // scalastyle: on
       }
       .getOrElse(Map.empty)
   }
@@ -192,18 +194,17 @@ package object test {
       }
     }
 
-    def expectWsConsumerKeyValueResultAvro(
+    def expectWsConsumerResultAvro[K, V](
         expectedTopic: String,
-        expectedKey: Option[TestKey],
-        expectedValue: Album,
-        expectHeaders: Boolean = false
+        expectHeaders: Boolean = false,
+        keyFormat: FormatType,
+        valFormat: FormatType
+    )(
+        assertion: WsConsumerRecord[K, V] => Assertion
     )(
         implicit mat: Materializer,
         crSerde: WsProxyAvroSerde[AvroConsumerRecord]
     ): Assertion = {
-      val keySerdes = TestTypes.TestSerdes.keySerdes
-      val valSerdes = TestTypes.TestSerdes.valueSerdes
-
       probe.inProbe.requestNext(20 seconds) match {
         case bm: BinaryMessage =>
           val collected = bm.dataStream
@@ -212,9 +213,10 @@ package object test {
             .awaitResult(5 seconds)
             .reduce(_ ++ _)
 
-          val actual = WsConsumerRecord.fromAvro(
-            crSerde.deserialize(collected.toArray)
-          )(AvroType)
+          val actual: WsConsumerRecord[K, V] =
+            WsConsumerRecord.fromAvro[K, V](
+              crSerde.deserialize(collected.toArray)
+            )(keyFormat, valFormat)
 
           actual.topic.value mustBe expectedTopic
           actual.offset.value mustBe >=(0L)
@@ -229,20 +231,7 @@ package object test {
             actual.headers mustBe empty
           }
 
-          actual match {
-            case ConsumerKeyValueRecord(_, _, _, _, _, keyOut, valOut, _) =>
-              val k = keySerdes.deserialize(expectedTopic, keyOut.value)
-              val v = valSerdes.deserialize(expectedTopic, valOut.value)
-              k.username mustBe expectedKey.get.username
-              v.title mustBe expectedValue.title
-              v.artist mustBe expectedValue.artist
-              v.tracks must have size expectedValue.tracks.size.toLong
-              v.tracks must contain allElementsOf expectedValue.tracks
-
-            case ConsumerValueRecord(_, _, _, _, _, valOut, _) =>
-              val v = valSerdes.deserialize(expectedTopic, valOut.value)
-              v mustBe expectedValue
-          }
+          assertion(actual)
 
         case _ =>
           throw new AssertionError(
@@ -250,7 +239,39 @@ package object test {
           )
       }
     }
-    // scalastyle:on method.length
+
+    def expectWsConsumerKeyValueResultAvro(
+        expectedTopic: String,
+        expectedKey: Option[TestKey],
+        expectedValue: Album,
+        expectHeaders: Boolean = false
+    )(
+        implicit mat: Materializer,
+        crSerde: WsProxyAvroSerde[AvroConsumerRecord]
+    ): Assertion = {
+      val keySerdes = TestTypes.TestSerdes.keySerdes
+      val valSerdes = TestTypes.TestSerdes.valueSerdes
+
+      expectWsConsumerResultAvro[Array[Byte], Array[Byte]](
+        expectedTopic,
+        expectHeaders,
+        AvroType,
+        AvroType
+      ) {
+        case ConsumerKeyValueRecord(_, _, _, _, _, key, value, _) =>
+          val k = keySerdes.deserialize(expectedTopic, key.value)
+          val v = valSerdes.deserialize(expectedTopic, value.value)
+          k.username mustBe expectedKey.get.username
+          v.title mustBe expectedValue.title
+          v.artist mustBe expectedValue.artist
+          v.tracks must have size expectedValue.tracks.size.toLong
+          v.tracks must contain allElementsOf expectedValue.tracks
+
+        case ConsumerValueRecord(_, _, _, _, _, value, _) =>
+          val v = valSerdes.deserialize(expectedTopic, value.value)
+          v mustBe expectedValue
+      }
+    }
 
     def expectWsConsumerValueResultJson[V](
         expectedTopic: String,

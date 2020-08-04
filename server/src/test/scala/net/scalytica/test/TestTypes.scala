@@ -2,7 +2,7 @@ package net.scalytica.test
 
 import com.sksamuel.avro4s._
 import net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde
-import org.apache.kafka.common.serialization.Serdes
+import org.apache.kafka.common.serialization.{Serde, Serdes}
 
 trait TestTypes {
 
@@ -16,7 +16,8 @@ trait TestTypes {
 
   object TestSerdes {
 
-    val stringSerdes = Serdes.String()
+    val stringSerdes: Serde[String] = Serdes.String()
+    val longSerdes: Serde[Long]     = Serdes.Long().asInstanceOf[Serde[Long]]
 
     val keySerdes: WsProxyAvroSerde[TestKey] = {
       val srCfg = registryConfig()(None)

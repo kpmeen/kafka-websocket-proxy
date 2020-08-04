@@ -3,11 +3,11 @@ package net.scalytica.kafka.wsproxy.models
 import akka.kafka.ConsumerMessage
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
   AvroConsumerRecord,
+  AvroValueTypesCoproduct,
   KafkaMessageHeader
 }
-import net.scalytica.kafka.wsproxy.models.Formats.FormatType
+import net.scalytica.kafka.wsproxy.models.Formats.{ByteArrayType, FormatType}
 import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails
-import org.apache.kafka.common.serialization.Serializer
 
 /**
  * ADT describing any record that can be sent out from the service through the
@@ -35,17 +35,21 @@ sealed abstract class WsConsumerRecord[+K, +V](
   lazy val wsProxyMessageId: WsMessageId =
     WsMessageId(topic, partition, offset, timestamp)
 
-  def toAvroRecord[Key >: K, Value >: V](
-      implicit keySer: Serializer[Key],
-      valSer: Serializer[Value]
-  ): AvroConsumerRecord = {
-    val k = key.flatMap { det =>
-      det.format.flatMap { fmt =>
-        val v = det.value.asInstanceOf[fmt.Tpe]
-        fmt.toCoproduct(v)
-      }
+  private[this] def asCoproduct[T](
+      d: OutValueDetails[T]
+  ): Option[AvroValueTypesCoproduct] = {
+    d.format.flatMap { fmt =>
+      val x = d.value.asInstanceOf[fmt.Tpe]
+      fmt.toCoproduct(x)
     }
-    // FIXME: There's something odd about this code 🤔
+  }
+
+  def toAvroRecord[Key >: K, Value >: V]: AvroConsumerRecord = {
+    val k = key.flatMap(asCoproduct)
+    val v = asCoproduct(value).getOrElse {
+      ByteArrayType.anyToCoproduct(value.value)
+    }
+
     AvroConsumerRecord(
       wsProxyMessageId = wsProxyMessageId.value,
       topic = topic.value,
@@ -54,7 +58,7 @@ sealed abstract class WsConsumerRecord[+K, +V](
       timestamp = timestamp.value,
       headers = headers.map(_.map(h => KafkaMessageHeader(h.key, h.value))),
       key = k,
-      value = valSer.serialize(topic.value, value.value)
+      value = v
     )
   }
 
@@ -64,32 +68,34 @@ sealed abstract class WsConsumerRecord[+K, +V](
 
 object WsConsumerRecord {
 
-  def fromAvro[K](
+  def fromAvro[K, V](
       avro: AvroConsumerRecord
   )(
-      formatType: FormatType
-  ): WsConsumerRecord[K, Array[Byte]] = {
+      keyFormatType: FormatType,
+      valFormatType: FormatType
+  ): WsConsumerRecord[K, V] = {
+    val v: V = valFormatType.unsafeFromCoproduct[V](avro.value)
     avro.key match {
       case Some(key) =>
-        val k: K = formatType.unsafeFromCoproduct[K](key)
-        ConsumerKeyValueRecord(
+        val k: K = keyFormatType.unsafeFromCoproduct[K](key)
+        ConsumerKeyValueRecord[K, V](
           topic = TopicName(avro.topic),
           partition = Partition(avro.partition),
           offset = Offset(avro.offset),
           timestamp = Timestamp(avro.timestamp),
           headers = avro.headers.map(_.map(KafkaHeader.fromAvro)),
-          key = OutValueDetails(k, Option(formatType)),
-          value = OutValueDetails(avro.value, Option(Formats.AvroType)),
+          key = OutValueDetails(k, Option(keyFormatType)),
+          value = OutValueDetails(v, Option(valFormatType)),
           committableOffset = None
         )
 
       case None =>
-        ConsumerValueRecord(
+        ConsumerValueRecord[V](
           topic = TopicName(avro.topic),
           partition = Partition(avro.partition),
           offset = Offset(avro.offset),
           timestamp = Timestamp(avro.timestamp),
-          value = OutValueDetails(avro.value, Option(Formats.AvroType)),
+          value = OutValueDetails(v, Option(valFormatType)),
           headers = avro.headers.map(_.map(KafkaHeader.fromAvro)),
           committableOffset = None
         )

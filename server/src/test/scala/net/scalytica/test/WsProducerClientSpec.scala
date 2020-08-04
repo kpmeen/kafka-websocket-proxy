@@ -39,9 +39,8 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
       basicCreds: Option[BasicHttpCredentials] = None
   )(implicit wsClient: WSProbe): Unit = {
     val uri = baseProducerUri(topic, keyType = keyType, valType = valType)
-    val kt  = if (keyType == NoType) None else Option(keyType)
 
-    checkWebSocket(uri, routes, kt, basicCreds) {
+    checkWebSocket(uri, routes, basicCreds) {
       isWebSocketUpgrade mustBe true
 
       forAll(messages) { msg =>
@@ -57,6 +56,7 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
       topic: String,
       routes: Route,
       keyType: Option[FormatType],
+      valType: FormatType,
       messages: Seq[AvroProducerRecord],
       basicCreds: Option[BasicHttpCredentials] = None
   )(
@@ -66,13 +66,12 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
       topic = topic,
       payloadType = AvroPayload,
       keyType = keyType.getOrElse(NoType),
-      valType = AvroType
+      valType = valType
     )
 
     checkWebSocket(
       baseUri,
       routes,
-      keyType,
       basicCreds
     ) {
       isWebSocketUpgrade mustBe true
