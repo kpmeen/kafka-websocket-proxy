@@ -76,9 +76,9 @@ class WsProxyEnvLoggerConfiguratorSpec
   )
 
   override def afterAll(): Unit = {
-    // TODO: Not sure why the system properties aren't properly cleared when
-    //       removing a property key. Every test below still has property values
-    //       from preceding tests.
+    // Not sure why the system properties aren't properly cleared when
+    // removing a property key. Every test below still has property values
+    // from preceding tests.
     sys.props -= testEnvLogger
     sys.props -= s"$loggerEnvPrefix$scalyticaLogger"
     sys.props -= logbackConfigEnv

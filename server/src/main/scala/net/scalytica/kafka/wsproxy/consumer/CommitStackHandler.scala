@@ -2,6 +2,8 @@ package net.scalytica.kafka.wsproxy.consumer
 
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior}
+import akka.kafka.CommitterSettings
+import akka.stream.Materializer
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.consumer.CommitStackTypes._
 import net.scalytica.kafka.wsproxy.models.{WsCommit, WsConsumerRecord}
@@ -18,8 +20,13 @@ object CommitStackHandler {
   case class GetStack(sender: ActorRef[CommitStack]) extends CommitProtocol
 
   /** Behaviour initialising the message commit stack */
-  def commitStack(implicit cfg: AppCfg): Behavior[CommitProtocol] =
+  def commitStack(
+      implicit cfg: AppCfg,
+      mat: Materializer
+  ): Behavior[CommitProtocol] = {
+    implicit val cs = CommitterSettings.create(mat.system)
     committableStack()
+  }
 
   /**
    * Behavior implementation for the CommitHandler. New [[Uncommitted]] messages
@@ -33,9 +40,12 @@ object CommitStackHandler {
    */
   private[this] def committableStack(
       stack: CommitStack = CommitStack.empty
-  )(implicit cfg: AppCfg): Behavior[CommitProtocol] =
+  )(
+      implicit cfg: AppCfg,
+      cs: CommitterSettings,
+      mat: Materializer
+  ): Behavior[CommitProtocol] =
     Behaviors.setup { implicit ctx =>
-      implicit val ec = implicitly(ctx.executionContext)
       Behaviors.receiveMessage {
         case Stash(record) =>
           stack.stash(record).map(committableStack).getOrElse(Behaviors.same)

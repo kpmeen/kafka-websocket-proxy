@@ -52,8 +52,6 @@ class ServerRoutesSpec
 
   import TestServerRoutes.{serverErrorHandler, serverRejectionHandler}
 
-  // TODO: Refactor consumer tests to reduce boilerplate and repetitive code.
-
   "The server routes" should {
     "return HTTP 404 when requesting an invalid resource" in {
       val expected =

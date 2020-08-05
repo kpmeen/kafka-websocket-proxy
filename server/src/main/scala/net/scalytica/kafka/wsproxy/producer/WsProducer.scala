@@ -291,7 +291,7 @@ object WsProducer extends WithProxyLogger {
           )
       }
       .log("produceAvro", m => s"Trying to deserialize bytes: $m")
-      .map(bs => serde.deserialize(bs.toArray)) // FIXME: Test fails here
+      .map(bs => serde.deserialize(bs.toArray))
       .log("produceAvro", m => s"Deserialized bytes into: $m")
       .recover {
         case t: Exception =>

@@ -1,6 +1,10 @@
 package net.scalytica.kafka.wsproxy.consumer
 
+import akka.kafka.CommitterSettings
 import akka.kafka.ConsumerMessage.Committable
+import akka.kafka.scaladsl.Committer
+import akka.stream.Materializer
+import akka.stream.scaladsl.Source
 import com.typesafe.scalalogging.Logger
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.models.{
@@ -8,8 +12,6 @@ import net.scalytica.kafka.wsproxy.models.{
   WsConsumerRecord,
   WsMessageId
 }
-
-import scala.concurrent.ExecutionContext
 
 /**
  * Types that model a kind of Stack to keep track of uncommitted messages.
@@ -117,11 +119,14 @@ private[consumer] object CommitStackTypes {
      * DROPPED from the stack, since they are no longer necessary to commit.
      *
      * @param msgId the [[WsMessageId]] of the message to commit.
-     * @return An option with an updated stack or empty if message wasn't found.
+     * @return An option with updated stack or empty if message wasn't found.
      */
     def commit(
         msgId: WsMessageId
-    )(implicit ec: ExecutionContext): Option[CommitStack] =
+    )(
+        implicit mat: Materializer,
+        cs: CommitterSettings
+    ): Option[CommitStack] =
       stack
         .find(_._2.exists(_.wsProxyMsgId == msgId))
         .orElse {
@@ -136,13 +141,13 @@ private[consumer] object CommitStackTypes {
         .flatMap {
           case (nextStack, maybeCommittable) =>
             maybeCommittable.map { u =>
-              // FIXME:
-              //       This deprecation is bad for the current design, since
-              //       we want to commit single messages and not a stream. Might
-              //       need a redesign of OutboundWebSocket.prepareSink.
-              u.committable.commitScaladsl().foreach { _ =>
-                logger.debug(s"COMMIT: committed $msgId and cleaned up stack")
-              }
+              Source
+                .single(u)
+                .map(_.committable)
+                .via(Committer.flow(cs))
+                .runForeach { _ =>
+                  logger.debug(s"COMMIT: committed $msgId and cleaned up stack")
+                }
               nextStack
             }
         }

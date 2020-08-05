@@ -1,10 +1,9 @@
 package net.scalytica.kafka.wsproxy.session
 
-import akka.actor.typed.Scheduler
 import akka.actor.typed.scaladsl.AskPattern._
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.scaladsl.adapter._
-import akka.actor.typed.{ActorRef, Behavior}
+import akka.actor.typed.{ActorRef, Behavior, Scheduler}
 import akka.kafka.scaladsl.Consumer
 import akka.stream.scaladsl.{RunnableGraph, Sink}
 import akka.util.Timeout

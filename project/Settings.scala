@@ -19,7 +19,6 @@ object Settings {
     "-explaintypes", // Explain type errors in more detail.
     "-Xfuture", // Turn on future language features.
     "-Xcheckinit", // Wrap field accessors to throw an exception on uninitialized access.
-    // TODO: CommitStackTypes + OutboundWebSocket require a redesign to avoid usage of deprecated implementation.
 //    "-Xfatal-warnings", // Fail the compilation if there are any warnings.
     "-Xlint:adapted-args", // Warn if an argument list is modified to match the receiver.
     "-Xlint:by-name-right-associative", // By-name parameter of right associative operator.
