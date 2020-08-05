@@ -68,7 +68,7 @@ file. Where the following parameters can be adjusted:
 > the `application.conf` file in `src/main/resources`.
 
 
-### Main Server Configuration
+### Server Configuration
 
 Basic properties allowing configurations of things related to the basic server.
 Allows for changing things like network interface, port number, etc. 
@@ -78,15 +78,24 @@ Allows for changing things like network interface, port number, etc.
 | kafka.ws.proxy.server.server-id                                 | WSPROXY_SERVER_ID                        | `node-1`                 | A unique identifier for the specific kafka-websocket-proxy instance. |
 | kafka.ws.proxy.server.bind-interface                            | WSPROXY_BIND_INTERFACE                   | `0.0.0.0`                | Network interface to bind unsecured traffic to. |
 | kafka.ws.proxy.server.port                                      | WSPROXY_PORT                             | `8078`                   | Port where the unsecured endpoints will be available. |
-| kafka.ws.proxy.server.ssl.ssl-only                              | WSPROXY_SSL_ONLY                         | `false`                  | Indicates if the server should use SSL/TLS only binding when SSL/TLS is enabled. |
-| kafka.ws.proxy.server.ssl.bind-interface                        | WSPROXY_SSL_BIND_INTERFACE               | `0.0.0.0`                | Network interface to bind the SSL/TLS traffic to.
-| kafka.ws.proxy.server.ssl.port                                  | WSPROXY_SSL_PORT                         | not set                  | Port where the SSL/TLS endpoints will be available. |
-| kafka.ws.proxy.server.ssl.keystore-location                     | WSPROXY_SSL_KEYSTORE_LOCATION            | not set                  | File path to location of key store file. |
-| kafka.ws.proxy.server.ssl.keystore-password                     | WSPROXY_SSL_KEYSTORE_PASS                | not set                  | Password for the key store file. |
 | kafka.ws.proxy.server.broker-resolution-timeout                 | WSPROXY_BROKER_RESOLUTION_TIMEOUT        | `30 seconds`             | Timeout duration to wait for successful host resolution of Kafka brokers. |
 | kafka.ws.proxy.server.broker-resolution-retries                 | WSPROXY_BROKER_RESOLUTION_RETRIES        | `25`                     | Max number of retries for host resolution of Kafka brokers. |
 | kafka.ws.proxy.server.broker-resolution-retry-interval          | WSPROXY_BROKER_RESOLUTION_RETRY_INTERVAL | `1 second`               | Interval duration between retries when resolving the Kafka broker hosts. |
 
+### Server TLS/SSL Configuration
+
+The `kafka-websocket-proxy` can run with SSL enabled. When using self-signed
+certificates it is important to provide the location and password for the JKS
+keystore file. When the certificate is provided through a valid authority these
+configuration properties can be omitted. 
+
+| Config key                                  | Environment                   | Default                  | Description   |
+|:---                                         |:----                          |:------------------------:|:-----         |
+| kafka.ws.proxy.server.ssl.ssl-only          | WSPROXY_SSL_ONLY              | `false`                  | Indicates if the server should use SSL/TLS only binding when SSL/TLS is enabled. |
+| kafka.ws.proxy.server.ssl.bind-interface    | WSPROXY_SSL_BIND_INTERFACE    | `0.0.0.0`                | Network interface to bind the SSL/TLS traffic to.
+| kafka.ws.proxy.server.ssl.port              | WSPROXY_SSL_PORT              | not set                  | Port where the SSL/TLS endpoints will be available. |
+| kafka.ws.proxy.server.ssl.keystore-location | WSPROXY_SSL_KEYSTORE_LOCATION | not set                  | File path to location of key store file when using self-signed certificates. |
+| kafka.ws.proxy.server.ssl.keystore-password | WSPROXY_SSL_KEYSTORE_PASS     | not set                  | Password for the key store file. |
 
 ### Internal Session Handler
 
