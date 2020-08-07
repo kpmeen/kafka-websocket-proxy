@@ -165,6 +165,13 @@ object Configuration extends WithProxyLogger {
 
   }
 
+  final case class BasicAuth(
+      username: String,
+      password: String,
+      realm: String,
+      enabled: Boolean = true
+  )
+
   final case class ServerCfg(
       serverId: WsServerId,
       bindInterface: String,
@@ -172,8 +179,16 @@ object Configuration extends WithProxyLogger {
       ssl: Option[ServerSslCfg],
       brokerResolutionTimeout: FiniteDuration,
       brokerResolutionRetries: Int,
-      brokerResolutionRetryInterval: FiniteDuration
-  )
+      brokerResolutionRetryInterval: FiniteDuration,
+      basicAuthCredentials: Option[BasicAuth]
+  ) {
+
+    def isBasicAuthEnabled: Boolean = {
+      basicAuthCredentials.isDefined && basicAuthCredentials.exists(_.enabled)
+    }
+    def unsafeBasicAuth: BasicAuth = basicAuthCredentials.get
+
+  }
 
   final case class AppCfg(
       server: ServerCfg,
