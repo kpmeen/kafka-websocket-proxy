@@ -5,14 +5,10 @@ import akka.actor.typed.scaladsl.adapter._
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model._
-import akka.http.scaladsl.model.headers.{BasicHttpCredentials, HttpCredentials}
+import akka.http.scaladsl.model.headers.BasicHttpCredentials
 import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.{
-  ExceptionHandler,
-  RejectionHandler,
-  Route,
-  ValidationRejection
-}
+import akka.http.scaladsl.server._
+import akka.http.scaladsl.server.directives.Credentials
 import akka.kafka.scaladsl.Consumer
 import akka.stream.Materializer
 import akka.stream.scaladsl.RunnableGraph
@@ -20,6 +16,7 @@ import akka.util.Timeout
 import io.circe.syntax._
 import io.circe.{Json, Printer}
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.Headers.XKafkaAuthHeader
 import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
   AvroCommit,
@@ -54,7 +51,7 @@ import org.apache.kafka.common.KafkaException
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 /**
  */
@@ -63,6 +60,34 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
   implicit private[this] val timeout: Timeout = 3 seconds
 
   protected def sessionHandler: Option[SessionHandlerRef] = None
+
+  protected def basicAuthCredentials(
+      creds: Credentials
+  )(implicit cfg: AppCfg): Option[String] = {
+    cfg.server.basicAuthCredentials
+      .map { bac =>
+        creds match {
+          case p @ Credentials.Provided(id)
+              if bac.username.equals(id) && p.verify(bac.password) =>
+            Some(id)
+
+          case _ =>
+            None
+        }
+      }
+      .getOrElse(Some("basic auth not configured"))
+  }
+
+  protected def maybeAuthenticateBasic[T](
+      implicit cfg: AppCfg
+  ): Directive1[String] = {
+    if (cfg.server.isBasicAuthEnabled) {
+      val bac = cfg.server.unsafeBasicAuth
+      authenticateBasic(bac.realm, basicAuthCredentials)
+    } else {
+      provide("Basic auth not enabled")
+    }
+  }
 
   /**
    * @return
@@ -99,12 +124,12 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
             case (cid, gid) =>
               sessionHandler.foreach { sh =>
                 sh.shRef.removeConsumer(gid, cid).onComplete {
-                  case util.Success(res) =>
+                  case Success(res) =>
                     logger.debug(
                       s"Removing consumer ${cid.value} from group" +
                         s" ${gid.value} returned: ${res.asString}"
                     )
-                  case util.Failure(err) =>
+                  case Failure(err) =>
                     logger.warn(
                       "An error occurred when trying to remove consumer" +
                         s" ${cid.value} from group" +
@@ -213,6 +238,7 @@ trait ServerRoutes
     extends BaseRoutes
     with OutboundWebSocket
     with InboundWebSocket
+    with StatusRoutes
     with SchemaRoutes
     with WebSocketRoutes { self =>
 
@@ -222,11 +248,11 @@ trait ServerRoutes
     Some(sessionHandlerRef)
 
   /**
-   * @param cfg
-   * @param sys
-   * @param mat
-   * @param ctx
-   * @return
+   * @param cfg Implicitly provided [[AppCfg]]
+   * @param sys Implicitly provided [[ActorSystem]]
+   * @param mat Implicitly provided [[Materializer]]
+   * @param ctx Implicitly provided [[ExecutionContext]]
+   * @return a tuple containing a [[RunnableGraph]] and the [[Route]] definition
    */
   def wsProxyRoutes(
       implicit cfg: AppCfg,
@@ -241,10 +267,10 @@ trait ServerRoutes
   }
 
   /**
-   * @param inbound
-   * @param outbound
-   * @param cfg
-   * @return
+   * @param inbound function defining the [[Route]] for the producer socket
+   * @param outbound function defining the [[Route]] for the consumer socket
+   * @param cfg Implicitly provided [[AppCfg]]
+   * @return a new [[Route]]
    */
   def routesWith(
       inbound: InSocketArgs => Route,
@@ -252,9 +278,18 @@ trait ServerRoutes
   )(implicit cfg: AppCfg): Route = {
     schemaRoutes ~
       websocketRoutes(inbound, outbound) ~
-      pathPrefix("kafka") {
-        pathPrefix("cluster") {
-          path("info") {
+      statusRoutes
+  }
+
+}
+
+trait StatusRoutes { self: BaseRoutes =>
+
+  def statusRoutes(implicit cfg: AppCfg): Route = {
+    pathPrefix("kafka") {
+      pathPrefix("cluster") {
+        path("info") {
+          maybeAuthenticateBasic(cfg) { _ =>
             complete {
               val admin = new WsKafkaAdminClient(cfg)
               try {
@@ -273,20 +308,22 @@ trait ServerRoutes
             }
           }
         }
-      } ~
+      }
+    } ~
       path("healthcheck") {
-        complete {
-          HttpResponse(
-            status = OK,
-            entity = HttpEntity(
-              contentType = ContentTypes.`application/json`,
-              string = """{ "response": "I'm healthy" }"""
+        maybeAuthenticateBasic(cfg) { _ =>
+          complete {
+            HttpResponse(
+              status = OK,
+              entity = HttpEntity(
+                contentType = ContentTypes.`application/json`,
+                string = """{ "response": "I'm healthy" }"""
+              )
             )
-          )
+          }
         }
       }
   }
-
 }
 
 /**
@@ -300,23 +337,28 @@ trait SchemaRoutes { self: BaseRoutes =>
     )
   }
 
-  /**
-   * @return
-   */
-  def schemaRoutes: Route = {
+  def schemaRoutes(implicit cfg: AppCfg): Route = {
     pathPrefix("schemas") {
       pathPrefix("avro") {
         pathPrefix("producer") {
           path("record") {
-            complete(avroSchemaString(AvroProducerRecord.schema))
+            maybeAuthenticateBasic(cfg) { _ =>
+              complete(avroSchemaString(AvroProducerRecord.schema))
+            }
           } ~ path("result") {
-            complete(avroSchemaString(AvroProducerResult.schema))
+            maybeAuthenticateBasic(cfg) { _ =>
+              complete(avroSchemaString(AvroProducerResult.schema))
+            }
           }
         } ~ pathPrefix("consumer") {
           path("record") {
-            complete(avroSchemaString(AvroConsumerRecord.schema))
+            maybeAuthenticateBasic(cfg) { _ =>
+              complete(avroSchemaString(AvroConsumerRecord.schema))
+            }
           } ~ path("commit") {
-            complete(avroSchemaString(AvroCommit.schema))
+            maybeAuthenticateBasic(cfg) { _ =>
+              complete(avroSchemaString(AvroCommit.schema))
+            }
           }
         }
       }
@@ -357,22 +399,25 @@ trait WebSocketRoutes { self: BaseRoutes =>
   }
 
   /**
-   * @param creds
-   * @return
+   * @param creds Optional [[XKafkaAuthHeader]] header object
+   * @return [[AclCredentials]] if the header exists and contains basic auth
+   *        credentials, otherwise returns None.
    */
-  private[this] def aclCredentials(creds: Option[HttpCredentials]) =
-    creds match {
+  private[this] def aclCredentials(creds: Option[XKafkaAuthHeader]) = {
+    creds.map(_.credentials) match {
       case Some(BasicHttpCredentials(uname, pass)) =>
         Some(AclCredentials(uname, pass))
+
       case _ =>
         None
     }
+  }
 
   /**
-   * @param inbound
-   * @param outbound
-   * @param cfg
-   * @return
+   * @param inbound function defining the [[Route]] for the producer socket
+   * @param outbound function defining the [[Route]] for the consumer socket
+   * @param cfg Implicitly provided [[AppCfg]]
+   * @return The [[Route]] definition for the websocket endpoints
    */
   def websocketRoutes(
       inbound: InSocketArgs => Route,
@@ -380,17 +425,21 @@ trait WebSocketRoutes { self: BaseRoutes =>
   )(implicit cfg: AppCfg): Route = {
     pathPrefix("socket") {
       path("in") {
-        extractCredentials { creds =>
-          inParams { inArgs =>
-            val args = inArgs.withAclCredentials(aclCredentials(creds))
-            validateAndHandleWebSocket(args)(inbound(args))
+        maybeAuthenticateBasic(cfg) { _ =>
+          optionalHeaderValueByType[XKafkaAuthHeader](()) { creds =>
+            inParams { inArgs =>
+              val args = inArgs.withAclCredentials(aclCredentials(creds))
+              validateAndHandleWebSocket(args)(inbound(args))
+            }
           }
         }
       } ~ path("out") {
-        extractCredentials { creds =>
-          outParams { outArgs =>
-            val args = outArgs.withAclCredentials(aclCredentials(creds))
-            validateAndHandleWebSocket(args)(outbound(args))
+        maybeAuthenticateBasic(cfg) { _ =>
+          optionalHeaderValueByType[XKafkaAuthHeader](()) { creds =>
+            outParams { outArgs =>
+              val args = outArgs.withAclCredentials(aclCredentials(creds))
+              validateAndHandleWebSocket(args)(outbound(args))
+            }
           }
         }
       }

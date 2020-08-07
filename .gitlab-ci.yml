@@ -14,7 +14,7 @@ variables:
   CI_APPLICATION_TAG: $CI_COMMIT_SHA
   # Static Application Security Testing properties
   SAST_JAVA_VERSION: 11
-  SAST_EXCLUDED_PATHS: target
+  SAST_EXCLUDED_PATHS: 'target, */target, */src/test'
   # Dependency scan properties
   DS_DEFAULT_ANALYZERS: "gemnasium-maven"
 

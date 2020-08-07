@@ -14,28 +14,29 @@ import net.manub.embeddedkafka.schemaregistry.{
 import net.scalytica.kafka.wsproxy.Configuration.{
   AdminClientCfg,
   AppCfg,
+  BasicAuth,
   KafkaBootstrapHosts,
   SchemaRegistryCfg
 }
 import net.scalytica.kafka.wsproxy.models.WsServerId
 import net.scalytica.kafka.wsproxy.{mapToProperties, Configuration}
-import org.apache.kafka.clients.admin.{AdminClient, NewTopic}
+import org.apache.kafka.clients.CommonClientConfigs._
 import org.apache.kafka.clients.admin.AdminClientConfig.{
   BOOTSTRAP_SERVERS_CONFIG,
   CLIENT_ID_CONFIG,
   CONNECTIONS_MAX_IDLE_MS_CONFIG,
   REQUEST_TIMEOUT_MS_CONFIG
 }
-import org.apache.kafka.clients.CommonClientConfigs._
+import org.apache.kafka.clients.admin.{AdminClient, NewTopic}
 import org.apache.kafka.common.config.SaslConfigs._
 import org.apache.kafka.common.config.SslConfigs._
 import org.apache.kafka.common.security.auth.SecurityProtocol._
 import org.scalatest.Suite
+import org.scalatest.matchers.must.Matchers
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.util.Random
-import org.scalatest.matchers.must.Matchers
 
 // scalastyle:off magic.number
 trait WSProxyKafkaSpec
@@ -149,9 +150,31 @@ trait WSProxyKafkaSpec
       server = defaultTestAppCfg.server.copy(serverId = WsServerId(sid))
     )
 
+  val basicAuthUser         = "basicAuthUser"
+  val basicAuthPass         = "basicAuthPass"
+  val basicAuthRealm        = "Test Server"
+  val basicHttpCreds        = BasicHttpCredentials(basicAuthUser, basicAuthPass)
+  val invalidBasicHttpCreds = BasicHttpCredentials(basicAuthUser, "invalid")
+
+  def plainTestConfig(useBasicAuth: Boolean = false): Configuration.AppCfg = {
+    val serverId = s"test-server-${Random.nextInt(50000)}"
+    val basicAuthCreds =
+      if (useBasicAuth)
+        Some(BasicAuth(basicAuthUser, basicAuthPass, basicAuthRealm))
+      else None
+
+    defaultTestAppCfg.copy(
+      server = defaultTestAppCfg.server.copy(
+        serverId = WsServerId(serverId),
+        basicAuthCredentials = basicAuthCreds
+      )
+    )
+  }
+
   def appTestConfig(
       kafkaPort: Int,
-      schemaRegistryPort: Option[Int] = None
+      schemaRegistryPort: Option[Int] = None,
+      useBasicAuth: Boolean = false
   ): Configuration.AppCfg = {
     val serverId = s"test-server-${Random.nextInt(50000)}"
     val srUrl =
@@ -161,8 +184,16 @@ trait WSProxyKafkaSpec
         srUrl.map(u => SchemaRegistryCfg(u, autoRegisterSchemas = true))
       )(sr => Option(sr.copy(url = srUrl.getOrElse(sr.url))))
 
+    val basicAuthCreds =
+      if (useBasicAuth)
+        Some(BasicAuth(basicAuthUser, basicAuthPass, basicAuthRealm))
+      else None
+
     defaultTestAppCfg.copy(
-      server = defaultTestAppCfg.server.copy(serverId = WsServerId(serverId)),
+      server = defaultTestAppCfg.server.copy(
+        serverId = WsServerId(serverId),
+        basicAuthCredentials = basicAuthCreds
+      ),
       kafkaClient = defaultTestAppCfg.kafkaClient.copy(
         bootstrapHosts = KafkaBootstrapHosts(List(serverHost(Some(kafkaPort)))),
         schemaRegistry = srCfg

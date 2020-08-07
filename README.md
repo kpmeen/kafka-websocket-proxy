@@ -263,7 +263,7 @@ The same applies when an external logback configuration file is provided through
 ### WebSocket APIs
 
 
-TODO: Document query parameters for produce/consume
+_TODO: Document query parameters for produce/consume_
 
 All WebSocket endpoints are available at the following base URL:
 
@@ -290,6 +290,20 @@ both inbound and outbound messages.
 | float     | float      | number      |
 
 #### `/in`
+
+**Headers**:
+
+| Name          | Type                              | Required | Description   |
+|:-------       |:-----------                       |:--------:|:------------- |
+| Authorization | Basic authentication (Base64)     |     n    | [Basic authentication](https://en.wikipedia.org/wiki/Basic_access_authentication) header. |
+| X-Kafka-Auth  | Base64                            |     n    | Header for providing Base64 representation of credentials in the form `username:password` to use for the Kafka connection when the topic has ACL restrictions. |
+
+> **Warning**
+>
+> When providing `Authorization` with basic authentication, or Kafka ACL
+> credentials via the `X-Kafka-Auth` header, make sure the proxy is configured
+> to use SSL/TLS. This is because header credentials are transferred in plain
+> text, as for regular HTTP basic authentication.
 
 **Query parameters**:
 
@@ -325,7 +339,21 @@ both inbound and outbound messages.
 }
 ```
 
-#### `/out`                                   
+#### `/out`
+
+**Headers**:
+
+| Name          | Type                              | Required | Description   |
+|:-------       |:-----------                       |:--------:|:------------- |
+| Authorization | Basic authentication (Base64)     |     n    | [Basic authentication](https://en.wikipedia.org/wiki/Basic_access_authentication) header. |
+| X-Kafka-Auth  | Base64                            |     n    | Header for providing Base64 representation of credentials in the form `username:password` to use for the Kafka connection when the topic has ACL restrictions. |
+
+> **Warning**
+>
+> When providing `Authorization` with basic authentication, or Kafka ACL
+> credentials via the `X-Kafka-Auth` header, make sure the proxy is configured
+> to use SSL/TLS. This is because header credentials are transferred in plain
+> text, as for regular HTTP basic authentication.
 
 **Query parameters**:
 
@@ -368,6 +396,20 @@ both inbound and outbound messages.
 ```
 
 ### HTTP endpoints
+
+**Headers**:
+
+All HTTP endpoints support the following headers:
+
+| Name          | Type                              | Required | Description   |
+|:-------       |:-----------                       |:--------:|:------------- |
+| Authorization | Basic authentication (Base64)     |     n    | [Basic authentication](https://en.wikipedia.org/wiki/Basic_access_authentication) header. |
+
+> **Warning**
+>
+> When providing `Authorization` with basic authentication, make sure the proxy
+> is configured to use SSL/TLS. This is because header credentials are
+> transferred in plain text, as for regular HTTP basic authentication.
 
 #### Avro payload schemas
 

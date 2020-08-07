@@ -3,6 +3,7 @@ package net.scalytica.test
 import akka.http.scaladsl.model.headers.BasicHttpCredentials
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
+import net.scalytica.kafka.wsproxy.Headers.XKafkaAuthHeader
 import net.scalytica.kafka.wsproxy.codecs.ProtocolSerdes
 import org.scalatest.Suite
 import org.scalatest.matchers.must.Matchers
@@ -44,10 +45,16 @@ trait WsClientSpec
       body: => T
   )(
       implicit wsClient: WSProbe
-  ) =
-    WS(uri, wsClient.flow) ~> addCredentials(creds) ~> routes ~> check(body)
+  ) = {
+    WS(uri, wsClient.flow) ~> addKafkaCreds(creds) ~> routes ~> check(body)
+  }
+//    WS(uri, wsClient.flow) ~> addCredentials(creds) ~> routes ~> check(body)
 
-  // scalastyle:off
+  def addKafkaCreds(creds: BasicHttpCredentials): RequestTransformer = {
+    val kaHeader = XKafkaAuthHeader(creds)
+    addHeader(kaHeader)
+  }
+
   /**
    * @param uri
    * @param routes
@@ -67,5 +74,4 @@ trait WsClientSpec
       .map(c => secureRouteCheck(uri, routes, c)(body))
       .getOrElse(defaultRouteCheck(uri, routes)(body))
   }
-  // scalastyle:on
 }
