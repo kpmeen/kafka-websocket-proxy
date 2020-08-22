@@ -15,7 +15,8 @@ class WsProxyAvroSerdeSpec
   "The WsProxyAvroSerde" should {
 
     "convert an AvroProducerRecord with headers and an Avro key" in {
-      val o = produceKeyValueAvro(1, withHeaders = true).headOption.value
+      val o =
+        createAvroProducerRecordKeyValue(1, withHeaders = true).headOption.value
 
       val bytes = avroProducerRecordSerde.serialize(o)
       bytes must not be empty
@@ -41,7 +42,10 @@ class WsProxyAvroSerdeSpec
     }
 
     "convert an AvroProducerRecord with headers and a String key" in {
-      val o = produceKeyStringValueAvro(1, withHeaders = true).headOption.value
+      val o = createAvroProducerRecordStringBytes(
+        1,
+        withHeaders = true
+      ).headOption.value
 
       val bytes = avroProducerRecordSerde.serialize(o)
       bytes must not be empty

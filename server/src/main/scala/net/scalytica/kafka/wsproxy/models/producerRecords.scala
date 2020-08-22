@@ -6,12 +6,14 @@ import net.scalytica.kafka.wsproxy.models.ValueDetails.InValueDetails
 
 /**
  * ADT describing any record that can come in to the service through the
- * WebSocket connection. Basically there are two types of messages; those with
- * a defined key of type {{{K}}} _and_ a value of type {{{V}}}. And records that
+ * WebSocket connection. Basically there are two types of messages; those with a
+ * defined key of type {{{K}}} _and_ a value of type {{{V}}}. And records that
  * only contain a value of type {{{V}}}.
  *
- * @tparam K the type of the key
- * @tparam V the type of the value
+ * @tparam K
+ *   the type of the key
+ * @tparam V
+ *   the type of the value
  */
 sealed trait WsProducerRecord[+K, +V] {
 
@@ -54,11 +56,16 @@ object WsProducerRecord {
 /**
  * Producer record type with key and value.
  *
- * @param key   The [[InValueDetails]] describing the message key
- * @param value The [[InValueDetails]] describing the message value
- * @param headers Optional [[KafkaHeader]]s to use for the Kafka message
- * @tparam K the type of the key
- * @tparam V the type of the value
+ * @param key
+ *   The [[InValueDetails]] describing the message key
+ * @param value
+ *   The [[InValueDetails]] describing the message value
+ * @param headers
+ *   Optional [[KafkaHeader]] s to use for the Kafka message
+ * @tparam K
+ *   the type of the key
+ * @tparam V
+ *   the type of the value
  */
 case class ProducerKeyValueRecord[K, V](
     key: InValueDetails[K],
@@ -72,9 +79,12 @@ case class ProducerKeyValueRecord[K, V](
 /**
  * Producer record type with value only.
  *
- * @param value The [[InValueDetails]] describing the message value
- * @param headers Optional [[KafkaHeader]]s to use for the Kafka message
- * @tparam V the type of the value
+ * @param value
+ *   The [[InValueDetails]] describing the message value
+ * @param headers
+ *   Optional [[KafkaHeader]] s to use for the Kafka message
+ * @tparam V
+ *   the type of the value
  */
 case class ProducerValueRecord[V](
     value: InValueDetails[V],

@@ -14,12 +14,12 @@ import net.scalytica.kafka.wsproxy.models.{
 }
 
 /**
- * Types that model a kind of Stack to keep track of uncommitted messages.
- * The stack is in effect a regular list, where new messages are appended at
- * the end. And, whenever a commit message comes along, the list is drained
- * from the beginning until the WsMessageId of the incoming message is found
- * in the list. If the WsMessageId is NOT found, the stack is left as-is and
- * no commit is executed.
+ * Types that model a kind of Stack to keep track of uncommitted messages. The
+ * stack is in effect a regular list, where new messages are appended at the
+ * end. And, whenever a commit message comes along, the list is drained from the
+ * beginning until the WsMessageId of the incoming message is found in the list.
+ * If the WsMessageId is NOT found, the stack is left as-is and no commit is
+ * executed.
  */
 private[consumer] object CommitStackTypes {
 
@@ -28,8 +28,10 @@ private[consumer] object CommitStackTypes {
   /**
    * Carries necessary metadata for messages in the stack.
    *
-   * @param wsProxyMsgId the unique [[WsMessageId]] for the committable message
-   * @param committable the [[Committable]] message
+   * @param wsProxyMsgId
+   *   the unique [[WsMessageId]] for the committable message
+   * @param committable
+   *   the [[Committable]] message
    */
   case class Uncommitted(
       wsProxyMsgId: WsMessageId,
@@ -103,8 +105,10 @@ private[consumer] object CommitStackTypes {
     /**
      * Adds a new [[Uncommitted]] entry to the [[CommitStack]]
      *
-     * @param record the [[WsConsumerRecord]] to derive an [[Uncommitted]] from.
-     * @return An option with the new stack or empty if no offset was found.
+     * @param record
+     *   the [[WsConsumerRecord]] to derive an [[Uncommitted]] from.
+     * @return
+     *   An option with the new stack or empty if no offset was found.
      */
     def stash(
         record: WsConsumerRecord[_, _]
@@ -118,8 +122,10 @@ private[consumer] object CommitStackTypes {
      * to Kafka. All messages that are OLDER than the message to commit are
      * DROPPED from the stack, since they are no longer necessary to commit.
      *
-     * @param msgId the [[WsMessageId]] of the message to commit.
-     * @return An option with updated stack or empty if message wasn't found.
+     * @param msgId
+     *   the [[WsMessageId]] of the message to commit.
+     * @return
+     *   An option with updated stack or empty if message wasn't found.
      */
     def commit(
         msgId: WsMessageId

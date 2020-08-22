@@ -26,9 +26,7 @@ import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
-/**
- * Functions for initialising Kafka consumer sources.
- */
+/** Functions for initialising Kafka consumer sources. */
 object WsConsumer extends WithProxyLogger {
 
   // scalastyle:off
@@ -76,13 +74,20 @@ object WsConsumer extends WithProxyLogger {
   /**
    * Initialise a new [[KafkaConsumer]] instance
    *
-   * @param topic [[TopicName]] to use for the consumer
-   * @param aclCredentials Option containing the [[AclCredentials]] to use
-   * @param cs the [[ConsumerSettings]] to apply
-   * @param cfg the [[AppCfg]] to use for configurable parameters
-   * @tparam K the type used for configuring the default key serdes.
-   * @tparam V the type used for configuring the default value serdes.
-   * @return a [[KafkaConsumer]] instance for keys of type [[K]] and value [[V]]
+   * @param topic
+   *   [[TopicName]] to use for the consumer
+   * @param aclCredentials
+   *   Option containing the [[AclCredentials]] to use
+   * @param cs
+   *   the [[ConsumerSettings]] to apply
+   * @param cfg
+   *   the [[AppCfg]] to use for configurable parameters
+   * @tparam K
+   *   the type used for configuring the default key serdes.
+   * @tparam V
+   *   the type used for configuring the default value serdes.
+   * @return
+   *   a [[KafkaConsumer]] instance for keys of type [[K]] and value [[V]]
    */
   private[this] def initialiseConsumer[K, V](
       topic: TopicName,
@@ -141,14 +146,19 @@ object WsConsumer extends WithProxyLogger {
    * Call partitionsFor with the client to validate auth etc. This is a
    * workaround for the following issues identified in alpakka-kafka client:
    *
-   * - https://github.com/akka/alpakka-kafka/issues/814
-   * - https://github.com/akka/alpakka-kafka/issues/796
+   *   - https://github.com/akka/alpakka-kafka/issues/814
+   *   - https://github.com/akka/alpakka-kafka/issues/796
    *
-   * @param topic the [[TopicName]] to fetch partitions for
-   * @param consumerClient the configured [[KafkaConsumer]] to use.
-   * @tparam K the key type of the [[KafkaConsumer]]
-   * @tparam V the value type of the [[KafkaConsumer]]
-   * @return A [[Try]] with the [[KafkaConsumer]] that was passed in if ok
+   * @param topic
+   *   the [[TopicName]] to fetch partitions for
+   * @param consumerClient
+   *   the configured [[KafkaConsumer]] to use.
+   * @tparam K
+   *   the key type of the [[KafkaConsumer]]
+   * @tparam V
+   *   the value type of the [[KafkaConsumer]]
+   * @return
+   *   A [[Try]] with the [[KafkaConsumer]] that was passed in if ok
    */
   private[this] def checkClient[K, V](
       topic: TopicName,
@@ -160,11 +170,11 @@ object WsConsumer extends WithProxyLogger {
     }.recover {
       case ae: AuthenticationException =>
         consumerClient.close()
-        throw AuthenticationError(ae.getMessage, ae)
+        throw AuthenticationError(ae.getMessage, Some(ae))
 
       case ae: AuthorizationException =>
         consumerClient.close()
-        throw AuthorisationError(ae.getMessage, ae)
+        throw AuthorisationError(ae.getMessage, Some(ae))
 
       case t: Throwable =>
         consumerClient.close()
@@ -182,14 +192,22 @@ object WsConsumer extends WithProxyLogger {
    * Instances of this consumer will automatically commit offsets to Kafka,
    * using the default Kafka consumer commit interval.
    *
-   * @param args     the input arguments to pass on to the consumer
-   * @param cfg      the [[AppCfg]] containing application configurations.
-   * @param as       an implicit ActorSystem
-   * @param kd       the Deserializer to use for the message key
-   * @param vd       the Deserializer to use for the message value
-   * @tparam K the type of the message key
-   * @tparam V the type of the message value
-   * @return a [[Source]] containing [[WsConsumerRecord]]s.
+   * @param args
+   *   the input arguments to pass on to the consumer
+   * @param cfg
+   *   the [[AppCfg]] containing application configurations.
+   * @param as
+   *   an implicit ActorSystem
+   * @param kd
+   *   the Deserializer to use for the message key
+   * @param vd
+   *   the Deserializer to use for the message value
+   * @tparam K
+   *   the type of the message key
+   * @tparam V
+   *   the type of the message value
+   * @return
+   *   a [[Source]] containing [[WsConsumerRecord]] s.
    */
   def consumeAutoCommit[K, V](
       args: OutSocketArgs
@@ -214,18 +232,26 @@ object WsConsumer extends WithProxyLogger {
    * Creates an akka-streams based Kafka Source for messages where the keys are
    * of type [[K]] and values of type [[V]].
    *
-   * Instances of this consumer will emit [[WsConsumerRecord]]s that include a
+   * Instances of this consumer will emit [[WsConsumerRecord]] s that include a
    * reference to the [[CommittableOffset]] for the consumed record. It can then
    * be used to trigger a manual commit in the down-stream processing.
    *
-   * @param args     the input arguments to pass on to the consumer
-   * @param cfg      the [[AppCfg]] containing application configurations.
-   * @param as       an implicit ActorSystem
-   * @param kd       the Deserializer to use for the message key
-   * @param vd       the Deserializer to use for the message value
-   * @tparam K the type of the message key
-   * @tparam V the type of the message value
-   * @return a [[Source]] containing [[WsConsumerRecord]]s.
+   * @param args
+   *   the input arguments to pass on to the consumer
+   * @param cfg
+   *   the [[AppCfg]] containing application configurations.
+   * @param as
+   *   an implicit ActorSystem
+   * @param kd
+   *   the Deserializer to use for the message key
+   * @param vd
+   *   the Deserializer to use for the message value
+   * @tparam K
+   *   the type of the message key
+   * @tparam V
+   *   the type of the message value
+   * @return
+   *   a [[Source]] containing [[WsConsumerRecord]] s.
    */
   def consumeManualCommit[K, V](
       args: OutSocketArgs
@@ -246,9 +272,7 @@ object WsConsumer extends WithProxyLogger {
       .map(msg => messageTransform(msg.record, Option(msg.committableOffset)))
   }
 
-  /**
-   * Transforms a [[ConsumerRecord]] into a [[WsConsumerRecord]].
-   */
+  /** Transforms a [[ConsumerRecord]] into a [[WsConsumerRecord]]. */
   private[this] def messageTransform[K, V](
       rec: ConsumerRecord[K, V],
       maybeCommittableOffset: Option[CommittableOffset]

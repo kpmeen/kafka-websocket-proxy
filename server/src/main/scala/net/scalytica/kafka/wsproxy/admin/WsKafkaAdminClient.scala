@@ -24,7 +24,8 @@ import scala.util.control.NonFatal
  * Simple wrapper around the Kafka AdminClient to allow for bootstrapping the
  * session state topic.
  *
- * @param cfg the [[AppCfg]] to use
+ * @param cfg
+ *   the [[AppCfg]] to use
  */
 class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
 
@@ -52,7 +53,8 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
   /**
    * Checks for the existence of the session state topic
    *
-   * @return an [[Option]] containing the name of the session state topic.
+   * @return
+   *   an [[Option]] containing the name of the session state topic.
    */
   private[admin] def findSessionStateTopic: Option[String] = {
     findTopic(cfg.sessionHandler.sessionStateTopicName)
@@ -81,7 +83,8 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
   /**
    * Find the topic with the given [[TopicName]]
    *
-   * @param topic the [[TopicName]] to find
+   * @param topic
+   *   the [[TopicName]] to find
    */
   def findTopic(topic: TopicName): Option[String] = {
     logger.debug(s"Trying to find topic ${topic.value}...")
@@ -95,8 +98,10 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
   /**
    * Check the given topic exists.
    *
-   * @param topic the [[TopicName]] to check
-   * @return true if the topic exists, else false
+   * @param topic
+   *   the [[TopicName]] to check
+   * @return
+   *   true if the topic exists, else false
    */
   def topicExists(topic: TopicName): Boolean = findTopic(topic).nonEmpty
 
@@ -129,9 +134,11 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
   /**
    * Fetches the configured number of partitions for the given Kafka topic.
    *
-   * @param topicName the topic name to get partitions for
-   * @return returns the number of partitions for the topic. If it is not found,
-   *         a [[TopicNotFoundError]] is thrown.
+   * @param topicName
+   *   the topic name to get partitions for
+   * @return
+   *   returns the number of partitions for the topic. If it is not found, a
+   *   [[TopicNotFoundError]] is thrown.
    */
   @throws(classOf[TopicNotFoundError])
   def topicPartitions(topicName: TopicName): Int = {
@@ -162,7 +169,8 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
   /**
    * Fetch the cluster information for the configured Kafka cluster.
    *
-   * @return a List of [[BrokerInfo]] data.
+   * @return
+   *   a List of [[BrokerInfo]] data.
    */
   def clusterInfo: List[BrokerInfo] = {
     logger.info("Fetching Kafka cluster information...")
@@ -182,7 +190,8 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
    * brokers available, the replication factor will set to the number of
    * available brokers in the cluster.
    *
-   * @return the number of replicas to use for the sesion state topic.
+   * @return
+   *   the number of replicas to use for the sesion state topic.
    */
   def replicationFactor: Short = {
     val numNodes = clusterInfo.size
@@ -196,7 +205,8 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
   /**
    * Verify that cluster is ready
    *
-   * @return true if the cluster is ready, else false
+   * @return
+   *   true if the cluster is ready, else false
    */
   def clusterReady: Boolean = {
     logger.info("Verifying that cluster is ready...")

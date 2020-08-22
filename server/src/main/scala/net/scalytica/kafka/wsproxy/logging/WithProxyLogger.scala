@@ -2,16 +2,19 @@ package net.scalytica.kafka.wsproxy.logging
 
 import com.typesafe.scalalogging.Logger
 
-/**
- * Convenience trait for providing loggers to different objects and classes.
- */
+/** Convenience trait for providing loggers to different objects and classes. */
 trait WithProxyLogger { self =>
 
-  protected lazy val logger = Logger(self.getClass.getName.stripSuffix("$"))
+  protected lazy val loggerName = self.getClass.getName.stripSuffix("$")
+
+  lazy val logger = Logger(loggerName)
 
 }
 
 object DefaultProxyLogger extends WithProxyLogger {
+
+  override protected lazy val loggerName =
+    this.getClass.getPackageName + ".Server"
 
   def trace(msg: String): Unit                   = logger.trace(msg)
   def debug(msg: String): Unit                   = logger.debug(msg)

@@ -24,8 +24,10 @@ import scala.collection.JavaConverters._
  * them into [[SessionHandlerProtocol.Protocol]] messages that can be sent to
  * the [[SessionHandler]]
  *
- * @param cfg the [[AppCfg]] to use
- * @param sys the [[ActorSystem]] to use
+ * @param cfg
+ *   the [[AppCfg]] to use
+ * @param sys
+ *   the [[ActorSystem]] to use
  */
 private[session] class SessionDataConsumer(
     implicit cfg: AppCfg,
@@ -71,9 +73,7 @@ private[session] class SessionDataConsumer(
     )
   }
 
-  /**
-   * The akka-stream Source consuming messages from the session state topic.
-   */
+  /** The akka-stream Source consuming messages from the session state topic. */
   lazy val sessionStateSource: SessionSource = {
     val subscription = Subscriptions.topics(Set(sessionStateTopic))
 

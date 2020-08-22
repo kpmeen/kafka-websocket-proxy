@@ -22,7 +22,7 @@ trait TestDataGenerators extends TestTypes { self =>
       |}""".stripMargin
   }
 
-  def produceKeyValueJson(
+  def createJsonKeyValue(
       num: Int,
       withHeaders: Boolean = false
   ): Seq[String] = {
@@ -51,7 +51,7 @@ trait TestDataGenerators extends TestTypes { self =>
     }
   }
 
-  def produceValueJson(num: Int, withHeaders: Boolean = false): Seq[String] = {
+  def createJsonValue(num: Int, withHeaders: Boolean = false): Seq[String] = {
     (1 to num).map { i =>
       val headers =
         if (withHeaders)
@@ -73,7 +73,7 @@ trait TestDataGenerators extends TestTypes { self =>
     }
   }
 
-  def produceCoproductKeyValueAvro(
+  def createAvroProducerRecordBytesBytes(
       num: Int,
       withHeaders: Boolean = false
   )(
@@ -96,13 +96,13 @@ trait TestDataGenerators extends TestTypes { self =>
     }
   }
 
-  def produceKeyValueAvro(
+  def createAvroProducerRecordKeyValue(
       num: Int,
       withHeaders: Boolean = false
   ): Seq[AvroProducerRecord] = {
     val now = java.time.Instant.now().toEpochMilli
 
-    produceCoproductKeyValueAvro(num, withHeaders)(
+    createAvroProducerRecordBytesBytes(num, withHeaders)(
       keyGen = { i =>
         val key = TestKey(s"foo-$i", now)
         val sk  = TestSerdes.keySerdes.serialize(key)
@@ -125,11 +125,11 @@ trait TestDataGenerators extends TestTypes { self =>
     )
   }
 
-  def produceKeyStringValueAvro(
+  def createAvroProducerRecordStringBytes(
       num: Int,
       withHeaders: Boolean = false
   ): Seq[AvroProducerRecord] = {
-    produceCoproductKeyValueAvro(num, withHeaders)(
+    createAvroProducerRecordBytesBytes(num, withHeaders)(
       keyGen = i => Option(Coproduct[AvroValueTypesCoproduct](s"foo-$i")),
       valGen = { i =>
         val value = Album(
@@ -148,31 +148,31 @@ trait TestDataGenerators extends TestTypes { self =>
     )
   }
 
-  def produceKeyStringValueString(
+  def createAvroProducerRecordStringString(
       num: Int,
       withHeaders: Boolean = false
   ): Seq[AvroProducerRecord] = {
-    produceCoproductKeyValueAvro(num, withHeaders)(
+    createAvroProducerRecordBytesBytes(num, withHeaders)(
       keyGen = i => Option(Coproduct[AvroValueTypesCoproduct](s"foo-$i")),
       valGen = i => Coproduct[AvroValueTypesCoproduct](s"artist-$i")
     )
   }
 
-  def produceKeyLongValueString(
+  def createAvroProducerRecordLongString(
       num: Int,
       withHeaders: Boolean = false
   ): Seq[AvroProducerRecord] = {
-    produceCoproductKeyValueAvro(num, withHeaders)(
+    createAvroProducerRecordBytesBytes(num, withHeaders)(
       keyGen = i => Option(Coproduct[AvroValueTypesCoproduct](i.toLong)),
       valGen = i => Coproduct[AvroValueTypesCoproduct](s"artist-$i")
     )
   }
 
-  def produceValueAvro(
+  def createAvroProducerRecordAvroAvro(
       num: Int,
       withHeaders: Boolean = false
   ): Seq[AvroProducerRecord] = {
-    produceCoproductKeyValueAvro(num, withHeaders)(
+    createAvroProducerRecordBytesBytes(num, withHeaders)(
       keyGen = _ => None,
       valGen = { i =>
         val value = Album(
@@ -191,11 +191,11 @@ trait TestDataGenerators extends TestTypes { self =>
     )
   }
 
-  def produceAvroWithStringValue(
+  def createAvroProducerRecordNoneString(
       num: Int,
       withHeaders: Boolean = false
   ): Seq[AvroProducerRecord] = {
-    produceCoproductKeyValueAvro(num, withHeaders)(
+    createAvroProducerRecordBytesBytes(num, withHeaders)(
       keyGen = _ => None,
       valGen = i => Coproduct[AvroValueTypesCoproduct](s"artist-$i")
     )

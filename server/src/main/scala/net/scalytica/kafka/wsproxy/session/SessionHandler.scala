@@ -142,10 +142,10 @@ object SessionHandler extends SessionHandler {
  * instances, and we can therefore implement some nice features on top of that
  * capability.
  *
- * - Keeping track of number of sockets per consumer group
- * - Keeping track of which consumers are part of the consumer group
- * - Possibility to share meta-data across nodes
- * - etc...
+ *   - Keeping track of number of sockets per consumer group
+ *   - Keeping track of which consumers are part of the consumer group
+ *   - Possibility to share meta-data across nodes
+ *   - etc...
  */
 trait SessionHandler extends WithProxyLogger {
 
@@ -153,9 +153,12 @@ trait SessionHandler extends WithProxyLogger {
    * Calculates the expected next behaviour based on the value of the {{either}}
    * argument.
    *
-   * @param either the value to calculate the next behaviour from.
-   * @param behavior the behaviour to use in the case of a rhs value.
-   * @return the next behaviour to use.
+   * @param either
+   *   the value to calculate the next behaviour from.
+   * @param behavior
+   *   the behaviour to use in the case of a rhs value.
+   * @return
+   *   the next behaviour to use.
    */
   private[this] def nextOrSame(
       either: Either[String, ActiveSessions]
@@ -172,12 +175,15 @@ trait SessionHandler extends WithProxyLogger {
    * Initialises a new SessionHandler actor. The [[ActorRef]] is named so there
    * will only be 1 instance per proxy server instance.
    *
-   * @param cfg implicit [[AppCfg]] to use
-   * @param sys the untyped [[akka.actor.ActorSystem]] to use
-   * @return a [[SessionHandler.SessionHandlerRef]] containing a reference to
-   *         the [[RunnableGraph]] that executes the [[SessionDataConsumer]]
-   *         stream. And a typed [[ActorRef]] that understands messages from the
-   *         defined protocol in [[SessionHandlerProtocol.Protocol]].
+   * @param cfg
+   *   implicit [[AppCfg]] to use
+   * @param sys
+   *   the untyped [[akka.actor.ActorSystem]] to use
+   * @return
+   *   a [[SessionHandler.SessionHandlerRef]] containing a reference to the
+   *   [[RunnableGraph]] that executes the [[SessionDataConsumer]] stream. And a
+   *   typed [[ActorRef]] that understands messages from the defined protocol in
+   *   [[SessionHandlerProtocol.Protocol]].
    */
   def init(
       implicit cfg: AppCfg,

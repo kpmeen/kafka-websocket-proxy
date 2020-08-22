@@ -50,6 +50,7 @@ lazy val server = (project in file("server"))
   .settings(libraryDependencies ++= Config.All)
   .settings(libraryDependencies ++= Circe.All)
   .settings(libraryDependencies ++= Logging.All)
+  .settings(libraryDependencies ++= OAuth.All)
   .settings(
     libraryDependencies ++= Seq(
       Akka.Actor,

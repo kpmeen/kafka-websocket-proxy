@@ -238,6 +238,15 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
         .loadConfig(invalidCfg2)
     }
 
+    "fail initialising an enabled BasicAuthCfg without required params" in {
+      val tcfg = ConfigFactory.defaultApplication.withValue(
+        "kafka.ws.proxy.server.basic-auth",
+        ConfigValueFactory.fromAnyRef("true")
+      )
+      a[ConfigReaderException[AppCfg]] should be thrownBy Configuration
+        .loadConfig(tcfg)
+    }
+
   }
 
 }

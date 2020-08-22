@@ -38,9 +38,7 @@ import org.apache.kafka.common.serialization.Serializer
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext
 
-/**
- * Functions for initialising Kafka producer sinks and flows.
- */
+/** Functions for initialising Kafka producer sinks and flows. */
 object WsProducer extends WithProxyLogger {
 
   private[this] val SaslJaasConfig: String = "sasl.jaas.config"
@@ -109,13 +107,20 @@ object WsProducer extends WithProxyLogger {
    * Parses an input message, in the form of a JSON String, into an instance of
    * [[WsProducerRecord]], which will be passed on to Kafka down-stream.
    *
-   * @param jsonStr the String containing the JSON formatted message
-   * @param keyDec  the JSON decoder to use for the message key
-   * @param valDec  the JSON decoder to use for the message value
-   * @tparam K      the message key type
-   * @tparam V      the message value type
-   * @return an instance of [[WsProducerRecord]]
-   * @throws Throwable when the underlying parser fails.
+   * @param jsonStr
+   *   the String containing the JSON formatted message
+   * @param keyDec
+   *   the JSON decoder to use for the message key
+   * @param valDec
+   *   the JSON decoder to use for the message value
+   * @tparam K
+   *   the message key type
+   * @tparam V
+   *   the message value type
+   * @return
+   *   an instance of [[WsProducerRecord]]
+   * @throws
+   *   Throwable when the underlying parser fails.
    */
   private[this] def parseInput[K, V](
       jsonStr: String
@@ -144,11 +149,16 @@ object WsProducer extends WithProxyLogger {
   /**
    * Converts a [[WsProducerRecord]] into a Kafka [[ProducerRecord]].
    *
-   * @param topic the topic name the record is to be written to.
-   * @param msg   the message to send to the Kafka topic.
-   * @tparam K    the message key type
-   * @tparam V    the message value type
-   * @return an instance of [[ProducerRecord]]
+   * @param topic
+   *   the topic name the record is to be written to.
+   * @param msg
+   *   the message to send to the Kafka topic.
+   * @tparam K
+   *   the message key type
+   * @tparam V
+   *   the message value type
+   * @return
+   *   an instance of [[ProducerRecord]]
    */
   private[this] def asKafkaProducerRecord[K, V](
       topic: TopicName,
@@ -178,13 +188,17 @@ object WsProducer extends WithProxyLogger {
    * Call partitionsFor with the client to validate auth etc. This is a
    * workaround for the following issues identified in alpakka-kafka client:
    *
-   * - https://github.com/akka/alpakka-kafka/issues/814
-   * - https://github.com/akka/alpakka-kafka/issues/796
+   *   - https://github.com/akka/alpakka-kafka/issues/814
+   *   - https://github.com/akka/alpakka-kafka/issues/796
    *
-   * @param topic the [[TopicName]] to fetch partitions for
-   * @param producerClient the configured [[IProducer]] to use.
-   * @tparam K the key type of the [[IProducer]]
-   * @tparam V the value type of the [[IProducer]]
+   * @param topic
+   *   the [[TopicName]] to fetch partitions for
+   * @param producerClient
+   *   the configured [[IProducer]] to use.
+   * @tparam K
+   *   the key type of the [[IProducer]]
+   * @tparam V
+   *   the value type of the [[IProducer]]
    */
   private[this] def checkClient[K, V](
       topic: TopicName,
@@ -195,11 +209,11 @@ object WsProducer extends WithProxyLogger {
     } catch {
       case ae: AuthenticationException =>
         producerClient.close()
-        throw AuthenticationError(ae.getMessage, ae)
+        throw AuthenticationError(ae.getMessage, Some(ae))
 
       case ae: AuthorizationException =>
         producerClient.close()
-        throw AuthorisationError(ae.getMessage, ae)
+        throw AuthorisationError(ae.getMessage, Some(ae))
 
       case t: Throwable =>
         producerClient.close()
@@ -211,19 +225,30 @@ object WsProducer extends WithProxyLogger {
     }
 
   /**
-   * @param args input arguments defining the base configs for the producer.
-   * @param cfg  the [[AppCfg]] containing application configurations.
-   * @param as   actor system to use
-   * @param mat  actor materializer to use
-   * @param ks   the message key serializer to use
-   * @param vs   the message value serializer to use
-   * @param kd   the JSON decoder to use for the message key
-   * @param vd   the JSON decoder to use for the message value
-   * @tparam K   the message key type
-   * @tparam V   the message value type
-   * @return a [[Flow]] that sends messages to Kafka and passes on the result
-   *         down-stream for further processing. For example sending the
-   *         metadata to the external web client for it to process locally.
+   * @param args
+   *   input arguments defining the base configs for the producer.
+   * @param cfg
+   *   the [[AppCfg]] containing application configurations.
+   * @param as
+   *   actor system to use
+   * @param mat
+   *   actor materializer to use
+   * @param ks
+   *   the message key serializer to use
+   * @param vs
+   *   the message value serializer to use
+   * @param kd
+   *   the JSON decoder to use for the message key
+   * @param vd
+   *   the JSON decoder to use for the message value
+   * @tparam K
+   *   the message key type
+   * @tparam V
+   *   the message value type
+   * @return
+   *   a [[Flow]] that sends messages to Kafka and passes on the result
+   *   down-stream for further processing. For example sending the metadata to
+   *   the external web client for it to process locally.
    */
   def produceJson[K, V](args: InSocketArgs)(
       implicit cfg: AppCfg,

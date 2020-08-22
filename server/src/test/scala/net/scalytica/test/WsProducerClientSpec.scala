@@ -1,6 +1,6 @@
 package net.scalytica.test
 
-import akka.http.scaladsl.model.headers.BasicHttpCredentials
+import akka.http.scaladsl.model.headers.{BasicHttpCredentials, HttpCredentials}
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.WSProbe
 import akka.util.ByteString
@@ -58,7 +58,8 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
       keyType: Option[FormatType],
       valType: FormatType,
       messages: Seq[AvroProducerRecord],
-      basicCreds: Option[BasicHttpCredentials] = None
+      kafkaCreds: Option[BasicHttpCredentials] = None,
+      creds: Option[HttpCredentials] = None
   )(
       implicit wsClient: WSProbe
   ): Unit = {
@@ -72,7 +73,8 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
     checkWebSocket(
       baseUri,
       routes,
-      basicCreds
+      kafkaCreds,
+      creds
     ) {
       isWebSocketUpgrade mustBe true
 

@@ -22,6 +22,7 @@ class WebSocketRoutesJsonSpec
     with ScalaFutures
     with WSProxyKafkaSpec
     with WsProducerClientSpec
+    with MockOpenIdServer
     with TestDataGenerators {
 
   implicit override val patienceConfig: PatienceConfig =
@@ -40,7 +41,7 @@ class WebSocketRoutesJsonSpec
           case (_, _, testRoutes, wsc) =>
             implicit val wsClient = wsc
 
-            val msgs = produceKeyValueJson(1)
+            val msgs = createJsonKeyValue(1)
 
             produceAndCheckJson(
               topic = "test-topic-1",
@@ -56,7 +57,7 @@ class WebSocketRoutesJsonSpec
           case (_, _, testRoutes, wsc) =>
             implicit val wsClient = wsc
 
-            val msgs = produceValueJson(1)
+            val msgs = createJsonValue(1)
 
             produceAndCheckJson(
               topic = "test-topic-2",
@@ -73,7 +74,7 @@ class WebSocketRoutesJsonSpec
             implicit val wsClient = wsc
             implicit val kcfg     = ekc
 
-            val msgs = produceKeyValueJson(1, withHeaders = true)
+            val msgs = createJsonKeyValue(1, withHeaders = true)
 
             produceAndCheckJson(
               topic = "test-topic-3",
@@ -96,7 +97,7 @@ class WebSocketRoutesJsonSpec
             implicit val wsClient = wsc
             implicit val kcfg     = ekc
 
-            val msgs = produceValueJson(1, withHeaders = true)
+            val msgs = createJsonValue(1, withHeaders = true)
 
             produceAndCheckJson(
               topic = "test-topic-4",
@@ -128,7 +129,7 @@ class WebSocketRoutesJsonSpec
             keyType = StringType,
             valType = StringType,
             routes = routes,
-            messages = produceKeyValueJson(10, withHeaders = true)
+            messages = createJsonKeyValue(10, withHeaders = true)
           )(producerProbe)
 
           val outPath = "/socket/out?" +
@@ -185,7 +186,7 @@ class WebSocketRoutesJsonSpec
             keyType = NoType,
             valType = StringType,
             routes = routes,
-            messages = produceValueJson(10)
+            messages = createJsonValue(10)
           )(producerProbe)
 
           val outPath = "/socket/out?" +
@@ -232,11 +233,11 @@ class WebSocketRoutesJsonSpec
         }
 
       "consume messages from a secured cluster" in
-        secureProducerContext("secure-topic-2") {
+        secureKafkaClusterProducerContext("secure-topic-2") {
           case (ekc, _, testRoutes, wsProducerClient) =>
             implicit val kcfg = ekc
             val routes        = Route.seal(testRoutes)
-            val messages      = produceValueJson(10)
+            val messages      = createJsonValue(10)
 
             produceAndCheckJson(
               topic = "secure-topic-2",

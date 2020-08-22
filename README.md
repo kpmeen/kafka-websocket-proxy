@@ -82,20 +82,56 @@ Allows for changing things like network interface, port number, etc.
 | kafka.ws.proxy.server.broker-resolution-retries                 | WSPROXY_BROKER_RESOLUTION_RETRIES        | `25`                     | Max number of retries for host resolution of Kafka brokers. |
 | kafka.ws.proxy.server.broker-resolution-retry-interval          | WSPROXY_BROKER_RESOLUTION_RETRY_INTERVAL | `1 second`               | Interval duration between retries when resolving the Kafka broker hosts. |
 
-### Server TLS/SSL Configuration
+### Endpoint Security
+
+#### Server TLS/SSL Configuration
 
 The `kafka-websocket-proxy` can run with SSL enabled. When using self-signed
 certificates it is important to provide the location and password for the JKS
 keystore file. When the certificate is provided through a valid authority these
 configuration properties can be omitted. 
 
-| Config key                                  | Environment                   | Default                  | Description   |
-|:---                                         |:----                          |:------------------------:|:-----         |
-| kafka.ws.proxy.server.ssl.ssl-only          | WSPROXY_SSL_ONLY              | `false`                  | Indicates if the server should use SSL/TLS only binding when SSL/TLS is enabled. |
-| kafka.ws.proxy.server.ssl.bind-interface    | WSPROXY_SSL_BIND_INTERFACE    | `0.0.0.0`                | Network interface to bind the SSL/TLS traffic to.
-| kafka.ws.proxy.server.ssl.port              | WSPROXY_SSL_PORT              | not set                  | Port where the SSL/TLS endpoints will be available. |
-| kafka.ws.proxy.server.ssl.keystore-location | WSPROXY_SSL_KEYSTORE_LOCATION | not set                  | File path to location of key store file when using self-signed certificates. |
-| kafka.ws.proxy.server.ssl.keystore-password | WSPROXY_SSL_KEYSTORE_PASS     | not set                  | Password for the key store file. |
+| Config key                                  | Environment                   | Default   | Description   |
+|:---                                         |:----                          |:---------:|:-----         |
+| kafka.ws.proxy.server.ssl.ssl-only          | WSPROXY_SSL_ONLY              | `false`   | Indicates if the server should use SSL/TLS only binding when SSL/TLS is enabled. |
+| kafka.ws.proxy.server.ssl.bind-interface    | WSPROXY_SSL_BIND_INTERFACE    | `0.0.0.0` | Network interface to bind the SSL/TLS traffic to. |
+| kafka.ws.proxy.server.ssl.port              | WSPROXY_SSL_PORT              | not set   | Port where the SSL/TLS endpoints will be available. |
+| kafka.ws.proxy.server.ssl.keystore-location | WSPROXY_SSL_KEYSTORE_LOCATION | not set   | File path to location of key store file when using self-signed certificates. |
+| kafka.ws.proxy.server.ssl.keystore-password | WSPROXY_SSL_KEYSTORE_PASS     | not set   | Password for the key store file. |
+
+#### Basic Authentication
+
+> **Warning**
+>
+> Make sure the proxy is configured to use SSL/TLS. Otherwise, the credentials
+> are transferred in plain text.
+> For production environments the `kafka.ws.proxy.server.ssl.ssl-only` property
+> should be set to `true`.
+
+| Config key                                | Environment                 | Default | Description   |
+|:---                                       |:----                        |:-------:|:-----         |
+| kafka.ws.proxy.server.basic-auth.enabled  | WSPROXY_BASIC_AUTH_ENABLED  | `false` | Indicates if the server should use basic authentication for the endpoints. |
+| kafka.ws.proxy.server.basic-auth.realm    | WSPROXY_BASIC_AUTH_REALM    | not set | The realm to use for basic authentication. |
+| kafka.ws.proxy.server.basic-auth.username | WSPROXY_BASIC_AUTH_USERNAME | not set | The username to use for basic authentication. |
+| kafka.ws.proxy.server.basic-auth.password | WSPROXY_BASIC_AUTH_PASSWORD | not set | The password to use for basic authentication. |
+
+
+#### OpenID Connect
+
+> **Warning**
+>
+> Make sure the proxy is configured to use SSL/TLS. Otherwise, the credentials
+> are transferred in plain text.
+> For production environments the `kafka.ws.proxy.server.ssl.ssl-only` property
+> should be set to `true`.
+
+| Config key                                          | Environment              | Default | Description   |
+|:---                                                 |:----                     |:-------:|:-----         |
+| kafka.ws.proxy.server.openid-connect.enabled        | WSPROXY_OPENID_ENABLED   | `false` | Indicates if the server should use OpenID Connect to authenticate Bearer tokens for the endpoints. |
+| kafka.ws.proxy.server.openid-connect.well-known-url | WSPROXY_OPENID_WELLKNOWN | not set | The full URL pointing to the OIDC `.well-known` OIDC configuration. |
+| kafka.ws.proxy.server.openid-connect.audience       | WSPROXY_OPENID_AUDIENCE  | not set | The OIDC audience to be used when communicating with the OIDC server. |
+| kafka.ws.proxy.server.openid-connect.realm          | WSPROXY_OPENID_REALM     | `""`    | Optional configuration that isn't really used by OIDC, but it's present in akka-http for API consistency. If not set, an empty string will be used. |
+
 
 ### Internal Session Handler
 

@@ -35,8 +35,10 @@ object CommitStackHandler {
    * message being committed. This way the number of messages in the stack can
    * be somewhat controlled.
    *
-   * @param stack the message stack of [[Uncommitted]] messages
-   * @return a Behavior describing the [[CommitStackHandler]].
+   * @param stack
+   *   the message stack of [[Uncommitted]] messages
+   * @return
+   *   a Behavior describing the [[CommitStackHandler]].
    */
   private[this] def committableStack(
       stack: CommitStack = CommitStack.empty

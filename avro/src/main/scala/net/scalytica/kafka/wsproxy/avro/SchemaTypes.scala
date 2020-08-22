@@ -10,8 +10,10 @@ object SchemaTypes {
    * Simple representation of Kafka message headers. Currently there is only
    * support for String values.
    *
-   * @param key The header key
-   * @param value The header value
+   * @param key
+   *   The header key
+   * @param value
+   *   The header value
    */
   @AvroDoc("Schema definition for simple Kafka message headers.")
   @AvroNamespace("net.scalytica.kafka.wsproxy.avro")
@@ -29,10 +31,13 @@ object SchemaTypes {
    * Wrapper schema for messages to produce into Kafka topics via the WebSocket
    * Proxy.
    *
-   * @param key The message key. Defined as a union type using shapeless
-   *            co-products with a subset of available types that can be used.
-   * @param value The message value.
-   * @param headers The headers to apply to the message in Kafka.
+   * @param key
+   *   The message key. Defined as a union type using shapeless co-products with
+   *   a subset of available types that can be used.
+   * @param value
+   *   The message value.
+   * @param headers
+   *   The headers to apply to the message in Kafka.
    */
   @AvroDoc(
     "Inbound schema for producing messages with a key and value to Kafka " +
@@ -66,13 +71,17 @@ object SchemaTypes {
   }
 
   /**
-   * Schema for confirmation messages sent back through the producer socket
-   * when a message has been successfully sent to Kafka.
+   * Schema for confirmation messages sent back through the producer socket when
+   * a message has been successfully sent to Kafka.
    *
-   * @param topic The topic the message was written to.
-   * @param partition The topic partition the message was written to.
-   * @param offset The topic partition offset for the given message.
-   * @param timestamp The timestamp for when the message was written to Kafka.
+   * @param topic
+   *   The topic the message was written to.
+   * @param partition
+   *   The topic partition the message was written to.
+   * @param offset
+   *   The topic partition offset for the given message.
+   * @param timestamp
+   *   The timestamp for when the message was written to Kafka.
    */
   @AvroDoc("Outbound schema for responding to produced messages.")
   @AvroNamespace("net.scalytica.kafka.wsproxy.avro")
@@ -96,14 +105,22 @@ object SchemaTypes {
    * the client to deserialize the key and value using the correct schemas,
    * since these are passed through as raw byte arrays in this wrapper message.
    *
-   * @param wsProxyMessageId The message ID for this record.
-   * @param topic The topic the message came from.
-   * @param partition The topic partition the message came from.
-   * @param offset The topic partition offset for the message.
-   * @param timestamp The timestamp for when the message was written to Kafka.
-   * @param key The message key.
-   * @param value The message value.
-   * @param headers The headers applied to the message in Kafka.
+   * @param wsProxyMessageId
+   *   The message ID for this record.
+   * @param topic
+   *   The topic the message came from.
+   * @param partition
+   *   The topic partition the message came from.
+   * @param offset
+   *   The topic partition offset for the message.
+   * @param timestamp
+   *   The timestamp for when the message was written to Kafka.
+   * @param key
+   *   The message key.
+   * @param value
+   *   The message value.
+   * @param headers
+   *   The headers applied to the message in Kafka.
    */
   @AvroDoc(
     "Outbound schema for messages with Avro key and value. It is up to the " +
@@ -135,7 +152,8 @@ object SchemaTypes {
    * Schema to use when committing consumed Kafka messages through an outbound
    * WebSocket.
    *
-   * @param wsProxyMessageId The message ID to commit.
+   * @param wsProxyMessageId
+   *   The message ID to commit.
    */
   @AvroDoc("Inbound schema for committing the offset of consumed messages.")
   @AvroNamespace("net.scalytica.kafka.wsproxy.avro")

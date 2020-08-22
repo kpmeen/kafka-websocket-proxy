@@ -35,6 +35,15 @@ import scala.util.{Failure, Success}
 
 package object test {
 
+  def availablePort: Int = {
+    val s = new java.net.ServerSocket(0)
+    try {
+      s.getLocalPort
+    } finally {
+      s.close()
+    }
+  }
+
   def serverHost(port: Option[Int] = None): String =
     s"localhost${port.map(p => s":$p").getOrElse("")}"
 
