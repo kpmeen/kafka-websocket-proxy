@@ -4,7 +4,9 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.testkit.{RouteTestTimeout, WSProbe}
 import net.manub.embeddedkafka.Codecs._
+import net.scalytica.kafka.wsproxy.auth.OpenIdClient
 import net.scalytica.kafka.wsproxy.models.Formats.{NoType, StringType}
+import net.scalytica.kafka.wsproxy.session.SessionHandler
 import net.scalytica.test._
 import org.scalatest.Inspectors.forAll
 import org.scalatest.concurrent.ScalaFutures
@@ -115,6 +117,9 @@ class WebSocketRoutesJsonSpec
         withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
           implicit val wsCfg = appTestConfig(kcfg.kafkaPort)
 
+          implicit val oidClient: Option[OpenIdClient] = None
+          implicit val sessionHandlerRef               = SessionHandler.init
+
           val topicName = "test-topic-5"
           initTopic(topicName)
 
@@ -171,6 +176,9 @@ class WebSocketRoutesJsonSpec
       "consume messages with String value" in
         withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
           implicit val wsCfg = appTestConfig(kcfg.kafkaPort)
+
+          implicit val oidClient: Option[OpenIdClient] = None
+          implicit val sessionHandlerRef               = SessionHandler.init
 
           val topicName = "test-topic-6"
           initTopic(topicName)

@@ -10,8 +10,10 @@ import akka.http.scaladsl.model.headers.{
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.testkit.RouteTestTimeout
 import io.circe.parser._
+import net.scalytica.kafka.wsproxy.auth.OpenIdClient
 import net.scalytica.kafka.wsproxy.codecs.Decoders.brokerInfoDecoder
 import net.scalytica.kafka.wsproxy.models.BrokerInfo
+import net.scalytica.kafka.wsproxy.session.SessionHandler
 import net.scalytica.test._
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Minutes, Span}
@@ -40,6 +42,9 @@ class StatusRoutesSpec
     "return the kafka cluster info" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val wsCfg = appTestConfig(kcfg.kafkaPort)
+
+        implicit val oidClient: Option[OpenIdClient] = None
+        implicit val sessionHandlerRef               = SessionHandler.init
 
         val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
         val ctrl                    = sdcStream.run()
@@ -70,6 +75,9 @@ class StatusRoutesSpec
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val wsCfg = appTestConfig(kcfg.kafkaPort)
 
+        implicit val oidClient: Option[OpenIdClient] = None
+        implicit val sessionHandlerRef               = SessionHandler.init
+
         val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
         val ctrl                    = sdcStream.run()
 
@@ -86,6 +94,8 @@ class StatusRoutesSpec
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val wsCfg =
           appTestConfig(kafkaPort = kcfg.kafkaPort, useBasicAuth = true)
+        implicit val oidClient: Option[OpenIdClient] = None
+        implicit val sessionHandlerRef               = SessionHandler.init
 
         val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
         val ctrl                    = sdcStream.run()
@@ -117,6 +127,8 @@ class StatusRoutesSpec
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val wsCfg =
           appTestConfig(kafkaPort = kcfg.kafkaPort, useBasicAuth = true)
+        implicit val oidClient: Option[OpenIdClient] = None
+        implicit val sessionHandlerRef               = SessionHandler.init
 
         val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
         val ctrl                    = sdcStream.run()
@@ -142,6 +154,8 @@ class StatusRoutesSpec
           withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
             implicit val wsCfg =
               appTestConfig(kafkaPort = kcfg.kafkaPort, openIdCfg = Option(cfg))
+            implicit val oidClient         = Option(OpenIdClient(wsCfg))
+            implicit val sessionHandlerRef = SessionHandler.init
 
             val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
             val ctrl                    = sdcStream.run()
@@ -177,6 +191,8 @@ class StatusRoutesSpec
           withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
             implicit val wsCfg =
               appTestConfig(kafkaPort = kcfg.kafkaPort, openIdCfg = Option(cfg))
+            implicit val oidClient         = Option(OpenIdClient(wsCfg))
+            implicit val sessionHandlerRef = SessionHandler.init
 
             val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
             val ctrl                    = sdcStream.run()

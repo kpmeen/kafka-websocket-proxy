@@ -3,6 +3,7 @@ package net.scalytica.kafka.wsproxy
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.testkit.RouteTestTimeout
+import net.scalytica.kafka.wsproxy.auth.OpenIdClient
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
   AvroCommit,
   AvroConsumerRecord,
@@ -28,6 +29,8 @@ class SchemaRoutesSpec
     PatienceConfig(timeout = Span(2, Minutes))
 
   implicit val timeout = RouteTestTimeout(20 seconds)
+
+  implicit val oidClient: Option[OpenIdClient] = None
 
   import TestServerRoutes.{serverErrorHandler, serverRejectionHandler}
 

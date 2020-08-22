@@ -6,7 +6,7 @@ import akka.http.scaladsl.server._
 import akka.http.scaladsl.testkit.{RouteTestTimeout, WSProbe}
 import net.manub.embeddedkafka.Codecs._
 import net.scalytica.kafka.wsproxy.SocketProtocol.AvroPayload
-import net.scalytica.kafka.wsproxy.auth.AccessToken
+import net.scalytica.kafka.wsproxy.auth.{AccessToken, OpenIdClient}
 import net.scalytica.kafka.wsproxy.models.Formats.{
   AvroType,
   LongType,
@@ -17,6 +17,7 @@ import net.scalytica.kafka.wsproxy.models.{
   ConsumerKeyValueRecord,
   ConsumerValueRecord
 }
+import net.scalytica.kafka.wsproxy.session.SessionHandler
 import net.scalytica.test._
 import org.scalatest.Inspectors.forAll
 import org.scalatest.concurrent.ScalaFutures
@@ -103,6 +104,9 @@ class WebSocketRoutesAvroSpec
           implicit val wsCfg =
             appTestConfig(kcfg.kafkaPort, Some(schemaRegPort))
 
+          implicit val oidClient: Option[OpenIdClient] = None
+          implicit val sessionHandlerRef               = SessionHandler.init
+
           val topicName = "test-topic-10"
           initTopic(topicName)
 
@@ -170,6 +174,9 @@ class WebSocketRoutesAvroSpec
           implicit val wsCfg =
             appTestConfig(kcfg.kafkaPort, Some(schemaRegPort))
 
+          implicit val oidClient: Option[OpenIdClient] = None
+          implicit val sessionHandlerRef               = SessionHandler.init
+
           val topicName = "test-topic-11"
           initTopic(topicName)
 
@@ -231,6 +238,9 @@ class WebSocketRoutesAvroSpec
           implicit val wsCfg =
             appTestConfig(kcfg.kafkaPort, Some(schemaRegPort))
 
+          implicit val oidClient: Option[OpenIdClient] = None
+          implicit val sessionHandlerRef               = SessionHandler.init
+
           val topicName = "test-topic-12"
           initTopic(topicName)
 
@@ -287,6 +297,9 @@ class WebSocketRoutesAvroSpec
 
           implicit val wsCfg =
             appTestConfig(kcfg.kafkaPort, Some(schemaRegPort))
+
+          implicit val oidClient: Option[OpenIdClient] = None
+          implicit val sessionHandlerRef               = SessionHandler.init
 
           val topicName = "test-topic-13"
           initTopic(topicName)
@@ -366,6 +379,9 @@ class WebSocketRoutesAvroSpec
         withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
           implicit val wsCfg = appTestConfig(kcfg.kafkaPort)
 
+          implicit val oidClient: Option[OpenIdClient] = None
+          implicit val sessionHandlerRef               = SessionHandler.init
+
           val topicName = "non-existing-topic"
           val outPath = "/socket/out?" +
             "clientId=test-100" +
@@ -393,6 +409,8 @@ class WebSocketRoutesAvroSpec
         secureKafkaContext { implicit kcfg =>
           implicit val wsCfg =
             secureAppTestConfig(kcfg.kafkaPort, Some(kcfg.schemaRegistryPort))
+          implicit val oidClient: Option[OpenIdClient] = None
+          implicit val sessionHandlerRef               = SessionHandler.init
 
           val topicName = "restricted-topic"
           initTopic(topicName, isSecure = true)
@@ -425,6 +443,9 @@ class WebSocketRoutesAvroSpec
         // scalastyle:on line.size.limit
         secureKafkaContext { implicit kcfg =>
           implicit val wsCfg = secureAppTestConfig(kcfg.kafkaPort)
+
+          implicit val oidClient: Option[OpenIdClient] = None
+          implicit val sessionHandlerRef               = SessionHandler.init
 
           val topicName = "restricted-topic"
           initTopic(topicName, isSecure = true)

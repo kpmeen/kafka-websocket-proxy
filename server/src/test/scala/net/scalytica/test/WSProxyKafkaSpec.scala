@@ -19,7 +19,9 @@ import net.scalytica.kafka.wsproxy.Configuration.{
   OpenIdConnectCfg,
   SchemaRegistryCfg
 }
+import net.scalytica.kafka.wsproxy.auth.OpenIdClient
 import net.scalytica.kafka.wsproxy.models.WsServerId
+import net.scalytica.kafka.wsproxy.session.SessionHandler
 import net.scalytica.kafka.wsproxy.{mapToProperties, Configuration}
 import org.apache.kafka.clients.CommonClientConfigs._
 import org.apache.kafka.clients.admin.AdminClientConfig.{
@@ -317,6 +319,11 @@ trait WSProxyKafkaSpec
         openIdCfg = openIdCfg
       )
 
+      implicit val oidClient = wsCfg.server.openidConnect
+        .filter(_.enabled)
+        .map(_ => OpenIdClient(wsCfg))
+      implicit val sessionHandlerRef = SessionHandler.init
+
       initTopic(topic)
 
       val wsClient                = WSProbe()
@@ -337,6 +344,11 @@ trait WSProxyKafkaSpec
     secureKafkaContext { implicit kcfg =>
       implicit val wsCfg =
         secureAppTestConfig(kcfg.kafkaPort, Some(kcfg.schemaRegistryPort))
+
+      implicit val oidClient = wsCfg.server.openidConnect
+        .filter(_.enabled)
+        .map(_ => OpenIdClient(wsCfg))
+      implicit val sessionHandlerRef = SessionHandler.init
 
       initTopic(topic, isSecure = true)
 
