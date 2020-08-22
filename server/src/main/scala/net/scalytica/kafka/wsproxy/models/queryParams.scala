@@ -14,17 +14,28 @@ trait SocketArgs {
 /**
  * Encodes configuration params for an outbound WebSocket stream.
  *
- * @param clientId the clientId to use for the Kafka consumer.
- * @param groupId the groupId to use for the Kafka consumer.
- * @param topic the Kafka topic to subscribe to.
- * @param socketPayload the type of payload to expect through the socket.
- * @param aclCredentials the Kafka ACL credentials to use with the Kafka client
- * @param keyType optional type for the message keys in the topic.
- * @param valType the type for the message values in the topic.
- * @param offsetResetStrategy the offset strategy to use. Defaults to EARLIEST
- * @param rateLimit max number of messages per second to pass through.
- * @param batchSize the number messages to include per batch.
- * @param autoCommit enable kafka consumer auto-commit interval.
+ * @param clientId
+ *   the clientId to use for the Kafka consumer.
+ * @param groupId
+ *   the groupId to use for the Kafka consumer.
+ * @param topic
+ *   the Kafka topic to subscribe to.
+ * @param socketPayload
+ *   the type of payload to expect through the socket.
+ * @param aclCredentials
+ *   the Kafka ACL credentials to use with the Kafka client
+ * @param keyType
+ *   optional type for the message keys in the topic.
+ * @param valType
+ *   the type for the message values in the topic.
+ * @param offsetResetStrategy
+ *   the offset strategy to use. Defaults to EARLIEST
+ * @param rateLimit
+ *   max number of messages per second to pass through.
+ * @param batchSize
+ *   the number messages to include per batch.
+ * @param autoCommit
+ *   enable kafka consumer auto-commit interval.
  */
 case class OutSocketArgs(
     clientId: WsClientId,
@@ -80,11 +91,16 @@ object OutSocketArgs {
 /**
  * Encodes configuration params for an inbound WebSocket stream.
  *
- * @param topic the Kafka topic to subscribe to.
- * @param socketPayload the type of payload to expect through the socket.
- * @param aclCredentials the Kafka ACL credentials to use with the Kafka client
- * @param keyType optional type for the message keys in the topic.
- * @param valType the type for the message values in the topic.
+ * @param topic
+ *   the Kafka topic to subscribe to.
+ * @param socketPayload
+ *   the type of payload to expect through the socket.
+ * @param aclCredentials
+ *   the Kafka ACL credentials to use with the Kafka client
+ * @param keyType
+ *   optional type for the message keys in the topic.
+ * @param valType
+ *   the type for the message values in the topic.
  */
 case class InSocketArgs(
     topic: TopicName,

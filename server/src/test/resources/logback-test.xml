@@ -19,22 +19,25 @@
   <logger name="akka.actor" level="OFF"/>
   <logger name="akka.stream" level="OFF"/>
   <logger name="akka.kafka" level="OFF"/>
+  <logger name="akka.http" level="OFF"/>
 
   <logger name="org.apache.kafka.clients" level="OFF"/>
 
   <logger name="net.scalytica" level="OFF"/>
-<!--  <logger name="net.scalytica.kafka.wsproxy" level="TRACE"/>-->
-<!--  <logger name="net.scalytica.kafka.wsproxy.admin" level="OFF"/>-->
-<!--  <logger name="net.scalytica.kafka.wsproxy.codecs" level="INFO"/>-->
-<!--  <logger name="net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde" level="TRACE"/>-->
-<!--  <logger name="net.scalytica.kafka.wsproxy.consumer" level="INFO"/>-->
-<!--  <logger name="net.scalytica.kafka.wsproxy.errors" level="OFF"/>-->
-<!--  <logger name="net.scalytica.kafka.wsproxy.logging.DefaultProxyLogger" level="TRACE"/>-->
-<!--  <logger name="net.scalytica.kafka.wsproxy.models" level="OFF"/>-->
-<!--  <logger name="net.scalytica.kafka.wsproxy.producer" level="TRACE"/>-->
-<!--  <logger name="net.scalytica.kafka.wsproxy.session" level="INFO"/>-->
-<!--  <logger name="net.scalytica.kafka.wsproxy.utils" level="INFO"/>-->
-<!--  <logger name="net.scalytica.kafka.wsproxy.websockets" level="INFO"/>-->
+  <!--  <logger name="net.scalytica.kafka.wsproxy.BaseRoutes" level="TRACE"/>-->
+  <!--  <logger name="net.scalytica.kafka.wsproxy.auth.OpenIdClient" level="TRACE"/>-->
+  <!--  <logger name="net.scalytica.kafka.wsproxy.auth.UrlJwkProvider" level="TRACE"/>-->
+  <!--  <logger name="net.scalytica.kafka.wsproxy.admin" level="OFF"/>-->
+  <!--  <logger name="net.scalytica.kafka.wsproxy.codecs" level="INFO"/>-->
+  <!--  <logger name="net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde" level="TRACE"/>-->
+  <!--  <logger name="net.scalytica.kafka.wsproxy.consumer" level="INFO"/>-->
+  <!--  <logger name="net.scalytica.kafka.wsproxy.errors" level="OFF"/>-->
+  <!--  <logger name="net.scalytica.kafka.wsproxy.logging.DefaultProxyLogger" level="TRACE"/>-->
+  <!--  <logger name="net.scalytica.kafka.wsproxy.models" level="OFF"/>-->
+  <!--  <logger name="net.scalytica.kafka.wsproxy.producer" level="TRACE"/>-->
+  <!--  <logger name="net.scalytica.kafka.wsproxy.session" level="INFO"/>-->
+  <!--  <logger name="net.scalytica.kafka.wsproxy.utils" level="INFO"/>-->
+  <!--  <logger name="net.scalytica.kafka.wsproxy.websockets" level="INFO"/>-->
 
   <!-- Root loggers catch all other events that are not explicitly handled-->
   <root level="OFF">

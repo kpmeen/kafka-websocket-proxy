@@ -165,12 +165,32 @@ object Configuration extends WithProxyLogger {
 
   }
 
-  final case class BasicAuth(
-      username: String,
-      password: String,
-      realm: String,
-      enabled: Boolean = true
-  )
+  final case class BasicAuthCfg(
+      username: Option[String],
+      password: Option[String],
+      realm: Option[String],
+      enabled: Boolean = false
+  ) {
+    if (enabled)
+      require(
+        username.isDefined && password.isDefined && realm.isDefined,
+        "username, password and realm are required when basic auth is enabled"
+      )
+  }
+
+  final case class OpenIdConnectCfg(
+      wellKnownUrl: Option[String],
+      audience: Option[String],
+      realm: Option[String],
+      enabled: Boolean = false,
+      requireHttps: Boolean = true
+  ) {
+    if (enabled)
+      require(
+        wellKnownUrl.isDefined && audience.isDefined,
+        "well-known-url and audience must be defined when openid is enabled"
+      )
+  }
 
   final case class ServerCfg(
       serverId: WsServerId,
@@ -180,13 +200,24 @@ object Configuration extends WithProxyLogger {
       brokerResolutionTimeout: FiniteDuration,
       brokerResolutionRetries: Int,
       brokerResolutionRetryInterval: FiniteDuration,
-      basicAuthCredentials: Option[BasicAuth]
+      basicAuth: Option[BasicAuthCfg],
+      openidConnect: Option[OpenIdConnectCfg]
   ) {
 
-    def isBasicAuthEnabled: Boolean = {
-      basicAuthCredentials.isDefined && basicAuthCredentials.exists(_.enabled)
-    }
-    def unsafeBasicAuth: BasicAuth = basicAuthCredentials.get
+    def isSslEnabled: Boolean = ssl.isDefined
+
+    def isPlainEnabled: Boolean = !ssl.exists(_.sslOnly)
+
+    def isAuthEnabled: Boolean = isBasicAuthEnabled || isOpenIdConnectEnabled
+
+    def isAuthSecurelyEnabled: Boolean =
+      isAuthEnabled && isSslEnabled && !isPlainEnabled
+
+    def isBasicAuthEnabled: Boolean =
+      basicAuth.isDefined && basicAuth.exists(_.enabled)
+
+    def isOpenIdConnectEnabled: Boolean =
+      openidConnect.isDefined && openidConnect.exists(_.enabled)
 
   }
 
@@ -220,7 +251,8 @@ object Configuration extends WithProxyLogger {
 
   /**
    * Loads and resolves the default application.conf
-   * @return The a resolved instance of Typesafe Config
+   * @return
+   *   The a resolved instance of Typesafe Config
    */
   def loadTypesafeConfig(): Config = {
     logger.debug("Loading default typesafe configuration")

@@ -6,6 +6,7 @@ import akka.http.scaladsl.server._
 import akka.http.scaladsl.testkit.{RouteTestTimeout, WSProbe}
 import net.manub.embeddedkafka.Codecs._
 import net.scalytica.kafka.wsproxy.SocketProtocol.AvroPayload
+import net.scalytica.kafka.wsproxy.auth.AccessToken
 import net.scalytica.kafka.wsproxy.models.Formats.{
   AvroType,
   LongType,
@@ -33,6 +34,7 @@ class WebSocketRoutesAvroSpec
     with ScalaFutures
     with WSProxyKafkaSpec
     with WsProducerClientSpec
+    with MockOpenIdServer
     with TestDataGenerators {
 
   implicit override val patienceConfig: PatienceConfig =
@@ -51,7 +53,7 @@ class WebSocketRoutesAvroSpec
           case (_, _, testRoutes, wsc) =>
             implicit val wsClient = wsc
 
-            val messages = produceKeyValueAvro(1)
+            val messages = createAvroProducerRecordKeyValue(1)
 
             produceAndCheckAvro(
               topic = "test-topic-7",
@@ -67,7 +69,7 @@ class WebSocketRoutesAvroSpec
           case (_, _, testRoutes, wsc) =>
             implicit val wsClient = wsc
 
-            val messages = produceKeyStringValueAvro(1)
+            val messages = createAvroProducerRecordStringBytes(1)
 
             produceAndCheckAvro(
               topic = "test-topic-8",
@@ -83,7 +85,7 @@ class WebSocketRoutesAvroSpec
           case (_, _, testRoutes, wsc) =>
             implicit val wsClient = wsc
 
-            val messages = produceValueAvro(1)
+            val messages = createAvroProducerRecordAvroAvro(1)
 
             produceAndCheckAvro(
               topic = "test-topic-9",
@@ -108,7 +110,7 @@ class WebSocketRoutesAvroSpec
           val producerProbe            = WSProbe()
           val (sdcStream, testRoutes)  = TestServerRoutes.wsProxyRoutes
           val ctrl                     = sdcStream.run()
-          val messages                 = produceKeyValueAvro(10)
+          val messages                 = createAvroProducerRecordKeyValue(10)
           val routes                   = Route.seal(testRoutes)
 
           produceAndCheckAvro(
@@ -175,8 +177,9 @@ class WebSocketRoutesAvroSpec
           val producerProbe            = WSProbe()
           val (sdcStream, testRoutes)  = TestServerRoutes.wsProxyRoutes
           val ctrl                     = sdcStream.run()
-          val messages                 = produceKeyStringValueString(10)
           val routes                   = Route.seal(testRoutes)
+
+          val messages = createAvroProducerRecordStringString(10)
 
           produceAndCheckAvro(
             topic = topicName,
@@ -235,7 +238,7 @@ class WebSocketRoutesAvroSpec
           val producerProbe            = WSProbe()
           val (sdcStream, testRoutes)  = TestServerRoutes.wsProxyRoutes
           val ctrl                     = sdcStream.run()
-          val messages                 = produceAvroWithStringValue(10)
+          val messages                 = createAvroProducerRecordNoneString(10)
           val routes                   = Route.seal(testRoutes)
 
           produceAndCheckAvro(
@@ -292,7 +295,7 @@ class WebSocketRoutesAvroSpec
           val producerProbe            = WSProbe()
           val (sdcStream, testRoutes)  = TestServerRoutes.wsProxyRoutes
           val ctrl                     = sdcStream.run()
-          val messages                 = produceKeyLongValueString(10)
+          val messages                 = createAvroProducerRecordLongString(10)
           val routes                   = Route.seal(testRoutes)
 
           produceAndCheckAvro(
@@ -387,7 +390,7 @@ class WebSocketRoutesAvroSpec
       // scalastyle:off line.size.limit
       "return a HTTP 401 when using wrong credentials to establish an outbound connection to a secured cluster" in
         // scalastyle:on line.size.limit
-        secureContext { implicit kcfg =>
+        secureKafkaContext { implicit kcfg =>
           implicit val wsCfg =
             secureAppTestConfig(kcfg.kafkaPort, Some(kcfg.schemaRegistryPort))
 
@@ -420,7 +423,7 @@ class WebSocketRoutesAvroSpec
       // scalastyle:off line.size.limit
       "return a HTTP 401 when using wrong credentials to establish an inbound connection to a secured cluster" in
         // scalastyle:on line.size.limit
-        secureContext { implicit kcfg =>
+        secureKafkaContext { implicit kcfg =>
           implicit val wsCfg = secureAppTestConfig(kcfg.kafkaPort)
 
           val topicName = "restricted-topic"
@@ -439,7 +442,11 @@ class WebSocketRoutesAvroSpec
 
           val wrongCreds = BasicHttpCredentials("bad", "user")
 
-          checkWebSocket(baseUri, Route.seal(testRoutes), Some(wrongCreds)) {
+          checkWebSocket(
+            uri = baseUri,
+            routes = Route.seal(testRoutes),
+            kafkaCreds = Some(wrongCreds)
+          ) {
             status mustBe Unauthorized
           }
 
@@ -447,11 +454,11 @@ class WebSocketRoutesAvroSpec
         }
 
       "produce messages to a secured cluster" in
-        secureProducerContext("secure-topic-1") {
+        secureKafkaClusterProducerContext("secure-topic-1") {
           case (_, _, testRoutes, wsc) =>
             implicit val wsClient = wsc
 
-            val messages = produceValueAvro(1)
+            val messages = createAvroProducerRecordAvroAvro(1)
 
             produceAndCheckAvro(
               topic = "secure-topic-1",
@@ -459,8 +466,54 @@ class WebSocketRoutesAvroSpec
               keyType = None,
               valType = AvroType,
               messages = messages,
-              basicCreds = Some(creds)
+              kafkaCreds = Some(creds)
             )
+        }
+
+      "allow connections with a valid bearer token when OpenID is enabled" in
+        withEmbeddedOpenIdConnectServerAndToken() {
+          case (_, _, _, cfg, token) =>
+            secureServerProducerContext("openid-1", openIdCfg = Option(cfg)) {
+              case (_, _, testRoutes, wsc) =>
+                implicit val wsClient = wsc
+
+                val messages = createAvroProducerRecordAvroAvro(1)
+
+                produceAndCheckAvro(
+                  topic = "openid-1",
+                  routes = Route.seal(testRoutes),
+                  keyType = None,
+                  valType = AvroType,
+                  messages = messages,
+                  creds = Some(token.bearerToken)
+                )
+            }
+        }
+
+      "return HTTP 401 when bearer token is invalid with OpenID enabled" in
+        withEmbeddedOpenIdConnectServerAndClient() {
+          case (_, _, _, cfg) =>
+            secureServerProducerContext("openid-2", openIdCfg = Option(cfg)) {
+              case (_, _, testRoutes, wsc) =>
+                implicit val wsClient = wsc
+
+                val token = AccessToken("Bearer", "foo.bar.baz", 3600L, None)
+
+                val baseUri = baseProducerUri(
+                  topic = "openid-2",
+                  payloadType = AvroPayload,
+                  keyType = NoType,
+                  valType = StringType
+                )
+
+                checkWebSocket(
+                  uri = baseUri,
+                  routes = Route.seal(testRoutes),
+                  creds = Some(token.bearerToken)
+                ) {
+                  status mustBe Unauthorized
+                }
+            }
         }
     }
   }

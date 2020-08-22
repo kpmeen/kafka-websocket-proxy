@@ -5,16 +5,16 @@ set -o nounset \
     -o verbose \
     -o xtrace
 
-BASE_HOSTNAME="test.scalytica.net"
+BASE_HOSTNAME="wsproxytest.scalytica.net"
 
 # Generate CA (Certificate Authority) key
 openssl req \
   -new \
   -x509 \
-  -keyout test-ca-1.key \
-  -out test-ca-1.crt \
+  -keyout wsproxytest-ca-1.key \
+  -out wsproxytest-ca-1.crt \
   -days 365 \
-  -subj "/CN=ca1.$BASE_HOSTNAME/OU=TEST/O=SCALYTICA/L=Heggedal/S=Akershus/C=NO" \
+  -subj "/CN=ca1.$BASE_HOSTNAME/OU=WSPROXYTEST/O=SCALYTICA/L=Heggedal/S=Akershus/C=NO" \
   -passin pass:scalytica \
   -passout pass:scalytica
 
@@ -25,8 +25,8 @@ keytool \
   -genkey \
   -noprompt \
   -alias wsproxy \
-  -dname "CN=wsproxy.$BASE_HOSTNAME/OU=TEST/O=SCALYTICA/L=Heggedal/S=Akershus/C=NO" \
-  -keystore $i.keystore.jks \
+  -dname "CN=wsproxy.$BASE_HOSTNAME/OU=WSPROXYTEST/O=SCALYTICA/L=Heggedal/S=Akershus/C=NO" \
+  -keystore wsproxy.keystore.jks \
   -keyalg RSA \
   -storepass scalytica \
   -keypass scalytica
@@ -42,8 +42,8 @@ keytool \
 
 openssl x509 \
   -req \
-  -CA test-ca-1.crt \
-  -CAkey test-ca-1.key \
+  -CA wsproxytest-ca-1.crt \
+  -CAkey wsproxytest-ca-1.key \
   -in wsproxy.csr \
   -out wsproxy-ca1-signed.crt \
   -days 9999 \
@@ -53,7 +53,7 @@ openssl x509 \
 keytool \
   -import \
   -alias CARoot \
-  -file test-ca-1.crt \
+  -file wsproxytest-ca-1.crt \
   -keystore wsproxy.keystore.jks \
   -storepass scalytica \
   -keypass scalytica << EOF
@@ -74,13 +74,14 @@ EOF
 keytool \
   -import \
   -alias CARoot \
-  -file test-ca-1.crt \
+  -file wsproxytest-ca-1.crt \
   -keystore wsproxy.truststore.jks \
   -storepass scalytica \
   -keypass scalytica << EOF
 yes
 EOF
 
-echo "Cleaning up..."
+#echo "Cleaning up..."
+#rm *.csr *.srl *.key *.crt
 
-rm *.csr *.srl *.key *.crt
+echo "All done..."

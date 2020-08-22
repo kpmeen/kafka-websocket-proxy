@@ -26,9 +26,12 @@ trait InboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
    * Request handler for the inbound Kafka WebSocket connection, with a Kafka
    * producer as the Sink.
    *
-   * @param args the input arguments to pass on to the producer.
-   * @return a [[Route]] for accessing the inbound WebSocket functionality.
-   * @see [[WsProducer.produceJson]]
+   * @param args
+   *   the input arguments to pass on to the producer.
+   * @return
+   *   a [[Route]] for accessing the inbound WebSocket functionality.
+   * @see
+   *   [[WsProducer.produceJson]]
    */
   def inboundWebSocket(
       args: InSocketArgs

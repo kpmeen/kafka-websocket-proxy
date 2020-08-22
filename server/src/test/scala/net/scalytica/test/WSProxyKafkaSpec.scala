@@ -14,8 +14,9 @@ import net.manub.embeddedkafka.schemaregistry.{
 import net.scalytica.kafka.wsproxy.Configuration.{
   AdminClientCfg,
   AppCfg,
-  BasicAuth,
+  BasicAuthCfg,
   KafkaBootstrapHosts,
+  OpenIdConnectCfg,
   SchemaRegistryCfg
 }
 import net.scalytica.kafka.wsproxy.models.WsServerId
@@ -44,15 +45,6 @@ trait WSProxyKafkaSpec
     with ScalatestRouteTest
     with Matchers
     with EmbeddedKafka { self: Suite =>
-
-  private[this] def availablePort: Int = {
-    val s = new java.net.ServerSocket(0)
-    try {
-      s.getLocalPort
-    } finally {
-      s.close()
-    }
-  }
 
   val testKeyPass: String         = "scalytica"
   val creds: BasicHttpCredentials = BasicHttpCredentials("client", "client")
@@ -88,7 +80,7 @@ trait WSProxyKafkaSpec
     SSL_KEYSTORE_PASSWORD_CONFIG -> testKeyPass,
     SSL_KEY_PASSWORD_CONFIG      -> testKeyPass,
     SASL_JAAS_CONFIG             -> """org.apache.kafka.common.security.plain.PlainLoginModule required username="client" password="client";"""
-    // scalastyle:on
+    // scalastyle:on line.size.limit
   )
 
   def embeddedKafkaConfigWithSasl: EmbeddedKafkaConfig = {
@@ -156,17 +148,36 @@ trait WSProxyKafkaSpec
   val basicHttpCreds        = BasicHttpCredentials(basicAuthUser, basicAuthPass)
   val invalidBasicHttpCreds = BasicHttpCredentials(basicAuthUser, "invalid")
 
+  def basicAuthCredendials(useBasicAuth: Boolean): Option[BasicAuthCfg] = {
+    if (useBasicAuth)
+      Option(
+        BasicAuthCfg(
+          username = Option(basicAuthUser),
+          password = Option(basicAuthPass),
+          realm = Option(basicAuthRealm),
+          enabled = true
+        )
+      )
+    else None
+  }
+
   def plainTestConfig(useBasicAuth: Boolean = false): Configuration.AppCfg = {
     val serverId = s"test-server-${Random.nextInt(50000)}"
     val basicAuthCreds =
       if (useBasicAuth)
-        Some(BasicAuth(basicAuthUser, basicAuthPass, basicAuthRealm))
+        Option(
+          BasicAuthCfg(
+            username = Option(basicAuthUser),
+            password = Option(basicAuthPass),
+            realm = Option(basicAuthRealm)
+          )
+        )
       else None
 
     defaultTestAppCfg.copy(
       server = defaultTestAppCfg.server.copy(
         serverId = WsServerId(serverId),
-        basicAuthCredentials = basicAuthCreds
+        basicAuth = basicAuthCreds
       )
     )
   }
@@ -174,7 +185,8 @@ trait WSProxyKafkaSpec
   def appTestConfig(
       kafkaPort: Int,
       schemaRegistryPort: Option[Int] = None,
-      useBasicAuth: Boolean = false
+      useBasicAuth: Boolean = false,
+      openIdCfg: Option[OpenIdConnectCfg] = None
   ): Configuration.AppCfg = {
     val serverId = s"test-server-${Random.nextInt(50000)}"
     val srUrl =
@@ -184,15 +196,13 @@ trait WSProxyKafkaSpec
         srUrl.map(u => SchemaRegistryCfg(u, autoRegisterSchemas = true))
       )(sr => Option(sr.copy(url = srUrl.getOrElse(sr.url))))
 
-    val basicAuthCreds =
-      if (useBasicAuth)
-        Some(BasicAuth(basicAuthUser, basicAuthPass, basicAuthRealm))
-      else None
+    val basicAuthCreds = basicAuthCredendials(useBasicAuth)
 
     defaultTestAppCfg.copy(
       server = defaultTestAppCfg.server.copy(
         serverId = WsServerId(serverId),
-        basicAuthCredentials = basicAuthCreds
+        basicAuth = basicAuthCreds,
+        openidConnect = openIdCfg
       ),
       kafkaClient = defaultTestAppCfg.kafkaClient.copy(
         bootstrapHosts = KafkaBootstrapHosts(List(serverHost(Some(kafkaPort)))),
@@ -203,7 +213,9 @@ trait WSProxyKafkaSpec
 
   def secureAppTestConfig(
       kafkaPort: Int,
-      schemaRegistryPort: Option[Int] = None
+      schemaRegistryPort: Option[Int] = None,
+      useBasicAuth: Boolean = false,
+      openIdCfg: Option[OpenIdConnectCfg] = None
   ): Configuration.AppCfg = {
     val serverId = s"test-server-${Random.nextInt(50000)}"
     val srUrl =
@@ -213,8 +225,14 @@ trait WSProxyKafkaSpec
         srUrl.map(u => SchemaRegistryCfg(u, autoRegisterSchemas = true))
       )(sr => Option(sr.copy(url = srUrl.getOrElse(sr.url))))
 
+    val basicAuthCreds = basicAuthCredendials(useBasicAuth)
+
     defaultTestAppCfg.copy(
-      server = defaultTestAppCfg.server.copy(serverId = WsServerId(serverId)),
+      server = defaultTestAppCfg.server.copy(
+        serverId = WsServerId(serverId),
+        basicAuth = basicAuthCreds,
+        openidConnect = openIdCfg
+      ),
       kafkaClient = defaultTestAppCfg.kafkaClient.copy(
         bootstrapHosts = KafkaBootstrapHosts(List(serverHost(Some(kafkaPort)))),
         schemaRegistry = srCfg,
@@ -283,9 +301,21 @@ trait WSProxyKafkaSpec
   def defaultProducerContext[T](
       topic: String = "test-topic"
   )(body: (EmbeddedKafkaConfig, AppCfg, Route, WSProbe) => T): T = {
+    secureServerProducerContext(topic)(body)
+  }
+
+  def secureServerProducerContext[T](
+      topic: String,
+      useBasicAuth: Boolean = false,
+      openIdCfg: Option[OpenIdConnectCfg] = None
+  )(body: (EmbeddedKafkaConfig, AppCfg, Route, WSProbe) => T): T = {
     withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-      implicit val wsCfg =
-        appTestConfig(kcfg.kafkaPort, Some(kcfg.schemaRegistryPort))
+      implicit val wsCfg = appTestConfig(
+        kafkaPort = kcfg.kafkaPort,
+        schemaRegistryPort = Some(kcfg.schemaRegistryPort),
+        useBasicAuth = useBasicAuth,
+        openIdCfg = openIdCfg
+      )
 
       initTopic(topic)
 
@@ -301,10 +331,10 @@ trait WSProxyKafkaSpec
     }
   }
 
-  def secureProducerContext[T](
+  def secureKafkaClusterProducerContext[T](
       topic: String = "test-topic"
   )(body: (EmbeddedKafkaConfig, AppCfg, Route, WSProbe) => T): T = {
-    secureContext { implicit kcfg =>
+    secureKafkaContext { implicit kcfg =>
       implicit val wsCfg =
         secureAppTestConfig(kcfg.kafkaPort, Some(kcfg.schemaRegistryPort))
 
@@ -322,7 +352,7 @@ trait WSProxyKafkaSpec
     }
   }
 
-  def secureContext[T](body: EmbeddedKafkaConfig => T): T = {
+  def secureKafkaContext[T](body: EmbeddedKafkaConfig => T): T = {
     implicit val secureCfg = embeddedKafkaConfigWithSasl
     withRunningKafka(body(secureCfg))
   }

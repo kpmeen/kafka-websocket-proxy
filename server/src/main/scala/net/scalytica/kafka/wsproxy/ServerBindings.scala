@@ -21,7 +21,26 @@ trait ServerBindings {
       mat: Materializer
   ): Option[Future[Http.ServerBinding]] = {
     if (cfg.server.ssl.exists(_.sslOnly.equals(true))) None
-    else
+    else {
+      // scalastyle:off
+      if (!cfg.server.isAuthSecurelyEnabled) {
+        println(
+          s"""
+            |-------------------------------------------------------------------
+            |  WARNING:
+            |-------------------------------------------------------------------
+            |Server starting with authentication and non-TLS binding
+            |
+            |interface: ${cfg.server.bindInterface}
+            |     port: ${cfg.server.port}
+            |
+            |This will allow credentials to be transmitted in plain text over
+            |the network, and could compromise security!
+            |-------------------------------------------------------------------
+            |""".stripMargin
+        )
+      }
+      // scalastyle:on
       Option(
         Http().bindAndHandle(
           handler = routes,
@@ -29,6 +48,7 @@ trait ServerBindings {
           port = cfg.server.port
         )
       )
+    }
   }
 
   // scalastyle:off

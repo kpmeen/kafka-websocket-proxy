@@ -18,7 +18,7 @@ import scala.util.{Failure, Success}
 
 /**
  * @param cfg
- * @param sys
+ *   @param sys
  */
 private[session] class SessionDataProducer(
     implicit cfg: AppCfg,
@@ -60,9 +60,12 @@ private[session] class SessionDataProducer(
   /**
    * Writes the [[Session]] data to the session state topic in Kafka.
    *
-   * @param session Session to write
-   * @param ec      The [[ExecutionContext]] to use
-   * @return eventually returns [[Done]] when successfully completed
+   * @param session
+   *   Session to write
+   * @param ec
+   *   The [[ExecutionContext]] to use
+   * @return
+   *   eventually returns [[Done]] when successfully completed
    */
   def publish(session: Session)(implicit ec: ExecutionContext): Future[Done] = {
     val record = new ProducerRecord[String, Session](

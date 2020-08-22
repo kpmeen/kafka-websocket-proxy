@@ -6,10 +6,14 @@ import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroProducerResult
 /**
  * Type that wraps metadata about messages committed to Kafka.
  *
- * @param topic     the topic the message was written to.
- * @param partition the partition the message was written to.
- * @param offset    the partition offset for the written message.
- * @param timestamp the timestamp the message was received by Kafka.
+ * @param topic
+ *   the topic the message was written to.
+ * @param partition
+ *   the partition the message was written to.
+ * @param offset
+ *   the partition offset for the written message.
+ * @param timestamp
+ *   the timestamp the message was received by Kafka.
  */
 case class WsProducerResult(
     topic: String,

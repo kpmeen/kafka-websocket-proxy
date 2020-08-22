@@ -1,6 +1,10 @@
 package net.scalytica.test
 
-import akka.http.scaladsl.model.headers.BasicHttpCredentials
+import akka.http.scaladsl.model.headers.{
+  Authorization,
+  BasicHttpCredentials,
+  HttpCredentials
+}
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
 import net.scalytica.kafka.wsproxy.Headers.XKafkaAuthHeader
@@ -13,65 +17,60 @@ trait WsClientSpec
     with Matchers
     with ProtocolSerdes { self: Suite =>
 
-  /**
-   * @param uri
-   * @param routes
-   * @param body
-   * @param wsClient
-   * @tparam T
-   * @return
-   */
-  private[this] def defaultRouteCheck[T](uri: String, routes: Route)(
-      body: => T
-  )(
-      implicit wsClient: WSProbe
-  ) =
-    WS(uri, wsClient.flow) ~> routes ~> check(body)
-
-  /**
-   * @param uri
-   * @param routes
-   * @param creds
-   * @param body
-   * @param wsClient
-   * @tparam T
-   * @return
-   */
-  private[this] def secureRouteCheck[T](
+  /** Verify the server routes using an unsecured Kafka cluster */
+  private[this] def defaultRouteCheck[T](
       uri: String,
       routes: Route,
-      creds: BasicHttpCredentials
+      creds: Option[HttpCredentials] = None
   )(
       body: => T
   )(
       implicit wsClient: WSProbe
   ) = {
-    WS(uri, wsClient.flow) ~> addKafkaCreds(creds) ~> routes ~> check(body)
+    creds match {
+      case None => WS(uri, wsClient.flow) ~> routes ~> check(body)
+      case Some(c) =>
+        val authHeader = addHeader(Authorization(c))
+        WS(uri, wsClient.flow) ~> authHeader ~> routes ~> check(body)
+    }
   }
-//    WS(uri, wsClient.flow) ~> addCredentials(creds) ~> routes ~> check(body)
 
+  /** Verify the server routes using a secured Kafka cluster */
+  private[this] def secureKafkaRouteCheck[T](
+      uri: String,
+      routes: Route,
+      kafkaCreds: XKafkaAuthHeader,
+      creds: Option[HttpCredentials] = None
+  )(
+      body: => T
+  )(
+      implicit wsClient: WSProbe
+  ) = {
+    val headers = creds match {
+      case Some(c) => addHeaders(Authorization(c), kafkaCreds)
+      case None    => addHeader(kafkaCreds)
+    }
+    WS(uri, wsClient.flow) ~> headers ~> routes ~> check(body)
+  }
+
+  /** Set the X-Kafka-Auth header */
   def addKafkaCreds(creds: BasicHttpCredentials): RequestTransformer = {
     val kaHeader = XKafkaAuthHeader(creds)
     addHeader(kaHeader)
   }
 
-  /**
-   * @param uri
-   * @param routes
-   * @param basicCreds
-   * @param body
-   * @param wsClient
-   * @tparam T the return type of the body function
-   * @tparam M the type of messages
-   * @return
-   */
+  /** Check that the websocket behaves */
   def checkWebSocket[T, M](
       uri: String,
       routes: Route,
-      basicCreds: Option[BasicHttpCredentials] = None
+      kafkaCreds: Option[BasicHttpCredentials] = None,
+      creds: Option[HttpCredentials] = None
   )(body: => T)(implicit wsClient: WSProbe): T = {
-    basicCreds
-      .map(c => secureRouteCheck(uri, routes, c)(body))
-      .getOrElse(defaultRouteCheck(uri, routes)(body))
+    val u = creds.map(c => uri + s"&access_token=${c.token}").getOrElse(uri)
+
+    kafkaCreds
+      .map(c => secureKafkaRouteCheck(u, routes, XKafkaAuthHeader(c))(body))
+      .getOrElse(defaultRouteCheck(u, routes)(body))
   }
+
 }

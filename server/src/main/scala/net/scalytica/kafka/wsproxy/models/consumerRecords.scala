@@ -11,14 +11,18 @@ import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails
 
 /**
  * ADT describing any record that can be sent out from the service through the
- * WebSocket connection. Basically there are two types of messages; those with
- * a defined key of type {{{K}}} _and_ a value of type {{{V}}}. And records
- * that only contain a value of type {{{V}}}.
+ * WebSocket connection. Basically there are two types of messages; those with a
+ * defined key of type {{{K}}} _and_ a value of type {{{V}}}. And records that
+ * only contain a value of type {{{V}}}.
  *
- * @param key   The [[OutValueDetails]] describing the message key
- * @param value The [[OutValueDetails]] describing the message value
- * @tparam K the type of the key
- * @tparam V the type of the value
+ * @param key
+ *   The [[OutValueDetails]] describing the message key
+ * @param value
+ *   The [[OutValueDetails]] describing the message value
+ * @tparam K
+ *   the type of the key
+ * @tparam V
+ *   the type of the value
  */
 sealed abstract class WsConsumerRecord[+K, +V](
     key: Option[OutValueDetails[K]],
@@ -107,17 +111,27 @@ object WsConsumerRecord {
 /**
  * Consumer record type with key and value.
  *
- * @param topic             The topic name the message was consumed from
- * @param partition         The topic partition for the message
- * @param offset            The topic offset of the message
- * @param timestamp         The timestamp for when Kafka received the record
- * @param headers           The [[KafkaHeader]]s found on the message.
- * @param key               The [[OutValueDetails]] for the message key
- * @param value             The [[OutValueDetails]] for the message value
- * @param committableOffset An optional handle to the mechanism that allows
- *                          committing the message offset back to Kafka.
- * @tparam K the type of the key
- * @tparam V the type of the value
+ * @param topic
+ *   The topic name the message was consumed from
+ * @param partition
+ *   The topic partition for the message
+ * @param offset
+ *   The topic offset of the message
+ * @param timestamp
+ *   The timestamp for when Kafka received the record
+ * @param headers
+ *   The [[KafkaHeader]] s found on the message.
+ * @param key
+ *   The [[OutValueDetails]] for the message key
+ * @param value
+ *   The [[OutValueDetails]] for the message value
+ * @param committableOffset
+ *   An optional handle to the mechanism that allows committing the message
+ *   offset back to Kafka.
+ * @tparam K
+ *   the type of the key
+ * @tparam V
+ *   the type of the value
  */
 case class ConsumerKeyValueRecord[K, V](
     topic: TopicName,
@@ -141,15 +155,23 @@ case class ConsumerKeyValueRecord[K, V](
 /**
  * Consumer record type with value only.
  *
- * @param topic             The topic name the message was consumed from
- * @param partition         The topic partition for the message
- * @param offset            The topic offset of the message
- * @param timestamp         The timestamp for when Kafka received the record
- * @param headers           The [[KafkaHeader]]s found on the message.
- * @param value             The [[OutValueDetails]] for the message value
- * @param committableOffset An optional handle to the mechanism that allows
- *                          committing the message offset back to Kafka.
- * @tparam V the type of the value
+ * @param topic
+ *   The topic name the message was consumed from
+ * @param partition
+ *   The topic partition for the message
+ * @param offset
+ *   The topic offset of the message
+ * @param timestamp
+ *   The timestamp for when Kafka received the record
+ * @param headers
+ *   The [[KafkaHeader]] s found on the message.
+ * @param value
+ *   The [[OutValueDetails]] for the message value
+ * @param committableOffset
+ *   An optional handle to the mechanism that allows committing the message
+ *   offset back to Kafka.
+ * @tparam V
+ *   the type of the value
  */
 case class ConsumerValueRecord[V](
     topic: TopicName,

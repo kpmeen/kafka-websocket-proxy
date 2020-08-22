@@ -58,8 +58,10 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
   /**
    * Request handler for the outbound Kafka WebSocket connection.
    *
-   * @param args the output arguments to pass on to the consumer.
-   * @return a [[Route]] for accessing the outbound WebSocket functionality.
+   * @param args
+   *   the output arguments to pass on to the consumer.
+   * @return
+   *   a [[Route]] for accessing the outbound WebSocket functionality.
    */
   def outboundWebSocket(
       args: OutSocketArgs
@@ -139,13 +141,20 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
   /**
    * Actual preparation and setup of the outbound WebSocket [[Route]].
    *
-   * @param args the [[OutSocketArgs]]
-   * @param terminateConsumer termination logic for current websocket consumer.
-   * @param cfg the implicit [[AppCfg]] to use
-   * @param as the implicit untyped [[ActorSystem]] to use
-   * @param mat the implicit [[Materializer]] to use
-   * @param ec the implicit [[ExecutionContext]] to use
-   * @return the WebSocket [[Route]]
+   * @param args
+   *   the [[OutSocketArgs]]
+   * @param terminateConsumer
+   *   termination logic for current websocket consumer.
+   * @param cfg
+   *   the implicit [[AppCfg]] to use
+   * @param as
+   *   the implicit untyped [[ActorSystem]] to use
+   * @param mat
+   *   the implicit [[Materializer]] to use
+   * @param ec
+   *   the implicit [[ExecutionContext]] to use
+   * @return
+   *   the WebSocket [[Route]]
    */
   private[this] def prepareOutboundWebSocket(
       args: OutSocketArgs
@@ -193,15 +202,19 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
    * Prepares the appropriate Sink to use for incoming messages on the outbound
    * socket. The Sink is set up based on the desire to auto-commit or not.
    *
-   * - If the client requests auto-commit, all incoming messages are ignored.
-   * - If the client disables auto-commit, the Sink accepts JSON representation
-   *   of [[WsCommit]] messages. These are then passed on to an Actor with
-   *   [[CommitStackHandler]] behaviour.
+   *   - If the client requests auto-commit, all incoming messages are ignored.
+   *   - If the client disables auto-commit, the Sink accepts JSON
+   *     representation of [[WsCommit]] messages. These are then passed on to an
+   *     Actor with [[CommitStackHandler]] behaviour.
    *
-   * @param messageParser parser to use for decoding incoming messages.
-   * @param aref          an optional [[ActorRef]] to a [[CommitStackHandler]].
-   * @return a [[Sink]] for consuming [[Message]]s
-   * @see [[CommitStackHandler.commitStack]]
+   * @param messageParser
+   *   parser to use for decoding incoming messages.
+   * @param aref
+   *   an optional [[ActorRef]] to a [[CommitStackHandler]].
+   * @return
+   *   a [[Sink]] for consuming [[Message]] s
+   * @see
+   *   [[CommitStackHandler.commitStack]]
    */
   private[this] def prepareSink(
       messageParser: Flow[Message, WsCommit, NotUsed],
@@ -229,9 +242,12 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
    * Converts a WebSocket [[Message]] with a JSON String payload into a
    * [[WsCommit]] for down-stream processing.
    *
-   * @param mat the Materializer to use
-   * @param ec  the ExecutionContext to use
-   * @return a [[Flow]] converting [[Message]] to String
+   * @param mat
+   *   the Materializer to use
+   * @param ec
+   *   the ExecutionContext to use
+   * @return
+   *   a [[Flow]] converting [[Message]] to String
    */
   private[this] def jsonMessageToWsCommit(
       implicit mat: Materializer,
@@ -252,9 +268,12 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
    * Converts a WebSocket [[Message]] with an Avro payload into a [[WsCommit]]
    * for down-stream processing.
    *
-   * @param mat the [[Materializer]] to use
-   * @param ec  the [[ExecutionContext]] to use
-   * @return a [[Flow]] converting [[Message]] to String
+   * @param mat
+   *   the [[Materializer]] to use
+   * @param ec
+   *   the [[ExecutionContext]] to use
+   * @return
+   *   a [[Flow]] converting [[Message]] to String
    */
   private[this] def avroMessageToWsCommit(
       implicit mat: Materializer,
@@ -275,10 +294,14 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
   /**
    * The Kafka [[Source]] where messages are consumed from the topic.
    *
-   * @param args the output arguments to pass on to the consumer.
-   * @param cfg the application configuration.
-   * @param as the actor system to use.
-   * @return a [[Source]] producing [[TextMessage]]s for the outbound WebSocket.
+   * @param args
+   *   the output arguments to pass on to the consumer.
+   * @param cfg
+   *   the application configuration.
+   * @param as
+   *   the actor system to use.
+   * @return
+   *   a [[Source]] producing [[TextMessage]] s for the outbound WebSocket.
    */
   private[this] def kafkaSource(
       args: OutSocketArgs,
@@ -336,11 +359,16 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
    * Helper function that translates a [[WsConsumerRecord]] into the correct
    * type of [[Message]], based on the {{{args}}}.
    *
-   * @param args [[OutSocketArgs]] for building the outbound WebSocket.
-   * @param recEnc JSON encoder for [[WsConsumerRecord]]
-   * @tparam K the key type
-   * @tparam V the value type
-   * @return the data as a [[Message]].
+   * @param args
+   *   [[OutSocketArgs]] for building the outbound WebSocket.
+   * @param recEnc
+   *   JSON encoder for [[WsConsumerRecord]]
+   * @tparam K
+   *   the key type
+   * @tparam V
+   *   the value type
+   * @return
+   *   the data as a [[Message]].
    */
   private[this] def socketFormatConverter[K, V](
       args: OutSocketArgs
@@ -360,14 +388,18 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
     }
 
   /**
-   * Builds a Flow that sends consumed [[WsConsumerRecord]]s to the relevant
+   * Builds a Flow that sends consumed [[WsConsumerRecord]] s to the relevant
    * instance of [[CommitStackHandler]] actor Sink, which stashed the record so
    * that its offset can be committed later.
    *
-   * @param ref the [[ActorRef]] for the [[CommitStackHandler]]
-   * @tparam K the type of the record key
-   * @tparam V the type of the record value
-   * @return a commit [[Sink]] for [[WsConsumerRecord]] messages
+   * @param ref
+   *   the [[ActorRef]] for the [[CommitStackHandler]]
+   * @tparam K
+   *   the type of the record key
+   * @tparam V
+   *   the type of the record value
+   * @return
+   *   a commit [[Sink]] for [[WsConsumerRecord]] messages
    */
   private[this] def manualCommitSink[K, V](
       ref: ActorRef[CommitStackHandler.CommitProtocol]

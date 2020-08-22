@@ -1,5 +1,6 @@
 package net.scalytica.kafka
 
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.CompletableFuture
 import java.util.{Properties => JProps}
 
@@ -17,13 +18,14 @@ import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.logging.DefaultProxyLogger
 
 import scala.concurrent.ExecutionContext
+import scala.util.Try
 // scalastyle:off
 import org.apache.kafka.clients.consumer.ConsumerConfig.INTERCEPTOR_CLASSES_CONFIG
 // scalastyle:on
 
 import scala.compat.java8.{FunctionConverters, FutureConverters}
-import scala.concurrent.duration._
 import scala.concurrent.Future
+import scala.concurrent.duration._
 
 package object wsproxy {
 
@@ -165,4 +167,21 @@ package object wsproxy {
     def debugf(message: String, cause: Throwable): Future[Unit] =
       wrapInFuture(logger.debug(message, cause))
   }
+
+  implicit class SafeByteStringExtensions(val bs: ByteString) {
+
+    /**
+     * Safely decodes a [[ByteString]] into an optional String.
+     *
+     * @return
+     *   An Option of String.
+     */
+    def decodeSafeString: Option[String] =
+      Try(bs.decodeString(StandardCharsets.UTF_8)).toOption.flatMap {
+        case ""    => None
+        case value => Some(value)
+      }
+
+  }
+
 }

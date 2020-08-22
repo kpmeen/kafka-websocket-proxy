@@ -75,8 +75,9 @@ trait QueryParamParsers {
   }
 
   /**
-   * @return Directive extracting query parameters for the outbound (consuming)
-   *         socket communication.
+   * @return
+   *   Directive extracting query parameters for the outbound (consuming) socket
+   *   communication.
    */
   def outParams: Directive[Tuple1[OutSocketArgs]] =
     parameters(
@@ -109,8 +110,9 @@ trait QueryParamParsers {
     }
 
   /**
-   * @return Directive extracting query parameters for the inbound (producer)
-   *         socket communication.
+   * @return
+   *   Directive extracting query parameters for the inbound (producer) socket
+   *   communication.
    */
   def inParams: Directive[Tuple1[InSocketArgs]] =
     parameters(
