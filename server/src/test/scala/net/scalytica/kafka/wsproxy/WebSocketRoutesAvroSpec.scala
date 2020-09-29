@@ -329,8 +329,6 @@ class WebSocketRoutesAvroSpec
           numMessages = 0,
           prePopulate = false
         ) { ctx =>
-          implicit val kcfg = ctx.embeddedKafkaConfig
-
           val out = "/socket/out?" +
             "clientId=test-101" +
             "&groupId=test-group-101" +

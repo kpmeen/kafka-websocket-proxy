@@ -518,7 +518,7 @@ trait WebSocketRoutes { self: BaseRoutes =>
       pathPrefix("socket") {
         path("in") {
           maybeAuthenticate(cfg, maybeOpenIdClient, mat) { _ =>
-            optionalHeaderValueByType[XKafkaAuthHeader](()) { creds =>
+            optionalHeaderValueByType(XKafkaAuthHeader) { creds =>
               inParams { inArgs =>
                 val args = inArgs.withAclCredentials(aclCredentials(creds))
                 validateAndHandleWebSocket(args)(inbound(args))
@@ -527,7 +527,7 @@ trait WebSocketRoutes { self: BaseRoutes =>
           }
         } ~ path("out") {
           maybeAuthenticate(cfg, maybeOpenIdClient, mat) { _ =>
-            optionalHeaderValueByType[XKafkaAuthHeader](()) { creds =>
+            optionalHeaderValueByType(XKafkaAuthHeader) { creds =>
               outParams { outArgs =>
                 val args = outArgs.withAclCredentials(aclCredentials(creds))
                 validateAndHandleWebSocket(args)(outbound(args))

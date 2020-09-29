@@ -33,7 +33,7 @@ trait MockOpenIdServer
     with ScalaFutures
     with OptionValues {
 
-  implicit private[this] val circeConfig: Configuration =
+  implicit val openIdCirceConfig: Configuration =
     Configuration.default.withSnakeCaseMemberNames
 
   val oidClientSecret =
