@@ -6,16 +6,24 @@ import akka.http.scaladsl.model.headers.{
   HttpCredentials
 }
 import akka.http.scaladsl.server.Route
-import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
+import akka.http.scaladsl.testkit.{
+  RouteTestTimeout,
+  ScalatestRouteTest,
+  WSProbe
+}
 import net.scalytica.kafka.wsproxy.Headers.XKafkaAuthHeader
 import net.scalytica.kafka.wsproxy.codecs.ProtocolSerdes
 import org.scalatest.Suite
 import org.scalatest.matchers.must.Matchers
 
+import scala.concurrent.duration._
+
 trait WsClientSpec
     extends ScalatestRouteTest
     with Matchers
     with ProtocolSerdes { self: Suite =>
+
+  implicit private[this] val routeTestTimeout = RouteTestTimeout(20 seconds)
 
   /** Verify the server routes using an unsecured Kafka cluster */
   private[this] def defaultRouteCheck[T](
