@@ -7,18 +7,18 @@ object Versions {
   val ScalaVersion = "2.12.11"
 
   val ConfigVersion     = "1.4.0"
-  val PureConfigVersion = "0.13.0"
+  val PureConfigVersion = "0.14.0"
 
-  val Avro4sVersion                 = "4.0.0-RC2"
+  val Avro4sVersion                 = "4.0.0"
   val ConfluentPlatformVersion      = "5.5.1"
-  val KafkaVersion                  = "2.5.0"
-  val EmbeddedKafkaVersion          = "2.5.0"
+  val KafkaVersion                  = "2.5.1"
+  val EmbeddedKafkaVersion          = "2.5.1"
   val EmbeddedSchemaRegistryVersion = "5.5.1"
   val KafkaStreamsQueryVersion      = "0.1.1"
 
-  val AkkaVersion            = "2.6.8"
-  val AkkaHttpVersion        = "10.1.12"
-  val AkkaStreamKafkaVersion = "2.0.4"
+  val AkkaVersion            = "2.6.9"
+  val AkkaHttpVersion        = "10.2.0"
+  val AkkaStreamKafkaVersion = "2.0.5"
 
   val AlpakkaVersion = "1.0.2"
 
@@ -27,11 +27,13 @@ object Versions {
   val CirceGenericExtrasVersion = CirceVersion
   val CirceOpticsVersion        = CirceVersion
 
+  val JwtScalaVersion = "4.3.0"
+
   val ScalaLoggingVersion = "3.9.2"
   val Slf4JVersion        = "1.7.30"
   val LogbackVersion      = "1.2.3"
 
-  val ScalaTestVersion = "3.2.0"
+  val ScalaTestVersion = "3.2.2"
 
   val GatlingVersion = "3.1.1"
 }
@@ -87,8 +89,8 @@ object Dependencies {
   }
 
   object OAuth {
-    val JwtScala = "com.pauldijou" %% "jwt-core"  % "4.2.0"
-    val JwtCirce = "com.pauldijou" %% "jwt-circe" % "4.2.0"
+    val JwtScala = "com.pauldijou" %% "jwt-core"  % JwtScalaVersion
+    val JwtCirce = "com.pauldijou" %% "jwt-circe" % JwtScalaVersion
 
     val All = Seq(JwtScala, JwtCirce)
   }
