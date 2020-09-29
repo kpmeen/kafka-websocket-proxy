@@ -2,7 +2,11 @@ package net.scalytica.test
 
 import akka.http.scaladsl.model.headers.BasicHttpCredentials
 import akka.http.scaladsl.server.Route
-import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
+import akka.http.scaladsl.testkit.{
+  RouteTestTimeout,
+  ScalatestRouteTest,
+  WSProbe
+}
 import com.typesafe.config.Config
 import io.confluent.kafka.schemaregistry.rest.SchemaRegistryConfig._
 import jdk.jshell.spi.ExecutionControl.NotImplementedException
@@ -55,6 +59,8 @@ trait WsProxyKafkaSpec
 
   val testKeyPass: String         = "scalytica"
   val creds: BasicHttpCredentials = BasicHttpCredentials("client", "client")
+
+  implicit val routeTestTimeout = RouteTestTimeout(20 seconds)
 
   implicit val consumerRetryConfig: ConsumerRetryConfig =
     ConsumerRetryConfig(30, 50 millis)

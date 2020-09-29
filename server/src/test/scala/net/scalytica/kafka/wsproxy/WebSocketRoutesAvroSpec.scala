@@ -3,7 +3,6 @@ package net.scalytica.kafka.wsproxy
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers.BasicHttpCredentials
 import akka.http.scaladsl.server._
-import akka.http.scaladsl.testkit.RouteTestTimeout
 import net.manub.embeddedkafka.Codecs._
 import net.scalytica.kafka.wsproxy.SocketProtocol.AvroPayload
 import net.scalytica.kafka.wsproxy.auth.AccessToken

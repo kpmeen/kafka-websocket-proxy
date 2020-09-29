@@ -1,7 +1,7 @@
 package net.scalytica
 
 import akka.http.scaladsl.model.ws.{BinaryMessage, TextMessage}
-import akka.http.scaladsl.testkit.{RouteTestTimeout, WSProbe}
+import akka.http.scaladsl.testkit.WSProbe
 import akka.stream.Materializer
 import akka.stream.scaladsl.Sink
 import io.circe.Decoder
@@ -36,8 +36,6 @@ import scala.util.{Failure, Success}
 
 package object test {
 
-  implicit val routeTestTimeout = RouteTestTimeout(20 seconds)
-
   def availablePort: Int = {
     val s = new java.net.ServerSocket(0)
     try {
@@ -60,14 +58,14 @@ package object test {
   ): Map[String, _] = {
     schemaRegistryPort
       .map { _ =>
-        // scalastyle: off
+        // scalastyle:off
         Map(
           SCHEMA_REGISTRY_URL_CONFIG    -> s"http://${serverHost(schemaRegistryPort)}",
           AUTO_REGISTER_SCHEMAS         -> true,
           "key.subject.name.strategy"   -> keySubjNameStrategy.getCanonicalName,
           "value.subject.name.strategy" -> valSubjNameStrategy.getCanonicalName
         )
-        // scalastyle: on
+        // scalastyle:on
       }
       .getOrElse(Map.empty)
   }
