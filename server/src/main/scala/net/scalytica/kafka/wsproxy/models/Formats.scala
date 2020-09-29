@@ -32,13 +32,12 @@ object Formats {
 
     def anyToCoproduct(v: Any): AvroValueTypesCoproduct =
       Try(v.asInstanceOf[Tpe])
-        .recover {
-          case NonFatal(e) =>
-            DefaultProxyLogger.warn(
-              s"Could not cast ${v.getClass} to ${self.getClass}",
-              e
-            )
-            throw e
+        .recover { case NonFatal(e) =>
+          DefaultProxyLogger.warn(
+            s"Could not cast ${v.getClass} to ${self.getClass}",
+            e
+          )
+          throw e
         }
         .toOption
         .map(typeToCoproduct)

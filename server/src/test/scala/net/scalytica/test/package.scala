@@ -22,6 +22,7 @@ import net.scalytica.kafka.wsproxy.models.Formats.{AvroType, FormatType}
 import net.scalytica.kafka.wsproxy.models.{
   ConsumerKeyValueRecord,
   ConsumerValueRecord,
+  TopicName,
   WsConsumerRecord,
   WsProducerResult
 }
@@ -91,7 +92,7 @@ package object test {
       with OptionValues {
 
     def expectWsProducerResultJson(
-        expectedTopic: String
+        expectedTopic: TopicName
     )(implicit mat: Materializer): Assertion = {
       probe.expectMessage() match {
         case tm: TextMessage =>
@@ -107,7 +108,7 @@ package object test {
               js.as[WsProducerResult] match {
                 case Left(err) => throw err
                 case Right(actual) =>
-                  actual.topic mustBe expectedTopic
+                  actual.topic mustBe expectedTopic.value
                   actual.offset mustBe >=(0L)
                   actual.partition mustBe >=(0)
               }
@@ -119,7 +120,7 @@ package object test {
     }
 
     def expectWsProducerResultAvro(
-        expectedTopic: String
+        expectedTopic: TopicName
     )(
         implicit mat: Materializer,
         resultSerde: WsProxyAvroSerde[AvroProducerResult]
@@ -134,7 +135,7 @@ package object test {
 
           val actual = resultSerde.deserialize(collected.toArray)
 
-          actual.topic mustBe expectedTopic
+          actual.topic mustBe expectedTopic.value
           actual.offset mustBe >=(0L)
           actual.partition mustBe >=(0)
 
@@ -145,7 +146,7 @@ package object test {
 
     // scalastyle:off method.length
     def expectWsConsumerKeyValueResultJson[K, V](
-        expectedTopic: String,
+        expectedTopic: TopicName,
         expectedKey: K,
         expectedValue: V,
         expectHeaders: Boolean = false
@@ -168,7 +169,7 @@ package object test {
               js.as[WsConsumerRecord[K, V]] match {
                 case Left(err) => throw err
                 case Right(actual) =>
-                  actual.topic.value mustBe expectedTopic
+                  actual.topic.value mustBe expectedTopic.value
                   actual.offset.value mustBe >=(0L)
                   actual.partition.value mustBe >=(0)
 
@@ -204,7 +205,7 @@ package object test {
     }
 
     def expectWsConsumerResultAvro[K, V](
-        expectedTopic: String,
+        expectedTopic: TopicName,
         expectHeaders: Boolean = false,
         keyFormat: FormatType,
         valFormat: FormatType
@@ -227,7 +228,7 @@ package object test {
               crSerde.deserialize(collected.toArray)
             )(keyFormat, valFormat)
 
-          actual.topic.value mustBe expectedTopic
+          actual.topic.value mustBe expectedTopic.value
           actual.offset.value mustBe >=(0L)
           actual.partition.value mustBe >=(0)
 
@@ -250,7 +251,7 @@ package object test {
     }
 
     def expectWsConsumerKeyValueResultAvro(
-        expectedTopic: String,
+        expectedTopic: TopicName,
         expectedKey: Option[TestKey],
         expectedValue: Album,
         expectHeaders: Boolean = false
@@ -268,8 +269,8 @@ package object test {
         AvroType
       ) {
         case ConsumerKeyValueRecord(_, _, _, _, _, key, value, _) =>
-          val k = keySerdes.deserialize(expectedTopic, key.value)
-          val v = valSerdes.deserialize(expectedTopic, value.value)
+          val k = keySerdes.deserialize(expectedTopic.value, key.value)
+          val v = valSerdes.deserialize(expectedTopic.value, value.value)
           k.username mustBe expectedKey.get.username
           v.title mustBe expectedValue.title
           v.artist mustBe expectedValue.artist
@@ -277,13 +278,13 @@ package object test {
           v.tracks must contain allElementsOf expectedValue.tracks
 
         case ConsumerValueRecord(_, _, _, _, _, value, _) =>
-          val v = valSerdes.deserialize(expectedTopic, value.value)
+          val v = valSerdes.deserialize(expectedTopic.value, value.value)
           v mustBe expectedValue
       }
     }
 
     def expectWsConsumerValueResultJson[V](
-        expectedTopic: String,
+        expectedTopic: TopicName,
         expectedValue: V
     )(
         implicit mat: Materializer,
@@ -297,7 +298,7 @@ package object test {
     }
 
     def expectWsConsumerValueResultAvro(
-        expectedTopic: String,
+        expectedTopic: TopicName,
         expectedValue: Album
     )(
         implicit mat: Materializer,

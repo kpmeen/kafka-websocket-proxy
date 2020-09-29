@@ -73,18 +73,17 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
           p <- bac.password
         } yield (u, p)
       }
-      .map {
-        case (usr, pwd) =>
-          creds match {
-            case p @ Credentials.Provided(id) // constant time comparison
-                if usr.equals(id) && p.verify(pwd) =>
-              logger.trace("Successfully authenticated bearer token.")
-              Some(id)
+      .map { case (usr, pwd) =>
+        creds match {
+          case p @ Credentials.Provided(id) // constant time comparison
+              if usr.equals(id) && p.verify(pwd) =>
+            logger.trace("Successfully authenticated bearer token.")
+            Some(id)
 
-            case _ =>
-              logger.info("Could not authenticate basic auth credentials")
-              None
-          }
+          case _ =>
+            logger.info("Could not authenticate basic auth credentials")
+            None
+        }
       }
       .getOrElse(Some("basic auth not configured"))
   }
@@ -189,22 +188,21 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
           implicit val s = sys.scheduler.toTyped
           implicit val e = sys.dispatcher
 
-          args.foreach {
-            case (cid, gid) =>
-              sessionHandler.shRef.removeConsumer(gid, cid).onComplete {
-                case Success(res) =>
-                  logger.debug(
-                    s"Removing consumer ${cid.value} from group" +
-                      s" ${gid.value} returned: ${res.asString}"
-                  )
-                case Failure(err) =>
-                  logger.warn(
-                    "An error occurred when trying to remove consumer" +
-                      s" ${cid.value} from group" +
-                      s" ${gid.value}",
-                    err
-                  )
-              }
+          args.foreach { case (cid, gid) =>
+            sessionHandler.shRef.removeConsumer(gid, cid).onComplete {
+              case Success(res) =>
+                logger.debug(
+                  s"Removing consumer ${cid.value} from group" +
+                    s" ${gid.value} returned: ${res.asString}"
+                )
+              case Failure(err) =>
+                logger.warn(
+                  "An error occurred when trying to remove consumer" +
+                    s" ${cid.value} from group" +
+                    s" ${gid.value}",
+                  err
+                )
+            }
           }
 
           request.discardEntityBytes()
@@ -233,7 +231,13 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
           rejectAndComplete(jsonResponseMsg(BadRequest, t.message))
         }
 
-      case a @ (_: AuthenticationError | _: InvalidPublicKeyError) =>
+      case a: InvalidPublicKeyError =>
+        extractUri { uri =>
+          logger.info(s"Request to $uri could not be authenticated.", a)
+          rejectAndComplete(jsonResponseMsg(Unauthorized, a.getMessage))
+        }
+
+      case a: AuthenticationError =>
         extractUri { uri =>
           logger.info(s"Request to $uri could not be authenticated.", a)
           rejectAndComplete(jsonResponseMsg(Unauthorized, a.getMessage))
@@ -269,14 +273,13 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
           )
         )
       }
-      .handle {
-        case ValidationRejection(msg, _) =>
-          rejectAndComplete(
-            jsonResponseMsg(
-              statusCode = BadRequest,
-              message = msg
-            )
+      .handle { case ValidationRejection(msg, _) =>
+        rejectAndComplete(
+          jsonResponseMsg(
+            statusCode = BadRequest,
+            message = msg
           )
+        )
       }
       .result()
       .withFallback(RejectionHandler.default)
@@ -284,7 +287,7 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
         res.entity match {
           case HttpEntity.Strict(ContentTypes.`text/plain(UTF-8)`, body) =>
             val js = jsonMessageStr(body.utf8String).printWith(Printer.noSpaces)
-            res.copy(entity = HttpEntity(ContentTypes.`application/json`, js))
+            res.withEntity(HttpEntity(ContentTypes.`application/json`, js))
 
           case _ => res
         }
@@ -303,6 +306,11 @@ trait ServerRoutes
   /**
    * @param cfg
    *   Implicitly provided [[AppCfg]]
+   * @param sessionHandlerRef
+   *   Implicitly provided [[SessionHandlerRef]] to use
+   * @param maybeOpenIdClient
+   *   Implicitly provided Option that contains an [[OpenIdClient]] if OIDC is
+   *   enabled.
    * @param sys
    *   Implicitly provided [[ActorSystem]]
    * @param mat
@@ -496,6 +504,9 @@ trait WebSocketRoutes { self: BaseRoutes =>
    *   function defining the [[Route]] for the consumer socket
    * @param cfg
    *   Implicitly provided [[AppCfg]]
+   * @param maybeOpenIdClient
+   *   Implicitly provided Option that contains an [[OpenIdClient]] if OIDC is
+   *   enabled.
    * @return
    *   The [[Route]] definition for the websocket endpoints
    */

@@ -23,7 +23,7 @@ class SchemaRoutesSpec
     with EitherValues
     with OptionValues
     with ScalaFutures
-    with WSProxyKafkaSpec {
+    with WsProxyKafkaSpec {
 
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(2, Minutes))

@@ -139,23 +139,21 @@ private[consumer] object CommitStackTypes {
           logger.debug(s"COMMIT: Could not find $msgId in stack")
           None
         }
-        .map {
-          case (p, s) =>
-            val reduced = s.dropWhile(_.wsProxyMsgId != msgId)
-            updated(p, reduced.tail) -> reduced.headOption
+        .map { case (p, s) =>
+          val reduced = s.dropWhile(_.wsProxyMsgId != msgId)
+          updated(p, reduced.tail) -> reduced.headOption
         }
-        .flatMap {
-          case (nextStack, maybeCommittable) =>
-            maybeCommittable.map { u =>
-              Source
-                .single(u)
-                .map(_.committable)
-                .via(Committer.flow(cs))
-                .runForeach { _ =>
-                  logger.debug(s"COMMIT: committed $msgId and cleaned up stack")
-                }
-              nextStack
-            }
+        .flatMap { case (nextStack, maybeCommittable) =>
+          maybeCommittable.map { u =>
+            Source
+              .single(u)
+              .map(_.committable)
+              .via(Committer.flow(cs))
+              .runForeach { _ =>
+                logger.debug(s"COMMIT: committed $msgId and cleaned up stack")
+              }
+            nextStack
+          }
         }
 
     def mkString: String = stack.mkString("")

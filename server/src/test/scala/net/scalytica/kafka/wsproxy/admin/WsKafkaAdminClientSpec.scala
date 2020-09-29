@@ -1,7 +1,7 @@
 package net.scalytica.kafka.wsproxy.admin
 
 import net.manub.embeddedkafka.schemaregistry.EmbeddedKafka
-import net.scalytica.test.WSProxyKafkaSpec
+import net.scalytica.test.WsProxyKafkaSpec
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Minutes, Span}
 import org.scalatest.OptionValues
@@ -11,7 +11,7 @@ class WsKafkaAdminClientSpec
     extends AnyWordSpec
     with OptionValues
     with ScalaFutures
-    with WSProxyKafkaSpec
+    with WsProxyKafkaSpec
     with EmbeddedKafka {
 
   implicit override val patienceConfig: PatienceConfig =
@@ -21,7 +21,7 @@ class WsKafkaAdminClientSpec
 
     "return info on brokers in the cluster" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-        val wsCfg  = appTestConfig(kcfg.kafkaPort)
+        val wsCfg  = plainAppTestConfig(kcfg.kafkaPort)
         val client = new WsKafkaAdminClient(wsCfg)
 
         val res = client.clusterInfo
@@ -36,7 +36,7 @@ class WsKafkaAdminClientSpec
 
     "return number replicas to use for the session topic" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-        val wsCfg  = appTestConfig(kcfg.kafkaPort)
+        val wsCfg  = plainAppTestConfig(kcfg.kafkaPort)
         val client = new WsKafkaAdminClient(wsCfg)
 
         client.replicationFactor mustBe 1
@@ -46,7 +46,7 @@ class WsKafkaAdminClientSpec
 
     "create and find the session state topic" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-        val wsCfg  = appTestConfig(kcfg.kafkaPort)
+        val wsCfg  = plainAppTestConfig(kcfg.kafkaPort)
         val client = new WsKafkaAdminClient(wsCfg)
 
         client.createSessionStateTopic()
@@ -60,7 +60,7 @@ class WsKafkaAdminClientSpec
 
     "initialise the session state topic" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-        val wsCfg  = appTestConfig(kcfg.kafkaPort)
+        val wsCfg  = plainAppTestConfig(kcfg.kafkaPort)
         val client = new WsKafkaAdminClient(wsCfg)
 
         client.initSessionStateTopic()

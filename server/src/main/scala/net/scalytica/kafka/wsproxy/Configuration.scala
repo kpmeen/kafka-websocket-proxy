@@ -24,7 +24,7 @@ object Configuration extends WithProxyLogger {
 
   implicit lazy val configAsMap: ConfigReader[Map[String, AnyRef]] =
     ConfigReader
-      .fromCursor(_.asObjectCursor.map(_.value.toConfig))
+      .fromCursor(_.asObjectCursor.map(_.objValue.toConfig))
       .map(typesafeConfigToMap)
 
   implicit lazy val stringAsKafkaUrls: ConfigReader[KafkaBootstrapHosts] =
@@ -55,7 +55,7 @@ object Configuration extends WithProxyLogger {
             val props = cursor.fluent
               .at("properties")
               .asObjectCursor
-              .map(coc => typesafeConfigToMap(coc.value.toConfig))
+              .map(coc => typesafeConfigToMap(coc.objValue.toConfig))
               .getOrElse(Map.empty)
 
             Right[ConfigReaderFailures, Option[SchemaRegistryCfg]](
@@ -106,9 +106,8 @@ object Configuration extends WithProxyLogger {
         bootstrapHosts: KafkaBootstrapHosts,
         props: Map[String, AnyRef]
     ): Map[String, AnyRef] = {
-      props.map {
-        case (key, value) =>
-          s"${ConfluentMonitoringCfg.MonitoringPrefix}.$key" -> value
+      props.map { case (key, value) =>
+        s"${ConfluentMonitoringCfg.MonitoringPrefix}.$key" -> value
       } + (BootstrapServersKey -> bootstrapHosts.hosts.mkString(","))
     }
   }

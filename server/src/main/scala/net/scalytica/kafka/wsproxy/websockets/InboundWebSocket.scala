@@ -28,6 +28,10 @@ trait InboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
    *
    * @param args
    *   the input arguments to pass on to the producer.
+   * @param as
+   *   Implicitly provided [[ActorSystem]]
+   * @param mat
+   *   Implicitly provided [[Materializer]]
    * @return
    *   a [[Route]] for accessing the inbound WebSocket functionality.
    * @see

@@ -5,6 +5,7 @@ import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
 import com.typesafe.config.Config
 import io.confluent.kafka.schemaregistry.rest.SchemaRegistryConfig._
+import jdk.jshell.spi.ExecutionControl.NotImplementedException
 import kafka.server.KafkaConfig._
 import net.manub.embeddedkafka.ConsumerExtensions.ConsumerRetryConfig
 import net.manub.embeddedkafka.schemaregistry.{
@@ -20,9 +21,12 @@ import net.scalytica.kafka.wsproxy.Configuration.{
   SchemaRegistryCfg
 }
 import net.scalytica.kafka.wsproxy.auth.OpenIdClient
-import net.scalytica.kafka.wsproxy.models.WsServerId
+import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroProducerRecord
+import net.scalytica.kafka.wsproxy.models.Formats._
+import net.scalytica.kafka.wsproxy.models.{TopicName, WsServerId}
 import net.scalytica.kafka.wsproxy.session.SessionHandler
 import net.scalytica.kafka.wsproxy.{mapToProperties, Configuration}
+import net.scalytica.test.TestDataGenerators._
 import org.apache.kafka.clients.CommonClientConfigs._
 import org.apache.kafka.clients.admin.AdminClientConfig.{
   BOOTSTRAP_SERVERS_CONFIG,
@@ -42,11 +46,12 @@ import scala.concurrent.duration._
 import scala.util.Random
 
 // scalastyle:off magic.number
-trait WSProxyKafkaSpec
+trait WsProxyKafkaSpec
     extends FileLoader
     with ScalatestRouteTest
     with Matchers
-    with EmbeddedKafka { self: Suite =>
+    with EmbeddedKafka {
+  self: Suite =>
 
   val testKeyPass: String         = "scalytica"
   val creds: BasicHttpCredentials = BasicHttpCredentials("client", "client")
@@ -86,10 +91,10 @@ trait WSProxyKafkaSpec
   )
 
   def embeddedKafkaConfigWithSasl: EmbeddedKafkaConfig = {
-    val kbpPlain  = availablePort
-    val kbpSecure = availablePort
-    val zkp       = availablePort
-    val srp       = availablePort
+    val brokerPortPlain  = availablePort
+    val brokerPortSecure = availablePort
+    val zkp              = availablePort
+    val srp              = availablePort
 
     val brokerSasl =
       "org.apache.kafka.common.security.plain.PlainLoginModule required " +
@@ -100,10 +105,11 @@ trait WSProxyKafkaSpec
         "user_client=\"client\";"
 
     val listeners =
-      s"PLAINTEXT://localhost:$kbpPlain,SASL_SSL://localhost:$kbpSecure"
+      s"PLAINTEXT://localhost:$brokerPortPlain," +
+        s"SASL_SSL://localhost:$brokerPortSecure"
 
     EmbeddedKafkaConfig(
-      kafkaPort = kbpSecure,
+      kafkaPort = brokerPortSecure,
       zooKeeperPort = zkp,
       schemaRegistryPort = srp,
       customBrokerProperties = Map(
@@ -150,8 +156,10 @@ trait WSProxyKafkaSpec
   val basicHttpCreds        = BasicHttpCredentials(basicAuthUser, basicAuthPass)
   val invalidBasicHttpCreds = BasicHttpCredentials(basicAuthUser, "invalid")
 
-  def basicAuthCredendials(useBasicAuth: Boolean): Option[BasicAuthCfg] = {
-    if (useBasicAuth)
+  def basicAuthCredendials(
+      useServerBasicAuth: Boolean
+  ): Option[BasicAuthCfg] = {
+    if (useServerBasicAuth)
       Option(
         BasicAuthCfg(
           username = Option(basicAuthUser),
@@ -163,10 +171,12 @@ trait WSProxyKafkaSpec
     else None
   }
 
-  def plainTestConfig(useBasicAuth: Boolean = false): Configuration.AppCfg = {
+  def plainTestConfig(
+      useServerBasicAuth: Boolean = false
+  ): Configuration.AppCfg = {
     val serverId = s"test-server-${Random.nextInt(50000)}"
     val basicAuthCreds =
-      if (useBasicAuth)
+      if (useServerBasicAuth)
         Option(
           BasicAuthCfg(
             username = Option(basicAuthUser),
@@ -187,8 +197,31 @@ trait WSProxyKafkaSpec
   def appTestConfig(
       kafkaPort: Int,
       schemaRegistryPort: Option[Int] = None,
-      useBasicAuth: Boolean = false,
-      openIdCfg: Option[OpenIdConnectCfg] = None
+      useServerBasicAuth: Boolean = false,
+      serverOpenIdCfg: Option[OpenIdConnectCfg] = None
+  ): Configuration.AppCfg = {
+    if (useServerBasicAuth || serverOpenIdCfg.isDefined) {
+      secureAppTestConfig(
+        kafkaPort = kafkaPort,
+        schemaRegistryPort = schemaRegistryPort,
+        useServerBasicAuth = useServerBasicAuth,
+        serverOpenIdCfg = serverOpenIdCfg
+      )
+    } else {
+      plainAppTestConfig(
+        kafkaPort = kafkaPort,
+        schemaRegistryPort = schemaRegistryPort,
+        useServerBasicAuth = useServerBasicAuth,
+        serverOpenIdCfg = serverOpenIdCfg
+      )
+    }
+  }
+
+  def plainAppTestConfig(
+      kafkaPort: Int,
+      schemaRegistryPort: Option[Int] = None,
+      useServerBasicAuth: Boolean = false,
+      serverOpenIdCfg: Option[OpenIdConnectCfg] = None
   ): Configuration.AppCfg = {
     val serverId = s"test-server-${Random.nextInt(50000)}"
     val srUrl =
@@ -198,13 +231,13 @@ trait WSProxyKafkaSpec
         srUrl.map(u => SchemaRegistryCfg(u, autoRegisterSchemas = true))
       )(sr => Option(sr.copy(url = srUrl.getOrElse(sr.url))))
 
-    val basicAuthCreds = basicAuthCredendials(useBasicAuth)
+    val basicAuthCreds = basicAuthCredendials(useServerBasicAuth)
 
     defaultTestAppCfg.copy(
       server = defaultTestAppCfg.server.copy(
         serverId = WsServerId(serverId),
         basicAuth = basicAuthCreds,
-        openidConnect = openIdCfg
+        openidConnect = serverOpenIdCfg
       ),
       kafkaClient = defaultTestAppCfg.kafkaClient.copy(
         bootstrapHosts = KafkaBootstrapHosts(List(serverHost(Some(kafkaPort)))),
@@ -216,8 +249,8 @@ trait WSProxyKafkaSpec
   def secureAppTestConfig(
       kafkaPort: Int,
       schemaRegistryPort: Option[Int] = None,
-      useBasicAuth: Boolean = false,
-      openIdCfg: Option[OpenIdConnectCfg] = None
+      useServerBasicAuth: Boolean = false,
+      serverOpenIdCfg: Option[OpenIdConnectCfg] = None
   ): Configuration.AppCfg = {
     val serverId = s"test-server-${Random.nextInt(50000)}"
     val srUrl =
@@ -227,13 +260,13 @@ trait WSProxyKafkaSpec
         srUrl.map(u => SchemaRegistryCfg(u, autoRegisterSchemas = true))
       )(sr => Option(sr.copy(url = srUrl.getOrElse(sr.url))))
 
-    val basicAuthCreds = basicAuthCredendials(useBasicAuth)
+    val basicAuthCreds = basicAuthCredendials(useServerBasicAuth)
 
     defaultTestAppCfg.copy(
       server = defaultTestAppCfg.server.copy(
         serverId = WsServerId(serverId),
         basicAuth = basicAuthCreds,
-        openidConnect = openIdCfg
+        openidConnect = serverOpenIdCfg
       ),
       kafkaClient = defaultTestAppCfg.kafkaClient.copy(
         bootstrapHosts = KafkaBootstrapHosts(List(serverHost(Some(kafkaPort)))),
@@ -251,8 +284,7 @@ trait WSProxyKafkaSpec
 
   private[this] val zkSessionTimeoutMs    = 10000
   private[this] val zkConnectionTimeoutMs = 10000
-  private[this] val topicCreationTimeout  = 2 seconds
-//  private[this] val topicDeletionTimeout  = 2 seconds
+  private[this] val topicCreationTimeout  = 5 seconds
 
   def initialiseTopic(
       topic: String,
@@ -281,6 +313,13 @@ trait WSProxyKafkaSpec
         .createTopics(Seq(newTopic).asJava)
         .all
         .get(topicCreationTimeout.length, topicCreationTimeout.unit)
+    } catch {
+      case je: java.util.concurrent.TimeoutException =>
+        fail(
+          s"Timed out attempting to create ${if (isSecure) " secure" else ""}" +
+            s"topic $topic",
+          je
+        )
     } finally {
       client.close()
     }
@@ -300,23 +339,42 @@ trait WSProxyKafkaSpec
       isSecure = isSecure
     )
 
-  def defaultProducerContext[T](
-      topic: String = "test-topic"
-  )(body: (EmbeddedKafkaConfig, AppCfg, Route, WSProbe) => T): T = {
-    secureServerProducerContext(topic)(body)
+  def secureKafkaContext[T](body: EmbeddedKafkaConfig => T): T = {
+    implicit val secureCfg = embeddedKafkaConfigWithSasl
+    withRunningKafka(body(secureCfg))
   }
 
-  def secureServerProducerContext[T](
-      topic: String,
-      useBasicAuth: Boolean = false,
-      openIdCfg: Option[OpenIdConnectCfg] = None
-  )(body: (EmbeddedKafkaConfig, AppCfg, Route, WSProbe) => T): T = {
+  def plainServerContext[T](
+      body: (EmbeddedKafkaConfig, AppCfg, Route) => T
+  ): T =
     withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-      implicit val wsCfg = appTestConfig(
+      implicit val wsCfg =
+        plainAppTestConfig(kafkaPort = kcfg.kafkaPort)
+      implicit val oidClient: Option[OpenIdClient] = None
+      implicit val sessionHandlerRef               = SessionHandler.init
+
+      val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
+      val ctrl                    = sdcStream.run()
+
+      val res = body(kcfg, wsCfg, testRoutes)
+
+      ctrl.shutdown()
+
+      res
+    }
+
+  def secureServerContext[T](
+      useServerBasicAuth: Boolean = false,
+      serverOpenIdCfg: Option[OpenIdConnectCfg] = None
+  )(
+      body: (EmbeddedKafkaConfig, AppCfg, Route) => T
+  ): T =
+    withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
+      implicit val wsCfg = plainAppTestConfig(
         kafkaPort = kcfg.kafkaPort,
         schemaRegistryPort = Some(kcfg.schemaRegistryPort),
-        useBasicAuth = useBasicAuth,
-        openIdCfg = openIdCfg
+        useServerBasicAuth = useServerBasicAuth,
+        serverOpenIdCfg = serverOpenIdCfg
       )
 
       implicit val oidClient = wsCfg.server.openidConnect
@@ -324,26 +382,60 @@ trait WSProxyKafkaSpec
         .map(_ => OpenIdClient(wsCfg))
       implicit val sessionHandlerRef = SessionHandler.init
 
-      initTopic(topic)
-
-      val wsClient                = WSProbe()
       val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
       val ctrl                    = sdcStream.run()
 
-      val res = body(kcfg, wsCfg, testRoutes, wsClient)
+      val res = body(kcfg, wsCfg, testRoutes)
 
       ctrl.shutdown()
 
       res
     }
+
+}
+
+trait WsProxyProducerKafkaSpec
+    extends WsProxyKafkaSpec
+    with WsProducerClientSpec { self: Suite =>
+
+  case class ProducerContext(
+      topicName: TopicName,
+      embeddedKafkaConfig: EmbeddedKafkaConfig,
+      appCfg: AppCfg,
+      route: Route,
+      producerProbe: WSProbe
+  )
+
+  def plainProducerContext[T](
+      topic: String = "test-topic"
+  )(body: ProducerContext => T): T =
+    secureServerProducerContext(topic = topic)(body)
+
+  def secureServerProducerContext[T](
+      topic: String,
+      useServerBasicAuth: Boolean = false,
+      serverOpenIdCfg: Option[OpenIdConnectCfg] = None
+  )(body: ProducerContext => T): T = {
+    secureKafkaClusterProducerContext(
+      topic,
+      useServerBasicAuth,
+      serverOpenIdCfg
+    )(body)
   }
 
   def secureKafkaClusterProducerContext[T](
-      topic: String = "test-topic"
-  )(body: (EmbeddedKafkaConfig, AppCfg, Route, WSProbe) => T): T = {
+      topic: String = "test-topic",
+      useServerBasicAuth: Boolean = false,
+      serverOpenIdCfg: Option[OpenIdConnectCfg] = None
+  )(body: ProducerContext => T): T = {
     secureKafkaContext { implicit kcfg =>
       implicit val wsCfg =
-        secureAppTestConfig(kcfg.kafkaPort, Some(kcfg.schemaRegistryPort))
+        secureAppTestConfig(
+          kafkaPort = kcfg.kafkaPort,
+          schemaRegistryPort = Some(kcfg.schemaRegistryPort),
+          useServerBasicAuth = useServerBasicAuth,
+          serverOpenIdCfg = serverOpenIdCfg
+        )
 
       implicit val oidClient = wsCfg.server.openidConnect
         .filter(_.enabled)
@@ -352,11 +444,18 @@ trait WSProxyKafkaSpec
 
       initTopic(topic, isSecure = true)
 
-      val wsProducerClient        = WSProbe()
+      val producerProbe           = WSProbe()
       val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
       val ctrl                    = sdcStream.run()
 
-      val res = body(kcfg, wsCfg, testRoutes, wsProducerClient)
+      val ctx = ProducerContext(
+        topicName = TopicName(topic),
+        embeddedKafkaConfig = kcfg,
+        appCfg = wsCfg,
+        route = testRoutes,
+        producerProbe = producerProbe
+      )
+      val res = body(ctx)
 
       ctrl.shutdown()
 
@@ -364,8 +463,295 @@ trait WSProxyKafkaSpec
     }
   }
 
-  def secureKafkaContext[T](body: EmbeddedKafkaConfig => T): T = {
-    implicit val secureCfg = embeddedKafkaConfigWithSasl
-    withRunningKafka(body(secureCfg))
+}
+
+trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
+
+  case class ConsumerContext(
+      topicName: TopicName,
+      embeddedKafkaConfig: EmbeddedKafkaConfig,
+      appCfg: AppCfg,
+      route: Route,
+      producerProbe: WSProbe,
+      consumerProbe: WSProbe
+  )
+
+  def plainJsonConsumerContext[T](
+      topic: String,
+      keyType: Option[FormatType],
+      valType: FormatType,
+      numMessages: Int = 1,
+      prePopulate: Boolean = true
+  )(body: ConsumerContext => T): T =
+    plainConsumerContext(
+      topic = topic,
+      messageType = JsonType,
+      keyType = keyType,
+      valType = valType,
+      numMessages = numMessages,
+      prePopulate = prePopulate
+    )(body)
+
+  def plainAvroConsumerContext[T](
+      topic: String,
+      keyType: Option[FormatType],
+      valType: FormatType,
+      numMessages: Int = 1,
+      prePopulate: Boolean = true
+  )(body: ConsumerContext => T): T =
+    plainConsumerContext(
+      topic,
+      AvroType,
+      keyType,
+      valType,
+      numMessages,
+      prePopulate
+    )(body)
+
+  def plainConsumerContext[T, M <: FormatType](
+      topic: String,
+      messageType: M,
+      keyType: Option[FormatType],
+      valType: FormatType,
+      numMessages: Int = 1,
+      prePopulate: Boolean = true
+  )(body: ConsumerContext => T): T =
+    secureServerConsumerContext[T, M](
+      topic = topic,
+      messageType = messageType,
+      keyType = keyType,
+      valType = valType,
+      numMessages = numMessages,
+      prePopulate = prePopulate,
+      useServerBasicAuth = false,
+      serverOpenIdCfg = None
+    )(body)
+
+  def secureKafkaJsonConsumerContext[T](
+      topic: String,
+      keyType: Option[FormatType],
+      valType: FormatType,
+      numMessages: Int = 1,
+      prePopulate: Boolean = true,
+      useServerBasicAuth: Boolean = false,
+      serverOpenIdCfg: Option[OpenIdConnectCfg] = None
+  )(body: ConsumerContext => T): T =
+    secureKafkaConsumerContext(
+      topic = topic,
+      messageType = JsonType,
+      keyType = keyType,
+      valType = valType,
+      numMessages = numMessages,
+      prePopulate = prePopulate,
+      useServerBasicAuth = useServerBasicAuth,
+      serverOpenIdCfg = serverOpenIdCfg
+    )(body)
+
+  def secureKafkaAvroConsumerContext[T](
+      topic: String,
+      keyType: Option[FormatType],
+      valType: FormatType,
+      numMessages: Int = 1,
+      prePopulate: Boolean = true,
+      useServerBasicAuth: Boolean = false,
+      serverOpenIdCfg: Option[OpenIdConnectCfg] = None
+  )(body: ConsumerContext => T): T =
+    secureKafkaConsumerContext(
+      topic = topic,
+      messageType = AvroType,
+      keyType = keyType,
+      valType = valType,
+      numMessages = numMessages,
+      prePopulate = prePopulate,
+      useServerBasicAuth = useServerBasicAuth,
+      serverOpenIdCfg = serverOpenIdCfg
+    )(body)
+
+  def secureKafkaConsumerContext[T, M <: FormatType](
+      topic: String,
+      messageType: M,
+      keyType: Option[FormatType],
+      valType: FormatType,
+      numMessages: Int = 1,
+      prePopulate: Boolean = true,
+      useServerBasicAuth: Boolean = false,
+      serverOpenIdCfg: Option[OpenIdConnectCfg] = None
+  )(body: ConsumerContext => T): T = secureKafkaClusterProducerContext(
+    topic = topic,
+    useServerBasicAuth = useServerBasicAuth,
+    serverOpenIdCfg = serverOpenIdCfg
+  ) { implicit pctx =>
+    if (prePopulate) {
+      produceForMessageType(
+        messageType = messageType,
+        keyType = keyType,
+        valType = valType,
+        numMessages = numMessages,
+        prePopulate = prePopulate
+      )
+    }
+    val ctx = setupConsumerContext
+    body(ctx)
+  }
+
+  def secureServerAvroConsumerContext[T](
+      topic: String,
+      keyType: Option[FormatType],
+      valType: FormatType,
+      numMessages: Int = 1,
+      prePopulate: Boolean = true,
+      useServerBasicAuth: Boolean = false,
+      serverOpenIdCfg: Option[OpenIdConnectCfg] = None
+  )(body: ConsumerContext => T): T =
+    secureServerConsumerContext(
+      topic = topic,
+      messageType = AvroType,
+      keyType = keyType,
+      valType = valType,
+      numMessages = numMessages,
+      useServerBasicAuth = useServerBasicAuth,
+      serverOpenIdCfg = serverOpenIdCfg,
+      prePopulate = prePopulate
+    )(body)
+
+  def secureServerJsonConsumerContext[T](
+      topic: String,
+      keyType: Option[FormatType],
+      valType: FormatType,
+      numMessages: Int = 1,
+      prePopulate: Boolean = true,
+      useServerBasicAuth: Boolean = false,
+      serverOpenIdCfg: Option[OpenIdConnectCfg] = None
+  )(body: ConsumerContext => T): T =
+    secureServerConsumerContext(
+      topic = topic,
+      messageType = JsonType,
+      keyType = keyType,
+      valType = valType,
+      numMessages = numMessages,
+      useServerBasicAuth = useServerBasicAuth,
+      serverOpenIdCfg = serverOpenIdCfg,
+      prePopulate = prePopulate
+    )(body)
+
+  // scalastyle:off
+  def secureServerConsumerContext[T, M <: FormatType](
+      topic: String,
+      messageType: M,
+      keyType: Option[FormatType],
+      valType: FormatType,
+      numMessages: Int = 1,
+      prePopulate: Boolean = true,
+      useServerBasicAuth: Boolean = false,
+      serverOpenIdCfg: Option[OpenIdConnectCfg] = None
+  )(body: ConsumerContext => T): T = {
+    // scalastyle:on
+    secureServerProducerContext(topic, useServerBasicAuth, serverOpenIdCfg) {
+      implicit p =>
+        if (prePopulate) {
+          produceForMessageType(
+            messageType = messageType,
+            keyType = keyType,
+            valType = valType,
+            numMessages = numMessages,
+            prePopulate = prePopulate
+          )
+        }
+        val ctx = setupConsumerContext
+        body(ctx)
+    }
+  }
+
+  private[this] def createAvroMessagesForTypes(
+      keyType: Option[FormatType],
+      valType: FormatType,
+      numMessages: Int
+  ): Seq[AvroProducerRecord] = {
+    (keyType, valType) match {
+      case (None, AvroType) =>
+        createAvroProducerRecordNoneAvro(numMessages)
+
+      case (Some(AvroType), AvroType) =>
+        createAvroProducerRecordAvroAvro(numMessages)
+
+      case (Some(LongType), StringType) =>
+        createAvroProducerRecordLongString(numMessages)
+
+      case (None, StringType) =>
+        createAvroProducerRecordNoneString(numMessages)
+
+      case (Some(StringType), ByteArrayType) =>
+        createAvroProducerRecordStringBytes(numMessages)
+
+      case (Some(StringType), StringType) =>
+        createAvroProducerRecordStringString(numMessages)
+
+      case (kt, vt) =>
+        throw new NotImplementedException(
+          s"Test producer messages for key/value kombo" +
+            s" ${kt.getOrElse(NoType).name}/${vt.name} is not implemented."
+        )
+    }
+  }
+
+  private[this] def createJsonMessages(
+      withKey: Boolean,
+      withHeaders: Boolean,
+      numMessages: Int
+  ): Seq[String] = {
+    if (withKey) createJsonKeyValue(numMessages, withHeaders)
+    else createJsonValue(numMessages, withHeaders)
+  }
+
+  private[this] def setupConsumerContext(
+      implicit pctx: ProducerContext
+  ): ConsumerContext = {
+    val consProbe = WSProbe()
+    ConsumerContext(
+      topicName = pctx.topicName,
+      embeddedKafkaConfig = pctx.embeddedKafkaConfig,
+      appCfg = pctx.appCfg,
+      route = pctx.route,
+      producerProbe = pctx.producerProbe,
+      consumerProbe = consProbe
+    )
+  }
+
+  private[this] def produceForMessageType(
+      messageType: FormatType,
+      keyType: Option[FormatType],
+      valType: FormatType,
+      numMessages: Int,
+      prePopulate: Boolean
+  )(implicit pctx: ProducerContext): Unit = {
+    if (prePopulate) {
+      messageType match {
+        case AvroType =>
+          val msgs = createAvroMessagesForTypes(keyType, valType, numMessages)
+          produceAndCheckAvro(
+            topic = pctx.topicName,
+            routes = pctx.route,
+            keyType = keyType,
+            valType = valType,
+            messages = msgs
+          )(pctx.producerProbe)
+
+        case JsonType =>
+          val messages = createJsonMessages(
+            withKey = keyType.isDefined,
+            withHeaders = false,
+            numMessages = numMessages
+          )
+          produceAndCheckJson(
+            topic = pctx.topicName,
+            keyType = keyType.getOrElse(NoType),
+            valType = valType,
+            routes = pctx.route,
+            messages = messages
+          )(pctx.producerProbe)
+
+        case _ => fail("messageType must be one of JsonType or AvroType")
+      }
+    }
   }
 }

@@ -6,7 +6,6 @@ import java.security.{KeyStore, SecureRandom}
 import akka.actor.ActorSystem
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.{ConnectionContext, Http, HttpsConnectionContext}
-import akka.stream.Materializer
 import javax.net.ssl.{KeyManagerFactory, SSLContext, TrustManagerFactory}
 import net.scalytica.kafka.wsproxy.Configuration.{AppCfg, ServerSslCfg}
 
@@ -17,8 +16,7 @@ trait ServerBindings {
   def initialisePlainBinding(
       implicit cfg: AppCfg,
       routes: Route,
-      sys: ActorSystem,
-      mat: Materializer
+      sys: ActorSystem
   ): Option[Future[Http.ServerBinding]] = {
     if (cfg.server.ssl.exists(_.sslOnly.equals(true))) None
     else {
@@ -42,11 +40,12 @@ trait ServerBindings {
       }
       // scalastyle:on
       Option(
-        Http().bindAndHandle(
-          handler = routes,
-          interface = cfg.server.bindInterface,
-          port = cfg.server.port
-        )
+        Http()
+          .newServerAt(
+            interface = cfg.server.bindInterface,
+            port = cfg.server.port
+          )
+          .bindFlow(routes)
       )
     }
   }
@@ -55,8 +54,7 @@ trait ServerBindings {
   def initialiseSslBinding(
       implicit cfg: AppCfg,
       routes: Route,
-      sys: ActorSystem,
-      mat: Materializer
+      sys: ActorSystem
   ): Option[Future[Http.ServerBinding]] = {
     cfg.server.ssl.flatMap { sslCfg =>
       val ks: KeyStore = KeyStore.getInstance("PKCS12")
@@ -76,12 +74,15 @@ trait ServerBindings {
         val sslCtx   = initSslContext(ks, sslCfg)
         val httpsCtx = httpsContext(sslCtx)
 
-        Http().bindAndHandle(
-          handler = routes,
-          interface = sslCfg.bindInterface.getOrElse(cfg.server.bindInterface),
-          port = port, // scalastyle:ignore
-          connectionContext = httpsCtx
-        )
+        Http()
+          .newServerAt(
+            interface =
+              sslCfg.bindInterface.getOrElse(cfg.server.bindInterface),
+            port = port
+          )
+          .enableHttps(httpsCtx)
+          .bindFlow(routes)
+
       }
     }
   }
@@ -102,13 +103,6 @@ trait ServerBindings {
   }
 
   private[this] def httpsContext(ctx: SSLContext): HttpsConnectionContext = {
-    ConnectionContext.https(
-      sslContext = ctx,
-      sslConfig = None,
-      enabledCipherSuites = None,
-      enabledProtocols = None,
-      clientAuth = None,
-      sslParameters = None
-    )
+    ConnectionContext.httpsServer(sslContext = ctx)
   }
 }

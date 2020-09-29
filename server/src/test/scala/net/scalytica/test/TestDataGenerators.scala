@@ -96,7 +96,7 @@ trait TestDataGenerators extends TestTypes { self =>
     }
   }
 
-  def createAvroProducerRecordKeyValue(
+  def createAvroProducerRecordAvroAvro(
       num: Int,
       withHeaders: Boolean = false
   ): Seq[AvroProducerRecord] = {
@@ -168,7 +168,7 @@ trait TestDataGenerators extends TestTypes { self =>
     )
   }
 
-  def createAvroProducerRecordAvroAvro(
+  def createAvroProducerRecordNoneAvro(
       num: Int,
       withHeaders: Boolean = false
   ): Seq[AvroProducerRecord] = {
@@ -201,3 +201,5 @@ trait TestDataGenerators extends TestTypes { self =>
     )
   }
 }
+
+object TestDataGenerators extends TestDataGenerators

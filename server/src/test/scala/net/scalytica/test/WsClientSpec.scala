@@ -25,13 +25,13 @@ trait WsClientSpec
   )(
       body: => T
   )(
-      implicit wsClient: WSProbe
+      implicit probe: WSProbe
   ) = {
     creds match {
-      case None => WS(uri, wsClient.flow) ~> routes ~> check(body)
+      case None => WS(uri, probe.flow) ~> routes ~> check(body)
       case Some(c) =>
         val authHeader = addHeader(Authorization(c))
-        WS(uri, wsClient.flow) ~> authHeader ~> routes ~> check(body)
+        WS(uri, probe.flow) ~> authHeader ~> routes ~> check(body)
     }
   }
 

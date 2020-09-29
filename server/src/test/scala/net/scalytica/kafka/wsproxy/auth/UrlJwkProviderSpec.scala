@@ -1,7 +1,7 @@
 package net.scalytica.kafka.wsproxy.auth
 
 import akka.util.Timeout
-import net.scalytica.test.WSProxyKafkaSpec
+import net.scalytica.test.WsProxyKafkaSpec
 import org.scalatest.Inspectors.forAll
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.must.Matchers
@@ -13,7 +13,7 @@ import scala.concurrent.duration._
 
 class UrlJwkProviderSpec
     extends AnyWordSpec
-    with WSProxyKafkaSpec
+    with WsProxyKafkaSpec
     with Matchers
     with ScalaFutures
     with OptionValues

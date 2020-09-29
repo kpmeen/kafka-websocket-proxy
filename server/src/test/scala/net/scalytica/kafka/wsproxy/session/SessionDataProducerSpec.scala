@@ -5,7 +5,7 @@ import net.manub.embeddedkafka.schemaregistry._
 import net.scalytica.kafka.wsproxy.codecs.Implicits._
 import net.scalytica.kafka.wsproxy.codecs.{SessionSerde, WsGroupIdSerde}
 import net.scalytica.kafka.wsproxy.models.WsGroupId
-import net.scalytica.test.WSProxyKafkaSpec
+import net.scalytica.test.WsProxyKafkaSpec
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Minute, Span}
 import org.scalatest.{BeforeAndAfterAll, OptionValues}
@@ -15,7 +15,7 @@ import org.scalatest.wordspec.AnyWordSpec
 // scalastyle:off magic.number
 class SessionDataProducerSpec
     extends AnyWordSpec
-    with WSProxyKafkaSpec
+    with WsProxyKafkaSpec
     with Matchers
     with OptionValues
     with Eventually
@@ -55,7 +55,7 @@ class SessionDataProducerSpec
     "be able to publish a session record to the session state topic" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val cfg =
-          appTestConfig(kcfg.kafkaPort, Option(kcfg.schemaRegistryPort))
+          plainAppTestConfig(kcfg.kafkaPort, Option(kcfg.schemaRegistryPort))
 
         initTopic(cfg.sessionHandler.sessionStateTopicName.value)
 
@@ -77,7 +77,7 @@ class SessionDataProducerSpec
     "be able to publish multiple session records to the session state topic" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val cfg =
-          appTestConfig(kcfg.kafkaPort, Option(kcfg.schemaRegistryPort))
+          plainAppTestConfig(kcfg.kafkaPort, Option(kcfg.schemaRegistryPort))
 
         initTopic(cfg.sessionHandler.sessionStateTopicName.value)
 
@@ -103,7 +103,7 @@ class SessionDataProducerSpec
     "be able to publish removal of a session from the session state topic" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val cfg =
-          appTestConfig(kcfg.kafkaPort, Option(kcfg.schemaRegistryPort))
+          plainAppTestConfig(kcfg.kafkaPort, Option(kcfg.schemaRegistryPort))
 
         initTopic(cfg.sessionHandler.sessionStateTopicName.value)
 

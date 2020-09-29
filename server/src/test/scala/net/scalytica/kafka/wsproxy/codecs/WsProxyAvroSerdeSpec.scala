@@ -16,7 +16,7 @@ class WsProxyAvroSerdeSpec
 
     "convert an AvroProducerRecord with headers and an Avro key" in {
       val o =
-        createAvroProducerRecordKeyValue(1, withHeaders = true).headOption.value
+        createAvroProducerRecordAvroAvro(1, withHeaders = true).headOption.value
 
       val bytes = avroProducerRecordSerde.serialize(o)
       bytes must not be empty

@@ -14,7 +14,7 @@ trait WithProxyLogger { self =>
 object DefaultProxyLogger extends WithProxyLogger {
 
   override protected lazy val loggerName =
-    this.getClass.getPackageName + ".Server"
+    this.getClass.getPackageName.stripSuffix("logging") + "Server"
 
   def trace(msg: String): Unit                   = logger.trace(msg)
   def debug(msg: String): Unit                   = logger.debug(msg)

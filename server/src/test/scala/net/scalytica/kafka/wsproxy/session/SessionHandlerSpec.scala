@@ -13,7 +13,7 @@ import net.scalytica.kafka.wsproxy.codecs.{SessionSerde, WsGroupIdSerde}
 import net.scalytica.kafka.wsproxy.models.{WsClientId, WsGroupId, WsServerId}
 import net.scalytica.kafka.wsproxy.session.Session.SessionOpResult
 import net.scalytica.kafka.wsproxy.session.SessionHandler._
-import net.scalytica.test.{TestDataGenerators, WSProxyKafkaSpec}
+import net.scalytica.test.{TestDataGenerators, WsProxyKafkaSpec}
 import org.apache.kafka.common.serialization.Deserializer
 import org.scalatest.Inspectors.forAll
 import org.scalatest._
@@ -32,7 +32,7 @@ class SessionHandlerSpec
     with Eventually
     with ScalaFutures
     with OptionValues
-    with WSProxyKafkaSpec
+    with WsProxyKafkaSpec
     with TestDataGenerators
     with EmbeddedKafka {
 
@@ -65,7 +65,7 @@ class SessionHandlerSpec
 
   def sessionHandlerCtx[T](body: Ctx => T): Assertion =
     withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-      implicit val wsCfg = appTestConfig(kcfg.kafkaPort)
+      implicit val wsCfg = plainAppTestConfig(kcfg.kafkaPort)
 
       val shr  = SessionHandler.init
       val ctrl = shr.stream.run()
@@ -132,11 +132,10 @@ class SessionHandlerSpec
       val kvs =
         consumeNumberKeyedMessagesFrom[WsGroupId, Session](testTopic.value, 3)
 
-      forAll(kvs.zipWithIndex) {
-        case ((k, v), idx) =>
-          k mustBe WsGroupId(s"group${idx + 1}")
-          v.consumerGroupId mustBe WsGroupId(s"group${idx + 1}")
-          v.consumers mustBe empty
+      forAll(kvs.zipWithIndex) { case ((k, v), idx) =>
+        k mustBe WsGroupId(s"group${idx + 1}")
+        v.consumerGroupId mustBe WsGroupId(s"group${idx + 1}")
+        v.consumers mustBe empty
       }
     }
 
