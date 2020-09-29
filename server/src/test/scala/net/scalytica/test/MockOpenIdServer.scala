@@ -8,6 +8,7 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.testkit.RouteTestTimeout
 import akka.stream.Materializer
 import io.circe.JsonObject
 import io.circe.generic.extras.Configuration

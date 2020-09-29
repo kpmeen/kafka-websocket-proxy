@@ -1,7 +1,7 @@
 package net.scalytica
 
 import akka.http.scaladsl.model.ws.{BinaryMessage, TextMessage}
-import akka.http.scaladsl.testkit.WSProbe
+import akka.http.scaladsl.testkit.{RouteTestTimeout, WSProbe}
 import akka.stream.Materializer
 import akka.stream.scaladsl.Sink
 import io.circe.Decoder
@@ -35,6 +35,8 @@ import scala.concurrent.{Await, Future}
 import scala.util.{Failure, Success}
 
 package object test {
+
+  implicit val routeTestTimeout = RouteTestTimeout(20 seconds)
 
   def availablePort: Int = {
     val s = new java.net.ServerSocket(0)

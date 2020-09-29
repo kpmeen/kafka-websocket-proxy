@@ -40,8 +40,6 @@ class WebSocketRoutesAvroSpec
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(2, Minutes))
 
-  implicit val timeout = RouteTestTimeout(20 seconds)
-
   implicit val testKeyDeserializer = TestSerdes.keySerdes.deserializer()
   implicit val albumDeserializer   = TestSerdes.valueSerdes.deserializer()
   implicit val longDeserializer    = TestSerdes.longSerdes.deserializer()
