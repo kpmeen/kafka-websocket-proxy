@@ -1,5 +1,6 @@
 package net.scalytica.kafka.wsproxy.codecs
 
+import java.nio.charset.StandardCharsets
 import java.util.Base64
 
 import scala.util.Try
@@ -14,7 +15,7 @@ private[codecs] object Binary {
   }
 
   def encodeBase64(data: Array[Byte]): String = {
-    enc.encodeToString(data)
+    new String(enc.encode(data), StandardCharsets.UTF_8)
   }
 
 }
