@@ -2,7 +2,7 @@ package net.scalytica.kafka.wsproxy
 
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server._
-import akka.http.scaladsl.testkit.RouteTestTimeout
+import akka.http.scaladsl.testkit.{RouteTestTimeout, WSProbe}
 import net.manub.embeddedkafka.Codecs.stringDeserializer
 import net.scalytica.kafka.wsproxy.models.Formats.{NoType, StringType}
 import net.scalytica.kafka.wsproxy.models.TopicName
@@ -208,7 +208,7 @@ class WebSocketRoutesJsonSpec
             "&groupId=test-group-102" +
             s"&topic=${ctx.topicName.value}" +
             s"&valType=${StringType.name}" +
-            "&autoCommit=false"
+            "&autoCommit=true"
 
           consumeFirstMessageFrom[String](ctx.topicName.value) mustBe "bar-1"
 
@@ -225,6 +225,80 @@ class WebSocketRoutesJsonSpec
                 )
               }
             }
+        }
+
+      "reject a new connection if the consumer already exists" in
+        plainJsonConsumerContext(
+          topic = "test-topic-8",
+          keyType = None,
+          valType = StringType,
+          partitions = 2,
+          numMessages = 0,
+          prePopulate = false
+        ) { ctx =>
+          val rejectionMsg = "WebSocket for consumer test-8 in session " +
+            "test-group-8 not established because a consumer with the" +
+            " same ID is already registered"
+
+          val out = "/socket/out?" +
+            "clientId=test-8" +
+            "&groupId=test-group-8" +
+            s"&topic=${ctx.topicName.value}" +
+            s"&valType=${StringType.name}" +
+            "&autoCommit=false"
+
+          val probe1 = WSProbe()
+
+          WS(out, probe1.flow) ~> ctx.route ~> check {
+            isWebSocketUpgrade mustBe true
+
+            // Make sure consumer socket 1 is ready and registered in session
+            Thread.sleep((4 seconds).toMillis)
+
+            WS(out, ctx.consumerProbe.flow) ~> ctx.route ~> check {
+              rejection match {
+                case vr: ValidationRejection => vr.message mustBe rejectionMsg
+                case _                       => fail("Unexpected Rejection")
+              }
+            }
+          }
+        }
+
+      "reject a new connection if the consumer limit has been reached" in
+        plainJsonConsumerContext(
+          topic = "test-topic-9",
+          keyType = None,
+          valType = StringType,
+          numMessages = 0,
+          prePopulate = false
+        ) { ctx =>
+          val rejectionMsg =
+            "The maximum number of WebSockets for session test-group-9 " +
+              "has been reached. Limit is 1"
+
+          val out = (cid: String) =>
+            "/socket/out?" +
+              s"clientId=test-9$cid" +
+              "&groupId=test-group-9" +
+              s"&topic=${ctx.topicName.value}" +
+              s"&valType=${StringType.name}" +
+              "&autoCommit=false"
+
+          val probe1 = WSProbe()
+
+          WS(out("a"), probe1.flow) ~> ctx.route ~> check {
+            isWebSocketUpgrade mustBe true
+
+            // Make sure consumer socket 1 is ready and registered in session
+            Thread.sleep((4 seconds).toMillis)
+
+            WS(out("b"), ctx.consumerProbe.flow) ~> ctx.route ~> check {
+              rejection match {
+                case vr: ValidationRejection => vr.message mustBe rejectionMsg
+                case _                       => fail("Unexpected Rejection")
+              }
+            }
+          }
         }
     }
   }

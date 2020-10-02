@@ -413,17 +413,20 @@ trait WsProxyProducerKafkaSpec
   )
 
   def plainProducerContext[T](
-      topic: String = "test-topic"
+      topic: String = "test-topic",
+      partitions: Int = 1
   )(body: ProducerContext => T): T =
-    secureServerProducerContext(topic = topic)(body)
+    secureServerProducerContext(topic = topic, partitions = partitions)(body)
 
   def secureServerProducerContext[T](
       topic: String,
+      partitions: Int = 1,
       useServerBasicAuth: Boolean = false,
       serverOpenIdCfg: Option[OpenIdConnectCfg] = None
   )(body: ProducerContext => T): T = {
     secureKafkaClusterProducerContext(
       topic,
+      partitions,
       useServerBasicAuth,
       serverOpenIdCfg
     )(body)
@@ -431,6 +434,7 @@ trait WsProxyProducerKafkaSpec
 
   def secureKafkaClusterProducerContext[T](
       topic: String = "test-topic",
+      partitions: Int = 1,
       useServerBasicAuth: Boolean = false,
       serverOpenIdCfg: Option[OpenIdConnectCfg] = None
   )(body: ProducerContext => T): T = {
@@ -448,7 +452,7 @@ trait WsProxyProducerKafkaSpec
         .map(_ => OpenIdClient(wsCfg))
       implicit val sessionHandlerRef = SessionHandler.init
 
-      initTopic(topic, isSecure = true)
+      initTopic(topic, partitions, isSecure = true)
 
       val producerProbe           = WSProbe()
       val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
@@ -487,6 +491,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       keyType: Option[FormatType],
       valType: FormatType,
       numMessages: Int = 1,
+      partitions: Int = 1,
       prePopulate: Boolean = true
   )(body: ConsumerContext => T): T =
     plainConsumerContext(
@@ -495,6 +500,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       keyType = keyType,
       valType = valType,
       numMessages = numMessages,
+      partitions = partitions,
       prePopulate = prePopulate
     )(body)
 
@@ -503,15 +509,17 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       keyType: Option[FormatType],
       valType: FormatType,
       numMessages: Int = 1,
+      partitions: Int = 1,
       prePopulate: Boolean = true
   )(body: ConsumerContext => T): T =
     plainConsumerContext(
-      topic,
-      AvroType,
-      keyType,
-      valType,
-      numMessages,
-      prePopulate
+      topic = topic,
+      messageType = AvroType,
+      keyType = keyType,
+      valType = valType,
+      numMessages = numMessages,
+      partitions = partitions,
+      prePopulate = prePopulate
     )(body)
 
   def plainConsumerContext[T, M <: FormatType](
@@ -520,6 +528,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       keyType: Option[FormatType],
       valType: FormatType,
       numMessages: Int = 1,
+      partitions: Int = 1,
       prePopulate: Boolean = true
   )(body: ConsumerContext => T): T =
     secureServerConsumerContext[T, M](
@@ -528,6 +537,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       keyType = keyType,
       valType = valType,
       numMessages = numMessages,
+      partitions = partitions,
       prePopulate = prePopulate,
       useServerBasicAuth = false,
       serverOpenIdCfg = None
@@ -538,6 +548,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       keyType: Option[FormatType],
       valType: FormatType,
       numMessages: Int = 1,
+      partitions: Int = 1,
       prePopulate: Boolean = true,
       useServerBasicAuth: Boolean = false,
       serverOpenIdCfg: Option[OpenIdConnectCfg] = None
@@ -548,6 +559,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       keyType = keyType,
       valType = valType,
       numMessages = numMessages,
+      partitions = partitions,
       prePopulate = prePopulate,
       useServerBasicAuth = useServerBasicAuth,
       serverOpenIdCfg = serverOpenIdCfg
@@ -558,6 +570,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       keyType: Option[FormatType],
       valType: FormatType,
       numMessages: Int = 1,
+      partitions: Int = 1,
       prePopulate: Boolean = true,
       useServerBasicAuth: Boolean = false,
       serverOpenIdCfg: Option[OpenIdConnectCfg] = None
@@ -568,6 +581,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       keyType = keyType,
       valType = valType,
       numMessages = numMessages,
+      partitions = partitions,
       prePopulate = prePopulate,
       useServerBasicAuth = useServerBasicAuth,
       serverOpenIdCfg = serverOpenIdCfg
@@ -579,11 +593,13 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       keyType: Option[FormatType],
       valType: FormatType,
       numMessages: Int = 1,
+      partitions: Int = 1,
       prePopulate: Boolean = true,
       useServerBasicAuth: Boolean = false,
       serverOpenIdCfg: Option[OpenIdConnectCfg] = None
   )(body: ConsumerContext => T): T = secureKafkaClusterProducerContext(
     topic = topic,
+    partitions = partitions,
     useServerBasicAuth = useServerBasicAuth,
     serverOpenIdCfg = serverOpenIdCfg
   ) { implicit pctx =>
@@ -605,6 +621,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       keyType: Option[FormatType],
       valType: FormatType,
       numMessages: Int = 1,
+      partitions: Int = 1,
       prePopulate: Boolean = true,
       useServerBasicAuth: Boolean = false,
       serverOpenIdCfg: Option[OpenIdConnectCfg] = None
@@ -615,6 +632,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       keyType = keyType,
       valType = valType,
       numMessages = numMessages,
+      partitions = partitions,
       useServerBasicAuth = useServerBasicAuth,
       serverOpenIdCfg = serverOpenIdCfg,
       prePopulate = prePopulate
@@ -625,6 +643,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       keyType: Option[FormatType],
       valType: FormatType,
       numMessages: Int = 1,
+      partitions: Int = 1,
       prePopulate: Boolean = true,
       useServerBasicAuth: Boolean = false,
       serverOpenIdCfg: Option[OpenIdConnectCfg] = None
@@ -635,6 +654,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       keyType = keyType,
       valType = valType,
       numMessages = numMessages,
+      partitions = partitions,
       useServerBasicAuth = useServerBasicAuth,
       serverOpenIdCfg = serverOpenIdCfg,
       prePopulate = prePopulate
@@ -647,24 +667,29 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       keyType: Option[FormatType],
       valType: FormatType,
       numMessages: Int = 1,
+      partitions: Int = 1,
       prePopulate: Boolean = true,
       useServerBasicAuth: Boolean = false,
       serverOpenIdCfg: Option[OpenIdConnectCfg] = None
   )(body: ConsumerContext => T): T = {
     // scalastyle:on
-    secureServerProducerContext(topic, useServerBasicAuth, serverOpenIdCfg) {
-      implicit p =>
-        if (prePopulate) {
-          produceForMessageType(
-            messageType = messageType,
-            keyType = keyType,
-            valType = valType,
-            numMessages = numMessages,
-            prePopulate = prePopulate
-          )
-        }
-        val ctx = setupConsumerContext
-        body(ctx)
+    secureServerProducerContext(
+      topic = topic,
+      partitions = partitions,
+      useServerBasicAuth = useServerBasicAuth,
+      serverOpenIdCfg = serverOpenIdCfg
+    ) { implicit p =>
+      if (prePopulate) {
+        produceForMessageType(
+          messageType = messageType,
+          keyType = keyType,
+          valType = valType,
+          numMessages = numMessages,
+          prePopulate = prePopulate
+        )
+      }
+      val ctx = setupConsumerContext
+      body(ctx)
     }
   }
 
