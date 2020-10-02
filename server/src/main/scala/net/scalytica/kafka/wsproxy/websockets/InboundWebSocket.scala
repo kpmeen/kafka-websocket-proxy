@@ -10,7 +10,6 @@ import io.circe.Printer.noSpaces
 import io.circe.syntax._
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.SocketProtocol.{AvroPayload, JsonPayload}
-import net.scalytica.kafka.wsproxy.WithSchemaRegistryConfig
 import net.scalytica.kafka.wsproxy.codecs.Encoders._
 import net.scalytica.kafka.wsproxy.codecs.ProtocolSerdes.{
   avroProducerRecordSerde,
@@ -20,7 +19,7 @@ import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models.{Formats, InSocketArgs}
 import net.scalytica.kafka.wsproxy.producer.WsProducer
 
-trait InboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
+trait InboundWebSocket extends WithProxyLogger {
 
   /**
    * Request handler for the inbound Kafka WebSocket connection, with a Kafka
