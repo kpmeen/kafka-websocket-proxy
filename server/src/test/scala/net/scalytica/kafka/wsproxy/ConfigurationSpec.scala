@@ -158,34 +158,34 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
 
     "successfully load the default configuration without the" +
       "schema-registry-url key set" in {
-      val tcfg = ConfigFactory.defaultApplication.withValue(
-        "kafka.ws.proxy.kafka-client.bootstrap-hosts",
-        ConfigValueFactory.fromAnyRef("localhost:29092")
-      )
-      val cfg = Configuration.loadConfig(tcfg)
+        val tcfg = ConfigFactory.defaultApplication.withValue(
+          "kafka.ws.proxy.kafka-client.bootstrap-hosts",
+          ConfigValueFactory.fromAnyRef("localhost:29092")
+        )
+        val cfg = Configuration.loadConfig(tcfg)
 
-      cfg.server.serverId.value mustBe "node-1"
-      cfg.server.bindInterface mustBe "0.0.0.0"
-      cfg.server.port mustBe 8078
+        cfg.server.serverId.value mustBe "node-1"
+        cfg.server.bindInterface mustBe "0.0.0.0"
+        cfg.server.port mustBe 8078
 
-      // format: off
+        // format: off
       cfg.kafkaClient.bootstrapHosts mustBe KafkaBootstrapHosts(List("localhost:29092")) // scalastyle:ignore
       cfg.kafkaClient.schemaRegistry mustBe empty
       cfg.kafkaClient.monitoringEnabled mustBe false
       // format: on
 
-      cfg.consumer.defaultBatchSize mustBe 0
-      cfg.consumer.defaultRateLimit mustBe 0
+        cfg.consumer.defaultBatchSize mustBe 0
+        cfg.consumer.defaultRateLimit mustBe 0
 
-      cfg.sessionHandler.sessionStateTopicName.value mustBe "_wsproxy.session.state" // scalastyle:ignore
-      cfg.sessionHandler.sessionStateReplicationFactor mustBe 3
-      cfg.sessionHandler.sessionStateRetention mustBe 30.days
+        cfg.sessionHandler.sessionStateTopicName.value mustBe "_wsproxy.session.state" // scalastyle:ignore
+        cfg.sessionHandler.sessionStateReplicationFactor mustBe 3
+        cfg.sessionHandler.sessionStateRetention mustBe 30.days
 
-      cfg.commitHandler.maxStackSize mustBe 100
-      cfg.commitHandler.autoCommitEnabled mustBe false
-      cfg.commitHandler.autoCommitInterval mustBe 1.second
-      cfg.commitHandler.autoCommitMaxAge mustBe 20.seconds
-    }
+        cfg.commitHandler.maxStackSize mustBe 100
+        cfg.commitHandler.autoCommitEnabled mustBe false
+        cfg.commitHandler.autoCommitInterval mustBe 1.second
+        cfg.commitHandler.autoCommitMaxAge mustBe 20.seconds
+      }
 
     "successfully load the application.conf configuration" in {
       // Set required, unset, props
@@ -226,9 +226,9 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
 
     "fail when trying to load the default config without providing the " +
       "bootstrap-hosts with a value" in {
-      a[ConfigurationError] should be thrownBy Configuration
-        .loadTypesafeConfig()
-    }
+        a[ConfigurationError] should be thrownBy Configuration
+          .loadTypesafeConfig()
+      }
 
     "fail when trying to load an invalid configuration" in {
       a[ConfigReaderException[AppCfg]] should be thrownBy Configuration

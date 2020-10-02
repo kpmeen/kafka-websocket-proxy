@@ -46,7 +46,6 @@ import net.scalytica.kafka.wsproxy.session.SessionHandler.{
   SessionHandlerOpExtensions,
   SessionHandlerRef
 }
-import net.scalytica.kafka.wsproxy.session._
 import net.scalytica.kafka.wsproxy.websockets.{
   InboundWebSocket,
   OutboundWebSocket
@@ -62,7 +61,7 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
 
   implicit private[this] val timeout: Timeout = 3 seconds
 
-  protected def sessionHandler: Option[SessionHandlerRef] = None
+  protected var sessionHandler: SessionHandlerRef = _
 
   protected def basicAuthCredentials(
       creds: Credentials
@@ -74,18 +73,17 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
           p <- bac.password
         } yield (u, p)
       }
-      .map {
-        case (usr, pwd) =>
-          creds match {
-            case p @ Credentials.Provided(id) // constant time comparison
-                if usr.equals(id) && p.verify(pwd) =>
-              logger.trace("Successfully authenticated bearer token.")
-              Some(id)
+      .map { case (usr, pwd) =>
+        creds match {
+          case p @ Credentials.Provided(id) // constant time comparison
+              if usr.equals(id) && p.verify(pwd) =>
+            logger.trace("Successfully authenticated bearer token.")
+            Some(id)
 
-            case _ =>
-              logger.info("Could not authenticate basic auth credentials")
-              None
-          }
+          case _ =>
+            logger.info("Could not authenticate basic auth credentials")
+            None
+        }
       }
       .getOrElse(Some("basic auth not configured"))
   }
@@ -93,40 +91,37 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
   protected def openIdAuth(
       creds: Credentials
   )(
-      implicit cfg: AppCfg,
+      implicit maybeOpenIdClient: Option[OpenIdClient],
       mat: Materializer
   ): Future[Option[String]] = {
     logger.trace(s"Going to validate openid token $creds")
     implicit val ec = mat.executionContext
-    // TODO: This should ideally be a singleton!
-    val oidcClient = OpenIdClient(cfg)
-    creds match {
-      case Credentials.Provided(token) =>
-        oidcClient.validate(OAuth2BearerToken(token)).map {
-          case Success(_) =>
-            logger.trace("Successfully authenticated bearer token.")
-            Some(token)
-          case Failure(err) =>
-            logger.info("Could not authenticate bearer token", err)
-            None
+
+    maybeOpenIdClient match {
+      case Some(oidcClient) =>
+        creds match {
+          case Credentials.Provided(token) =>
+            oidcClient.validate(OAuth2BearerToken(token)).map {
+              case Success(_) =>
+                logger.trace("Successfully authenticated bearer token.")
+                Some(token)
+              case Failure(err) =>
+                logger.info("Could not authenticate bearer token", err)
+                None
+            }
+          case _ =>
+            logger.info("Could not authenticate bearer token")
+            Future.successful(None)
         }
-      case _ =>
-        logger.info("Could not authenticate bearer token")
+      case None =>
+        logger.info("OpenID Connect is not enabled")
         Future.successful(None)
     }
   }
 
-  protected def maybeAuthenticate[T](
-      implicit cfg: AppCfg,
-      mat: Materializer
-  ): Directive1[String] = {
-    if (cfg.server.isOpenIdConnectEnabled) maybeAuthenticateOpenId[T]
-    else if (cfg.server.isBasicAuthEnabled) maybeAuthenticateBasic[T]
-    else provide("Authentication not enabled")
-  }
-
   protected def maybeAuthenticateOpenId[T](
       implicit cfg: AppCfg,
+      maybeOpenIdClient: Option[OpenIdClient],
       mat: Materializer
   ): Directive1[String] = {
     logger.debug("Attempting authentication using openid-connect...")
@@ -158,7 +153,17 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
       }
   }
 
-  private[this] def jsonMessageStr(msg: String): Json =
+  protected def maybeAuthenticate[T](
+      implicit cfg: AppCfg,
+      maybeOpenIdClient: Option[OpenIdClient],
+      mat: Materializer
+  ): Directive1[String] = {
+    if (cfg.server.isOpenIdConnectEnabled) maybeAuthenticateOpenId[T]
+    else if (cfg.server.isBasicAuthEnabled) maybeAuthenticateBasic[T]
+    else provide("Authentication not enabled")
+  }
+
+  private[this] def jsonMessageFromString(msg: String): Json =
     Json.obj("message" -> Json.fromString(msg))
 
   private[this] def jsonResponseMsg(
@@ -169,7 +174,7 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
       status = statusCode,
       entity = HttpEntity(
         contentType = ContentTypes.`application/json`,
-        string = jsonMessageStr(message).printWith(Printer.noSpaces)
+        string = jsonMessageFromString(message).spaces2
       )
     )
   }
@@ -183,24 +188,21 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
           implicit val s = sys.scheduler.toTyped
           implicit val e = sys.dispatcher
 
-          args.foreach {
-            case (cid, gid) =>
-              sessionHandler.foreach { sh =>
-                sh.shRef.removeConsumer(gid, cid).onComplete {
-                  case Success(res) =>
-                    logger.debug(
-                      s"Removing consumer ${cid.value} from group" +
-                        s" ${gid.value} returned: ${res.asString}"
-                    )
-                  case Failure(err) =>
-                    logger.warn(
-                      "An error occurred when trying to remove consumer" +
-                        s" ${cid.value} from group" +
-                        s" ${gid.value}",
-                      err
-                    )
-                }
-              }
+          args.foreach { case (cid, gid) =>
+            sessionHandler.shRef.removeConsumer(gid, cid).onComplete {
+              case Success(res) =>
+                logger.debug(
+                  s"Removing consumer ${cid.value} from group" +
+                    s" ${gid.value} returned: ${res.asString}"
+                )
+              case Failure(err) =>
+                logger.warn(
+                  "An error occurred when trying to remove consumer" +
+                    s" ${cid.value} from group" +
+                    s" ${gid.value}",
+                  err
+                )
+            }
           }
 
           request.discardEntityBytes()
@@ -229,7 +231,13 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
           rejectAndComplete(jsonResponseMsg(BadRequest, t.message))
         }
 
-      case a @ (_: AuthenticationError | _: InvalidPublicKeyError) =>
+      case a: InvalidPublicKeyError =>
+        extractUri { uri =>
+          logger.info(s"Request to $uri could not be authenticated.", a)
+          rejectAndComplete(jsonResponseMsg(Unauthorized, a.getMessage))
+        }
+
+      case a: AuthenticationError =>
         extractUri { uri =>
           logger.info(s"Request to $uri could not be authenticated.", a)
           rejectAndComplete(jsonResponseMsg(Unauthorized, a.getMessage))
@@ -265,22 +273,21 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
           )
         )
       }
-      .handle {
-        case ValidationRejection(msg, _) =>
-          rejectAndComplete(
-            jsonResponseMsg(
-              statusCode = BadRequest,
-              message = msg
-            )
+      .handle { case ValidationRejection(msg, _) =>
+        rejectAndComplete(
+          jsonResponseMsg(
+            statusCode = BadRequest,
+            message = msg
           )
+        )
       }
       .result()
       .withFallback(RejectionHandler.default)
       .mapRejectionResponse { res =>
         res.entity match {
           case HttpEntity.Strict(ContentTypes.`text/plain(UTF-8)`, body) =>
-            val js = jsonMessageStr(body.utf8String).printWith(Printer.noSpaces)
-            res.copy(entity = HttpEntity(ContentTypes.`application/json`, js))
+            val js = jsonMessageFromString(body.utf8String).noSpaces
+            res.withEntity(HttpEntity(ContentTypes.`application/json`, js))
 
           case _ => res
         }
@@ -296,14 +303,14 @@ trait ServerRoutes
     with SchemaRoutes
     with WebSocketRoutes { self =>
 
-  private[this] var sessionHandlerRef: SessionHandlerRef = _
-
-  override protected def sessionHandler: Option[SessionHandlerRef] =
-    Option(sessionHandlerRef)
-
   /**
    * @param cfg
    *   Implicitly provided [[AppCfg]]
+   * @param sessionHandlerRef
+   *   Implicitly provided [[SessionHandlerRef]] to use
+   * @param maybeOpenIdClient
+   *   Implicitly provided Option that contains an [[OpenIdClient]] if OIDC is
+   *   enabled.
    * @param sys
    *   Implicitly provided [[ActorSystem]]
    * @param mat
@@ -315,14 +322,16 @@ trait ServerRoutes
    */
   def wsProxyRoutes(
       implicit cfg: AppCfg,
+      sessionHandlerRef: SessionHandlerRef,
+      maybeOpenIdClient: Option[OpenIdClient],
       sys: ActorSystem,
       mat: Materializer,
       ctx: ExecutionContext
   ): (RunnableGraph[Consumer.Control], Route) = {
-    sessionHandlerRef = SessionHandler.init
-    implicit val sh = sessionHandlerRef.shRef
+    sessionHandler = sessionHandlerRef // TODO: This mutation hurts my pride
+    implicit val sh = sessionHandler.shRef
 
-    (sessionHandlerRef.stream, routesWith(inboundWebSocket, outboundWebSocket))
+    (sessionHandler.stream, routesWith(inboundWebSocket, outboundWebSocket))
   }
 
   /**
@@ -338,7 +347,7 @@ trait ServerRoutes
   def routesWith(
       inbound: InSocketArgs => Route,
       outbound: OutSocketArgs => Route
-  )(implicit cfg: AppCfg): Route = {
+  )(implicit cfg: AppCfg, maybeOpenIdClient: Option[OpenIdClient]): Route = {
     schemaRoutes ~
       websocketRoutes(inbound, outbound) ~
       statusRoutes
@@ -348,12 +357,15 @@ trait ServerRoutes
 
 trait StatusRoutes { self: BaseRoutes =>
 
-  def statusRoutes(implicit cfg: AppCfg): Route = {
+  def statusRoutes(
+      implicit cfg: AppCfg,
+      maybeOpenIdClient: Option[OpenIdClient]
+  ): Route = {
     extractMaterializer { implicit mat =>
       pathPrefix("kafka") {
         pathPrefix("cluster") {
           path("info") {
-            maybeAuthenticate(cfg, mat) { _ =>
+            maybeAuthenticate(cfg, maybeOpenIdClient, mat) { _ =>
               complete {
                 val admin = new WsKafkaAdminClient(cfg)
                 try {
@@ -375,7 +387,7 @@ trait StatusRoutes { self: BaseRoutes =>
         }
       } ~
         path("healthcheck") {
-          maybeAuthenticate(cfg, mat) { _ =>
+          maybeAuthenticate(cfg, maybeOpenIdClient, mat) { _ =>
             complete {
               HttpResponse(
                 status = OK,
@@ -400,27 +412,30 @@ trait SchemaRoutes { self: BaseRoutes =>
     )
   }
 
-  def schemaRoutes(implicit cfg: AppCfg): Route = {
+  def schemaRoutes(
+      implicit cfg: AppCfg,
+      maybeOpenIdClient: Option[OpenIdClient]
+  ): Route = {
     extractMaterializer { implicit mat =>
       pathPrefix("schemas") {
         pathPrefix("avro") {
           pathPrefix("producer") {
             path("record") {
-              maybeAuthenticate(cfg, mat) { _ =>
+              maybeAuthenticate(cfg, maybeOpenIdClient, mat) { _ =>
                 complete(avroSchemaString(AvroProducerRecord.schema))
               }
             } ~ path("result") {
-              maybeAuthenticate(cfg, mat) { _ =>
+              maybeAuthenticate(cfg, maybeOpenIdClient, mat) { _ =>
                 complete(avroSchemaString(AvroProducerResult.schema))
               }
             }
           } ~ pathPrefix("consumer") {
             path("record") {
-              maybeAuthenticate(cfg, mat) { _ =>
+              maybeAuthenticate(cfg, maybeOpenIdClient, mat) { _ =>
                 complete(avroSchemaString(AvroConsumerRecord.schema))
               }
             } ~ path("commit") {
-              maybeAuthenticate(cfg, mat) { _ =>
+              maybeAuthenticate(cfg, maybeOpenIdClient, mat) { _ =>
                 complete(avroSchemaString(AvroCommit.schema))
               }
             }
@@ -489,18 +504,21 @@ trait WebSocketRoutes { self: BaseRoutes =>
    *   function defining the [[Route]] for the consumer socket
    * @param cfg
    *   Implicitly provided [[AppCfg]]
+   * @param maybeOpenIdClient
+   *   Implicitly provided Option that contains an [[OpenIdClient]] if OIDC is
+   *   enabled.
    * @return
    *   The [[Route]] definition for the websocket endpoints
    */
   def websocketRoutes(
       inbound: InSocketArgs => Route,
       outbound: OutSocketArgs => Route
-  )(implicit cfg: AppCfg): Route = {
+  )(implicit cfg: AppCfg, maybeOpenIdClient: Option[OpenIdClient]): Route = {
     extractMaterializer { implicit mat =>
       pathPrefix("socket") {
         path("in") {
-          maybeAuthenticate(cfg, mat) { _ =>
-            optionalHeaderValueByType[XKafkaAuthHeader](()) { creds =>
+          maybeAuthenticate(cfg, maybeOpenIdClient, mat) { _ =>
+            optionalHeaderValueByType(XKafkaAuthHeader) { creds =>
               inParams { inArgs =>
                 val args = inArgs.withAclCredentials(aclCredentials(creds))
                 validateAndHandleWebSocket(args)(inbound(args))
@@ -508,8 +526,8 @@ trait WebSocketRoutes { self: BaseRoutes =>
             }
           }
         } ~ path("out") {
-          maybeAuthenticate(cfg, mat) { _ =>
-            optionalHeaderValueByType[XKafkaAuthHeader](()) { creds =>
+          maybeAuthenticate(cfg, maybeOpenIdClient, mat) { _ =>
+            optionalHeaderValueByType(XKafkaAuthHeader) { creds =>
               outParams { outArgs =>
                 val args = outArgs.withAclCredentials(aclCredentials(creds))
                 validateAndHandleWebSocket(args)(outbound(args))

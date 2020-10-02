@@ -11,27 +11,28 @@ import net.scalytica.kafka.wsproxy.SocketProtocol.{
 }
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroProducerRecord
 import net.scalytica.kafka.wsproxy.models.Formats._
+import net.scalytica.kafka.wsproxy.models.TopicName
 import org.scalatest.Inspectors.forAll
 import org.scalatest.Suite
 
 trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
 
   def baseProducerUri(
-      topic: String,
+      topicName: TopicName,
       payloadType: SocketPayload = JsonPayload,
       keyType: FormatType = StringType,
       valType: FormatType = StringType
   ): String = {
     val baseUri =
       "/socket/in?" +
-        s"topic=$topic" +
+        s"topic=${topicName.value}" +
         s"&socketPayload=${payloadType.name}" +
         s"&valType=${valType.name}"
     if (keyType != NoType) baseUri + s"&keyType=${keyType.name}" else baseUri
   }
 
   def produceAndCheckJson(
-      topic: String,
+      topic: TopicName,
       keyType: FormatType,
       valType: FormatType,
       routes: Route,
@@ -53,7 +54,7 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
   }
 
   def produceAndCheckAvro(
-      topic: String,
+      topic: TopicName,
       routes: Route,
       keyType: Option[FormatType],
       valType: FormatType,
@@ -61,10 +62,10 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
       kafkaCreds: Option[BasicHttpCredentials] = None,
       creds: Option[HttpCredentials] = None
   )(
-      implicit wsClient: WSProbe
+      implicit producerProbe: WSProbe
   ): Unit = {
     val baseUri = baseProducerUri(
-      topic = topic,
+      topicName = topic,
       payloadType = AvroPayload,
       keyType = keyType.getOrElse(NoType),
       valType = valType
@@ -80,11 +81,11 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
 
       forAll(messages) { msg =>
         val bytes = avroProducerRecordSerde.serialize(msg)
-        wsClient.sendMessage(ByteString(bytes))
-        wsClient.expectWsProducerResultAvro(topic)
+        producerProbe.sendMessage(ByteString(bytes))
+        producerProbe.expectWsProducerResultAvro(topic)
       }
-      wsClient.sendCompletion()
-      wsClient.expectCompletion()
+      producerProbe.sendCompletion()
+      producerProbe.expectCompletion()
     }
   }
 

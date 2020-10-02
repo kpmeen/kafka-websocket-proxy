@@ -24,7 +24,7 @@
   <logger name="org.apache.kafka.clients" level="OFF"/>
 
   <logger name="net.scalytica" level="OFF"/>
-  <!--  <logger name="net.scalytica.kafka.wsproxy.BaseRoutes" level="TRACE"/>-->
+  <!--  <logger name="net.scalytica.kafka.wsproxy" level="TRACE"/>-->
   <!--  <logger name="net.scalytica.kafka.wsproxy.auth.OpenIdClient" level="TRACE"/>-->
   <!--  <logger name="net.scalytica.kafka.wsproxy.auth.UrlJwkProvider" level="TRACE"/>-->
   <!--  <logger name="net.scalytica.kafka.wsproxy.admin" level="OFF"/>-->

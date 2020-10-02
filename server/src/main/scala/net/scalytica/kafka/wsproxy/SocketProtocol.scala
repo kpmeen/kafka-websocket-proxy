@@ -4,10 +4,8 @@ object SocketProtocol {
 
   sealed trait SocketPayload { self =>
 
-    lazy val name: String = self.getClass.getSimpleName
-      .stripSuffix("$")
-      .stripSuffix("Payload")
-      .toSnakeCase
+    lazy val name: String =
+      self.niceClassSimpleName.stripSuffix("Payload").toSnakeCase
 
     def isSameName(s: String): Boolean = name.equalsIgnoreCase(s)
   }

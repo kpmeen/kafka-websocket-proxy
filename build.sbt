@@ -34,7 +34,8 @@ lazy val avro = (project in file("avro"))
   .settings(resolvers ++= Dependencies.Resolvers)
   .settings(scalastyleFailOnWarning := true)
   .settings(
-    coverageExcludedPackages := "<empty>;net.scalytica.kafka.wsproxy.avro.*;"
+    coverageExcludedPackages :=
+      """<empty>;net\.scalytica\.kafka\.wsproxy\.avro.*"""
   )
   .settings(libraryDependencies ++= Avro.All)
   .settings(libraryDependencies += Testing.ScalaTest % Test)
@@ -47,6 +48,16 @@ lazy val server = (project in file("server"))
   .settings(BaseSettings: _*)
   .settings(dockerSettings(8078))
   .settings(scalastyleFailOnWarning := true)
+  .settings(
+    coverageExcludedPackages :=
+      "<empty>" +
+        """;net\.scalytica\.kafka\.wsproxy\.*ServerBindings""" +
+        """;net\.scalytica\.kafka\.wsproxy\.*Server""" +
+        """;net\.scalytica\.kafka\.wsproxy\.Configuration\..*Cfg""" +
+        """;net\.scalytica\.kafka\.wsproxy\.*LoggerExtensions""" +
+        """;net\.scalytica\.kafka\.wsproxy\.errors\..*""" +
+        """;net\.scalytica\.kafka\.wsproxy\.auth\..*OpenIdConnectConfig.*"""
+  )
   .settings(libraryDependencies ++= Config.All)
   .settings(libraryDependencies ++= Circe.All)
   .settings(libraryDependencies ++= Logging.All)

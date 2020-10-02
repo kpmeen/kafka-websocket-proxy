@@ -23,14 +23,19 @@ case class Session(
   def addConsumer(consumerInstance: ConsumerInstance): SessionOpResult =
     if (hasConsumer(consumerInstance.id)) ConsumerExists(this)
     else {
-      if (!canOpenSocket) ConsumerLimitReached(this)
-      else ConsumerAdded(copy(consumers = consumers + consumerInstance))
+      if (canOpenSocket) {
+        ConsumerAdded(copy(consumers = consumers + consumerInstance))
+      } else {
+        ConsumerLimitReached(this)
+      }
     }
 
   def removeConsumer(consumerId: WsClientId): SessionOpResult = {
-    if (hasConsumer(consumerId))
+    if (hasConsumer(consumerId)) {
       ConsumerRemoved(copy(consumers = consumers.filterNot(_.id == consumerId)))
-    else ConsumerDoesNotExists(this)
+    } else {
+      ConsumerDoesNotExists(this)
+    }
   }
 }
 

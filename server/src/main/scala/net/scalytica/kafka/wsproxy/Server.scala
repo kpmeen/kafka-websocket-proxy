@@ -5,11 +5,13 @@ import akka.actor.CoordinatedShutdown
 import akka.actor.CoordinatedShutdown._
 import akka.http.scaladsl.Http
 import akka.stream.Materializer
-import net.scalytica.kafka.wsproxy.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.Configuration.{AppCfg, OpenIdConnectCfg}
+import net.scalytica.kafka.wsproxy.auth.OpenIdClient
 import net.scalytica.kafka.wsproxy.logging.{
   WithProxyLogger,
   WsProxyEnvLoggerConfigurator
 }
+import net.scalytica.kafka.wsproxy.session.SessionHandler
 import net.scalytica.kafka.wsproxy.utils.HostResolver.{
   resolveKafkaBootstrapHosts,
   HostResolutionError
@@ -67,6 +69,7 @@ object Server
   implicit val ctx: ExecutionContext = classicSys.dispatcher
 
   val resStatus = resolveKafkaBootstrapHosts(cfg.kafkaClient.bootstrapHosts)
+
   if (!resStatus.hasErrors) {
     logger.info("All Kafka broker hosts were correctly resolved")
   } else {
@@ -80,6 +83,12 @@ object Server
     val _ = Await.result(classicSys.terminate(), 10 seconds)
     System.exit(1)
   }
+
+  implicit val maybeOpenIdClient = cfg.server.openidConnect.collect {
+    case oidc: OpenIdConnectCfg if oidc.enabled => OpenIdClient(cfg)
+  }
+
+  implicit val sessionHandlerRef = SessionHandler.init
 
   private[this] val plainPort = cfg.server.port
 

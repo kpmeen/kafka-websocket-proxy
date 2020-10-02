@@ -65,13 +65,11 @@ class OpenIdClient private (
   // Decodes the base64-encoded header and body
   private[this] val decodeElements = (data: Try[(String, String, String)]) =>
     data
-      .map {
-        case (header, body, sig) =>
-          (JwtBase64.decodeString(header), JwtBase64.decodeString(body), sig)
+      .map { case (header, body, sig) =>
+        (JwtBase64.decodeString(header), JwtBase64.decodeString(body), sig)
       }
-      .recover {
-        case t: Throwable =>
-          throw AuthenticationError("Token is not valid a valid JWT", Option(t))
+      .recover { case t: Throwable =>
+        throw AuthenticationError("Token is not valid a valid JWT", Option(t))
       }
 
   private[this] def getJwk(token: String): Future[Try[Jwk]] = {

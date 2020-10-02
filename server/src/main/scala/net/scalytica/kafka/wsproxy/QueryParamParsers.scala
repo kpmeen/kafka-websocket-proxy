@@ -1,17 +1,11 @@
 package net.scalytica.kafka.wsproxy
 
-import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server._
 import akka.http.scaladsl.unmarshalling.Unmarshaller
 import net.scalytica.kafka.wsproxy.SocketProtocol._
 import net.scalytica.kafka.wsproxy.models.Formats._
-import net.scalytica.kafka.wsproxy.models.{
-  InSocketArgs,
-  OutSocketArgs,
-  TopicName,
-  WsClientId,
-  WsGroupId
-}
+import net.scalytica.kafka.wsproxy.models._
 import org.apache.kafka.clients.consumer.OffsetResetStrategy
 
 import scala.util.Try
@@ -67,10 +61,8 @@ trait QueryParamParsers {
 
   def paramsOnError: Directive[Tuple1[Option[(WsClientId, WsGroupId)]]] = {
     parameters(
-      (
-        'clientId.as[WsClientId] ?,
-        'groupId.as[WsGroupId] ?
-      )
+      'clientId.as[WsClientId] ?,
+      'groupId.as[WsGroupId] ?
     ).tmap(t => t._1.map(cid => (cid, WsGroupId.fromOption(t._2)(cid))))
   }
 
@@ -81,19 +73,17 @@ trait QueryParamParsers {
    */
   def outParams: Directive[Tuple1[OutSocketArgs]] =
     parameters(
-      (
-        'clientId.as[WsClientId],
-        'groupId.as[WsGroupId] ?,
-        'topic.as[TopicName],
-        'socketPayload.as[SocketPayload] ? (JsonPayload: SocketPayload),
-        'keyType.as[FormatType] ?,
-        'valType.as[FormatType] ? (StringType: FormatType),
-        'offsetResetStrategy
-          .as[OffsetResetStrategy] ? OffsetResetStrategy.EARLIEST,
-        'rate.as[Int] ?,
-        'batchSize.as[Int] ?,
-        'autoCommit.as[Boolean] ? true
-      )
+      'clientId.as[WsClientId],
+      'groupId.as[WsGroupId] ?,
+      'topic.as[TopicName],
+      'socketPayload.as[SocketPayload] ? (JsonPayload: SocketPayload),
+      'keyType.as[FormatType] ?,
+      'valType.as[FormatType] ? (StringType: FormatType),
+      'offsetResetStrategy
+        .as[OffsetResetStrategy] ? OffsetResetStrategy.EARLIEST,
+      'rate.as[Int] ?,
+      'batchSize.as[Int] ?,
+      'autoCommit.as[Boolean] ? true
     ).tmap { t =>
       OutSocketArgs.fromQueryParams(
         clientId = t._1,
@@ -116,12 +106,10 @@ trait QueryParamParsers {
    */
   def inParams: Directive[Tuple1[InSocketArgs]] =
     parameters(
-      (
-        'topic.as[TopicName],
-        'socketPayload.as[SocketPayload] ? (JsonPayload: SocketPayload),
-        'keyType.as[FormatType] ?,
-        'valType.as[FormatType] ? (StringType: FormatType)
-      )
+      'topic.as[TopicName],
+      'socketPayload.as[SocketPayload] ? (JsonPayload: SocketPayload),
+      'keyType.as[FormatType] ?,
+      'valType.as[FormatType] ? (StringType: FormatType)
     ).tmap(t => InSocketArgs.fromQueryParams(t._1, t._2, t._3, t._4))
 
 }

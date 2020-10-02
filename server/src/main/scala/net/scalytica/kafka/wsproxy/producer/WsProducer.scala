@@ -119,9 +119,8 @@ object WsProducer extends WithProxyLogger {
    *   the message value type
    * @return
    *   an instance of [[WsProducerRecord]]
-   * @throws
-   *   Throwable when the underlying parser fails.
    */
+  @throws[Throwable]
   private[this] def parseInput[K, V](
       jsonStr: String
   )(implicit keyDec: Decoder[K], valDec: Decoder[V]): WsProducerRecord[K, V] = {
@@ -160,6 +159,7 @@ object WsProducer extends WithProxyLogger {
    * @return
    *   an instance of [[ProducerRecord]]
    */
+  @throws[IllegalStateException]
   private[this] def asKafkaProducerRecord[K, V](
       topic: TopicName,
       msg: WsProducerRecord[K, V]
@@ -200,6 +200,9 @@ object WsProducer extends WithProxyLogger {
    * @tparam V
    *   the value type of the [[IProducer]]
    */
+  @throws[AuthenticationError]
+  @throws[AuthorisationError]
+  @throws[Throwable]
   private[this] def checkClient[K, V](
       topic: TopicName,
       producerClient: IProducer[K, V]
@@ -267,16 +270,14 @@ object WsProducer extends WithProxyLogger {
     checkClient(args.topic, producerClient)
 
     wsMessageToStringFlow
-      .recover {
-        case t: Exception =>
-          logAndEmpty("There was an error processing a JSON message", t)("")
+      .recover { case t: Exception =>
+        logAndEmpty("There was an error processing a JSON message", t)("")
       }
       .map(str => parseInput[K, V](str))
-      .recover {
-        case t: Exception =>
-          logAndEmpty(s"JSON message could not be parsed", t)(
-            ProducerEmptyMessage
-          )
+      .recover { case t: Exception =>
+        logAndEmpty(s"JSON message could not be parsed", t)(
+          ProducerEmptyMessage
+        )
       }
       .filter(_.nonEmpty)
       .map { wpr =>
@@ -309,20 +310,18 @@ object WsProducer extends WithProxyLogger {
     checkClient(args.topic, producerClient)
 
     wsMessageToByteStringFlow
-      .recover {
-        case t: Exception =>
-          logAndEmpty("There was an error processing an Avro message", t)(
-            ByteString.empty
-          )
+      .recover { case t: Exception =>
+        logAndEmpty("There was an error processing an Avro message", t)(
+          ByteString.empty
+        )
       }
       .log("produceAvro", m => s"Trying to deserialize bytes: $m")
       .map(bs => serde.deserialize(bs.toArray))
       .log("produceAvro", m => s"Deserialized bytes into: $m")
-      .recover {
-        case t: Exception =>
-          logAndEmpty(s"Avro message could not be deserialized", t)(
-            AvroProducerRecord.Empty
-          )
+      .recover { case t: Exception =>
+        logAndEmpty(s"Avro message could not be deserialized", t)(
+          AvroProducerRecord.Empty
+        )
       }
       .filterNot(_.isEmpty)
       .map { wpr =>

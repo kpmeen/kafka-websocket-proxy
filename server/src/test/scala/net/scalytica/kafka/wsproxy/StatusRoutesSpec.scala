@@ -1,6 +1,6 @@
 package net.scalytica.kafka.wsproxy
 
-import akka.http.scaladsl.model.ContentTypes
+import akka.http.scaladsl.model.ContentTypes._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers.{
   `WWW-Authenticate`,
@@ -25,7 +25,7 @@ class StatusRoutesSpec
     with EitherValues
     with OptionValues
     with ScalaFutures
-    with WSProxyKafkaSpec
+    with WsProxyKafkaSpec
     with MockOpenIdServer {
 
   implicit override val patienceConfig: PatienceConfig =
@@ -38,15 +38,10 @@ class StatusRoutesSpec
   "The status routes" should {
 
     "return the kafka cluster info" in
-      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-        implicit val wsCfg = appTestConfig(kcfg.kafkaPort)
-
-        val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
-        val ctrl                    = sdcStream.run()
-
-        Get("/kafka/cluster/info") ~> Route.seal(testRoutes) ~> check {
+      plainServerContext { case (kcfg, _, route) =>
+        Get("/kafka/cluster/info") ~> Route.seal(route) ~> check {
           status mustBe OK
-          responseEntity.contentType mustBe ContentTypes.`application/json`
+          responseEntity.contentType mustBe `application/json`
 
           val ci = parse(responseAs[String])
             .map(_.as[Seq[BrokerInfo]])
@@ -62,38 +57,23 @@ class StatusRoutesSpec
             rack = None
           )
         }
-
-        ctrl.shutdown()
       }
 
     "ignore basic auth header when not enabled" in
-      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-        implicit val wsCfg = appTestConfig(kcfg.kafkaPort)
-
-        val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
-        val ctrl                    = sdcStream.run()
-
+      plainServerContext { case (_, _, route) =>
         Get("/kafka/cluster/info") ~> addCredentials(basicHttpCreds) ~> Route
-          .seal(testRoutes) ~> check {
+          .seal(route) ~> check {
           status mustBe OK
-          responseEntity.contentType mustBe ContentTypes.`application/json`
+          responseEntity.contentType mustBe `application/json`
         }
-
-        ctrl.shutdown()
       }
 
     "return the kafka cluster info when secured with basic auth" in
-      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-        implicit val wsCfg =
-          appTestConfig(kafkaPort = kcfg.kafkaPort, useBasicAuth = true)
-
-        val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
-        val ctrl                    = sdcStream.run()
-
+      plainServerContext { case (kcfg, _, route) =>
         Get("/kafka/cluster/info") ~> addCredentials(basicHttpCreds) ~> Route
-          .seal(testRoutes) ~> check {
+          .seal(route) ~> check {
           status mustBe OK
-          responseEntity.contentType mustBe ContentTypes.`application/json`
+          responseEntity.contentType mustBe `application/json`
 
           val ci = parse(responseAs[String])
             .map(_.as[Seq[BrokerInfo]])
@@ -109,21 +89,13 @@ class StatusRoutesSpec
             rack = None
           )
         }
-
-        ctrl.shutdown()
       }
 
     "return 401 when accessing kafka cluster info with invalid basic auth" in
-      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-        implicit val wsCfg =
-          appTestConfig(kafkaPort = kcfg.kafkaPort, useBasicAuth = true)
-
-        val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
-        val ctrl                    = sdcStream.run()
-
+      secureServerContext(useServerBasicAuth = true) { case (_, _, route) =>
         Get("/kafka/cluster/info") ~> addCredentials(
           invalidBasicHttpCreds
-        ) ~> Route.seal(testRoutes) ~> check {
+        ) ~> Route.seal(route) ~> check {
           status mustBe Unauthorized
           val authHeader = header[`WWW-Authenticate`].get
           authHeader.challenges.head mustEqual HttpChallenge(
@@ -132,25 +104,17 @@ class StatusRoutesSpec
             params = Map("charset" -> "UTF-8")
           )
         }
-
-        ctrl.shutdown()
       }
 
     "return the kafka cluster info when secured with OpenID Connect" in
-      withEmbeddedOpenIdConnectServerAndToken() {
-        case (_, _, _, cfg, token) =>
-          withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-            implicit val wsCfg =
-              appTestConfig(kafkaPort = kcfg.kafkaPort, openIdCfg = Option(cfg))
-
-            val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
-            val ctrl                    = sdcStream.run()
-
+      withEmbeddedOpenIdConnectServerAndToken() { case (_, _, _, cfg, token) =>
+        secureServerContext(serverOpenIdCfg = Option(cfg)) {
+          case (kcfg, _, route) =>
             Get("/kafka/cluster/info") ~> addCredentials(
               token.bearerToken
-            ) ~> Route.seal(testRoutes) ~> check {
+            ) ~> Route.seal(route) ~> check {
               status mustBe OK
-              responseEntity.contentType mustBe ContentTypes.`application/json`
+              responseEntity.contentType mustBe `application/json`
 
               val ci = parse(responseAs[String])
                 .map(_.as[Seq[BrokerInfo]])
@@ -166,29 +130,19 @@ class StatusRoutesSpec
                 rack = None
               )
             }
-
-            ctrl.shutdown()
-          }
+        }
       }
 
     "return 401 when accessing kafka cluster info with invalid bearer token" in
-      withEmbeddedOpenIdConnectServerAndClient() {
-        case (_, _, _, cfg) =>
-          withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-            implicit val wsCfg =
-              appTestConfig(kafkaPort = kcfg.kafkaPort, openIdCfg = Option(cfg))
-
-            val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
-            val ctrl                    = sdcStream.run()
-
+      withEmbeddedOpenIdConnectServerAndClient() { case (_, _, _, cfg) =>
+        secureServerContext(serverOpenIdCfg = Option(cfg)) {
+          case (_, _, route) =>
             Get("/kafka/cluster/info") ~> addCredentials(
               OAuth2BearerToken("invalid-token")
-            ) ~> Route.seal(testRoutes) ~> check {
+            ) ~> Route.seal(route) ~> check {
               status mustBe Unauthorized
             }
-
-            ctrl.shutdown()
-          }
+        }
       }
   }
 

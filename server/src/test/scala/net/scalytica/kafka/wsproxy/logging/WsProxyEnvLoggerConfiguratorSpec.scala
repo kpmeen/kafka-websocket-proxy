@@ -116,9 +116,9 @@ class WsProxyEnvLoggerConfiguratorSpec
 
     "not modify loggers if there are no logger configs defined " +
       "in the env" in testContext() { configuredLevels =>
-      configuredLevels.keys must not contain testLogger
-      configuredLevels must contain allElementsOf defaultLoggers
-    }
+        configuredLevels.keys must not contain testLogger
+        configuredLevels must contain allElementsOf defaultLoggers
+      }
 
     "set level for logger from environment" in
       testContext(testEnvLogger -> "DEBUG") { configuredLevels =>

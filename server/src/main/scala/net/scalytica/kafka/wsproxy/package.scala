@@ -91,6 +91,15 @@ package object wsproxy {
     props
   }
 
+  implicit class NiceClassNameExtensions(c: Any) {
+
+    def niceClassName: String = c.getClass.getName.stripSuffix("$")
+
+    def niceClassNameShort: String = niceClassName.split("""\.""").last
+
+    def niceClassSimpleName: String = c.getClass.getSimpleName.stripSuffix("$")
+  }
+
   implicit class OptionExtensions[T](underlying: Option[T]) {
 
     def getUnsafe: T = {
@@ -183,5 +192,4 @@ package object wsproxy {
       }
 
   }
-
 }

@@ -19,7 +19,7 @@ import net.scalytica.kafka.wsproxy.session.SessionHandlerProtocol.{
   RemoveSession,
   UpdateSession
 }
-import net.scalytica.test.WSProxyKafkaSpec
+import net.scalytica.test.WsProxyKafkaSpec
 import org.scalatest.Inspectors.forAll
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Minute, Span}
@@ -30,7 +30,7 @@ import org.scalatest.wordspec.AnyWordSpec
 // scalastyle:off magic.number
 class SessionDataConsumerSpec
     extends AnyWordSpec
-    with WSProxyKafkaSpec
+    with WsProxyKafkaSpec
     with Matchers
     with OptionValues
     with Eventually
@@ -94,7 +94,7 @@ class SessionDataConsumerSpec
     "consume session data from the session state topic" in {
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val cfg =
-          appTestConfig(kcfg.kafkaPort, Option(kcfg.schemaRegistryPort))
+          plainAppTestConfig(kcfg.kafkaPort, Option(kcfg.schemaRegistryPort))
 
         initTopic(cfg.sessionHandler.sessionStateTopicName.value)
 

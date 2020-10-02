@@ -35,16 +35,12 @@ import net.scalytica.kafka.wsproxy.models.{
 }
 import net.scalytica.kafka.wsproxy.session.SessionHandler._
 import net.scalytica.kafka.wsproxy.session.{Session, SessionHandlerProtocol}
-import net.scalytica.kafka.wsproxy.{
-  WithSchemaRegistryConfig,
-  wsMessageToStringFlow,
-  _
-}
+import net.scalytica.kafka.wsproxy.{wsMessageToStringFlow, _}
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 
-trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
+trait OutboundWebSocket extends WithProxyLogger {
 
   implicit private[this] val timeout: Timeout = 3 seconds
 
@@ -60,6 +56,15 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
    *
    * @param args
    *   the output arguments to pass on to the consumer.
+   * @param as
+   *   Implicitly provided [[ActorSystem]]
+   * @param mat
+   *   Implicitly provided [[Materializer]]
+   * @param ec
+   *   Implicitly provided [[ExecutionContext]]
+   * @param sessionHandler
+   *   Implicitly provided typed [[ActorRef]] for the
+   *   [[SessionHandlerProtocol.Protocol]]
    * @return
    *   a [[Route]] for accessing the outbound WebSocket functionality.
    */
@@ -254,13 +259,12 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
       ec: ExecutionContext
   ): Flow[Message, WsCommit, NotUsed] =
     wsMessageToStringFlow
-      .recover {
-        case t: Throwable =>
-          logAndThrow("There was an error processing a JSON message", t)
+      .recover { case t: Throwable =>
+        logAndThrow("There was an error processing a JSON message", t)
       }
       .map(msg => parse(msg).flatMap(_.as[WsCommit]))
-      .recover {
-        case t: Throwable => logAndThrow(s"JSON message could not be parsed", t)
+      .recover { case t: Throwable =>
+        logAndThrow(s"JSON message could not be parsed", t)
       }
       .collect { case Right(res) => res }
 
@@ -280,14 +284,12 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
       ec: ExecutionContext
   ): Flow[Message, WsCommit, NotUsed] =
     wsMessageToByteStringFlow
-      .recover {
-        case t: Throwable =>
-          logAndThrow("There was an error processing an Avro message", t)
+      .recover { case t: Throwable =>
+        logAndThrow("There was an error processing an Avro message", t)
       }
       .map(msg => avroCommitSerde.deserialize(msg.toArray[Byte]))
-      .recover {
-        case t: Throwable =>
-          logAndThrow(s"Avro message could not be deserialised", t)
+      .recover { case t: Throwable =>
+        logAndThrow(s"Avro message could not be deserialised", t)
       }
       .map(WsCommit.fromAvro)
 
@@ -296,6 +298,8 @@ trait OutboundWebSocket extends WithSchemaRegistryConfig with WithProxyLogger {
    *
    * @param args
    *   the output arguments to pass on to the consumer.
+   * @param commitHandlerRef
+   *   an optional [[ActorRef]] to a [[CommitStackHandler]].
    * @param cfg
    *   the application configuration.
    * @param as
