@@ -143,7 +143,7 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
   @throws(classOf[TopicNotFoundError])
   def topicPartitions(topicName: TopicName): Int = {
     try {
-      underlying
+      val p = underlying
         .describeTopics(Seq(topicName.value).asJava)
         .all()
         .get()
@@ -151,6 +151,9 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
         .headOption
         .map(_._2.partitions().size())
         .getOrElse(0)
+
+      logger.debug(s"Topic ${topicName.value} has $p partitions")
+      p
     } catch {
       case ee: java.util.concurrent.ExecutionException =>
         ee.getCause match {
