@@ -163,7 +163,7 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
     else provide("Authentication not enabled")
   }
 
-  private[this] def jsonMessageStr(msg: String): Json =
+  private[this] def jsonMessageFromString(msg: String): Json =
     Json.obj("message" -> Json.fromString(msg))
 
   private[this] def jsonResponseMsg(
@@ -174,7 +174,7 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
       status = statusCode,
       entity = HttpEntity(
         contentType = ContentTypes.`application/json`,
-        string = jsonMessageStr(message).printWith(Printer.noSpaces)
+        string = jsonMessageFromString(message).spaces2
       )
     )
   }
@@ -286,7 +286,7 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
       .mapRejectionResponse { res =>
         res.entity match {
           case HttpEntity.Strict(ContentTypes.`text/plain(UTF-8)`, body) =>
-            val js = jsonMessageStr(body.utf8String).printWith(Printer.noSpaces)
+            val js = jsonMessageFromString(body.utf8String).noSpaces
             res.withEntity(HttpEntity(ContentTypes.`application/json`, js))
 
           case _ => res

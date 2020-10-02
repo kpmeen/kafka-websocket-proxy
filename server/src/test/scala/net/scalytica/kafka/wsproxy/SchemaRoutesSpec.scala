@@ -3,6 +3,7 @@ package net.scalytica.kafka.wsproxy
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.testkit.RouteTestTimeout
+import io.circe.Json
 import net.scalytica.kafka.wsproxy.auth.OpenIdClient
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
   AvroCommit,
@@ -38,8 +39,12 @@ class SchemaRoutesSpec
     "return HTTP 404 when requesting an invalid resource" in {
       implicit val cfg = plainTestConfig()
 
-      val expected =
-        "{\"message\":\"This is not the resource you are looking for.\"}"
+      val expected = Json
+        .obj(
+          "message" -> Json
+            .fromString("This is not the resource you are looking for.")
+        )
+        .spaces2
 
       val routes = Route.seal(TestSchemaRoutes.schemaRoutes)
 
