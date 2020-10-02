@@ -5,7 +5,11 @@ import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroValueTypesCoproduct
 import net.scalytica.kafka.wsproxy.codecs.{BasicSerdes, Decoders, Encoders}
 import net.scalytica.kafka.wsproxy.errors.IllegalFormatTypeError
 import net.scalytica.kafka.wsproxy.logging.DefaultProxyLogger
-import net.scalytica.kafka.wsproxy.{OptionExtensions, StringExtensions}
+import net.scalytica.kafka.wsproxy.{
+  NiceClassNameExtensions,
+  OptionExtensions,
+  StringExtensions
+}
 import org.apache.kafka.common.serialization.{Deserializer, Serializer}
 import shapeless.Coproduct
 
@@ -47,10 +51,8 @@ object Formats {
           )
         )
 
-    lazy val name: String = self.getClass.getSimpleName
-      .stripSuffix("$")
-      .stripSuffix("Type")
-      .toSnakeCase
+    lazy val name: String =
+      self.niceClassSimpleName.stripSuffix("Type").toSnakeCase
 
     def isSameName(s: String): Boolean = name.equalsIgnoreCase(s)
 
