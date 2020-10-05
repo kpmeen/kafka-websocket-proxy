@@ -1,0 +1,47 @@
+---
+version: 2
+prepare:
+  fetch:
+    - url: "https://gitlab.com/gitlab-org/ci-cd/codequality/-/raw/master/codeclimate_defaults/.codeclimate.yml.template"
+      path: ".default-codeclimate.yml"
+
+checks:
+  # Disable checks that are handled by Scalastyle
+  argument-count:
+    enabled: false
+  complex-logic:
+    enabled: false
+  file-lines:
+    enabled: false
+  method-complexity:
+    enabled: false
+  method-count:
+    enabled: false
+  method-lines:
+    enabled: false
+  return-statements:
+    enabled: false
+  identical-code:
+    enabled: false
+  similar-code:
+    enabled: false
+  nested-control-flow:
+    enabled: false
+
+plugins:
+  scalastyle:
+    enabled: true
+    config:
+      config: scalastyle-config.xml
+
+exclude_patterns:
+  - "docker/"
+  - ".gitlab/"
+  - ".idea/"
+  - "gatling/"
+  - "project/"
+  - "target/"
+  - "**/target/"
+  - "script/"
+  - "**/spec/"
+  - "**/test/"
