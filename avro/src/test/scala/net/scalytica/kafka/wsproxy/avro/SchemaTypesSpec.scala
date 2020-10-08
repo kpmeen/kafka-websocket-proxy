@@ -38,6 +38,10 @@ class SchemaTypesSpec extends AnyWordSpec with Matchers {
       |      }
       |    } ],
       |    "default" : null
+      |  }, {
+      |    "name" : "clientMessageId",
+      |    "type" : [ "null", "string" ],
+      |    "default" : null
       |  } ]
       |}""".stripMargin
 
@@ -59,6 +63,10 @@ class SchemaTypesSpec extends AnyWordSpec with Matchers {
       |  }, {
       |    "name" : "timestamp",
       |    "type" : "long"
+      |  }, {
+      |    "name" : "clientMessageId",
+      |    "type" : [ "null", "string" ],
+      |    "default" : null
       |  } ]
       |}""".stripMargin
 

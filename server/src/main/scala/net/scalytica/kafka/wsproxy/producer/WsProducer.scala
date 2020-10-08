@@ -33,6 +33,7 @@ import org.apache.kafka.common.errors.{
   AuthenticationException,
   AuthorizationException
 }
+import org.apache.kafka.common.header.Header
 import org.apache.kafka.common.serialization.Serializer
 
 import scala.collection.JavaConverters._
@@ -163,13 +164,25 @@ object WsProducer extends WithProxyLogger {
   private[this] def asKafkaProducerRecord[K, V](
       topic: TopicName,
       msg: WsProducerRecord[K, V]
-  ): ProducerRecord[K, V] =
+  ): ProducerRecord[K, V] = {
+    val headers: Iterable[Header] =
+      msg.headers.getOrElse(Seq.empty).map(_.asRecordHeader)
+
     msg match {
       case kvm: ProducerKeyValueRecord[K, V] =>
-        new ProducerRecord[K, V](topic.value, kvm.key.value, kvm.value.value)
+        new ExtendedProducerRecord[K, V](
+          topic.value,
+          kvm.key.value,
+          kvm.value.value,
+          headers.asJava
+        )
 
       case vm: ProducerValueRecord[V] =>
-        new ProducerRecord[K, V](topic.value, vm.value.value)
+        new ExtendedProducerRecord[K, V](
+          topic.value,
+          vm.value.value,
+          headers.asJava
+        )
 
       case ProducerEmptyMessage =>
         throw new IllegalStateException(
@@ -177,6 +190,7 @@ object WsProducer extends WithProxyLogger {
             " been filtered out."
         )
     }
+  }
 
   /** Convenience function for logging and throwing an error in a Flow */
   private[this] def logAndEmpty[T](msg: String, t: Throwable)(empty: T): T = {
@@ -282,10 +296,10 @@ object WsProducer extends WithProxyLogger {
       .filter(_.nonEmpty)
       .map { wpr =>
         val record = asKafkaProducerRecord(args.topic, wpr)
-        ProducerMessage.Message(record, record)
+        ProducerMessage.Message(record, wpr)
       }
       .via(Producer.flexiFlow(settings.withProducer(producerClient)))
-      .map(r => WsProducerResult.fromProducerResults(r))
+      .map(r => WsProducerResult.fromProducerResult(r))
       .flatMapConcat(seqToSource)
   }
 
@@ -324,18 +338,17 @@ object WsProducer extends WithProxyLogger {
         )
       }
       .filterNot(_.isEmpty)
-      .map { wpr =>
-        val record =
-          asKafkaProducerRecord(
-            topic = args.topic,
-            msg = WsProducerRecord
-              .fromAvro[keyType.Aux, valType.Aux](wpr)(keyType, valType)
-          )
-        ProducerMessage.Message(record, record)
+      .map { apr =>
+        val wpr = WsProducerRecord.fromAvro[keyType.Aux, valType.Aux](apr)(
+          keyFormatType = keyType,
+          valueFormatType = valType
+        )
+        val record = asKafkaProducerRecord(args.topic, wpr)
+        ProducerMessage.Message(record, wpr)
 
       }
       .via(Producer.flexiFlow(settings.withProducer(producerClient)))
-      .map(r => WsProducerResult.fromProducerResults(r))
+      .map(r => WsProducerResult.fromProducerResult(r))
       .flatMapConcat(seqToSource)
   }
 

@@ -38,6 +38,8 @@ object SchemaTypes {
    *   The message value.
    * @param headers
    *   The headers to apply to the message in Kafka.
+   * @param clientMessageId
+   *   Message identifier given by the client to uniquely identify the message.
    */
   @AvroDoc(
     "Inbound schema for producing messages with a key and value to Kafka " +
@@ -51,7 +53,8 @@ object SchemaTypes {
       key: Option[AvroValueTypesCoproduct] = None,
       // format: on
       value: AvroValueTypesCoproduct,
-      headers: Option[Seq[KafkaMessageHeader]] = None
+      headers: Option[Seq[KafkaMessageHeader]] = None,
+      clientMessageId: Option[String] = None
   ) {
 
     def isEmpty: Boolean = AvroProducerRecord.Empty == this
@@ -82,6 +85,8 @@ object SchemaTypes {
    *   The topic partition offset for the given message.
    * @param timestamp
    *   The timestamp for when the message was written to Kafka.
+   * @param clientMessageId
+   *   Message identifier given by the client to uniquely identify the message.
    */
   @AvroDoc("Outbound schema for responding to produced messages.")
   @AvroNamespace("net.scalytica.kafka.wsproxy.avro")
@@ -89,7 +94,8 @@ object SchemaTypes {
       topic: String,
       partition: Int,
       offset: Long,
-      timestamp: Long
+      timestamp: Long,
+      clientMessageId: Option[String] = None
   )
 
   object AvroProducerResult {

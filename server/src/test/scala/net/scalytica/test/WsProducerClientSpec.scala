@@ -37,6 +37,7 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
       valType: FormatType,
       routes: Route,
       messages: Seq[String],
+      validateMessageId: Boolean = false,
       basicCreds: Option[BasicHttpCredentials] = None
   )(implicit wsClient: WSProbe): Unit = {
     val uri = baseProducerUri(topic, keyType = keyType, valType = valType)
@@ -46,7 +47,7 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
 
       forAll(messages) { msg =>
         wsClient.sendMessage(msg)
-        wsClient.expectWsProducerResultJson(topic)
+        wsClient.expectWsProducerResultJson(topic, validateMessageId)
       }
       wsClient.sendCompletion()
       wsClient.expectCompletion()
@@ -59,6 +60,7 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
       keyType: Option[FormatType],
       valType: FormatType,
       messages: Seq[AvroProducerRecord],
+      validateMessageId: Boolean = false,
       kafkaCreds: Option[BasicHttpCredentials] = None,
       creds: Option[HttpCredentials] = None
   )(
@@ -82,7 +84,7 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
       forAll(messages) { msg =>
         val bytes = avroProducerRecordSerde.serialize(msg)
         producerProbe.sendMessage(ByteString(bytes))
-        producerProbe.expectWsProducerResultAvro(topic)
+        producerProbe.expectWsProducerResultAvro(topic, validateMessageId)
       }
       producerProbe.sendCompletion()
       producerProbe.expectCompletion()

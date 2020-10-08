@@ -17,6 +17,9 @@ import net.scalytica.kafka.wsproxy.models.ValueDetails.InValueDetails
  */
 sealed trait WsProducerRecord[+K, +V] {
 
+  val clientMessageId: Option[String]
+  val headers: Option[Seq[KafkaHeader]]
+
   def maybeKey: Option[InValueDetails[_ <: K]] = None
   def value: InValueDetails[_ <: V]
 
@@ -40,13 +43,15 @@ object WsProducerRecord {
         ProducerKeyValueRecord[K, V](
           key = InValueDetails(k, keyFormatType),
           value = InValueDetails(v, valueFormatType),
-          headers = avro.headers.map(_.map(KafkaHeader.fromAvro))
+          headers = avro.headers.map(_.map(KafkaHeader.fromAvro)),
+          clientMessageId = avro.clientMessageId
         )
       }
       .getOrElse {
         ProducerValueRecord[V](
           value = InValueDetails(v, valueFormatType),
-          headers = avro.headers.map(_.map(KafkaHeader.fromAvro))
+          headers = avro.headers.map(_.map(KafkaHeader.fromAvro)),
+          clientMessageId = avro.clientMessageId
         )
       }
   }
@@ -62,6 +67,8 @@ object WsProducerRecord {
  *   The [[InValueDetails]] describing the message value
  * @param headers
  *   Optional [[KafkaHeader]] s to use for the Kafka message
+ * @param clientMessageId
+ *   Message identifier given by the client to uniquely identify the message.
  * @tparam K
  *   the type of the key
  * @tparam V
@@ -70,7 +77,8 @@ object WsProducerRecord {
 case class ProducerKeyValueRecord[K, V](
     key: InValueDetails[K],
     value: InValueDetails[V],
-    headers: Option[Seq[KafkaHeader]]
+    headers: Option[Seq[KafkaHeader]],
+    clientMessageId: Option[String]
 ) extends WsProducerRecord[K, V] {
   override val maybeKey = Some(key)
   override def isEmpty  = false
@@ -83,19 +91,24 @@ case class ProducerKeyValueRecord[K, V](
  *   The [[InValueDetails]] describing the message value
  * @param headers
  *   Optional [[KafkaHeader]] s to use for the Kafka message
+ * @param clientMessageId
+ *   Message identifier given by the client to uniquely identify the message.
  * @tparam V
  *   the type of the value
  */
 case class ProducerValueRecord[V](
     value: InValueDetails[V],
-    headers: Option[Seq[KafkaHeader]]
+    headers: Option[Seq[KafkaHeader]],
+    clientMessageId: Option[String]
 ) extends WsProducerRecord[Nothing, V] {
   override val maybeKey = None
   override def isEmpty  = false
 }
 
 case object ProducerEmptyMessage extends WsProducerRecord[Nothing, Nothing] {
-  override val maybeKey = None
+  override val maybeKey        = None
+  override val clientMessageId = None
+  override val headers         = None
 
   override def value =
     throw new NoSuchElementException(
