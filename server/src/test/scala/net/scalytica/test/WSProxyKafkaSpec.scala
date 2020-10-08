@@ -492,7 +492,8 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       valType: FormatType,
       numMessages: Int = 1,
       partitions: Int = 1,
-      prePopulate: Boolean = true
+      prePopulate: Boolean = true,
+      withHeaders: Boolean = false
   )(body: ConsumerContext => T): T =
     plainConsumerContext(
       topic = topic,
@@ -501,7 +502,8 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       valType = valType,
       numMessages = numMessages,
       partitions = partitions,
-      prePopulate = prePopulate
+      prePopulate = prePopulate,
+      withHeaders = withHeaders
     )(body)
 
   def plainAvroConsumerContext[T](
@@ -510,7 +512,8 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       valType: FormatType,
       numMessages: Int = 1,
       partitions: Int = 1,
-      prePopulate: Boolean = true
+      prePopulate: Boolean = true,
+      withHeaders: Boolean = false
   )(body: ConsumerContext => T): T =
     plainConsumerContext(
       topic = topic,
@@ -519,7 +522,8 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       valType = valType,
       numMessages = numMessages,
       partitions = partitions,
-      prePopulate = prePopulate
+      prePopulate = prePopulate,
+      withHeaders = withHeaders
     )(body)
 
   def plainConsumerContext[T, M <: FormatType](
@@ -529,7 +533,8 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       valType: FormatType,
       numMessages: Int = 1,
       partitions: Int = 1,
-      prePopulate: Boolean = true
+      prePopulate: Boolean = true,
+      withHeaders: Boolean = false
   )(body: ConsumerContext => T): T =
     secureServerConsumerContext[T, M](
       topic = topic,
@@ -539,6 +544,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       numMessages = numMessages,
       partitions = partitions,
       prePopulate = prePopulate,
+      withHeaders = withHeaders,
       useServerBasicAuth = false,
       serverOpenIdCfg = None
     )(body)
@@ -587,6 +593,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       serverOpenIdCfg = serverOpenIdCfg
     )(body)
 
+  // scalastyle:off
   def secureKafkaConsumerContext[T, M <: FormatType](
       topic: String,
       messageType: M,
@@ -595,6 +602,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       numMessages: Int = 1,
       partitions: Int = 1,
       prePopulate: Boolean = true,
+      withHeaders: Boolean = false,
       useServerBasicAuth: Boolean = false,
       serverOpenIdCfg: Option[OpenIdConnectCfg] = None
   )(body: ConsumerContext => T): T = secureKafkaClusterProducerContext(
@@ -609,12 +617,14 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
         keyType = keyType,
         valType = valType,
         numMessages = numMessages,
-        prePopulate = prePopulate
+        prePopulate = prePopulate,
+        withHeaders = withHeaders
       )
     }
     val ctx = setupConsumerContext
     body(ctx)
   }
+  //scalastyle:on
 
   def secureServerAvroConsumerContext[T](
       topic: String,
@@ -623,6 +633,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       numMessages: Int = 1,
       partitions: Int = 1,
       prePopulate: Boolean = true,
+      withHeaders: Boolean = false,
       useServerBasicAuth: Boolean = false,
       serverOpenIdCfg: Option[OpenIdConnectCfg] = None
   )(body: ConsumerContext => T): T =
@@ -635,7 +646,8 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       partitions = partitions,
       useServerBasicAuth = useServerBasicAuth,
       serverOpenIdCfg = serverOpenIdCfg,
-      prePopulate = prePopulate
+      prePopulate = prePopulate,
+      withHeaders = withHeaders
     )(body)
 
   def secureServerJsonConsumerContext[T](
@@ -645,6 +657,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       numMessages: Int = 1,
       partitions: Int = 1,
       prePopulate: Boolean = true,
+      withHeaders: Boolean = false,
       useServerBasicAuth: Boolean = false,
       serverOpenIdCfg: Option[OpenIdConnectCfg] = None
   )(body: ConsumerContext => T): T =
@@ -657,7 +670,8 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       partitions = partitions,
       useServerBasicAuth = useServerBasicAuth,
       serverOpenIdCfg = serverOpenIdCfg,
-      prePopulate = prePopulate
+      prePopulate = prePopulate,
+      withHeaders = withHeaders
     )(body)
 
   // scalastyle:off
@@ -669,6 +683,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       numMessages: Int = 1,
       partitions: Int = 1,
       prePopulate: Boolean = true,
+      withHeaders: Boolean = false,
       useServerBasicAuth: Boolean = false,
       serverOpenIdCfg: Option[OpenIdConnectCfg] = None
   )(body: ConsumerContext => T): T = {
@@ -685,7 +700,8 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
           keyType = keyType,
           valType = valType,
           numMessages = numMessages,
-          prePopulate = prePopulate
+          prePopulate = prePopulate,
+          withHeaders = withHeaders
         )
       }
       val ctx = setupConsumerContext
@@ -696,26 +712,27 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
   private[this] def createAvroMessagesForTypes(
       keyType: Option[FormatType],
       valType: FormatType,
-      numMessages: Int
+      numMessages: Int,
+      withHeaders: Boolean
   ): Seq[AvroProducerRecord] = {
     (keyType, valType) match {
       case (None, AvroType) =>
-        createAvroProducerRecordNoneAvro(numMessages)
+        createAvroProducerRecordNoneAvro(numMessages, withHeaders)
 
       case (Some(AvroType), AvroType) =>
-        createAvroProducerRecordAvroAvro(numMessages)
+        createAvroProducerRecordAvroAvro(numMessages, withHeaders)
 
       case (Some(LongType), StringType) =>
-        createAvroProducerRecordLongString(numMessages)
+        createAvroProducerRecordLongString(numMessages, withHeaders)
 
       case (None, StringType) =>
-        createAvroProducerRecordNoneString(numMessages)
+        createAvroProducerRecordNoneString(numMessages, withHeaders)
 
       case (Some(StringType), ByteArrayType) =>
-        createAvroProducerRecordStringBytes(numMessages)
+        createAvroProducerRecordStringBytes(numMessages, withHeaders)
 
       case (Some(StringType), StringType) =>
-        createAvroProducerRecordStringString(numMessages)
+        createAvroProducerRecordStringString(numMessages, withHeaders)
 
       case (kt, vt) =>
         throw new NotImplementedException(
@@ -730,8 +747,8 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       withHeaders: Boolean,
       numMessages: Int
   ): Seq[String] = {
-    if (withKey) createJsonKeyValue(numMessages, withHeaders)
-    else createJsonValue(numMessages, withHeaders)
+    if (withKey) createJsonKeyValue(numMessages, withHeaders = withHeaders)
+    else createJsonValue(numMessages, withHeaders = withHeaders)
   }
 
   private[this] def setupConsumerContext(
@@ -753,12 +770,18 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       keyType: Option[FormatType],
       valType: FormatType,
       numMessages: Int,
-      prePopulate: Boolean
+      prePopulate: Boolean,
+      withHeaders: Boolean
   )(implicit pctx: ProducerContext): Unit = {
     if (prePopulate) {
       messageType match {
         case AvroType =>
-          val msgs = createAvroMessagesForTypes(keyType, valType, numMessages)
+          val msgs = createAvroMessagesForTypes(
+            keyType,
+            valType,
+            numMessages,
+            withHeaders
+          )
           produceAndCheckAvro(
             topic = pctx.topicName,
             routes = pctx.route,
@@ -770,7 +793,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
         case JsonType =>
           val messages = createJsonMessages(
             withKey = keyType.isDefined,
-            withHeaders = false,
+            withHeaders = withHeaders,
             numMessages = numMessages
           )
           produceAndCheckJson(

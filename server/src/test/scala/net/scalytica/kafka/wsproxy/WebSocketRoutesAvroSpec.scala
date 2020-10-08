@@ -60,12 +60,19 @@ class WebSocketRoutesAvroSpec
     }
   }
 
+  private[this] var topicCounter = 0
+
+  private[this] def nextTopic: String = {
+    topicCounter = topicCounter + 1
+    s"avro-test-topic-$topicCounter"
+  }
+
   "Using Avro payloads with WebSockets" when {
 
     "the server routes" should {
 
       "produce messages with Avro key and value" in
-        plainProducerContext("test-topic-7") { ctx =>
+        plainProducerContext(nextTopic) { ctx =>
           implicit val wsClient = ctx.producerProbe
 
           val messages = createAvroProducerRecordAvroAvro(1)
@@ -80,7 +87,7 @@ class WebSocketRoutesAvroSpec
         }
 
       "produce messages with String key and Avro value" in
-        plainProducerContext("test-topic-8") { ctx =>
+        plainProducerContext(nextTopic) { ctx =>
           implicit val wsClient = ctx.producerProbe
 
           val messages = createAvroProducerRecordStringBytes(1)
@@ -94,8 +101,24 @@ class WebSocketRoutesAvroSpec
           )
         }
 
+      "produce messages with String key and Avro value with headers" in
+        plainProducerContext(nextTopic) { ctx =>
+          implicit val wsClient = ctx.producerProbe
+
+          val messages =
+            createAvroProducerRecordStringBytes(1, withHeaders = true)
+
+          produceAndCheckAvro(
+            topic = ctx.topicName,
+            routes = Route.seal(ctx.route),
+            keyType = Some(StringType),
+            valType = AvroType,
+            messages = messages
+          )
+        }
+
       "produce messages with Avro value" in
-        plainProducerContext("test-topic-9") { ctx =>
+        plainProducerContext(nextTopic) { ctx =>
           implicit val wsClient = ctx.producerProbe
 
           val messages = createAvroProducerRecordNoneAvro(1)
@@ -109,9 +132,26 @@ class WebSocketRoutesAvroSpec
           )
         }
 
+      "produce messages with String key and Avro value and message ID" in
+        plainProducerContext(nextTopic) { ctx =>
+          implicit val wsClient = ctx.producerProbe
+
+          val messages =
+            createAvroProducerRecordStringBytes(1, withMessageId = true)
+
+          produceAndCheckAvro(
+            topic = ctx.topicName,
+            routes = Route.seal(ctx.route),
+            keyType = Some(StringType),
+            valType = AvroType,
+            messages = messages,
+            validateMessageId = true
+          )
+        }
+
       "consume messages with Avro key and value" in
         plainAvroConsumerContext(
-          topic = "test-topic-10",
+          topic = nextTopic,
           keyType = Some(AvroType),
           valType = AvroType,
           numMessages = 10
@@ -119,8 +159,8 @@ class WebSocketRoutesAvroSpec
           implicit val kcfg = ctx.embeddedKafkaConfig
 
           val outPath = "/socket/out?" +
-            "clientId=test-10" +
-            "&groupId=test-group-10" +
+            s"clientId=avro-test-$topicCounter" +
+            s"&groupId=avro-test-group-$topicCounter" +
             s"&topic=${ctx.topicName.value}" +
             s"&socketPayload=${AvroPayload.name}" +
             s"&keyType=${AvroType.name}" +
@@ -152,7 +192,7 @@ class WebSocketRoutesAvroSpec
 
       "consume messages with String key and value" in
         plainAvroConsumerContext(
-          topic = "test-topic-11",
+          topic = nextTopic,
           keyType = Some(StringType),
           valType = StringType,
           numMessages = 10
@@ -160,8 +200,8 @@ class WebSocketRoutesAvroSpec
           implicit val kcfg = ctx.embeddedKafkaConfig
 
           val outPath = "/socket/out?" +
-            "clientId=test-11" +
-            "&groupId=test-group-11" +
+            s"clientId=avro-test-$topicCounter" +
+            s"&groupId=avro-test-group-$topicCounter" +
             s"&topic=${ctx.topicName.value}" +
             s"&socketPayload=${AvroPayload.name}" +
             s"&keyType=${StringType.name}" +
@@ -193,9 +233,54 @@ class WebSocketRoutesAvroSpec
           }
         }
 
+      "consume messages with String key and value with headers" in
+        plainAvroConsumerContext(
+          topic = nextTopic,
+          keyType = Some(StringType),
+          valType = StringType,
+          numMessages = 10,
+          withHeaders = true
+        ) { ctx =>
+          implicit val kcfg = ctx.embeddedKafkaConfig
+
+          val outPath = "/socket/out?" +
+            s"clientId=avro-test-$topicCounter" +
+            s"&groupId=avro-test-group-$topicCounter" +
+            s"&topic=${ctx.topicName.value}" +
+            s"&socketPayload=${AvroPayload.name}" +
+            s"&keyType=${StringType.name}" +
+            s"&valType=${StringType.name}" +
+            "&autoCommit=false"
+
+          val (rk, rv) =
+            consumeFirstKeyedMessageFrom[String, String](ctx.topicName.value)
+          rk mustBe "foo-1"
+          rv mustBe "artist-1"
+
+          WS(outPath, ctx.consumerProbe.flow) ~> ctx.route ~> check {
+            isWebSocketUpgrade mustBe true
+
+            forAll(1 to 10) { i =>
+              ctx.consumerProbe.expectWsConsumerResultAvro[String, String](
+                expectedTopic = ctx.topicName,
+                expectHeaders = true,
+                keyFormat = StringType,
+                valFormat = StringType
+              ) {
+                case ConsumerKeyValueRecord(_, _, _, _, _, key, value, _) =>
+                  key.value mustBe s"foo-$i"
+                  value.value mustBe s"artist-$i"
+
+                case _ =>
+                  fail("Unexpected ConsumerValueRecord")
+              }
+            }
+          }
+        }
+
       "consume messages with String value" in
         plainAvroConsumerContext(
-          topic = "test-topic-12",
+          topic = nextTopic,
           keyType = None,
           valType = StringType,
           numMessages = 10
@@ -203,8 +288,8 @@ class WebSocketRoutesAvroSpec
           implicit val kcfg = ctx.embeddedKafkaConfig
 
           val outPath = "/socket/out?" +
-            "clientId=test-12" +
-            "&groupId=test-group-12" +
+            s"clientId=avro-test-$topicCounter" +
+            s"&groupId=avro-test-group-$topicCounter" +
             s"&topic=${ctx.topicName.value}" +
             s"&socketPayload=${AvroPayload.name}" +
             s"&valType=${StringType.name}" +
@@ -234,7 +319,7 @@ class WebSocketRoutesAvroSpec
 
       "consume message with Long key and String value" in
         plainAvroConsumerContext(
-          topic = "test-topic-12",
+          topic = nextTopic,
           keyType = Some(LongType),
           valType = StringType,
           numMessages = 10
@@ -242,8 +327,8 @@ class WebSocketRoutesAvroSpec
           implicit val kcfg = ctx.embeddedKafkaConfig
 
           val outPath = "/socket/out?" +
-            "clientId=test-13" +
-            "&groupId=test-group-13" +
+            s"clientId=avro-test-$topicCounter" +
+            s"&groupId=avro-test-group-$topicCounter" +
             s"&topic=${ctx.topicName.value}" +
             s"&socketPayload=${AvroPayload.name}" +
             s"&keyType=${LongType.name}" +
@@ -295,7 +380,7 @@ class WebSocketRoutesAvroSpec
 
       "return HTTP 400 when attempting to consume from non-existing topic" in
         plainAvroConsumerContext(
-          topic = "test-topic-100",
+          topic = nextTopic,
           keyType = Some(AvroType),
           valType = AvroType,
           numMessages = 0,
@@ -303,8 +388,8 @@ class WebSocketRoutesAvroSpec
         ) { ctx =>
           val topicName = "non-existing-topic"
           val out = "/socket/out?" +
-            "clientId=test-100" +
-            "&groupId=test-group-100" +
+            s"clientId=avro-test-$topicCounter" +
+            s"&groupId=avro-test-group-$topicCounter" +
             s"&topic=$topicName" +
             s"&socketPayload=${AvroPayload.name}" +
             s"&keyType=${AvroPayload.name}" +
@@ -320,15 +405,15 @@ class WebSocketRoutesAvroSpec
       "return a HTTP 401 when using wrong credentials to establish an outbound connection to a secured cluster" in
         // scalastyle:on line.size.limit
         secureKafkaAvroConsumerContext(
-          topic = "restricted-1",
+          topic = nextTopic,
           keyType = Some(AvroType),
           valType = AvroType,
           numMessages = 0,
           prePopulate = false
         ) { ctx =>
           val out = "/socket/out?" +
-            "clientId=test-101" +
-            "&groupId=test-group-101" +
+            s"clientId=avro-test-$topicCounter" +
+            s"&groupId=avro-test-group-$topicCounter" +
             s"&topic=${ctx.topicName.value}" +
             s"&socketPayload=${AvroPayload.name}" +
             s"&keyType=${AvroPayload.name}" +
@@ -348,9 +433,7 @@ class WebSocketRoutesAvroSpec
       // scalastyle:off line.size.limit
       "return a HTTP 401 when using wrong credentials to establish an inbound connection to a secured cluster" in
         // scalastyle:on line.size.limit
-        secureKafkaClusterProducerContext(
-          topic = "restricted-2"
-        ) { implicit ctx =>
+        secureKafkaClusterProducerContext(topic = nextTopic) { implicit ctx =>
           implicit val wsClient = ctx.producerProbe
           val baseUri = baseProducerUri(
             topicName = ctx.topicName,
@@ -371,9 +454,7 @@ class WebSocketRoutesAvroSpec
         }
 
       "produce messages to a secured cluster" in
-        secureKafkaClusterProducerContext(
-          "secure-topic-1"
-        ) { ctx =>
+        secureKafkaClusterProducerContext(topic = nextTopic) { ctx =>
           implicit val wsClient = ctx.producerProbe
 
           val messages = createAvroProducerRecordNoneAvro(1)
@@ -392,7 +473,7 @@ class WebSocketRoutesAvroSpec
         withEmbeddedOpenIdConnectServerAndToken() {
           case (_, _, _, cfg, token) =>
             secureServerProducerContext(
-              topic = "openid-1",
+              topic = nextTopic,
               serverOpenIdCfg = Option(cfg)
             ) { ctx =>
               implicit val wsClient = ctx.producerProbe
@@ -414,7 +495,7 @@ class WebSocketRoutesAvroSpec
       "return HTTP 401 when bearer token is invalid with OpenID enabled" in
         withEmbeddedOpenIdConnectServerAndClient() { case (_, _, _, cfg) =>
           secureServerProducerContext(
-            topic = "openid-2",
+            topic = nextTopic,
             serverOpenIdCfg = Option(cfg)
           ) { ctx =>
             implicit val wsClient = ctx.producerProbe

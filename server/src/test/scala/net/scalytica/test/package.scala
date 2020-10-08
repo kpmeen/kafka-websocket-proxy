@@ -19,13 +19,7 @@ import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
 import net.scalytica.kafka.wsproxy.codecs.Decoders._
 import net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde
 import net.scalytica.kafka.wsproxy.models.Formats.{AvroType, FormatType}
-import net.scalytica.kafka.wsproxy.models.{
-  ConsumerKeyValueRecord,
-  ConsumerValueRecord,
-  TopicName,
-  WsConsumerRecord,
-  WsProducerResult
-}
+import net.scalytica.kafka.wsproxy.models._
 import net.scalytica.test.TestTypes.{Album, TestKey}
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.{Assertion, OptionValues}
@@ -92,7 +86,8 @@ package object test {
       with OptionValues {
 
     def expectWsProducerResultJson(
-        expectedTopic: TopicName
+        expectedTopic: TopicName,
+        validateMessageId: Boolean
     )(implicit mat: Materializer): Assertion = {
       probe.expectMessage() match {
         case tm: TextMessage =>
@@ -108,6 +103,7 @@ package object test {
               js.as[WsProducerResult] match {
                 case Left(err) => throw err
                 case Right(actual) =>
+                  if (validateMessageId) actual.clientMessageId must not be None
                   actual.topic mustBe expectedTopic.value
                   actual.offset mustBe >=(0L)
                   actual.partition mustBe >=(0)
@@ -120,7 +116,8 @@ package object test {
     }
 
     def expectWsProducerResultAvro(
-        expectedTopic: TopicName
+        expectedTopic: TopicName,
+        validateMessageId: Boolean
     )(
         implicit mat: Materializer,
         resultSerde: WsProxyAvroSerde[AvroProducerResult]
@@ -135,6 +132,7 @@ package object test {
 
           val actual = resultSerde.deserialize(collected.toArray)
 
+          if (validateMessageId) actual.clientMessageId must not be None
           actual.topic mustBe expectedTopic.value
           actual.offset mustBe >=(0L)
           actual.partition mustBe >=(0)
@@ -174,7 +172,7 @@ package object test {
                   actual.partition.value mustBe >=(0)
 
                   if (expectHeaders) {
-                    actual.headers must not be empty
+                    actual.headers must not be None
                     actual.headers.value must have size 1
                     actual.headers.value.headOption.value.key must startWith(
                       "key"
@@ -183,7 +181,7 @@ package object test {
                       "value"
                     )
                   } else {
-                    actual.headers mustBe empty
+                    actual.headers mustBe None
                   }
 
                   actual match {
@@ -233,12 +231,12 @@ package object test {
           actual.partition.value mustBe >=(0)
 
           if (expectHeaders) {
-            actual.headers must not be empty
+            actual.headers must not be None
             actual.headers.value must have size 1
             actual.headers.value.headOption.value.key must startWith("key")
             actual.headers.value.headOption.value.value must startWith("value")
           } else {
-            actual.headers mustBe empty
+            actual.headers mustBe None
           }
 
           assertion(actual)
@@ -263,10 +261,10 @@ package object test {
       val valSerdes = TestTypes.TestSerdes.valueSerdes
 
       expectWsConsumerResultAvro[Array[Byte], Array[Byte]](
-        expectedTopic,
-        expectHeaders,
-        AvroType,
-        AvroType
+        expectedTopic = expectedTopic,
+        expectHeaders = expectHeaders,
+        keyFormat = AvroType,
+        valFormat = AvroType
       ) {
         case ConsumerKeyValueRecord(_, _, _, _, _, key, value, _) =>
           val k = keySerdes.deserialize(expectedTopic.value, key.value)

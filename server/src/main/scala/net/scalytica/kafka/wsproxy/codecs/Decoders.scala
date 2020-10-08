@@ -109,12 +109,16 @@ trait Decoders {
         case Right(h) => h
         case Left(_)  => None
       }
+    val msgId =
+      cursor.downField("messageId").as[Option[String]].toOption.flatten
 
     value match {
       case Right(v) =>
         key match {
-          case Right(k) => Right(ProducerKeyValueRecord[K, V](k, v, headers))
-          case Left(_)  => Right(ProducerValueRecord[V](v, headers))
+          case Right(k) =>
+            Right(ProducerKeyValueRecord[K, V](k, v, headers, msgId))
+          case Left(_) =>
+            Right(ProducerValueRecord[V](v, headers, msgId))
         }
 
       case Left(fail) =>
@@ -131,7 +135,7 @@ trait Decoders {
       partition <- cursor.downField("partition").as[Partition]
       offset    <- cursor.downField("offset").as[Offset]
       timestamp <- cursor.downField("timestamp").as[Timestamp]
-      headers   <- cursor.downField("").as[Option[Seq[KafkaHeader]]]
+      headers   <- cursor.downField("headers").as[Option[Seq[KafkaHeader]]]
       key       <- cursor.downField("key").as[Option[OutValueDetails[K]]]
       value     <- cursor.downField("value").as[OutValueDetails[V]]
     } yield {

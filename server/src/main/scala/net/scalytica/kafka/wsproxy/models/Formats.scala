@@ -129,8 +129,6 @@ object Formats {
 
   case object AvroType extends BaseBinaryType
 
-  case object ProtobufType extends BaseBinaryType
-
   // "Primitives"
   case object ByteArrayType extends BaseBinaryType
 
@@ -239,7 +237,6 @@ object Formats {
     val All = List(
       JsonType,
       AvroType,
-      ProtobufType,
       ByteArrayType,
       StringType,
       IntType,

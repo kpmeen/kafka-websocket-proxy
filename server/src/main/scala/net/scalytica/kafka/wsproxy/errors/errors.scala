@@ -9,6 +9,12 @@ abstract class ProxyError(
     cause: Option[Throwable] = None
 ) extends Exception(msg, cause.orNull)
 
+case class ImpossibleError(
+    msg: String,
+    cause: Option[Throwable] = None
+) extends ProxyError(msg, cause)
+    with NoStackTrace
+
 case class OpenIdConnectError(message: String)
     extends ProxyError(message)
     with NoStackTrace

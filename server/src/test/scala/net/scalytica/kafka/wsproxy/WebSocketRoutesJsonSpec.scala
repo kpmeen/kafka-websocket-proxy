@@ -32,12 +32,19 @@ class WebSocketRoutesJsonSpec
 
   import TestServerRoutes.{serverErrorHandler, serverRejectionHandler}
 
+  private[this] var topicCounter = 0
+
+  private[this] def nextTopic: String = {
+    topicCounter = topicCounter + 1
+    s"json-test-topic-$topicCounter"
+  }
+
   "Using JSON payloads with WebSockets" when {
 
     "the server routes" should {
 
       "produce messages with String key and value" in
-        plainProducerContext("test-topic-1") { ctx =>
+        plainProducerContext(nextTopic) { ctx =>
           implicit val wsClient = ctx.producerProbe
 
           val msgs = createJsonKeyValue(1)
@@ -52,7 +59,7 @@ class WebSocketRoutesJsonSpec
         }
 
       "produce messages with String value" in
-        plainProducerContext("test-topic-2") { ctx =>
+        plainProducerContext(nextTopic) { ctx =>
           implicit val wsClient = ctx.producerProbe
 
           val msgs = createJsonValue(1)
@@ -67,7 +74,7 @@ class WebSocketRoutesJsonSpec
         }
 
       "produce messages with headers and String key and value" in
-        plainProducerContext("test-topic-3") { ctx =>
+        plainProducerContext(nextTopic) { ctx =>
           implicit val wsClient = ctx.producerProbe
           implicit val kcfg     = ctx.embeddedKafkaConfig
 
@@ -89,7 +96,7 @@ class WebSocketRoutesJsonSpec
         }
 
       "produce messages with headers and String values" in
-        plainProducerContext("test-topic-4") { ctx =>
+        plainProducerContext(nextTopic) { ctx =>
           implicit val wsClient = ctx.producerProbe
           implicit val kcfg     = ctx.embeddedKafkaConfig
 
@@ -107,9 +114,33 @@ class WebSocketRoutesJsonSpec
           consumeFirstMessageFrom[String](ctx.topicName.value) mustBe "bar-1"
         }
 
+      "produce messages with headers, String key and value and message ID" in
+        plainProducerContext(nextTopic) { ctx =>
+          implicit val wsClient = ctx.producerProbe
+          implicit val kcfg     = ctx.embeddedKafkaConfig
+
+          val messages =
+            createJsonKeyValue(1, withHeaders = true, withMessageId = true)
+
+          produceAndCheckJson(
+            topic = ctx.topicName,
+            keyType = StringType,
+            valType = StringType,
+            routes = Route.seal(ctx.route),
+            messages = messages,
+            validateMessageId = true
+          )
+
+          // validate the topic contents
+          val (k, v) =
+            consumeFirstKeyedMessageFrom[String, String](ctx.topicName.value)
+          k mustBe "foo-1"
+          v mustBe "bar-1"
+        }
+
       "consume messages with String key and value" in
         plainJsonConsumerContext(
-          topic = "test-topic-5",
+          topic = nextTopic,
           keyType = Some(StringType),
           valType = StringType,
           numMessages = 10
@@ -117,8 +148,8 @@ class WebSocketRoutesJsonSpec
           implicit val kcfg = ctx.embeddedKafkaConfig
 
           val out = "/socket/out?" +
-            "clientId=test-5" +
-            "&groupId=test-group-5" +
+            s"clientId=json-test-$topicCounter" +
+            s"&groupId=json-test-group-$topicCounter" +
             s"&topic=${ctx.topicName.value}" +
             s"&keyType=${StringType.name}" +
             s"&valType=${StringType.name}" +
@@ -149,9 +180,53 @@ class WebSocketRoutesJsonSpec
           }
         }
 
+      "consume messages with String key and value and headers" in
+        plainJsonConsumerContext(
+          topic = nextTopic,
+          keyType = Some(StringType),
+          valType = StringType,
+          numMessages = 10,
+          withHeaders = true
+        ) { ctx =>
+          implicit val kcfg = ctx.embeddedKafkaConfig
+
+          val out = "/socket/out?" +
+            s"clientId=json-test-$topicCounter" +
+            s"&groupId=json-test-group-$topicCounter" +
+            s"&topic=${ctx.topicName.value}" +
+            s"&keyType=${StringType.name}" +
+            s"&valType=${StringType.name}" +
+            "&autoCommit=false"
+
+          // validate the topic contents
+          val res =
+            consumeNumberKeyedMessagesFrom[String, String](
+              topic = ctx.topicName.value,
+              number = 10
+            )
+          res must have size 10
+          forAll(res) { case (k, v) =>
+            k must startWith("foo-")
+            v must startWith("bar-")
+          }
+          WS(out, ctx.consumerProbe.flow) ~> ctx.route ~> check {
+            isWebSocketUpgrade mustBe true
+
+            forAll(1 to 10) { i =>
+              ctx.consumerProbe
+                .expectWsConsumerKeyValueResultJson[String, String](
+                  expectedTopic = ctx.topicName,
+                  expectedKey = s"foo-$i",
+                  expectedValue = s"bar-$i",
+                  expectHeaders = true
+                )
+            }
+          }
+        }
+
       "consume messages with String value" in
         plainJsonConsumerContext(
-          topic = "test-topic-6",
+          topic = nextTopic,
           keyType = None,
           valType = StringType,
           numMessages = 10
@@ -159,8 +234,8 @@ class WebSocketRoutesJsonSpec
           implicit val kcfg = ctx.embeddedKafkaConfig
 
           val out = "/socket/out?" +
-            "clientId=test-6" +
-            "&groupId=test-group-6" +
+            s"clientId=json-test-$topicCounter" +
+            s"&groupId=json-test-group-$topicCounter" +
             s"&topic=${ctx.topicName.value}" +
             s"&valType=${StringType.name}" +
             "&autoCommit=false"
@@ -180,7 +255,7 @@ class WebSocketRoutesJsonSpec
         }
 
       "return HTTP 400 when attempting to produce to a non-existing topic" in
-        plainProducerContext("test-topic-7") { ctx =>
+        plainProducerContext(nextTopic) { ctx =>
           val topicName = TopicName("non-existing-topic")
 
           val uri = baseProducerUri(
@@ -196,7 +271,7 @@ class WebSocketRoutesJsonSpec
 
       "consume messages from a secured cluster" in
         secureKafkaJsonConsumerContext(
-          topic = "secure-topic-2",
+          topic = nextTopic,
           keyType = None,
           valType = StringType,
           numMessages = 10
@@ -204,8 +279,8 @@ class WebSocketRoutesJsonSpec
           implicit val kcfg = ctx.embeddedKafkaConfig
 
           val out = "/socket/out?" +
-            "clientId=test-102" +
-            "&groupId=test-group-102" +
+            s"clientId=json-test-$topicCounter" +
+            s"&groupId=json-test-group-$topicCounter" +
             s"&topic=${ctx.topicName.value}" +
             s"&valType=${StringType.name}" +
             "&autoCommit=true"
@@ -229,20 +304,21 @@ class WebSocketRoutesJsonSpec
 
       "reject a new connection if the consumer already exists" in
         plainJsonConsumerContext(
-          topic = "test-topic-8",
+          topic = nextTopic,
           keyType = None,
           valType = StringType,
           partitions = 2,
           numMessages = 0,
           prePopulate = false
         ) { ctx =>
-          val rejectionMsg = "WebSocket for consumer test-8 in session " +
-            "test-group-8 not established because a consumer with the" +
-            " same ID is already registered"
+          val rejectionMsg =
+            s"WebSocket for consumer json-test-$topicCounter in session " +
+              s"json-test-group-$topicCounter not established because a" +
+              " consumer with the same ID is already registered"
 
           val out = "/socket/out?" +
-            "clientId=test-8" +
-            "&groupId=test-group-8" +
+            s"clientId=json-test-$topicCounter" +
+            s"&groupId=json-test-group-$topicCounter" +
             s"&topic=${ctx.topicName.value}" +
             s"&valType=${StringType.name}" +
             "&autoCommit=false"
@@ -266,20 +342,20 @@ class WebSocketRoutesJsonSpec
 
       "reject a new connection if the consumer limit has been reached" in
         plainJsonConsumerContext(
-          topic = "test-topic-9",
+          topic = nextTopic,
           keyType = None,
           valType = StringType,
           numMessages = 0,
           prePopulate = false
         ) { ctx =>
           val rejectionMsg =
-            "The maximum number of WebSockets for session test-group-9 " +
-              "has been reached. Limit is 1"
+            s"The maximum number of WebSockets for session " +
+              s"json-test-group-$topicCounter has been reached. Limit is 1"
 
           val out = (cid: String) =>
             "/socket/out?" +
-              s"clientId=test-9$cid" +
-              "&groupId=test-group-9" +
+              s"clientId=json-test-$topicCounter$cid" +
+              s"&groupId=json-test-group-$topicCounter" +
               s"&topic=${ctx.topicName.value}" +
               s"&valType=${StringType.name}" +
               "&autoCommit=false"

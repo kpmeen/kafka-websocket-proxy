@@ -316,7 +316,6 @@ both inbound and outbound messages.
 |:--------- |:-----------|:----------- |
 | json      | string     | json        |
 | avro      | byte[]     | base64      |
-| protobuf  | byte[]     | base64      |
 | bytearray | byte[]     | base64      |
 | string    | string     | string      |
 | int       | int        | number      |
@@ -353,14 +352,19 @@ both inbound and outbound messages.
 
 ```json
 {
-  "key": {
-    "value":"foo",
-    "format":"string"
+  "headers": [ { // optional
+    "key": "my_header",
+    "value": "header_value"
+  } ],
+  "key": { // optional
+    "value": "foo",
+    "format": "string"
   },
   "value": {
-    "value":"bar",
-    "format":"string"
-  }
+    "value": "bar",
+    "format": "string"
+  },
+  "messageId": "client_generated_id" // optional
 }
 ```
 
@@ -371,7 +375,8 @@ both inbound and outbound messages.
   "topic": "foo",
   "partition": 2,
   "offset": 4,
-  "timestamp": 1554896731782
+  "timestamp": 1554896731782,
+  "messageId":"client_generated_id" // optional
 }
 ```
 
@@ -382,7 +387,7 @@ both inbound and outbound messages.
 | Name          | Type                              | Required | Description   |
 |:-------       |:-----------                       |:--------:|:------------- |
 | Authorization | Basic authentication (Base64)     |     n    | [Basic authentication](https://en.wikipedia.org/wiki/Basic_access_authentication) header. |
-| X-Kafka-Auth  | Base64                            |     n    | Header for providing Base64 representation of credentials in the form `username:password` to use for the Kafka connection when the topic has ACL restrictions. |
+| X-Kafka-Auth  | Base64                            |     n    | Header for providing Base64 representation of credentials in the form `username:password` to use for secure Kafka connections and when the topic has ACL restrictions. |
 
 > **Warning**
 >
@@ -428,7 +433,9 @@ both inbound and outbound messages.
 ##### Input (JSON)
 
 ```json
-{"wsProxyMessageId":"foo-0-1-1554402266846"}
+{
+  "wsProxyMessageId": "foo-0-1-1554402266846"
+}
 ```
 
 ### HTTP endpoints
@@ -490,6 +497,10 @@ the key and value are captured in a single message through the socket.
       }
     } ],
     "default" : null
+  }, {
+    "name" : "clientMessageId",
+    "type" : [ "null", "string" ],
+    "default" : null
   } ]
 }
 ```
@@ -516,6 +527,10 @@ Returns the Avro result schema containing metadata about the produced message.
   }, {
     "name" : "timestamp",
     "type" : "long"
+  }, {
+    "name" : "clientMessageId",
+    "type" : [ "null", "string" ],
+    "default" : null
   } ]
 }
 ```
