@@ -8,7 +8,7 @@ import net.scalytica.kafka.wsproxy.StringExtensions
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import org.apache.kafka.common.serialization.{Deserializer, Serde, Serializer}
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.reflect._
 import scala.util.control.NonFatal
 

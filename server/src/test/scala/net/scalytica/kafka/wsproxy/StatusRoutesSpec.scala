@@ -16,13 +16,13 @@ import net.scalytica.test._
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Minutes, Span}
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.{EitherValues, OptionValues}
+import org.scalatest.{CustomEitherValues, OptionValues}
 
 import scala.concurrent.duration._
 
 class StatusRoutesSpec
     extends AnyWordSpec
-    with EitherValues
+    with CustomEitherValues
     with OptionValues
     with ScalaFutures
     with WsProxyKafkaSpec
@@ -46,8 +46,7 @@ class StatusRoutesSpec
           val ci = parse(responseAs[String])
             .map(_.as[Seq[BrokerInfo]])
             .flatMap(identity)
-            .right
-            .value
+            .rightValue
 
           ci must have size 1
           ci.headOption.value mustBe BrokerInfo(
@@ -78,8 +77,7 @@ class StatusRoutesSpec
           val ci = parse(responseAs[String])
             .map(_.as[Seq[BrokerInfo]])
             .flatMap(identity)
-            .right
-            .value
+            .rightValue
 
           ci must have size 1
           ci.headOption.value mustBe BrokerInfo(
@@ -119,8 +117,7 @@ class StatusRoutesSpec
               val ci = parse(responseAs[String])
                 .map(_.as[Seq[BrokerInfo]])
                 .flatMap(identity)
-                .right
-                .value
+                .rightValue
 
               ci must have size 1
               ci.headOption.value mustBe BrokerInfo(

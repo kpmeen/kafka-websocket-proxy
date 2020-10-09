@@ -1,10 +1,8 @@
 import sbt._
 
 object Versions {
-  // TODO:
-  //  Cannot upgrade to Scala 2.13 yet, because some libs are only compiled
-  //  against 2.12.x.
-  val ScalaVersion = "2.12.11"
+
+  val ScalaVersion = "2.13.3"
 
   val ConfigVersion     = "1.4.0"
   val PureConfigVersion = "0.14.0"

@@ -22,7 +22,7 @@ import org.apache.kafka.common.errors.{
 }
 import org.apache.kafka.common.serialization.Deserializer
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 

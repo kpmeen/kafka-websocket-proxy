@@ -36,7 +36,7 @@ import org.apache.kafka.common.errors.{
 import org.apache.kafka.common.header.Header
 import org.apache.kafka.common.serialization.Serializer
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.concurrent.ExecutionContext
 
 /** Functions for initialising Kafka producer sinks and flows. */
@@ -50,7 +50,7 @@ object WsProducer extends WithProxyLogger {
 
   implicit def seqToSource[Out](s: Seq[Out]): Source[Out, NotUsed] = {
     val it = new scala.collection.immutable.Iterable[Out] {
-      override def iterator: Iterator[Out] = s.toIterator
+      override def iterator: Iterator[Out] = s.iterator
     }
     Source(it)
   }

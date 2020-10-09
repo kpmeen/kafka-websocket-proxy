@@ -12,14 +12,10 @@ import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models.WsGroupId
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 
-import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success}
 
-/**
- * @param cfg
- *   @param sys
- */
 private[session] class SessionDataProducer(
     implicit cfg: AppCfg,
     sys: ActorSystem[_]

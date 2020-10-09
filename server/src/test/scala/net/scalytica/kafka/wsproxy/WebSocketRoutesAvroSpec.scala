@@ -22,14 +22,13 @@ import org.scalatest.Inspectors.forAll
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Minutes, Span}
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.{Assertion, EitherValues, OptionValues}
+import org.scalatest.{Assertion, OptionValues}
 
 import scala.concurrent.duration._
 
 // scalastyle:off magic.number
 class WebSocketRoutesAvroSpec
     extends AnyWordSpec
-    with EitherValues
     with OptionValues
     with ScalaFutures
     with WsProxyConsumerKafkaSpec

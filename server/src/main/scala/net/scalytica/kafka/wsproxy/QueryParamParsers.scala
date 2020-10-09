@@ -61,8 +61,8 @@ trait QueryParamParsers {
 
   def paramsOnError: Directive[Tuple1[Option[(WsClientId, WsGroupId)]]] = {
     parameters(
-      'clientId.as[WsClientId] ?,
-      'groupId.as[WsGroupId] ?
+      Symbol("clientId").as[WsClientId] ?,
+      Symbol("groupId").as[WsGroupId] ?
     ).tmap(t => t._1.map(cid => (cid, WsGroupId.fromOption(t._2)(cid))))
   }
 
@@ -73,17 +73,17 @@ trait QueryParamParsers {
    */
   def outParams: Directive[Tuple1[OutSocketArgs]] =
     parameters(
-      'clientId.as[WsClientId],
-      'groupId.as[WsGroupId] ?,
-      'topic.as[TopicName],
-      'socketPayload.as[SocketPayload] ? (JsonPayload: SocketPayload),
-      'keyType.as[FormatType] ?,
-      'valType.as[FormatType] ? (StringType: FormatType),
-      'offsetResetStrategy
+      Symbol("clientId").as[WsClientId],
+      Symbol("groupId").as[WsGroupId] ?,
+      Symbol("topic").as[TopicName],
+      Symbol("socketPayload").as[SocketPayload] ? (JsonPayload: SocketPayload),
+      Symbol("keyType").as[FormatType] ?,
+      Symbol("valType").as[FormatType] ? (StringType: FormatType),
+      Symbol("offsetResetStrategy")
         .as[OffsetResetStrategy] ? OffsetResetStrategy.EARLIEST,
-      'rate.as[Int] ?,
-      'batchSize.as[Int] ?,
-      'autoCommit.as[Boolean] ? true
+      Symbol("rate").as[Int] ?,
+      Symbol("batchSize").as[Int] ?,
+      Symbol("autoCommit").as[Boolean] ? true
     ).tmap { t =>
       OutSocketArgs.fromQueryParams(
         clientId = t._1,
@@ -106,10 +106,10 @@ trait QueryParamParsers {
    */
   def inParams: Directive[Tuple1[InSocketArgs]] =
     parameters(
-      'topic.as[TopicName],
-      'socketPayload.as[SocketPayload] ? (JsonPayload: SocketPayload),
-      'keyType.as[FormatType] ?,
-      'valType.as[FormatType] ? (StringType: FormatType)
+      Symbol("topic").as[TopicName],
+      Symbol("socketPayload").as[SocketPayload] ? (JsonPayload: SocketPayload),
+      Symbol("keyType").as[FormatType] ?,
+      Symbol("valType").as[FormatType] ? (StringType: FormatType)
     ).tmap(t => InSocketArgs.fromQueryParams(t._1, t._2, t._3, t._4))
 
 }

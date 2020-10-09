@@ -52,7 +52,7 @@ trait WsProxyEnvLoggerConfigurator {
 
   private[this] def loadLoggersFromEnv(): Unit = {
     log.trace("Loading loggers from environment...")
-    val loggers = env.properties.filterKeys(_.startsWith(PropPrefix))
+    val loggers = env.properties.view.filterKeys(_.startsWith(PropPrefix)).toMap
     loggers
       .map(kv => kv._1.stripPrefix(PropPrefix) -> Level.toLevel(kv._2))
       .foreach(kv => setLoggerLevel(kv._1, kv._2))

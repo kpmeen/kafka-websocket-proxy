@@ -1,16 +1,16 @@
 package net.scalytica.kafka.wsproxy.session
 
 import net.scalytica.kafka.wsproxy.models.WsGroupId
-import org.scalatest.{EitherValues, OptionValues}
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.{CustomEitherValues, OptionValues}
 
 // scalastyle:off magic.number
 class ActiveSessionsSpec
     extends AnyWordSpec
     with Matchers
     with OptionValues
-    with EitherValues {
+    with CustomEitherValues {
 
   val s1 = Session(WsGroupId("c1"))
   val s2 = Session(WsGroupId("c2"))
@@ -50,7 +50,7 @@ class ActiveSessionsSpec
       val ns  = Session(WsGroupId("c4"), 4)
       val as2 = as.add(ns)
 
-      val res = as2.right.value.sessions
+      val res = as2.rightValue.sessions
       res must contain allElementsOf (expected + (ns.consumerGroupId -> ns))
     }
 
@@ -58,25 +58,25 @@ class ActiveSessionsSpec
       val ns  = Session(WsGroupId("c2"), 4)
       val as2 = as.updateSession(WsGroupId("c2"), ns)
 
-      as2.right.value must not be as
+      as2.rightValue must not be as
 
-      as2.right.value.find(WsGroupId("c2")).value mustBe ns
+      as2.rightValue.find(WsGroupId("c2")).value mustBe ns
     }
 
     "add a new session if it didn't previously exist" in {
       val ns  = Session(WsGroupId("c4"), 4)
       val as2 = as.updateSession(WsGroupId("c4"), ns)
 
-      val res = as2.right.value.sessions
+      val res = as2.rightValue.sessions
       res must contain allElementsOf (expected + (ns.consumerGroupId -> ns))
     }
 
     "remove a session" in {
       val as2 = as.removeSession(WsGroupId("c2"))
 
-      as2.right.value.sessions must contain allElementsOf (expected - WsGroupId(
-        "c2"
-      ))
+      as2.rightValue.sessions must contain allElementsOf (
+        expected - WsGroupId("c2")
+      )
     }
   }
 

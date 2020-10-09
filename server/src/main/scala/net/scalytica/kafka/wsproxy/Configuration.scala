@@ -11,7 +11,7 @@ import pureconfig.error.ConfigReaderFailures
 import pureconfig.generic.auto._
 import pureconfig.{ConfigReader, ConfigSource}
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.concurrent.duration.FiniteDuration
 
 object Configuration extends WithProxyLogger {

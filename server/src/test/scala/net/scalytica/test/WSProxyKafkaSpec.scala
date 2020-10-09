@@ -45,7 +45,7 @@ import org.apache.kafka.common.security.auth.SecurityProtocol._
 import org.scalatest.Suite
 import org.scalatest.matchers.must.Matchers
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.concurrent.duration._
 import scala.util.Random
 

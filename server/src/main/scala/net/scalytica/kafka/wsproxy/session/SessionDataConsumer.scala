@@ -17,7 +17,7 @@ import org.apache.kafka.clients.consumer.ConsumerConfig.{
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.consumer.OffsetResetStrategy.EARLIEST
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 /**
  * Consumer for processing all updates to session state topic and transforming

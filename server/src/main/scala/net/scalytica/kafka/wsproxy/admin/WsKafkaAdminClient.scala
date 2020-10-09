@@ -15,7 +15,7 @@ import org.apache.kafka.common.KafkaException
 import org.apache.kafka.common.config.TopicConfig._
 import org.apache.kafka.common.errors.UnknownTopicOrPartitionException
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.concurrent.duration._
 import scala.util.Try
 import scala.util.control.NonFatal

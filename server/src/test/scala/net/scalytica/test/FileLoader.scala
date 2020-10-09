@@ -10,7 +10,7 @@ import akka.stream.scaladsl.{FileIO, Source}
 import akka.util.ByteString
 import com.typesafe.config.{Config, ConfigFactory}
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 import scala.util.Try

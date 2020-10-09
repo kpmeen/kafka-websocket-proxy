@@ -14,5 +14,8 @@ object WsProxyEnvLoader {
     sys.env.exists(_._1.equals(key)) || sys.props.exists(_._1.equals(key))
 
   def envString(keyPrefix: String*): String =
-    properties.filterKeys(k => keyPrefix.exists(k.startsWith)).mkString("\n")
+    properties.view
+      .filterKeys(k => keyPrefix.exists(k.startsWith))
+      .toMap
+      .mkString("\n")
 }
