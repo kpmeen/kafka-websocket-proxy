@@ -154,8 +154,8 @@ possibility to change the behaviour of the session handler.
 
 ### Internal Message Commit Handler
 
-When a WebSocket client connects, it can specify whether or not the auto-commit
-feature should be used. In the case where the client opens the connection with
+When a WebSocket client connects, it can specify if the auto-commit feature
+should be used or not. In the case where the client opens the connection with
 `autoCommit=false` in the query parameters, the websocket will keep track of
 the uncommitted message offsets in an in-memory "stack" structure in a _commit
 handler_. This allows the client to send in a special _commit_ message on the
@@ -186,7 +186,7 @@ the `kafka-websocket-proxy` whenever a WebSocket connection is established.
 | kafka.ws.proxy.kafka-client.schema-registry.properties.schema.registry.basic.auth.user.info          | WSPROXY_SCHEMA_BASIC_AUTH_USER_INFO      |    n     | `true`        | User info for basic auth against Confluent Schema Registry. |
 | kafka.ws.proxy.kafka-client.properties.request.timeout.ms                                            | WSPROXY_KAFKA_CLIENT_REQUEST_TIMEOUT_MS  |    n     | `20000`       | Defines the request timeout period for the kafka clients. |
 | kafka.ws.proxy.kafka-client.properties.retry.backoff.ms                                              | WSPROXY_KAFKA_CLIENT_RETRY_BACKOFF_MS    |    n     | `500`         | Defines the amount of time to wait before retrying a request. | 
-| kafka.ws.proxy.kafka-client.metrics-enabled                                                          | WSPROXY_CONFLUENT_MONITORING_ENABLED     |    n     | `false`       | When this flag is set to `true`, it will enable the Confluent Metrics Reporter |
+| kafka.ws.proxy.kafka-client.monitoring-enabled                                                       | WSPROXY_CONFLUENT_MONITORING_ENABLED     |    n     | `false`       | When this flag is set to `true`, it will enable the Confluent Metrics Reporter |
 
 ### Kafka Security
 
@@ -224,31 +224,47 @@ The client specific configuration keys have the same structure as the
 * `kafka.ws.proxy.consumer.kafka-client-properties`
 * `kafka.ws.proxy.producer.kafka-client-properties`
 
+#### Kafka cluster with authorization restrictions
+
+For optimal operations the following permissions should be given to the
+principal used by the `kafka-websocket-proxy`: 
+
+| Operation        | Resource  | Required | Description                                                                                |
+|:----------       |:----------|:--------:|:-----                                                                                      |
+| DESCRIBE         | Cluster   |   Yes    | Used to query the cluster state                                                            |
+| DESCRIBE_CONFIGS | Cluster   |   Yes    | Used to query the cluster state                                                            |
+| DESCRIBE         | Topic     |   Yes    | Used to calculate maximum number of websocket consumers a client can initiate              |
+| DESCRIBE_CONFIGS | Topic     |   Yes    | Used to calculate maximum number of websocket consumers a client can initiate              |
+| CREATE           | Topic     |    No    | If not allowed, the session state topic must be created manually before starting the proxy |
+| READ             | Topic     |   Yes    | Can be restricted to the kafka.ws.proxy.session-handler.session-state-topic-name, and kafka.ws.proxy.kafka-client.confluent-monitoring.properties.interceptor.topic if confluent metrics is enabled |
+| WRITE            | Topic     |   Yes    | Can be restricted to the kafka.ws.proxy.session-handler.session-state-topic-name, and kafka.ws.proxy.kafka-client.confluent-monitoring.properties.interceptor.topic if confluent metrics is enabled |
+| DESCRIBE         | Group     |   Yes    |                                                                                            | 
 
 ### Confluent Metrics Reporter
 
-If the property `kafka.ws.proxy.kafka-client.metrics-enabled` is set to `true`,
+If the property `kafka.ws.proxy.kafka-client.monitoring-enabled` is set to `true`,
 the proxy service can be configured to send metrics data to a different cluster.
 The cluster can be differently configured, and it is therefore necessary to
 provide a distinct client configuration for the metrics reporter.
   
 
-| Config key                                                                                     | Environment                                      | Default      |
-|:---                                                                                            |:----                                             |:------------:|
-| kafka.ws.proxy.kafka-client.confluent-metrics.bootstrap-hosts                                  | WSPROXY_KAFKA_METRICS_BOOTSTRAP_HOSTS            | same as kafka.ws.proxy.kafka-client.bootstrap-hosts |
-| kafka.ws.proxy.kafka-client.confluent-metrics.properties.security.protocol                     | WSPROXY_KAFKA_METRICS_SECURITY_PROTOCOL          | `PLAINTEXT`  |
-| kafka.ws.proxy.kafka-client.confluent-metrics.properties.sasl.mechanism                        | WSPROXY_KAFKA_METRICS_SASL_MECHANISM             |  not set     |
-| kafka.ws.proxy.kafka-client.confluent-metrics.properties.sasl.jaas.config                      | WSPROXY_KAFKA_METRICS_SASL_JAAS_CFG              |  not set     |
-| kafka.ws.proxy.kafka-client.confluent-metrics.properties.sasl.kerberos.service.name            | WSPROXY_KAFKA_METRICS_SASL_KERBEROS_SERVICE_NAME |  not set     |
-| kafka.ws.proxy.kafka-client.confluent-metrics.properties.ssl.key.password                      | WSPROXY_KAFKA_METRICS_SSL_KEY_PASS               |  not set     |
-| kafka.ws.proxy.kafka-client.confluent-metrics.properties.ssl.endpoint.identification.algorithm | WSPROXY_KAFKA_METRICS_SASL_ENDPOINT_ID_ALOGO     |  not set     |
-| kafka.ws.proxy.kafka-client.confluent-metrics.properties.ssl.truststore.location               | WSPROXY_KAFKA_METRICS_SSL_TRUSTSTORE_LOCATION    |  not set     |
-| kafka.ws.proxy.kafka-client.confluent-metrics.properties.ssl.truststore.truststore.password    | WSPROXY_KAFKA_METRICS_SSL_TRUSTSTORE_PASS        |  not set     |
-| kafka.ws.proxy.kafka-client.confluent-metrics.properties.ssl.keystore.location                 | WSPROXY_KAFKA_METRICS_SSL_KEYSTORE_LOCATION      |  not set     |
-| kafka.ws.proxy.kafka-client.confluent-metrics.properties.ssl.keystore.password                 | WSPROXY_KAFKA_METRICS_SSL_KEYSTORE_PASS          |  not set     |
-| kafka.ws.proxy.kafka-client.confluent-metrics.properties.ssl.provider                          | WSPROXY_KAFKA_METRICS_SSL_PROVIDER               |  not set     |
-| kafka.ws.proxy.kafka-client.confluent-metrics.properties.ssl.cipher.suites                     | WSPROXY_KAFKA_METRICS_SSL_CIPHER_SUITES          |  not set     |
-| kafka.ws.proxy.kafka-client.confluent-metrics.properties.ssl.enabled.protocols                 | WSPROXY_KAFKA_METRICS_SSL_ENABLED_PROTOCOLS      |  not set     |
+| Config key                                                                                        | Environment                                         | Default      |
+|:---                                                                                               |:----                                                |:------------:|
+| kafka.ws.proxy.kafka-client.confluent-monitoring.bootstrap-hosts                                  | WSPROXY_KAFKA_MONITORING_BOOTSTRAP_HOSTS            | same as kafka.ws.proxy.kafka-client.bootstrap-hosts |
+| kafka.ws.proxy.kafka-client.confluent-monitoring.properties.interceptor.topic                     | WSPROXY_KAFKA_MONITORING_INTERCEPTOR_TOPIC          | `_confluent-metrics` |
+| kafka.ws.proxy.kafka-client.confluent-monitoring.properties.security.protocol                     | WSPROXY_KAFKA_MONITORING_SECURITY_PROTOCOL          | `PLAINTEXT`  |
+| kafka.ws.proxy.kafka-client.confluent-monitoring.properties.sasl.mechanism                        | WSPROXY_KAFKA_MONITORING_SASL_MECHANISM             |  not set     |
+| kafka.ws.proxy.kafka-client.confluent-monitoring.properties.sasl.jaas.config                      | WSPROXY_KAFKA_MONITORING_SASL_JAAS_CFG              |  not set     |
+| kafka.ws.proxy.kafka-client.confluent-monitoring.properties.sasl.kerberos.service.name            | WSPROXY_KAFKA_MONITORING_SASL_KERBEROS_SERVICE_NAME |  not set     |
+| kafka.ws.proxy.kafka-client.confluent-monitoring.properties.ssl.key.password                      | WSPROXY_KAFKA_MONITORING_SSL_KEY_PASS               |  not set     |
+| kafka.ws.proxy.kafka-client.confluent-monitoring.properties.ssl.endpoint.identification.algorithm | WSPROXY_KAFKA_MONITORING_SASL_ENDPOINT_ID_ALOGO     |  not set     |
+| kafka.ws.proxy.kafka-client.confluent-monitoring.properties.ssl.truststore.location               | WSPROXY_KAFKA_MONITORING_SSL_TRUSTSTORE_LOCATION    |  not set     |
+| kafka.ws.proxy.kafka-client.confluent-monitoring.properties.ssl.truststore.truststore.password    | WSPROXY_KAFKA_MONITORING_SSL_TRUSTSTORE_PASS        |  not set     |
+| kafka.ws.proxy.kafka-client.confluent-monitoring.properties.ssl.keystore.location                 | WSPROXY_KAFKA_MONITORING_SSL_KEYSTORE_LOCATION      |  not set     |
+| kafka.ws.proxy.kafka-client.confluent-monitoring.properties.ssl.keystore.password                 | WSPROXY_KAFKA_MONITORING_SSL_KEYSTORE_PASS          |  not set     |
+| kafka.ws.proxy.kafka-client.confluent-monitoring.properties.ssl.provider                          | WSPROXY_KAFKA_MONITORING_SSL_PROVIDER               |  not set     |
+| kafka.ws.proxy.kafka-client.confluent-monitoring.properties.ssl.cipher.suites                     | WSPROXY_KAFKA_MONITORING_SSL_CIPHER_SUITES          |  not set     |
+| kafka.ws.proxy.kafka-client.confluent-monitoring.properties.ssl.enabled.protocols                 | WSPROXY_KAFKA_MONITORING_SSL_ENABLED_PROTOCOLS      |  not set     |
 
 ### Logging
 
@@ -293,8 +309,8 @@ configurations will be ignored. So if e.g. both `WSPROXY_LOGBACK_XML_CONFIG` and
 The same applies when an external logback configuration file is provided through
 `-Dlogback.configurationFile=<file_path>`.
 
-## Endpoints and API
 
+## Endpoints and API
 
 ### WebSocket APIs
 
