@@ -227,7 +227,7 @@ The client specific configuration keys have the same structure as the
 #### Kafka cluster with authorization restrictions
 
 For optimal operations the following permissions should be given to the
-principal used by the `kafka-websocket-proxy`: 
+**principal** used by the `kafka-websocket-proxy`: 
 
 | Operation        | Resource  | Required | Description                                                                                |
 |:----------       |:----------|:--------:|:-----                                                                                      |
@@ -236,8 +236,8 @@ principal used by the `kafka-websocket-proxy`:
 | DESCRIBE         | Topic     |   Yes    | Used to calculate maximum number of websocket consumers a client can initiate              |
 | DESCRIBE_CONFIGS | Topic     |   Yes    | Used to calculate maximum number of websocket consumers a client can initiate              |
 | CREATE           | Topic     |    No    | If not allowed, the session state topic must be created manually before starting the proxy |
-| READ             | Topic     |   Yes    | Can be restricted to the kafka.ws.proxy.session-handler.session-state-topic-name, and kafka.ws.proxy.kafka-client.confluent-monitoring.properties.interceptor.topic if confluent metrics is enabled |
-| WRITE            | Topic     |   Yes    | Can be restricted to the kafka.ws.proxy.session-handler.session-state-topic-name, and kafka.ws.proxy.kafka-client.confluent-monitoring.properties.interceptor.topic if confluent metrics is enabled |
+| READ             | Topic     |   Yes    | Can be restricted to the `kafka.ws.proxy.session-handler.session-state-topic-name` (defaults to `_wsproxy.session.state`), and `kafka.ws.proxy.kafka-client.confluent-monitoring.properties.interceptor.topic` (defaults to `_confluent-metrics`) if confluent metrics is enabled |
+| WRITE            | Topic     |   Yes    | Can be restricted to the `kafka.ws.proxy.session-handler.session-state-topic-name` (defaults to `_wsproxy.session.state`), and `kafka.ws.proxy.kafka-client.confluent-monitoring.properties.interceptor.topic` (defaults to `_confluent-metrics`) if confluent metrics is enabled |
 | DESCRIBE         | Group     |   Yes    |                                                                                            | 
 
 ### Confluent Metrics Reporter
