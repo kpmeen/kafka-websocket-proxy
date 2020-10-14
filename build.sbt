@@ -22,6 +22,12 @@ releaseProcess := Seq[ReleaseStep](
   pushChanges                // : ReleaseStep, also checks that an upstream branch is properly configured
 )
 
+Global / excludeLintKeys ++= Set(
+  releaseProcess,
+  packageDoc / publishArtifact,
+  server / dockerRepository
+)
+
 lazy val root = (project in file("."))
   .enablePlugins(DockerTasksPlugin)
   .settings(BaseSettings: _*)

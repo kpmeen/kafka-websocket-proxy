@@ -91,27 +91,33 @@ object Settings {
   val GitLabUser     = "kpmeen"
   val DockerHubUser  = "kpmeen"
 
+  private[this] def gitlabDockerAlias(pkg: String, ver: String): DockerAlias = {
+    DockerAlias(
+      registryHost = Some(GitLabRegistry),
+      username = Some(GitLabUser),
+      name = s"kafka-websocket-proxy/$pkg",
+      tag = Some(ver)
+    )
+  }
+
+  private[this] def dockerhubAlias(version: String): DockerAlias = {
+    DockerAlias(
+      registryHost = None,
+      username = Option(DockerHubUser),
+      name = "kafka-websocket-proxy",
+      Option(version)
+    )
+  }
+
   def dockerSettings(exposedPort: Int) =
     Seq(
       maintainer := "contact@scalytica.net",
       dockerRepository := Some(s"$GitLabRegistry/$GitLabUser"),
-      dockerAlias := {
-        DockerAlias(
-          registryHost = Some(GitLabRegistry),
-          username = Some(GitLabUser),
-          name = s"kafka-websocket-proxy/${packageName.value}",
-          tag = Some(version.value)
-        )
-      },
+      dockerAlias := gitlabDockerAlias(packageName.value, version.value),
       dockerAliases ++= {
         val commitSha = SbtGit.git.gitHeadCommit.value
         val gitLab    = dockerAlias.value
-        val dockerHub = DockerAlias(
-          registryHost = None,
-          username = Option(DockerHubUser),
-          name = "kafka-websocket-proxy",
-          Option(version.value)
-        )
+        val dockerHub = dockerhubAlias(version.value)
 
         if (dockerUpdateLatest.value) {
           // Push to both the GitLab and DockerHub registries.
