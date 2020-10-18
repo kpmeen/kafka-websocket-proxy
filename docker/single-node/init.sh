@@ -8,20 +8,20 @@ CURR_DIR=$(pwd)
 SCRIPT_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 
 KAFKA_CONTAINER="kafka"
-ZOOKEEPER_CONTAINER="zookeeper"
 
 start_defined=false
 stop_defined=false
 status_defined=false
 cleanup=false
-initTopics=false
 loop=false
 debug=false
 
 if [[ "$(uname)" == "Darwin" ]]; then
-  export HOST_IP=$(ipconfig getifaddr en0)
+  HOST_IP=$(ipconfig getifaddr en0)
+  export HOST_IP
 elif [[ "$(uname)" == "Linux" ]]; then
-  export HOST_IP=$(ip route get 1 | awk '{print $NF;exit}')
+  HOST_IP=$(ip route get 1 | awk '{print $NF;exit}')
+  export HOST_IP
 else
   echo "Script does not currently support Windows. The alternative option is:"
   echo "  1. Manually export and set the 'HOST_IP' environment variable."
@@ -40,18 +40,18 @@ function createTopic() {
     echo "Creating topic with name $name with $policy policy and retention $retention milliseconds"
   fi
 
-  baseCommand="docker exec -it $KAFKA_CONTAINER kafka-topics"
-  args=" --zookeeper $ZOOKEEPER_CONTAINER:2181"
-  args+=" --create"
-  args+=" --if-not-exists"
-  args+=" --partitions 3"
-  args+=" --replication-factor 1"
-  args+=" --topic $name"
+  createCmd="docker exec -it $KAFKA_CONTAINER kafka-topics"
+  createCmd+=" --bootstrap-server $KAFKA_CONTAINER:9092"
+  createCmd+=" --create"
+  createCmd+=" --if-not-exists"
+  createCmd+=" --partitions 3"
+  createCmd+=" --replication-factor 1"
+  createCmd+=" --topic $name"
   if [[ "$policy" = "delete" ]]; then
-    args+=" --config cleanup.policy=$policy --config retention.ms=$retention"
+    createCmd+=" --config cleanup.policy=$policy --config retention.ms=$retention"
   fi
 
-  $baseCommand $args
+  $createCmd
 }
 
 function createTopics() {
@@ -123,9 +123,9 @@ function printUsage() {
   echo "";
 }
 
-cd $SCRIPT_DIR
+cd "$SCRIPT_DIR" || exit
 
-while [[ "$#" > 0 ]]; do
+while [[ "$#" -gt 0 ]]; do
   case $1 in
     start)       start_defined=true;;
     stop)        stop_defined=true;;
@@ -174,4 +174,4 @@ else
   printUsage
 fi
 
-cd $CURR_DIR
+cd "$CURR_DIR" || exit
