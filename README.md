@@ -139,8 +139,9 @@ The `kafka-websocket-proxy` needs to keep some state about the different active
 sessions across a multi-node deployment. The state is synced to other nodes
 through a dedicated Kafka topic and kept up to date in each node in an in-memory
 data structure. This allows e.g. controlling the number of open WebSockets in
-a given consumer group, and much more. The below properties gives some
-possibility to change the behaviour of the session handler.
+a given consumer group, etc.
+
+#### Properties
 
 | Config key                                                             | Environment                                     | Default                  | Description   |
 |:---                                                                    |:----                                            |:------------------------:|:-----         |
@@ -151,6 +152,43 @@ possibility to change the behaviour of the session handler.
 | kafka.ws.proxy.session-handler.session-state-topic-init-retries        | WSPROXY_SESSION_STATE_TOPIC_INIT_RETRIES        | `25`                     | Max number of retries for initialising the session state topic. |
 | kafka.ws.proxy.session-handler.session-state-topic-init-retry-interval | WSPROXY_SESSION_STATE_TOPIC_INIT_RETRY_INTERVAL | `1 second`               | Interval duration between retries when trying to initialise the session state topic. |
 
+#### Manual creation of the session state topic
+
+To enable persistent storage and distribution to other nodes, the
+`kafka-websocket-proxy` relies on a compacted topic in Kafka. In most
+circumstances, `kafka-websocket-proxy` will create the topic automatically.
+When that is not possible because of ACL restrictions or similar, it is
+necessary to create the topic manually.
+
+To create the topic manually, the following properties **MUST** be set for the
+topic:
+
+##### Required properties
+
+* **topic name**: <name of topic, must match `kafka.ws.proxy.session-handler.session-state-topic-name`.
+* **cleanup policy**: compact
+* **num partitions**: 1
+  - Do _not_ set the partition count higher, since the proxy counts on guaranteed ordering.
+
+##### Recommended properties
+
+* **retention duration**: 2592000000 milliseconds (30 days)
+* **replication factor**: 3
+  - ¡IMPORTANT! Do not set replication factor higher than `<num kafka brokers> - 1`.
+
+##### Example CLI command
+
+```bash
+kafka-topics \
+  --bootstrap-server <kafka_host>:<port> \
+  --create \
+  --if-not-exists \
+  --partitions 1 \
+  --replication-factor 3 \
+  --topic _wsproxy.session.state \
+  --config cleanup.policy=compact \
+  --config retention.ms=2592000000
+```
 
 ### Internal Message Commit Handler
 
