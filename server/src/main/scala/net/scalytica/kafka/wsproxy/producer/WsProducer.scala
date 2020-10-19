@@ -7,7 +7,6 @@ import akka.kafka.scaladsl.Producer
 import akka.kafka.{ProducerMessage, ProducerSettings}
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Flow, Source}
-import akka.util.ByteString
 import io.circe.Decoder
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroProducerRecord
@@ -18,14 +17,10 @@ import net.scalytica.kafka.wsproxy.errors.{
 }
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models._
-import net.scalytica.kafka.wsproxy.{
-  mapToProperties,
-  producerMetricsProperties,
-  wsMessageToByteStringFlow,
-  wsMessageToStringFlow
-}
+import net.scalytica.kafka.wsproxy.{mapToProperties, producerMetricsProperties}
 import org.apache.kafka.clients.producer.{
   KafkaProducer,
+  ProducerConfig,
   ProducerRecord,
   Producer => IProducer
 }
@@ -36,11 +31,11 @@ import org.apache.kafka.common.errors.{
 import org.apache.kafka.common.header.Header
 import org.apache.kafka.common.serialization.Serializer
 
-import scala.jdk.CollectionConverters._
 import scala.concurrent.ExecutionContext
+import scala.jdk.CollectionConverters._
 
 /** Functions for initialising Kafka producer sinks and flows. */
-object WsProducer extends WithProxyLogger {
+object WsProducer extends ProducerFlowExtras with WithProxyLogger {
 
   private[this] val SaslJaasConfig: String = "sasl.jaas.config"
 
@@ -66,9 +61,13 @@ object WsProducer extends WithProxyLogger {
   ) = {
     val kafkaUrl = cfg.kafkaClient.bootstrapHosts.mkString()
 
-    ProducerSettings(as, ks, vs)
+    val p = ProducerSettings(as, ks, vs)
       .withBootstrapServers(kafkaUrl)
       .withProducerFactory(initialiseProducer(args.aclCredentials))
+
+    args.clientId
+      .map(cid => p.withProperty(ProducerConfig.CLIENT_ID_CONFIG, cid.value))
+      .getOrElse(p)
   }
 
   private[this] def initialiseProducer[K, V](
@@ -103,48 +102,6 @@ object WsProducer extends WithProxyLogger {
       ks: Serializer[K],
       vs: Serializer[V]
   ) = producerSettings(args)(cfg, as, Option(ks), Option(vs))
-
-  /**
-   * Parses an input message, in the form of a JSON String, into an instance of
-   * [[WsProducerRecord]], which will be passed on to Kafka down-stream.
-   *
-   * @param jsonStr
-   *   the String containing the JSON formatted message
-   * @param keyDec
-   *   the JSON decoder to use for the message key
-   * @param valDec
-   *   the JSON decoder to use for the message value
-   * @tparam K
-   *   the message key type
-   * @tparam V
-   *   the message value type
-   * @return
-   *   an instance of [[WsProducerRecord]]
-   */
-  @throws[Throwable]
-  private[this] def parseInput[K, V](
-      jsonStr: String
-  )(implicit keyDec: Decoder[K], valDec: Decoder[V]): WsProducerRecord[K, V] = {
-    import io.circe._
-    import io.circe.parser._
-    import net.scalytica.kafka.wsproxy.codecs.Decoders._
-
-    if (jsonStr.isEmpty) ProducerEmptyMessage
-    else {
-      parse(jsonStr) match {
-        case Left(ParsingFailure(message, err)) =>
-          logger.error(s"Error parsing JSON string:\n$message")
-          logger.debug(s"JSON was: $jsonStr")
-          throw err
-
-        case Right(json) =>
-          json.as[WsProducerRecord[K, V]] match {
-            case Left(err)  => throw err
-            case Right(wpr) => wpr
-          }
-      }
-    }
-  }
 
   /**
    * Converts a [[WsProducerRecord]] into a Kafka [[ProducerRecord]].
@@ -190,12 +147,6 @@ object WsProducer extends WithProxyLogger {
             " been filtered out."
         )
     }
-  }
-
-  /** Convenience function for logging and throwing an error in a Flow */
-  private[this] def logAndEmpty[T](msg: String, t: Throwable)(empty: T): T = {
-    logger.error(msg, t)
-    empty
   }
 
   /**
@@ -283,17 +234,7 @@ object WsProducer extends WithProxyLogger {
 
     checkClient(args.topic, producerClient)
 
-    wsMessageToStringFlow
-      .recover { case t: Exception =>
-        logAndEmpty("There was an error processing a JSON message", t)("")
-      }
-      .map(str => parseInput[K, V](str))
-      .recover { case t: Exception =>
-        logAndEmpty(s"JSON message could not be parsed", t)(
-          ProducerEmptyMessage
-        )
-      }
-      .filter(_.nonEmpty)
+    rateLimitedJsonToWsProducerRecordFlow[K, V](args)
       .map { wpr =>
         val record = asKafkaProducerRecord(args.topic, wpr)
         ProducerMessage.Message(record, wpr)
@@ -319,35 +260,18 @@ object WsProducer extends WithProxyLogger {
     val settings       = producerSettingsWithKey[keyType.Aux, valType.Aux](args)
     val producerClient = settings.createKafkaProducer()
 
-    logger.debug(s"Using serde $serde")
+    logger.trace(s"Using serde $serde")
 
     checkClient(args.topic, producerClient)
 
-    wsMessageToByteStringFlow
-      .recover { case t: Exception =>
-        logAndEmpty("There was an error processing an Avro message", t)(
-          ByteString.empty
-        )
-      }
-      .log("produceAvro", m => s"Trying to deserialize bytes: $m")
-      .map(bs => serde.deserialize(bs.toArray))
-      .log("produceAvro", m => s"Deserialized bytes into: $m")
-      .recover { case t: Exception =>
-        logAndEmpty(s"Avro message could not be deserialized", t)(
-          AvroProducerRecord.Empty
-        )
-      }
-      .filterNot(_.isEmpty)
-      .map { apr =>
-        val wpr = WsProducerRecord.fromAvro[keyType.Aux, valType.Aux](apr)(
-          keyFormatType = keyType,
-          valueFormatType = valType
-        )
-        val record = asKafkaProducerRecord(args.topic, wpr)
-        ProducerMessage.Message(record, wpr)
-
-      }
-      .via(Producer.flexiFlow(settings.withProducer(producerClient)))
+    rateLimitedAvroToWsProducerRecordFlow[keyType.Aux, valType.Aux](
+      args = args,
+      keyType = keyType,
+      valType = valType
+    ).map { wpr =>
+      val record = asKafkaProducerRecord(args.topic, wpr)
+      ProducerMessage.Message(record, wpr)
+    }.via(Producer.flexiFlow(settings.withProducer(producerClient)))
       .map(r => WsProducerResult.fromProducerResult(r))
       .flatMapConcat(seqToSource)
   }

@@ -125,13 +125,24 @@ object Configuration extends WithProxyLogger {
       kafkaClientProperties: Map[String, AnyRef]
   )
 
+  final case class ClientSpecificRateLimitCfg(
+      clientId: String,
+      messagesPerSecond: Int
+  )
+
+  final case class RateLimitingCfg(
+      defaultMessagesPerSecond: Int = 0,
+      clientLimits: Seq[ClientSpecificRateLimitCfg] = Seq.empty
+  )
+
   final case class ConsumerCfg(
-      defaultRateLimit: Long,
+      defaultRateLimitMessagesPerSecond: Long,
       defaultBatchSize: Int,
       kafkaClientProperties: Map[String, AnyRef]
   )
 
   final case class ProducerCfg(
+      rateLimit: RateLimitingCfg,
       kafkaClientProperties: Map[String, AnyRef]
   )
 
@@ -230,8 +241,9 @@ object Configuration extends WithProxyLogger {
       commitHandler: CommitHandlerCfg
   ) {
 
-    lazy val isRateLimitEnabled: Boolean = consumer.defaultRateLimit > 0
-    lazy val isBatchingEnabled: Boolean  = consumer.defaultBatchSize > 0
+    lazy val isRateLimitEnabled: Boolean =
+      consumer.defaultRateLimitMessagesPerSecond > 0
+    lazy val isBatchingEnabled: Boolean = consumer.defaultBatchSize > 0
 
     lazy val isRateLimitAndBatchEnabled: Boolean =
       isRateLimitEnabled && isBatchingEnabled

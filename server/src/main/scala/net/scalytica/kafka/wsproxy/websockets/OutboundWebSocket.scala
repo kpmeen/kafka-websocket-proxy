@@ -35,12 +35,13 @@ import net.scalytica.kafka.wsproxy.models.{
 }
 import net.scalytica.kafka.wsproxy.session.SessionHandler._
 import net.scalytica.kafka.wsproxy.session.{Session, SessionHandlerProtocol}
-import net.scalytica.kafka.wsproxy.{wsMessageToStringFlow, _}
+import net.scalytica.kafka.wsproxy.streams.ProxyFlowExtras
+import net.scalytica.kafka.wsproxy._
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 
-trait OutboundWebSocket extends WithProxyLogger {
+trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
 
   implicit private[this] val timeout: Timeout = 3 seconds
 

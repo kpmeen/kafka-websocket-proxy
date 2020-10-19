@@ -95,6 +95,8 @@ object OutSocketArgs {
  *   the Kafka topic to subscribe to.
  * @param socketPayload
  *   the type of payload to expect through the socket.
+ * @param clientId
+ *   the clientId to use for the Kafka producer.
  * @param aclCredentials
  *   the Kafka ACL credentials to use with the Kafka client
  * @param keyType
@@ -105,6 +107,7 @@ object OutSocketArgs {
 case class InSocketArgs(
     topic: TopicName,
     socketPayload: SocketPayload,
+    clientId: Option[WsClientId] = None,
     aclCredentials: Option[AclCredentials] = None,
     keyType: Option[Formats.FormatType] = None,
     valType: Formats.FormatType = Formats.StringType
