@@ -4,10 +4,6 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.CompletableFuture
 import java.util.{Properties => JProps}
 
-import akka.NotUsed
-import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
-import akka.stream.Materializer
-import akka.stream.scaladsl.{Flow, Sink}
 import akka.util.ByteString
 import com.typesafe.scalalogging.Logger
 import io.confluent.monitoring.clients.interceptor.{
@@ -15,9 +11,7 @@ import io.confluent.monitoring.clients.interceptor.{
   MonitoringProducerInterceptor
 }
 import net.scalytica.kafka.wsproxy.Configuration.AppCfg
-import net.scalytica.kafka.wsproxy.logging.DefaultProxyLogger
 
-import scala.concurrent.ExecutionContext
 import scala.util.Try
 // scalastyle:off
 import org.apache.kafka.clients.consumer.ConsumerConfig.INTERCEPTOR_CLASSES_CONFIG
@@ -25,39 +19,8 @@ import org.apache.kafka.clients.consumer.ConsumerConfig.INTERCEPTOR_CLASSES_CONF
 
 import scala.compat.java8.{FunctionConverters, FutureConverters}
 import scala.concurrent.Future
-import scala.concurrent.duration._
 
 package object wsproxy {
-
-  def wsMessageToStringFlow(
-      implicit mat: Materializer,
-      ec: ExecutionContext
-  ): Flow[Message, String, NotUsed] =
-    Flow[Message]
-      .mapConcat {
-        case tm: TextMessage   => TextMessage(tm.textStream) :: Nil
-        case bm: BinaryMessage => bm.dataStream.runWith(Sink.ignore); Nil
-      }
-      .mapAsync(1)(_.toStrict(5 seconds).map(_.text))
-
-  def wsMessageToByteStringFlow(
-      implicit mat: Materializer,
-      ec: ExecutionContext
-  ): Flow[Message, ByteString, NotUsed] = {
-    Flow[Message]
-      .log("wsMessageToByteStringFlow", _ => "Concatenating incoming bytes...")
-      .mapConcat {
-        case tm: TextMessage =>
-          DefaultProxyLogger.debug("Received TextMessage through socket")
-          tm.textStream.runWith(Sink.ignore); Nil
-
-        case bm: BinaryMessage =>
-          DefaultProxyLogger.debug("Received BinaryMessage through socket")
-          BinaryMessage(bm.dataStream) :: Nil
-      }
-      .log("wsMessageToByteStringFlow", m => s"Aggregated message: $m")
-      .mapAsync(1)(_.toStrict(5 seconds).map(_.data))
-  }
 
   val ProducerInterceptorClass =
     classOf[MonitoringProducerInterceptor[_, _]].getName

@@ -396,11 +396,12 @@ both inbound and outbound messages.
 
 **Query parameters**:
 
-| Name    | Type        | Required | Default value |
-|:------- |:----------- |:--------:|:------------- |
-| topic   | string      |     y    |               |
-| keyType | format type |     n    |               |
-| valType | format type |     y    |               |
+| Name     | Type        | Required | Default value |
+|:-------- |:----------- |:--------:|:------------- |
+| topic    | string      |     y    |               |
+| clientId | string      |     n    |               |
+| keyType  | format type |     n    |               |
+| valType  | format type |     y    |               |
 
 ##### Input (JSON)
 

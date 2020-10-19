@@ -46,12 +46,16 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
       |  }
       |
       |  consumer {
-      |    default-rate-limit = 0
+      |    default-rate-limit-messages-per-second = 0
       |    default-batch-size = 0
       |    kafka-client-properties = $${kafka.ws.proxy.kafka-client.properties}
       |  }
       |
       |  producer {
+      |    rate-limit {
+      |      default-messages-per-second = 0
+      |      client-limits: []
+      |    }
       |    kafka-client-properties = $${kafka.ws.proxy.kafka-client.properties}
       |  }
       |
@@ -102,12 +106,16 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
       |  }
       |
       |  consumer {
-      |    default-rate-limit = 0
+      |    default-rate-limit-messages-per-second = 0
       |    default-batch-size = 0
       |    kafka-client-properties = $${kafka.ws.proxy.kafka-client.properties}
       |  }
       |
       |  producer {
+      |    rate-limit {
+      |      default-messages-per-second = 0
+      |      client-limits: []
+      |    }
       |    kafka-client-properties = $${kafka.ws.proxy.kafka-client.properties}
       |  }
       |
@@ -144,7 +152,7 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
       // format: on
 
       cfg.consumer.defaultBatchSize mustBe 0
-      cfg.consumer.defaultRateLimit mustBe 0
+      cfg.consumer.defaultRateLimitMessagesPerSecond mustBe 0
 
       cfg.sessionHandler.sessionStateTopicName.value mustBe "_wsproxy.session.state" // scalastyle:ignore
       cfg.sessionHandler.sessionStateReplicationFactor mustBe 3
@@ -169,13 +177,13 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
         cfg.server.port mustBe 8078
 
         // format: off
-      cfg.kafkaClient.bootstrapHosts mustBe KafkaBootstrapHosts(List("localhost:29092")) // scalastyle:ignore
-      cfg.kafkaClient.schemaRegistry mustBe empty
-      cfg.kafkaClient.monitoringEnabled mustBe false
-      // format: on
+        cfg.kafkaClient.bootstrapHosts mustBe KafkaBootstrapHosts(List("localhost:29092")) // scalastyle:ignore
+        cfg.kafkaClient.schemaRegistry mustBe empty
+        cfg.kafkaClient.monitoringEnabled mustBe false
+        // format: on
 
         cfg.consumer.defaultBatchSize mustBe 0
-        cfg.consumer.defaultRateLimit mustBe 0
+        cfg.consumer.defaultRateLimitMessagesPerSecond mustBe 0
 
         cfg.sessionHandler.sessionStateTopicName.value mustBe "_wsproxy.session.state" // scalastyle:ignore
         cfg.sessionHandler.sessionStateReplicationFactor mustBe 3
@@ -212,7 +220,7 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
       // format: on
 
       cfg.consumer.defaultBatchSize mustBe 0
-      cfg.consumer.defaultRateLimit mustBe 0
+      cfg.consumer.defaultRateLimitMessagesPerSecond mustBe 0
 
       cfg.sessionHandler.sessionStateTopicName.value mustBe "_wsproxy.session.state" // scalastyle:ignore
       cfg.sessionHandler.sessionStateReplicationFactor mustBe 3
