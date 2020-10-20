@@ -1,4 +1,4 @@
-package net.scalytica.kafka.wsproxy
+package net.scalytica.kafka.wsproxy.web
 
 import org.scalatest.wordspec.AnyWordSpec
 

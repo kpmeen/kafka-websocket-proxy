@@ -1,11 +1,11 @@
-package net.scalytica.kafka.wsproxy
+package net.scalytica.kafka.wsproxy.web
 
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers.BasicHttpCredentials
 import akka.http.scaladsl.server._
 import net.manub.embeddedkafka.Codecs._
-import net.scalytica.kafka.wsproxy.SocketProtocol.AvroPayload
 import net.scalytica.kafka.wsproxy.auth.AccessToken
+import net.scalytica.kafka.wsproxy.web.SocketProtocol.AvroPayload
 import net.scalytica.kafka.wsproxy.models.Formats.{
   AvroType,
   LongType,

@@ -1,7 +1,7 @@
 package net.scalytica.kafka.wsproxy.utils
 
-import net.scalytica.kafka.wsproxy.Configuration
-import net.scalytica.kafka.wsproxy.Configuration.KafkaBootstrapHosts
+import net.scalytica.kafka.wsproxy.config.Configuration.KafkaBootstrapHosts
+import net.scalytica.kafka.wsproxy.config.Configuration
 import net.scalytica.kafka.wsproxy.utils.HostResolver.resolveKafkaBootstrapHosts
 import net.scalytica.test.WsProxyKafkaSpec
 

@@ -4,7 +4,7 @@ import akka.http.scaladsl.model.headers.{BasicHttpCredentials, HttpCredentials}
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.WSProbe
 import akka.util.ByteString
-import net.scalytica.kafka.wsproxy.SocketProtocol.{
+import net.scalytica.kafka.wsproxy.web.SocketProtocol.{
   AvroPayload,
   JsonPayload,
   SocketPayload

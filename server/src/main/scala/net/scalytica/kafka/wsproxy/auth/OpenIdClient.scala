@@ -10,7 +10,10 @@ import io.circe._
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.auto._
 import io.circe.parser._
-import net.scalytica.kafka.wsproxy.Configuration.{AppCfg, OpenIdConnectCfg}
+import net.scalytica.kafka.wsproxy.config.Configuration.{
+  AppCfg,
+  OpenIdConnectCfg
+}
 import net.scalytica.kafka.wsproxy.OptionExtensions
 import net.scalytica.kafka.wsproxy.errors.{
   AuthenticationError,

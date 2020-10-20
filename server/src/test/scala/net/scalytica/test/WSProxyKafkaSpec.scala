@@ -16,7 +16,7 @@ import net.manub.embeddedkafka.schemaregistry.{
   EmbeddedKafka,
   EmbeddedKafkaConfig
 }
-import net.scalytica.kafka.wsproxy.Configuration.{
+import net.scalytica.kafka.wsproxy.config.Configuration.{
   AdminClientCfg,
   AppCfg,
   BasicAuthCfg,
@@ -26,10 +26,11 @@ import net.scalytica.kafka.wsproxy.Configuration.{
 }
 import net.scalytica.kafka.wsproxy.auth.OpenIdClient
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroProducerRecord
+import net.scalytica.kafka.wsproxy.config.Configuration
 import net.scalytica.kafka.wsproxy.models.Formats._
 import net.scalytica.kafka.wsproxy.models.{TopicName, WsServerId}
 import net.scalytica.kafka.wsproxy.session.SessionHandler
-import net.scalytica.kafka.wsproxy.{mapToProperties, Configuration}
+import net.scalytica.kafka.wsproxy.mapToProperties
 import net.scalytica.test.TestDataGenerators._
 import org.apache.kafka.clients.CommonClientConfigs._
 import org.apache.kafka.clients.admin.AdminClientConfig.{

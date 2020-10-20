@@ -1,4 +1,4 @@
-package net.scalytica.kafka.wsproxy.websockets
+package net.scalytica.kafka.wsproxy.web.websockets
 
 import akka.actor.ActorSystem
 import akka.actor.typed.ActorRef
@@ -16,8 +16,8 @@ import io.circe.Encoder
 import io.circe.Printer.noSpaces
 import io.circe.parser.parse
 import io.circe.syntax._
-import net.scalytica.kafka.wsproxy.Configuration.AppCfg
-import net.scalytica.kafka.wsproxy.SocketProtocol.{AvroPayload, JsonPayload}
+import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.web.SocketProtocol.{AvroPayload, JsonPayload}
 import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
 import net.scalytica.kafka.wsproxy.codecs.Decoders._
 import net.scalytica.kafka.wsproxy.codecs.Encoders._

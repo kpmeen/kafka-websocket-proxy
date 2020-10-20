@@ -1,4 +1,4 @@
-package net.scalytica.kafka.wsproxy
+package net.scalytica.kafka.wsproxy.web
 
 import akka.actor.ActorSystem
 import akka.actor.typed.scaladsl.adapter._
@@ -18,8 +18,6 @@ import akka.stream.scaladsl.RunnableGraph
 import akka.util.Timeout
 import io.circe.syntax._
 import io.circe.{Json, Printer}
-import net.scalytica.kafka.wsproxy.Configuration.AppCfg
-import net.scalytica.kafka.wsproxy.Headers.XKafkaAuthHeader
 import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
 import net.scalytica.kafka.wsproxy.auth.OpenIdClient
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
@@ -29,12 +27,14 @@ import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
   AvroProducerResult
 }
 import net.scalytica.kafka.wsproxy.codecs.Encoders.brokerInfoEncoder
+import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.errors.{
   AuthenticationError,
   AuthorisationError,
   InvalidPublicKeyError,
   TopicNotFoundError
 }
+import net.scalytica.kafka.wsproxy.web.Headers.XKafkaAuthHeader
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models.{
   AclCredentials,
@@ -46,7 +46,7 @@ import net.scalytica.kafka.wsproxy.session.SessionHandler.{
   SessionHandlerOpExtensions,
   SessionHandlerRef
 }
-import net.scalytica.kafka.wsproxy.websockets.{
+import net.scalytica.kafka.wsproxy.web.websockets.{
   InboundWebSocket,
   OutboundWebSocket
 }

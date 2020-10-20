@@ -1,4 +1,4 @@
-package net.scalytica.kafka.wsproxy.websockets
+package net.scalytica.kafka.wsproxy.web.websockets
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.ws.{BinaryMessage, TextMessage}
@@ -8,8 +8,8 @@ import akka.stream.Materializer
 import akka.util.ByteString
 import io.circe.Printer.noSpaces
 import io.circe.syntax._
-import net.scalytica.kafka.wsproxy.Configuration.AppCfg
-import net.scalytica.kafka.wsproxy.SocketProtocol.{AvroPayload, JsonPayload}
+import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.web.SocketProtocol.{AvroPayload, JsonPayload}
 import net.scalytica.kafka.wsproxy.codecs.Encoders._
 import net.scalytica.kafka.wsproxy.codecs.ProtocolSerdes.{
   avroProducerRecordSerde,

@@ -6,7 +6,7 @@ import akka.kafka.scaladsl.Committer
 import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import com.typesafe.scalalogging.Logger
-import net.scalytica.kafka.wsproxy.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.models.{
   Partition,
   WsConsumerRecord,

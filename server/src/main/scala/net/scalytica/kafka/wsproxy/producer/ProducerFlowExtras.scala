@@ -7,7 +7,7 @@ import akka.stream.{Materializer, OverflowStrategy}
 import akka.util.ByteString
 import io.circe.Decoder
 import net.scalytica.kafka.wsproxy.streams.ProxyFlowExtras
-import net.scalytica.kafka.wsproxy.Configuration.{
+import net.scalytica.kafka.wsproxy.config.Configuration.{
   AppCfg,
   ClientSpecificRateLimitCfg
 }

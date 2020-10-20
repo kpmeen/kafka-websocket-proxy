@@ -1,7 +1,7 @@
-package net.scalytica.kafka.wsproxy
+package net.scalytica.kafka.wsproxy.web
 
 import akka.http.scaladsl.model.headers.BasicHttpCredentials
-import net.scalytica.kafka.wsproxy.Headers.XKafkaAuthHeader
+import net.scalytica.kafka.wsproxy.web.Headers.XKafkaAuthHeader
 import org.scalatest.OptionValues
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec

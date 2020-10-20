@@ -1,6 +1,6 @@
 package net.scalytica.test
 
-import net.scalytica.kafka.wsproxy.{
+import net.scalytica.kafka.wsproxy.web.{
   BaseRoutes,
   SchemaRoutes,
   ServerRoutes,

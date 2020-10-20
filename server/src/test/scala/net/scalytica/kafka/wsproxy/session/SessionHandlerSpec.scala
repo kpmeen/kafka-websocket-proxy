@@ -6,7 +6,7 @@ import akka.actor.typed.Scheduler
 import akka.actor.typed.ActorRef
 import akka.util.Timeout
 import net.manub.embeddedkafka.schemaregistry._
-import net.scalytica.kafka.wsproxy.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.codecs.Decoders.sessionDecoder
 import net.scalytica.kafka.wsproxy.codecs.Encoders.sessionEncoder
 import net.scalytica.kafka.wsproxy.codecs.{SessionSerde, WsGroupIdSerde}

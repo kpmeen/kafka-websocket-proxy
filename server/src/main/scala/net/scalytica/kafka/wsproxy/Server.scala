@@ -5,8 +5,13 @@ import akka.actor.CoordinatedShutdown
 import akka.actor.CoordinatedShutdown._
 import akka.http.scaladsl.Http
 import akka.stream.Materializer
-import net.scalytica.kafka.wsproxy.Configuration.{AppCfg, OpenIdConnectCfg}
+import net.scalytica.kafka.wsproxy.config.Configuration.{
+  AppCfg,
+  OpenIdConnectCfg
+}
 import net.scalytica.kafka.wsproxy.auth.OpenIdClient
+import net.scalytica.kafka.wsproxy.config.Configuration
+import net.scalytica.kafka.wsproxy.web.{ServerBindings, ServerRoutes}
 import net.scalytica.kafka.wsproxy.logging.{
   WithProxyLogger,
   WsProxyEnvLoggerConfigurator
