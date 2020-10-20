@@ -8,7 +8,7 @@ import akka.kafka.{ProducerMessage, ProducerSettings}
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Flow, Source}
 import io.circe.Decoder
-import net.scalytica.kafka.wsproxy.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroProducerRecord
 import net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde
 import net.scalytica.kafka.wsproxy.errors.{

@@ -1,4 +1,4 @@
-package net.scalytica.kafka.wsproxy
+package net.scalytica.kafka.wsproxy.config
 
 import java.nio.file.Path
 

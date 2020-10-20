@@ -1,6 +1,6 @@
 package net.scalytica.kafka.wsproxy.admin
 
-import net.scalytica.kafka.wsproxy.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy._
 import net.scalytica.kafka.wsproxy.errors.{
   KafkaFutureErrorHandler,

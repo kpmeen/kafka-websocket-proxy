@@ -1,4 +1,6 @@
-package net.scalytica.kafka.wsproxy
+package net.scalytica.kafka.wsproxy.web
+
+import net.scalytica.kafka.wsproxy.StringExtensions
 
 object SocketProtocol {
 

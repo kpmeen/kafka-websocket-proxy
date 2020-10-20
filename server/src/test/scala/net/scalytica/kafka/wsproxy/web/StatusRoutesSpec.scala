@@ -1,4 +1,4 @@
-package net.scalytica.kafka.wsproxy
+package net.scalytica.kafka.wsproxy.web
 
 import akka.http.scaladsl.model.ContentTypes._
 import akka.http.scaladsl.model.StatusCodes._

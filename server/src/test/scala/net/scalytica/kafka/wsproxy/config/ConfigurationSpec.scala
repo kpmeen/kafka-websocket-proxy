@@ -1,7 +1,10 @@
-package net.scalytica.kafka.wsproxy
+package net.scalytica.kafka.wsproxy.config
 
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import net.scalytica.kafka.wsproxy.Configuration.{AppCfg, KafkaBootstrapHosts}
+import net.scalytica.kafka.wsproxy.config.Configuration.{
+  AppCfg,
+  KafkaBootstrapHosts
+}
 import net.scalytica.kafka.wsproxy.errors.ConfigurationError
 import net.scalytica.test.FileLoader.testConfigPath
 import org.scalatest.OptionValues

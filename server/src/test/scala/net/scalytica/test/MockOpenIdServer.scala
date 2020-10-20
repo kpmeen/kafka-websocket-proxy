@@ -13,7 +13,7 @@ import io.circe.JsonObject
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.auto._
 import io.circe.syntax._
-import net.scalytica.kafka.wsproxy.Configuration.OpenIdConnectCfg
+import net.scalytica.kafka.wsproxy.config.Configuration.OpenIdConnectCfg
 import net.scalytica.kafka.wsproxy.auth.{
   AccessToken,
   Jwk,

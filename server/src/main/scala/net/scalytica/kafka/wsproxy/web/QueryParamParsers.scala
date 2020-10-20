@@ -1,9 +1,9 @@
-package net.scalytica.kafka.wsproxy
+package net.scalytica.kafka.wsproxy.web
 
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.unmarshalling.Unmarshaller
-import net.scalytica.kafka.wsproxy.SocketProtocol._
+import net.scalytica.kafka.wsproxy.web.SocketProtocol._
 import net.scalytica.kafka.wsproxy.models.Formats._
 import net.scalytica.kafka.wsproxy.models._
 import org.apache.kafka.clients.consumer.OffsetResetStrategy

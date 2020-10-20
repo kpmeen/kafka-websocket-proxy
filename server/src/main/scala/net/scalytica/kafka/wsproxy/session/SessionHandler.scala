@@ -7,7 +7,7 @@ import akka.actor.typed.{ActorRef, Behavior, Scheduler}
 import akka.kafka.scaladsl.Consumer
 import akka.stream.scaladsl.{RunnableGraph, Sink}
 import akka.util.Timeout
-import net.scalytica.kafka.wsproxy.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models.{WsClientId, WsGroupId, WsServerId}

@@ -10,7 +10,7 @@ import io.confluent.monitoring.clients.interceptor.{
   MonitoringConsumerInterceptor,
   MonitoringProducerInterceptor
 }
-import net.scalytica.kafka.wsproxy.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 
 import scala.util.Try
 // scalastyle:off

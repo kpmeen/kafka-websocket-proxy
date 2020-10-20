@@ -1,4 +1,4 @@
-package net.scalytica.kafka.wsproxy
+package net.scalytica.kafka.wsproxy.web
 
 import java.nio.file.{Files, Path}
 import java.security.{KeyStore, SecureRandom}
@@ -7,7 +7,7 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.{ConnectionContext, Http, HttpsConnectionContext}
 import javax.net.ssl.{KeyManagerFactory, SSLContext, TrustManagerFactory}
-import net.scalytica.kafka.wsproxy.Configuration.{AppCfg, ServerSslCfg}
+import net.scalytica.kafka.wsproxy.config.Configuration.{AppCfg, ServerSslCfg}
 
 import scala.concurrent.Future
 

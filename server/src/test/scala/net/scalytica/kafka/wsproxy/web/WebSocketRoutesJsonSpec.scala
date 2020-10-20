@@ -1,4 +1,4 @@
-package net.scalytica.kafka.wsproxy
+package net.scalytica.kafka.wsproxy.web
 
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server._
@@ -8,10 +8,10 @@ import net.scalytica.kafka.wsproxy.models.Formats.{NoType, StringType}
 import net.scalytica.kafka.wsproxy.models.TopicName
 import net.scalytica.test._
 import org.scalatest.Inspectors.forAll
+import org.scalatest.OptionValues
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Minutes, Span}
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.OptionValues
 
 import scala.concurrent.duration._
 

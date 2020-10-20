@@ -11,7 +11,7 @@ import akka.http.scaladsl.testkit.{
   ScalatestRouteTest,
   WSProbe
 }
-import net.scalytica.kafka.wsproxy.Headers.XKafkaAuthHeader
+import net.scalytica.kafka.wsproxy.web.Headers.XKafkaAuthHeader
 import net.scalytica.kafka.wsproxy.codecs.ProtocolSerdes
 import org.scalatest.Suite
 import org.scalatest.matchers.must.Matchers
