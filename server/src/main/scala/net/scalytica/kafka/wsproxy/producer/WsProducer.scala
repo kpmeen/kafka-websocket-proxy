@@ -74,11 +74,19 @@ object WsProducer extends ProducerFlowExtras with WithProxyLogger {
       aclCredentials: Option[AclCredentials]
   )(ps: ProducerSettings[K, V])(implicit cfg: AppCfg): KafkaProducer[K, V] = {
     val props = {
-      val jaasProps = aclCredentials
-        .map(c => SaslJaasConfig -> PlainLogin(c.username, c.password))
-        .toMap
+      val jaasProps = aclCredentials match {
+        case Some(c) =>
+          Map(SaslJaasConfig -> PlainLogin(c.username, c.password))
 
-      cfg.producer.kafkaClientProperties ++
+        case None =>
+          Map(SaslJaasConfig -> "")
+      }
+
+      // Strip away the default sasl_jaas_config, since the client needs to
+      // use their own credentials for auth.
+      val kcp = cfg.producer.kafkaClientProperties - SaslJaasConfig
+
+      kcp ++
         ps.getProperties.asScala.toMap ++
         producerMetricsProperties ++
         jaasProps

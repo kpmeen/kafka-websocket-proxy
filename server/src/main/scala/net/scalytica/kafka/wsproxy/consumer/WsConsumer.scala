@@ -11,9 +11,9 @@ import net.scalytica.kafka.wsproxy.errors.{
   AuthorisationError
 }
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
-import net.scalytica.kafka.wsproxy.{consumerMetricsProperties, mapToProperties}
 import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails
 import net.scalytica.kafka.wsproxy.models._
+import net.scalytica.kafka.wsproxy.{consumerMetricsProperties, mapToProperties}
 import org.apache.kafka.clients.consumer.ConsumerConfig._
 import org.apache.kafka.clients.consumer.{ConsumerRecord, KafkaConsumer}
 import org.apache.kafka.common.errors.{
@@ -22,17 +22,17 @@ import org.apache.kafka.common.errors.{
 }
 import org.apache.kafka.common.serialization.Deserializer
 
-import scala.jdk.CollectionConverters._
 import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
 
 /** Functions for initialising Kafka consumer sources. */
 object WsConsumer extends WithProxyLogger {
 
   // scalastyle:off
-  private[this] val SASL_JAAS_CONFIG = "sasl.jaas.config"
+  private[this] val SaslJaasConfig = "sasl.jaas.config"
 
-  private[this] val PLAIN_LOGIN = (uname: String, pass: String) =>
+  private[this] val PlainLogin = (uname: String, pass: String) =>
     s"""org.apache.kafka.common.security.plain.PlainLoginModule required username="$uname" password="$pass";"""
   // scalastyle:on
 
@@ -96,11 +96,19 @@ object WsConsumer extends WithProxyLogger {
       cs: ConsumerSettings[K, V]
   )(implicit cfg: AppCfg): KafkaConsumer[K, V] = {
     val props = {
-      val jaasProps = aclCredentials
-        .map(c => SASL_JAAS_CONFIG -> PLAIN_LOGIN(c.username, c.password))
-        .toMap
+      val jaasProps = aclCredentials match {
+        case Some(c) =>
+          Map(SaslJaasConfig -> PlainLogin(c.username, c.password))
 
-      cfg.consumer.kafkaClientProperties ++
+        case None =>
+          Map(SaslJaasConfig -> "")
+      }
+
+      // Strip away the default sasl_jaas_config, since the client needs to
+      // use their own credentials for auth.
+      val kcp = cfg.consumer.kafkaClientProperties - SaslJaasConfig
+
+      kcp ++
         cs.getProperties.asScala.toMap ++
         consumerMetricsProperties ++
         jaasProps
