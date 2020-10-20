@@ -38,11 +38,17 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
       routes: Route,
       messages: Seq[String],
       validateMessageId: Boolean = false,
-      basicCreds: Option[BasicHttpCredentials] = None
+      kafkaCreds: Option[BasicHttpCredentials] = None,
+      creds: Option[HttpCredentials] = None
   )(implicit wsClient: WSProbe): Unit = {
     val uri = baseProducerUri(topic, keyType = keyType, valType = valType)
 
-    checkWebSocket(uri, routes, basicCreds) {
+    checkWebSocket(
+      uri = uri,
+      routes = routes,
+      kafkaCreds = kafkaCreds,
+      creds = creds
+    ) {
       isWebSocketUpgrade mustBe true
 
       forAll(messages) { msg =>
@@ -74,10 +80,10 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
     )
 
     checkWebSocket(
-      baseUri,
-      routes,
-      kafkaCreds,
-      creds
+      uri = baseUri,
+      routes = routes,
+      kafkaCreds = kafkaCreds,
+      creds = creds
     ) {
       isWebSocketUpgrade mustBe true
 

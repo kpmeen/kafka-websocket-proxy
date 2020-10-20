@@ -45,8 +45,8 @@ import org.apache.kafka.common.security.auth.SecurityProtocol._
 import org.scalatest.Suite
 import org.scalatest.matchers.must.Matchers
 
-import scala.jdk.CollectionConverters._
 import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
 import scala.util.Random
 
 // scalastyle:off magic.number
@@ -346,8 +346,8 @@ trait WsProxyKafkaSpec
     )
 
   def secureKafkaContext[T](body: EmbeddedKafkaConfig => T): T = {
-    implicit val secureCfg = embeddedKafkaConfigWithSasl
-    withRunningKafka(body(secureCfg))
+    implicit val cfg = embeddedKafkaConfigWithSasl
+    withRunningKafka(body(cfg))
   }
 
   def plainServerContext[T](
@@ -416,7 +416,20 @@ trait WsProxyProducerKafkaSpec
       topic: String = "test-topic",
       partitions: Int = 1
   )(body: ProducerContext => T): T =
-    secureServerProducerContext(topic = topic, partitions = partitions)(body)
+    plainServerContext { (kcfg, appCfg, routes) =>
+      initTopic(topic, partitions)(kcfg)
+
+      val ctx = ProducerContext(
+        topicName = TopicName(topic),
+        embeddedKafkaConfig = kcfg,
+        appCfg = appCfg,
+        route = routes,
+        producerProbe = WSProbe()
+      )
+
+      body(ctx)
+    }
+//  secureServerProducerContext(topic = topic, partitions = partitions)(body)
 
   def secureServerProducerContext[T](
       topic: String,
@@ -535,19 +548,24 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       partitions: Int = 1,
       prePopulate: Boolean = true,
       withHeaders: Boolean = false
-  )(body: ConsumerContext => T): T =
-    secureServerConsumerContext[T, M](
-      topic = topic,
-      messageType = messageType,
-      keyType = keyType,
-      valType = valType,
-      numMessages = numMessages,
-      partitions = partitions,
-      prePopulate = prePopulate,
-      withHeaders = withHeaders,
-      useServerBasicAuth = false,
-      serverOpenIdCfg = None
-    )(body)
+  )(body: ConsumerContext => T): T = {
+    plainProducerContext(topic, partitions) { implicit pctx =>
+      if (prePopulate) {
+        produceForMessageType(
+          messageType = messageType,
+          keyType = keyType,
+          valType = valType,
+          numMessages = numMessages,
+          prePopulate = prePopulate,
+          withHeaders = withHeaders,
+          secureKafka = false
+        )
+      }
+
+      val ctx = setupConsumerContext
+      body(ctx)
+    }
+  }
 
   def secureKafkaJsonConsumerContext[T](
       topic: String,
@@ -605,25 +623,27 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       withHeaders: Boolean = false,
       useServerBasicAuth: Boolean = false,
       serverOpenIdCfg: Option[OpenIdConnectCfg] = None
-  )(body: ConsumerContext => T): T = secureKafkaClusterProducerContext(
-    topic = topic,
-    partitions = partitions,
-    useServerBasicAuth = useServerBasicAuth,
-    serverOpenIdCfg = serverOpenIdCfg
-  ) { implicit pctx =>
-    if (prePopulate) {
-      produceForMessageType(
-        messageType = messageType,
-        keyType = keyType,
-        valType = valType,
-        numMessages = numMessages,
-        prePopulate = prePopulate,
-        withHeaders = withHeaders
-      )
+  )(body: ConsumerContext => T): T =
+    secureKafkaClusterProducerContext(
+      topic = topic,
+      partitions = partitions,
+      useServerBasicAuth = useServerBasicAuth,
+      serverOpenIdCfg = serverOpenIdCfg
+    ) { implicit pctx =>
+      if (prePopulate) {
+        produceForMessageType(
+          messageType = messageType,
+          keyType = keyType,
+          valType = valType,
+          numMessages = numMessages,
+          prePopulate = prePopulate,
+          withHeaders = withHeaders,
+          secureKafka = true
+        )
+      }
+      val ctx = setupConsumerContext
+      body(ctx)
     }
-    val ctx = setupConsumerContext
-    body(ctx)
-  }
   //scalastyle:on
 
   def secureServerAvroConsumerContext[T](
@@ -701,7 +721,8 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
           valType = valType,
           numMessages = numMessages,
           prePopulate = prePopulate,
-          withHeaders = withHeaders
+          withHeaders = withHeaders,
+          secureKafka = true
         )
       }
       val ctx = setupConsumerContext
@@ -771,7 +792,8 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       valType: FormatType,
       numMessages: Int,
       prePopulate: Boolean,
-      withHeaders: Boolean
+      withHeaders: Boolean,
+      secureKafka: Boolean
   )(implicit pctx: ProducerContext): Unit = {
     if (prePopulate) {
       messageType match {
@@ -787,7 +809,10 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
             routes = pctx.route,
             keyType = keyType,
             valType = valType,
-            messages = msgs
+            messages = msgs,
+            kafkaCreds =
+              if (secureKafka) Some(BasicHttpCredentials("client", "client"))
+              else None
           )(pctx.producerProbe)
 
         case JsonType =>
@@ -801,7 +826,10 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
             keyType = keyType.getOrElse(NoType),
             valType = valType,
             routes = pctx.route,
-            messages = messages
+            messages = messages,
+            kafkaCreds =
+              if (secureKafka) Some(BasicHttpCredentials("client", "client"))
+              else None
           )(pctx.producerProbe)
 
         case _ => fail("messageType must be one of JsonType or AvroType")
