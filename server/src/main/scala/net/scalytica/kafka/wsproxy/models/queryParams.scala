@@ -1,7 +1,7 @@
 package net.scalytica.kafka.wsproxy.models
 
-import net.scalytica.kafka.wsproxy.web.SocketProtocol.SocketPayload
 import net.scalytica.kafka.wsproxy.models.Formats.FormatType
+import net.scalytica.kafka.wsproxy.web.SocketProtocol.SocketPayload
 import org.apache.kafka.clients.consumer.OffsetResetStrategy
 
 trait SocketArgs {
@@ -60,6 +60,34 @@ case class OutSocketArgs(
 
 object OutSocketArgs {
 
+  type TupledQueryParams = (
+      WsClientId,
+      Option[WsGroupId],
+      TopicName,
+      SocketPayload,
+      Option[Formats.FormatType],
+      Formats.FormatType,
+      OffsetResetStrategy,
+      Option[Int],
+      Option[Int],
+      Boolean
+  )
+
+  def fromTupledQueryParams(
+      t: TupledQueryParams
+  ): OutSocketArgs = fromQueryParams(
+    clientId = t._1,
+    groupId = t._2,
+    topic = t._3,
+    socketPayload = t._4,
+    keyTpe = t._5,
+    valTpe = t._6,
+    offsetResetStrategy = t._7,
+    rateLimit = t._8,
+    batchSize = t._9,
+    autoCommit = t._10
+  )
+
   // scalastyle:off
   def fromQueryParams(
       clientId: WsClientId,
@@ -91,12 +119,12 @@ object OutSocketArgs {
 /**
  * Encodes configuration params for an inbound WebSocket stream.
  *
+ * @param clientId
+ *   the clientId to use for the Kafka producer.
  * @param topic
  *   the Kafka topic to subscribe to.
  * @param socketPayload
  *   the type of payload to expect through the socket.
- * @param clientId
- *   the clientId to use for the Kafka producer.
  * @param aclCredentials
  *   the Kafka ACL credentials to use with the Kafka client
  * @param keyType
@@ -105,9 +133,9 @@ object OutSocketArgs {
  *   the type for the message values in the topic.
  */
 case class InSocketArgs(
+    clientId: WsClientId,
     topic: TopicName,
     socketPayload: SocketPayload,
-    clientId: Option[WsClientId] = None,
     aclCredentials: Option[AclCredentials] = None,
     keyType: Option[Formats.FormatType] = None,
     valType: Formats.FormatType = Formats.StringType
@@ -120,28 +148,33 @@ case class InSocketArgs(
 
 object InSocketArgs {
 
-  def fromOptQueryParams(
-      topicName: Option[TopicName],
-      socketPayload: SocketPayload,
-      keyTpe: Option[FormatType],
-      valTpe: Option[FormatType]
-  ): Option[InSocketArgs] =
-    topicName.map { t =>
-      InSocketArgs(
-        topic = t,
-        socketPayload = socketPayload,
-        keyType = keyTpe,
-        valType = valTpe.getOrElse(Formats.StringType)
-      )
-    }
+  type TupledQueryParams = (
+      WsClientId,
+      TopicName,
+      SocketPayload,
+      Option[FormatType],
+      FormatType
+  )
+
+  def fromTupledQueryParams(
+      t: TupledQueryParams
+  ): InSocketArgs = fromQueryParams(
+    clientId = t._1,
+    topicName = t._2,
+    socketPayload = t._3,
+    keyTpe = t._4,
+    valTpe = t._5
+  )
 
   def fromQueryParams(
+      clientId: WsClientId,
       topicName: TopicName,
       socketPayload: SocketPayload,
       keyTpe: Option[FormatType],
       valTpe: FormatType
   ): InSocketArgs =
     InSocketArgs(
+      clientId = clientId,
       topic = topicName,
       socketPayload = socketPayload,
       keyType = keyTpe,

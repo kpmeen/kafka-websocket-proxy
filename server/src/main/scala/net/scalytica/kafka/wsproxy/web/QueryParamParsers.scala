@@ -84,20 +84,7 @@ trait QueryParamParsers {
       Symbol("rate").as[Int] ?,
       Symbol("batchSize").as[Int] ?,
       Symbol("autoCommit").as[Boolean] ? true
-    ).tmap { t =>
-      OutSocketArgs.fromQueryParams(
-        clientId = t._1,
-        groupId = t._2,
-        topic = t._3,
-        socketPayload = t._4,
-        keyTpe = t._5,
-        valTpe = t._6,
-        offsetResetStrategy = t._7,
-        rateLimit = t._8,
-        batchSize = t._9,
-        autoCommit = t._10
-      )
-    }
+    ).tmap(OutSocketArgs.fromTupledQueryParams)
 
   /**
    * @return
@@ -106,10 +93,11 @@ trait QueryParamParsers {
    */
   def inParams: Directive[Tuple1[InSocketArgs]] =
     parameters(
+      Symbol("clientId").as[WsClientId],
       Symbol("topic").as[TopicName],
       Symbol("socketPayload").as[SocketPayload] ? (JsonPayload: SocketPayload),
       Symbol("keyType").as[FormatType] ?,
       Symbol("valType").as[FormatType] ? (StringType: FormatType)
-    ).tmap(t => InSocketArgs.fromQueryParams(t._1, t._2, t._3, t._4))
+    ).tmap(InSocketArgs.fromTupledQueryParams)
 
 }

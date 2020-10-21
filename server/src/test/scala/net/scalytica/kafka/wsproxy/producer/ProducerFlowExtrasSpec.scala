@@ -5,6 +5,7 @@ import akka.http.scaladsl.model.ws.{Message, TextMessage}
 import akka.stream.Materializer
 import akka.stream.scaladsl._
 import akka.stream.testkit.scaladsl.{TestSink, TestSource}
+import net.scalytica.kafka.wsproxy.models.WsClientId
 import net.scalytica.test.{TestDataGenerators, WsProxyKafkaSpec}
 import org.scalatest.Inspectors.forAll
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
@@ -54,7 +55,7 @@ class ProducerFlowExtrasSpec
       .probe[Message]
       .via(
         rateLimitFlow(
-          clientId = None,
+          clientId = WsClientId("test-client"),
           defaultMessagesPerSecond = msgPerSec,
           clientLimits = Seq.empty
         )

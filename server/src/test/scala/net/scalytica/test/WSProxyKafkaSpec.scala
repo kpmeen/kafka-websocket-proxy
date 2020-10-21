@@ -28,7 +28,7 @@ import net.scalytica.kafka.wsproxy.auth.OpenIdClient
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroProducerRecord
 import net.scalytica.kafka.wsproxy.config.Configuration
 import net.scalytica.kafka.wsproxy.models.Formats._
-import net.scalytica.kafka.wsproxy.models.{TopicName, WsServerId}
+import net.scalytica.kafka.wsproxy.models.{TopicName, WsClientId, WsServerId}
 import net.scalytica.kafka.wsproxy.session.SessionHandler
 import net.scalytica.kafka.wsproxy.mapToProperties
 import net.scalytica.test.TestDataGenerators._
@@ -491,6 +491,8 @@ trait WsProxyProducerKafkaSpec
 
 trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
 
+  private[this] val defaultProducerClientId = WsClientId("test-producer-client")
+
   case class ConsumerContext(
       topicName: TopicName,
       embeddedKafkaConfig: EmbeddedKafkaConfig,
@@ -553,6 +555,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
     plainProducerContext(topic, partitions) { implicit pctx =>
       if (prePopulate) {
         produceForMessageType(
+          clientId = defaultProducerClientId,
           messageType = messageType,
           keyType = keyType,
           valType = valType,
@@ -633,6 +636,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
     ) { implicit pctx =>
       if (prePopulate) {
         produceForMessageType(
+          clientId = defaultProducerClientId,
           messageType = messageType,
           keyType = keyType,
           valType = valType,
@@ -717,6 +721,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
     ) { implicit p =>
       if (prePopulate) {
         produceForMessageType(
+          clientId = defaultProducerClientId,
           messageType = messageType,
           keyType = keyType,
           valType = valType,
@@ -787,7 +792,9 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
     )
   }
 
+  // scalastyle:off
   private[this] def produceForMessageType(
+      clientId: WsClientId,
       messageType: FormatType,
       keyType: Option[FormatType],
       valType: FormatType,
@@ -806,6 +813,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
             withHeaders
           )
           produceAndCheckAvro(
+            clientId = clientId,
             topic = pctx.topicName,
             routes = pctx.route,
             keyType = keyType,
@@ -823,6 +831,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
             numMessages = numMessages
           )
           produceAndCheckJson(
+            clientId = clientId,
             topic = pctx.topicName,
             keyType = keyType.getOrElse(NoType),
             valType = valType,
@@ -837,4 +846,5 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       }
     }
   }
+  // scalastyle:on
 }

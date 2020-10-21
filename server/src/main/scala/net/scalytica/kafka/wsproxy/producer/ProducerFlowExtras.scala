@@ -6,13 +6,12 @@ import akka.stream.scaladsl.Flow
 import akka.stream.{Materializer, OverflowStrategy}
 import akka.util.ByteString
 import io.circe.Decoder
-import net.scalytica.kafka.wsproxy.streams.ProxyFlowExtras
+import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroProducerRecord
+import net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde
 import net.scalytica.kafka.wsproxy.config.Configuration.{
   AppCfg,
   ClientSpecificRateLimitCfg
 }
-import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroProducerRecord
-import net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models.Formats.FormatType
 import net.scalytica.kafka.wsproxy.models.{
@@ -21,6 +20,7 @@ import net.scalytica.kafka.wsproxy.models.{
   WsClientId,
   WsProducerRecord
 }
+import net.scalytica.kafka.wsproxy.streams.ProxyFlowExtras
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -101,17 +101,13 @@ private[producer] trait ProducerFlowExtras
   }
 
   def rateLimitFlow(
-      clientId: Option[WsClientId],
+      clientId: WsClientId,
       defaultMessagesPerSecond: Int,
       clientLimits: Seq[ClientSpecificRateLimitCfg]
   ): Flow[Message, Message, NotUsed] = {
-    val mps = clientId
-      .map { cid =>
-        clientLimits
-          .find(_.clientId.equals(cid.value))
-          .map(_.messagesPerSecond)
-          .getOrElse(defaultMessagesPerSecond)
-      }
+    val mps = clientLimits
+      .find(_.clientId.equals(clientId.value))
+      .map(_.messagesPerSecond)
       .getOrElse(defaultMessagesPerSecond)
 
     if (mps == 0) {

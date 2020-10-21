@@ -61,13 +61,10 @@ object WsProducer extends ProducerFlowExtras with WithProxyLogger {
   ) = {
     val kafkaUrl = cfg.kafkaClient.bootstrapHosts.mkString()
 
-    val p = ProducerSettings(as, ks, vs)
+    ProducerSettings(as, ks, vs)
       .withBootstrapServers(kafkaUrl)
       .withProducerFactory(initialiseProducer(args.aclCredentials))
-
-    args.clientId
-      .map(cid => p.withProperty(ProducerConfig.CLIENT_ID_CONFIG, cid.value))
-      .getOrElse(p)
+      .withProperty(ProducerConfig.CLIENT_ID_CONFIG, args.clientId.value)
   }
 
   private[this] def initialiseProducer[K, V](

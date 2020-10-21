@@ -70,6 +70,31 @@ class WebSocketRoutesAvroSpec
 
     "the server routes" should {
 
+      "reject producer connection when the required clientId is not set" in
+        plainProducerContext(nextTopic) { ctx =>
+          implicit val wsClient = ctx.producerProbe
+
+          val messages = createAvroProducerRecordAvroAvro(1)
+
+          produceAndCheckAvro(
+            clientId = producerClientId("avro", topicCounter),
+            topic = ctx.topicName,
+            routes = Route.seal(ctx.route),
+            keyType = Some(AvroType),
+            valType = AvroType,
+            messages = messages,
+            producerUri = Some(
+              buildProducerUri(
+                clientId = None,
+                topicName = Some(ctx.topicName),
+                payloadType = Some(AvroPayload),
+                keyType = Some(AvroType),
+                valType = Some(AvroType)
+              )
+            )
+          )
+        }
+
       "produce messages with Avro key and value" in
         plainProducerContext(nextTopic) { ctx =>
           implicit val wsClient = ctx.producerProbe
@@ -77,6 +102,7 @@ class WebSocketRoutesAvroSpec
           val messages = createAvroProducerRecordAvroAvro(1)
 
           produceAndCheckAvro(
+            clientId = producerClientId("avro", topicCounter),
             topic = ctx.topicName,
             routes = Route.seal(ctx.route),
             keyType = Some(AvroType),
@@ -92,6 +118,7 @@ class WebSocketRoutesAvroSpec
           val messages = createAvroProducerRecordStringBytes(1)
 
           produceAndCheckAvro(
+            clientId = producerClientId("avro", topicCounter),
             topic = ctx.topicName,
             routes = Route.seal(ctx.route),
             keyType = Some(StringType),
@@ -108,6 +135,7 @@ class WebSocketRoutesAvroSpec
             createAvroProducerRecordStringBytes(1, withHeaders = true)
 
           produceAndCheckAvro(
+            clientId = producerClientId("avro", topicCounter),
             topic = ctx.topicName,
             routes = Route.seal(ctx.route),
             keyType = Some(StringType),
@@ -123,6 +151,7 @@ class WebSocketRoutesAvroSpec
           val messages = createAvroProducerRecordNoneAvro(1)
 
           produceAndCheckAvro(
+            clientId = producerClientId("avro", topicCounter),
             topic = ctx.topicName,
             routes = Route.seal(ctx.route),
             keyType = None,
@@ -139,6 +168,7 @@ class WebSocketRoutesAvroSpec
             createAvroProducerRecordStringBytes(1, withMessageId = true)
 
           produceAndCheckAvro(
+            clientId = producerClientId("avro", topicCounter),
             topic = ctx.topicName,
             routes = Route.seal(ctx.route),
             keyType = Some(StringType),
@@ -366,6 +396,7 @@ class WebSocketRoutesAvroSpec
           val nonExistingTopic = TopicName("non-existing-topic")
 
           val uri = baseProducerUri(
+            clientId = producerClientId("avro", topicCounter),
             topicName = nonExistingTopic,
             keyType = StringType,
             valType = StringType,
@@ -435,6 +466,7 @@ class WebSocketRoutesAvroSpec
         secureKafkaClusterProducerContext(topic = nextTopic) { implicit ctx =>
           implicit val wsClient = ctx.producerProbe
           val baseUri = baseProducerUri(
+            clientId = producerClientId("avro", topicCounter),
             topicName = ctx.topicName,
             payloadType = AvroPayload,
             keyType = NoType,
@@ -459,6 +491,7 @@ class WebSocketRoutesAvroSpec
           val messages = createAvroProducerRecordNoneAvro(1)
 
           produceAndCheckAvro(
+            clientId = producerClientId("avro", topicCounter),
             topic = ctx.topicName,
             routes = Route.seal(ctx.route),
             keyType = None,
@@ -480,6 +513,7 @@ class WebSocketRoutesAvroSpec
               val messages = createAvroProducerRecordNoneAvro(1)
 
               produceAndCheckAvro(
+                clientId = producerClientId("avro", topicCounter),
                 topic = ctx.topicName,
                 routes = Route.seal(ctx.route),
                 keyType = None,
@@ -502,6 +536,7 @@ class WebSocketRoutesAvroSpec
             val token = AccessToken("Bearer", "foo.bar.baz", 3600L, None)
 
             val baseUri = baseProducerUri(
+              clientId = producerClientId("avro", topicCounter),
               topicName = ctx.topicName,
               payloadType = AvroPayload,
               keyType = NoType,

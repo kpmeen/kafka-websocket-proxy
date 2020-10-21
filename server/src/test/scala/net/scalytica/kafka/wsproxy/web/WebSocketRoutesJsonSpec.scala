@@ -49,6 +49,7 @@ class WebSocketRoutesJsonSpec
           val msgs = createJsonKeyValue(1)
 
           produceAndCheckJson(
+            clientId = producerClientId("json", topicCounter),
             topic = ctx.topicName,
             keyType = StringType,
             valType = StringType,
@@ -64,6 +65,7 @@ class WebSocketRoutesJsonSpec
           val msgs = createJsonValue(1)
 
           produceAndCheckJson(
+            clientId = producerClientId("json", topicCounter),
             topic = ctx.topicName,
             keyType = NoType,
             valType = StringType,
@@ -80,6 +82,7 @@ class WebSocketRoutesJsonSpec
           val msgs = createJsonKeyValue(1, withHeaders = true)
 
           produceAndCheckJson(
+            clientId = producerClientId("json", topicCounter),
             topic = ctx.topicName,
             keyType = StringType,
             valType = StringType,
@@ -102,6 +105,7 @@ class WebSocketRoutesJsonSpec
           val msgs = createJsonValue(1, withHeaders = true)
 
           produceAndCheckJson(
+            clientId = producerClientId("json", topicCounter),
             topic = ctx.topicName,
             keyType = NoType,
             valType = StringType,
@@ -122,6 +126,7 @@ class WebSocketRoutesJsonSpec
             createJsonKeyValue(1, withHeaders = true, withMessageId = true)
 
           produceAndCheckJson(
+            clientId = producerClientId("json", topicCounter),
             topic = ctx.topicName,
             keyType = StringType,
             valType = StringType,
@@ -258,6 +263,7 @@ class WebSocketRoutesJsonSpec
           val topicName = TopicName("non-existing-topic")
 
           val uri = baseProducerUri(
+            clientId = producerClientId("json", topicCounter),
             topicName = topicName,
             keyType = StringType,
             valType = StringType
