@@ -398,6 +398,7 @@ both inbound and outbound messages.
 
 | Name     | Type        | Required | Default value |
 |:-------- |:----------- |:--------:|:------------- |
+| clientId | string      |     y    |               |
 | topic    | string      |     y    |               |
 | clientId | string      |     n    |               |
 | keyType  | format type |     n    |               |
