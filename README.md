@@ -378,6 +378,14 @@ both inbound and outbound messages.
 | double    | double     | number      |
 | float     | float      | number      |
 
+
+**Payload types**
+
+| Value     | description                                                                                                 |
+|:--------- |:----------------------------------------------------------------------------------------------------------- |
+| json      | The default payload type to send via the WebSockets. See the endpoint docs for examples for JSON messages   |
+| avro      | Used when WebSocket payload uses the Avro format described in [Avro Payload Schemas](#avro-payload-schemas) |
+
 #### `/in`
 
 **Headers**:
@@ -396,13 +404,14 @@ both inbound and outbound messages.
 
 **Query parameters**:
 
-| Name     | Type        | Required | Default value |
-|:-------- |:----------- |:--------:|:------------- |
-| clientId | string      |     y    |               |
-| topic    | string      |     y    |               |
-| clientId | string      |     n    |               |
-| keyType  | format type |     n    |               |
-| valType  | format type |     y    |               |
+| Name          | Type         | Required | Default value |
+|:------------- |:-----------  |:--------:|:------------- |
+| clientId      | string       |     y    |               |
+| topic         | string       |     y    |               |
+| socketPayload | payload type |     n    |      json     |
+| clientId      | string       |     n    |               |
+| keyType       | format type  |     n    |               |
+| valType       | format type  |     y    |               |
 
 ##### Input (JSON)
 
@@ -454,17 +463,18 @@ both inbound and outbound messages.
 
 **Query parameters**:
 
-| Name                | Type        | Required | Default value |
-|:------------------- |:----------- |:--------:|:------------- |
-| clientId            | string      |    y     |               |
-| groupId             | string      |    n     |               |
-| topic               | string      |    y     |               |
-| keyType             | format type |    n     |               |
-| valType             | format type |    y     |               |
-| offsetResetStrategy | string      |    n     | earliest      |
-| rate                | integer     |    n     |               |
-| batchSize           | integer     |    n     |               |
-| autoCommit          | boolean     |    n     | true          |
+| Name                | Type         | Required | Default value |
+|:------------------- |:------------ |:--------:|:------------- |
+| clientId            | string       |    y     |               |
+| groupId             | string       |    n     |               |
+| topic               | string       |    y     |               |
+| socketPayload       | payload type |     n    |      json     |
+| keyType             | format type  |    n     |               |
+| valType             | format type  |    y     |               |
+| offsetResetStrategy | string       |    n     |   earliest    |
+| rate                | integer      |    n     |               |
+| batchSize           | integer      |    n     |               |
+| autoCommit          | boolean      |    n     |     true      |
 
 ##### Output (JSON)
 
