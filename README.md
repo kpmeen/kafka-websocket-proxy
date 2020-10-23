@@ -409,7 +409,6 @@ both inbound and outbound messages.
 | clientId      | string       |     y    |               |
 | topic         | string       |     y    |               |
 | socketPayload | payload type |     n    |      json     |
-| clientId      | string       |     n    |               |
 | keyType       | format type  |     n    |               |
 | valType       | format type  |     y    |               |
 
