@@ -5,7 +5,6 @@ import akka.http.scaladsl.model.headers.BasicHttpCredentials
 import akka.http.scaladsl.server._
 import net.manub.embeddedkafka.Codecs._
 import net.scalytica.kafka.wsproxy.auth.AccessToken
-import net.scalytica.kafka.wsproxy.web.SocketProtocol.AvroPayload
 import net.scalytica.kafka.wsproxy.models.Formats.{
   AvroType,
   LongType,
@@ -17,6 +16,7 @@ import net.scalytica.kafka.wsproxy.models.{
   ConsumerValueRecord,
   TopicName
 }
+import net.scalytica.kafka.wsproxy.web.SocketProtocol.AvroPayload
 import net.scalytica.test._
 import org.scalatest.Inspectors.forAll
 import org.scalatest.concurrent.ScalaFutures
@@ -44,6 +44,8 @@ class WebSocketRoutesAvroSpec
 
   import TestServerRoutes.{serverErrorHandler, serverRejectionHandler}
 
+  override protected val testTopicPrefix: String = "avro-test-topic"
+
   private[this] def verifyTestKeyAndAlbum(
       testKey: TestKey,
       album: Album,
@@ -59,11 +61,34 @@ class WebSocketRoutesAvroSpec
     }
   }
 
-  private[this] var topicCounter = 0
+  private[this] def testRequiredQueryParamReject(
+      useClientId: Boolean = true,
+      useTopicName: Boolean = true,
+      useValType: Boolean = true
+  )(implicit ctx: ProducerContext): Assertion = {
+    implicit val wsClient = ctx.producerProbe
 
-  private[this] def nextTopic: String = {
-    topicCounter = topicCounter + 1
-    s"avro-test-topic-$topicCounter"
+    val cid = producerClientId("avro", topicCounter)
+
+    val messages = createAvroProducerRecordAvroAvro(1)
+
+    val uri = buildProducerUri(
+      clientId = if (useClientId) Some(cid) else None,
+      topicName = if (useTopicName) Some(ctx.topicName) else None,
+      payloadType = Some(AvroPayload),
+      keyType = Some(AvroType),
+      valType = if (useValType) Some(AvroType) else None
+    )
+
+    produceAndCheckAvro(
+      clientId = cid,
+      topic = ctx.topicName,
+      routes = Route.seal(ctx.route),
+      keyType = Some(AvroType),
+      valType = AvroType,
+      messages = messages,
+      producerUri = Some(uri)
+    )
   }
 
   "Using Avro payloads with WebSockets" when {
@@ -71,28 +96,13 @@ class WebSocketRoutesAvroSpec
     "the server routes" should {
 
       "reject producer connection when the required clientId is not set" in
-        plainProducerContext(nextTopic) { ctx =>
-          implicit val wsClient = ctx.producerProbe
+        plainProducerContext(nextTopic) { implicit ctx =>
+          testRequiredQueryParamReject(useClientId = false)
+        }
 
-          val messages = createAvroProducerRecordAvroAvro(1)
-
-          produceAndCheckAvro(
-            clientId = producerClientId("avro", topicCounter),
-            topic = ctx.topicName,
-            routes = Route.seal(ctx.route),
-            keyType = Some(AvroType),
-            valType = AvroType,
-            messages = messages,
-            producerUri = Some(
-              buildProducerUri(
-                clientId = None,
-                topicName = Some(ctx.topicName),
-                payloadType = Some(AvroPayload),
-                keyType = Some(AvroType),
-                valType = Some(AvroType)
-              )
-            )
-          )
+      "reject producer connection when the required topic is not set" in
+        plainProducerContext(nextTopic) { implicit ctx =>
+          testRequiredQueryParamReject(useTopicName = false)
         }
 
       "produce messages with Avro key and value" in

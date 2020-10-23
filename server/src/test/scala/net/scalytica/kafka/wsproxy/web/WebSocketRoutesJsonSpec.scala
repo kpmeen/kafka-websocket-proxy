@@ -4,11 +4,12 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.testkit.{RouteTestTimeout, WSProbe}
 import net.manub.embeddedkafka.Codecs.stringDeserializer
-import net.scalytica.kafka.wsproxy.models.Formats.{NoType, StringType}
+import net.scalytica.kafka.wsproxy.models.Formats.{JsonType, NoType, StringType}
 import net.scalytica.kafka.wsproxy.models.TopicName
+import net.scalytica.kafka.wsproxy.web.SocketProtocol.JsonPayload
 import net.scalytica.test._
 import org.scalatest.Inspectors.forAll
-import org.scalatest.OptionValues
+import org.scalatest.{Assertion, OptionValues}
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Minutes, Span}
 import org.scalatest.wordspec.AnyWordSpec
@@ -31,16 +32,51 @@ class WebSocketRoutesJsonSpec
 
   import TestServerRoutes.{serverErrorHandler, serverRejectionHandler}
 
-  private[this] var topicCounter = 0
+  override protected val testTopicPrefix: String = "json-test-topic"
 
-  private[this] def nextTopic: String = {
-    topicCounter = topicCounter + 1
-    s"json-test-topic-$topicCounter"
+  private[this] def testRequiredQueryParamReject(
+      useClientId: Boolean = true,
+      useTopicName: Boolean = true,
+      useValType: Boolean = true
+  )(implicit ctx: ProducerContext): Assertion = {
+    implicit val wsClient = ctx.producerProbe
+
+    val cid = producerClientId("avro", topicCounter)
+
+    val messages = createJsonKeyValue(1)
+
+    val uri = buildProducerUri(
+      clientId = if (useClientId) Some(cid) else None,
+      topicName = if (useTopicName) Some(ctx.topicName) else None,
+      payloadType = Some(JsonPayload),
+      keyType = Some(JsonType),
+      valType = if (useValType) Some(JsonType) else None
+    )
+
+    produceAndCheckJson(
+      clientId = cid,
+      topic = ctx.topicName,
+      routes = Route.seal(ctx.route),
+      keyType = JsonType,
+      valType = JsonType,
+      messages = messages,
+      producerUri = Some(uri)
+    )
   }
 
   "Using JSON payloads with WebSockets" when {
 
     "the server routes" should {
+
+      "reject producer connection when the required clientId is not set" in
+        plainProducerContext(nextTopic) { implicit ctx =>
+          testRequiredQueryParamReject(useClientId = false)
+        }
+
+      "reject producer connection when the required topic is not set" in
+        plainProducerContext(nextTopic) { implicit ctx =>
+          testRequiredQueryParamReject(useTopicName = false)
+        }
 
       "produce messages with String key and value" in
         plainProducerContext(nextTopic) { ctx =>

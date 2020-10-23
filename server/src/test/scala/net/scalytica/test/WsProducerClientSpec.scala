@@ -1,5 +1,6 @@
 package net.scalytica.test
 
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.headers.{BasicHttpCredentials, HttpCredentials}
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.WSProbe
@@ -13,7 +14,7 @@ import net.scalytica.kafka.wsproxy.web.SocketProtocol.{
   SocketPayload
 }
 import org.scalatest.Inspectors.forAll
-import org.scalatest.Suite
+import org.scalatest.{Assertion, Suite}
 
 trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
 
@@ -21,6 +22,15 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
     WsClientId(
       s"$prefix-producer-client-$topicNum"
     )
+
+  protected def testTopicPrefix: String
+
+  protected var topicCounter: Int = 0
+
+  protected def nextTopic: String = {
+    topicCounter = topicCounter + 1
+    s"$testTopicPrefix-$topicCounter"
+  }
 
   def buildProducerUri(
       clientId: Option[WsClientId],
@@ -37,9 +47,14 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
 
     val args = List(cidArg, topicArg, payloadArg, keyArg, valArg)
       .filterNot(_.isEmpty)
+      .collect { case Some(arg) => arg }
       .mkString("", "&", "")
 
     s"/socket/in?$args"
+  }
+
+  private[this] def validProducerUrl(uri: String): Boolean = {
+    uri.contains("clientId") && uri.contains("topic")
   }
 
   def baseProducerUri(
@@ -58,6 +73,7 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
     if (keyType != NoType) baseUri + s"&keyType=${keyType.name}" else baseUri
   }
 
+  // scalastyle:off
   def produceAndCheckJson(
       clientId: WsClientId,
       topic: TopicName,
@@ -67,14 +83,17 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
       messages: Seq[String],
       validateMessageId: Boolean = false,
       kafkaCreds: Option[BasicHttpCredentials] = None,
-      creds: Option[HttpCredentials] = None
-  )(implicit wsClient: WSProbe): Unit = {
-    val uri = baseProducerUri(
-      clientId = clientId,
-      topicName = topic,
-      keyType = keyType,
-      valType = valType
-    )
+      creds: Option[HttpCredentials] = None,
+      producerUri: Option[String] = None
+  )(implicit wsClient: WSProbe): Assertion = {
+    val uri = producerUri.getOrElse {
+      baseProducerUri(
+        clientId = clientId,
+        topicName = topic,
+        keyType = keyType,
+        valType = valType
+      )
+    }
 
     checkWebSocket(
       uri = uri,
@@ -82,18 +101,23 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
       kafkaCreds = kafkaCreds,
       creds = creds
     ) {
-      isWebSocketUpgrade mustBe true
+      if (validProducerUrl(uri)) {
+        isWebSocketUpgrade mustBe true
 
-      forAll(messages) { msg =>
-        wsClient.sendMessage(msg)
-        wsClient.expectWsProducerResultJson(topic, validateMessageId)
+        forAll(messages) { msg =>
+          wsClient.sendMessage(msg)
+          wsClient.expectWsProducerResultJson(topic, validateMessageId)
+        }
+        wsClient.sendCompletion()
+        wsClient.expectCompletion()
+        wsClient.succeed
+      } else {
+        isWebSocketUpgrade mustBe false
+        status mustBe StatusCodes.NotFound
       }
-      wsClient.sendCompletion()
-      wsClient.expectCompletion()
     }
   }
 
-  // scalastyle:off
   def produceAndCheckAvro(
       clientId: WsClientId,
       topic: TopicName,
@@ -106,9 +130,9 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
       creds: Option[HttpCredentials] = None,
       producerUri: Option[String] = None
   )(
-      implicit producerProbe: WSProbe
-  ): Unit = {
-    val baseUri = producerUri.getOrElse {
+      implicit wsClient: WSProbe
+  ): Assertion = {
+    val uri = producerUri.getOrElse {
       baseProducerUri(
         clientId = clientId,
         topicName = topic,
@@ -119,20 +143,26 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
     }
 
     checkWebSocket(
-      uri = baseUri,
+      uri = uri,
       routes = routes,
       kafkaCreds = kafkaCreds,
       creds = creds
     ) {
-      isWebSocketUpgrade mustBe true
+      if (validProducerUrl(uri)) {
+        isWebSocketUpgrade mustBe true
 
-      forAll(messages) { msg =>
-        val bytes = avroProducerRecordSerde.serialize(msg)
-        producerProbe.sendMessage(ByteString(bytes))
-        producerProbe.expectWsProducerResultAvro(topic, validateMessageId)
+        forAll(messages) { msg =>
+          val bytes = avroProducerRecordSerde.serialize(msg)
+          wsClient.sendMessage(ByteString(bytes))
+          wsClient.expectWsProducerResultAvro(topic, validateMessageId)
+        }
+        wsClient.sendCompletion()
+        wsClient.expectCompletion()
+        wsClient.succeed
+      } else {
+        isWebSocketUpgrade mustBe false
+        status mustBe StatusCodes.NotFound
       }
-      producerProbe.sendCompletion()
-      producerProbe.expectCompletion()
     }
   }
   // scalastyle:on

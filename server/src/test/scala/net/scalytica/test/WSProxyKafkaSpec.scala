@@ -812,7 +812,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
             numMessages,
             withHeaders
           )
-          produceAndCheckAvro(
+          val _ = produceAndCheckAvro(
             clientId = clientId,
             topic = pctx.topicName,
             routes = pctx.route,
@@ -830,7 +830,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
             withHeaders = withHeaders,
             numMessages = numMessages
           )
-          produceAndCheckJson(
+          val _ = produceAndCheckJson(
             clientId = clientId,
             topic = pctx.topicName,
             keyType = keyType.getOrElse(NoType),
