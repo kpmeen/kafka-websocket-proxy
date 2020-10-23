@@ -101,7 +101,7 @@ services:
 #      WSPROXY_SSL_PORT: 8078
 #      WSPROXY_SSL_KEYSTORE_LOCATION: /etc/kafka/secrets/broker1.keystore.jks
 #      WSPROXY_SSL_KEYSTORE_PASS: scalytica
-      WSPROXY_KAFKA_BOOTSTRAP_URLS: broker1:9094
+      WSPROXY_KAFKA_BOOTSTRAP_HOSTS: broker1:9094
       WSPROXY_SCHEMA_REGISTRY_URL: http://schema-registry:8081
       # The session state replication factor must not be larger than the total
       # number of running kafka brokers. In this compose that is 1.
