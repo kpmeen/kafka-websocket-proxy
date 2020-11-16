@@ -63,6 +63,9 @@ publish docker containers:
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN registry.gitlab.com
     - docker login -u kpmeen -p $DOCKERHUB_TOKEN
     - sbt docker:publish
+  dependencies:
+    - check style and formatting
+    - run test suites
   rules:
     - if: '$CI_COMMIT_BRANCH || $CI_COMMIT_TAG'
       when: always
