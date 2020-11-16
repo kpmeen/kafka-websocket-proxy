@@ -22,10 +22,17 @@ import scala.concurrent.Future
 
 package object wsproxy {
 
-  val ProducerInterceptorClass =
+  val SaslJaasConfig: String = "sasl.jaas.config"
+
+  // scalastyle:off
+  val PlainLogin = (uname: String, pass: String) =>
+    s"""org.apache.kafka.common.security.plain.PlainLoginModule required username="$uname" password="$pass";"""
+  // scalastyle:on
+
+  val ProducerInterceptorClass: String =
     classOf[MonitoringProducerInterceptor[_, _]].getName
 
-  val ConsumerInterceptorClass =
+  val ConsumerInterceptorClass: String =
     classOf[MonitoringConsumerInterceptor[_, _]].getName
 
   def monitoringProperties(

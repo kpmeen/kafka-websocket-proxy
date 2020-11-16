@@ -1,5 +1,6 @@
 package net.scalytica.kafka.wsproxy.session
 
+import akka.Done
 import akka.actor.typed.scaladsl.AskPattern._
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.scaladsl.adapter._
@@ -7,14 +8,15 @@ import akka.actor.typed.{ActorRef, Behavior, Scheduler}
 import akka.kafka.scaladsl.Consumer
 import akka.stream.scaladsl.{RunnableGraph, Sink}
 import akka.util.Timeout
-import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
+import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.jmx.WsProxyJmxRegistrar
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models.{WsClientId, WsGroupId, WsServerId}
 import net.scalytica.kafka.wsproxy.session.Session.SessionOpResult
 import net.scalytica.kafka.wsproxy.session.SessionHandlerProtocol._
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
  * Encapsulates the communication protocol to use with the [[SessionHandler]]
@@ -53,7 +55,8 @@ object SessionHandlerProtocol {
       replyTo: ActorRef[Option[Session]]
   ) extends ClientSessionProtocol
 
-  case object Stop extends ClientSessionProtocol
+  case class Stop(replyTo: ActorRef[Session.SessionOpResult])
+      extends ClientSessionProtocol
 
   /** Sub-protocol only to be used by the Kafka consumer */
   sealed private[session] trait InternalProtocol extends Protocol
@@ -97,16 +100,35 @@ object SessionHandler extends SessionHandler {
         clientId: WsClientId,
         serverId: WsServerId
     )(
-        implicit timeout: Timeout,
+        implicit ec: ExecutionContext,
+        timeout: Timeout,
         scheduler: Scheduler
     ): Future[SessionOpResult] = {
-      sh.ask[SessionOpResult] { ref =>
+      def add() = sh.ask[SessionOpResult] { ref =>
         SessionHandlerProtocol.AddConsumer(
           groupId = groupId,
           consumerId = clientId,
           serverId = serverId,
           replyTo = ref
         )
+      }
+
+      WsProxyJmxRegistrar.findConsumerClientMBean(clientId, groupId) match {
+        case Some(_) =>
+          // Let the add logic pan out as normal, and fail if the consumer
+          // is already registered.
+          add()
+
+        case None =>
+          // There is no MBean registered, meaning there should be no consumer
+          // registered in the session. Just in case, we trigger a removal to
+          // avoid not being able to connect the consumer after an unexpected
+          // disconnect.
+          for {
+            _      <- removeConsumer(groupId, clientId)
+            addRes <- add()
+          } yield addRes
+
       }
     }
 
@@ -116,6 +138,15 @@ object SessionHandler extends SessionHandler {
     ): Future[SessionOpResult] = {
       sh.ask[SessionOpResult] { ref =>
         SessionHandlerProtocol.RemoveConsumer(groupId, clientId, ref)
+      }
+    }
+
+    def sessionShutdown()(
+        implicit timeout: Timeout,
+        scheduler: Scheduler
+    ): Future[SessionOpResult] = {
+      sh.ask[SessionOpResult] { ref =>
+        SessionHandlerProtocol.Stop(ref)
       }
     }
 
@@ -178,7 +209,7 @@ trait SessionHandler extends WithProxyLogger {
    * @param cfg
    *   implicit [[AppCfg]] to use
    * @param sys
-   *   the untyped [[akka.actor.ActorSystem]] to use
+   *   the untyped / classic [[akka.actor.ActorSystem]] to use
    * @return
    *   a [[SessionHandler.SessionHandlerRef]] containing a reference to the
    *   [[RunnableGraph]] that executes the [[SessionDataConsumer]] stream. And a
@@ -191,46 +222,42 @@ trait SessionHandler extends WithProxyLogger {
   ): SessionHandler.SessionHandlerRef = {
     implicit val typedSys = sys.toTyped
 
-    val handlerName = s"session-handler-actor-${cfg.server.serverId.value}"
-    logger.debug(s"Initialising session handler $handlerName...")
+    val name = s"session-handler-actor-${cfg.server.serverId.value}"
+    logger.debug(s"Initialising session handler $name...")
 
     val admin = new WsKafkaAdminClient(cfg)
     try {
       val ready = admin.clusterReady
       if (ready) admin.initSessionStateTopic()
       else {
-        logger.error("Could not reach Kafka cluster. Terminating service!")
+        logger.error("Could not reach Kafka cluster. Terminating application!")
         System.exit(1)
       }
     } finally {
       admin.close()
     }
 
-    val ref =
-      sys.spawn(sessionHandler, handlerName)
+    val ref = sys.spawn(sessionHandler, name)
 
-    logger.debug(
-      s"Starting session state consumer for server id $handlerName..."
-    )
+    logger.debug(s"Starting session state consumer for server id $name...")
 
     val consumer = new SessionDataConsumer()
 
     val consumerStream: RunnableGraph[Consumer.Control] =
-      consumer.sessionStateSource.to(Sink.foreach {
-        case ip: InternalProtocol =>
-          logger.debug(s"Consumed message: $ip")
-          ref ! ip
+      consumer.sessionStateSource.to {
+        Sink.foreach {
+          case ip: InternalProtocol =>
+            logger.debug(s"Consumed message: $ip")
+            ref ! ip
 
-        case _ => ()
-      })
+          case _ => ()
+        }
+      }
 
     SessionHandler.SessionHandlerRef(consumerStream, ref)
   }
 
-  // scalastyle:off method.length cyclomatic.complexity
   protected def sessionHandler(implicit cfg: AppCfg): Behavior[Protocol] = {
-    val serverId = cfg.server.serverId
-
     Behaviors.setup { implicit ctx =>
       implicit val sys = ctx.system
       implicit val ec  = sys.executionContext
@@ -238,135 +265,204 @@ trait SessionHandler extends WithProxyLogger {
       logger.debug("Initialising session data producer...")
       implicit val producer = new SessionDataProducer()
 
-      def behavior(
-          active: ActiveSessions = ActiveSessions()
-      ): Behavior[Protocol] =
-        Behaviors.receiveMessage {
-          case csp: ClientSessionProtocol =>
-            csp match {
-              case InitSession(gid, limit, replyTo) =>
-                logger.debug(
-                  s"INIT_SESSION: initialise session ${gid.value} " +
-                    s"with limit $limit"
-                )
-                active.find(gid) match {
-                  case Some(s) =>
-                    logger.debug(
-                      s"INIT_SESSION: session ${gid.value} already initialised."
-                    )
-                    replyTo ! Session.SessionInitialised(s)
-                    Behaviors.same
-
-                  case None =>
-                    val s = Session(gid, limit)
-                    producer.publish(s).map { _ =>
-                      logger.debug(
-                        s"INIT_SESSION: session ${gid.value} initialised."
-                      )
-                      replyTo ! Session.SessionInitialised(s)
-                    }
-                    active
-                      .add(s)
-                      .map(as => behavior(as))
-                      .getOrElse(Behaviors.same)
-                }
-
-              case AddConsumer(gid, cid, sid, replyTo) =>
-                logger.debug(
-                  s"ADD_CONSUMER: add consumer ${cid.value} connected to " +
-                    s"server ${sid.value} to session ${gid.value}..."
-                )
-                active.find(gid) match {
-                  case None =>
-                    logger.debug(
-                      s"ADD_CONSUMER: session ${gid.value} was not found."
-                    )
-                    replyTo ! Session.SessionNotFound(gid)
-                    Behaviors.same
-
-                  case Some(session) =>
-                    session.addConsumer(cid, sid) match {
-                      case added @ Session.ConsumerAdded(s) =>
-                        producer.publish(s).map { _ =>
-                          logger.debug(
-                            s"ADD_CONSUMER: consumer ${cid.value} added to" +
-                              s" session ${gid.value}"
-                          )
-                          replyTo ! added
-                        }
-                        Behaviors.same
-
-                      case notAdded =>
-                        logger.debug(
-                          s"ADD_CONSUMER: session op result for ${gid.value}:" +
-                            s" ${notAdded.asString}"
-                        )
-                        replyTo ! notAdded
-                        Behaviors.same
-                    }
-                }
-
-              case RemoveConsumer(gid, cid, replyTo) =>
-                logger.debug(
-                  s"REMOVE_CONSUMER: remove consumer ${cid.value} from " +
-                    s"session ${gid.value} on server..."
-                )
-                active.find(gid) match {
-                  case None =>
-                    logger.debug(
-                      s"REMOVE_CONSUMER: session ${gid.value} was not found"
-                    )
-                    replyTo ! Session.SessionNotFound(gid)
-                    Behaviors.same
-
-                  case Some(session) =>
-                    session.removeConsumer(cid) match {
-                      case removed @ Session.ConsumerRemoved(s) =>
-                        producer.publish(s).map { _ =>
-                          logger.debug(
-                            s"REMOVE_CONSUMER: consumer ${cid.value} removed " +
-                              s"from session ${gid.value}"
-                          )
-                          replyTo ! removed
-                        }
-                        Behaviors.same
-
-                      case notRemoved =>
-                        logger.debug(
-                          "REMOVE_CONSUMER: session op result " +
-                            s"for ${gid.value}: ${notRemoved.asString}"
-                        )
-                        replyTo ! notRemoved
-                        Behaviors.same
-                    }
-                }
-
-              case GetSession(gid, replyTo) =>
-                replyTo ! active.find(gid)
-                Behaviors.same
-
-              case Stop =>
-                logger.debug(
-                  s"STOP: stopping session handler for server ${serverId.value}"
-                )
-                Behaviors.stopped
-            }
-
-          case ip: InternalProtocol =>
-            ip match {
-              case UpdateSession(gid, s) =>
-                logger.debug(s"INTERNAL: Updating session ${gid.value}...")
-                nextOrSame(active.updateSession(gid, s))(behavior)
-
-              case RemoveSession(gid) =>
-                logger.debug(s"INTERNAL: Removing session ${gid.value}..")
-                nextOrSame(active.removeSession(gid))(behavior)
-            }
-        }
-
       behavior()
     }
   }
 
-  // scalastyle:on
+  private[this] def behavior(
+      active: ActiveSessions = ActiveSessions()
+  )(
+      implicit ec: ExecutionContext,
+      cfg: AppCfg,
+      producer: SessionDataProducer
+  ): Behavior[Protocol] = {
+    Behaviors.receiveMessage {
+      case c: ClientSessionProtocol => clientSessionProtocolHandler(active, c)
+      case i: InternalProtocol      => internalProtocolHandler(active, i)
+    }
+  }
+
+  private[this] def clientSessionProtocolHandler(
+      active: ActiveSessions,
+      csp: ClientSessionProtocol
+  )(
+      implicit ec: ExecutionContext,
+      cfg: AppCfg,
+      producer: SessionDataProducer
+  ): Behavior[Protocol] = {
+    val serverId = cfg.server.serverId
+
+    csp match {
+      case is: InitSession    => initSessionHandler(active, is)
+      case ac: AddConsumer    => addConsumerHandler(active, ac)
+      case rc: RemoveConsumer => removeConsumerHandler(active, rc)
+      case gs: GetSession     => getSessionHandler(active, gs)
+      case Stop(replyTo) =>
+        Future
+          .sequence {
+            active.removeConsumersFromServerId(serverId).sessions.map {
+              case (gid, s) =>
+                producer.publish(s).map { _ =>
+                  logger.debug(
+                    "REMOVE_CONSUMER: consumers connected to server " +
+                      s"${serverId.value} removed from session ${gid.value}"
+                  )
+                  Done
+                }
+            }
+          }
+          .map { _ =>
+            replyTo ! Session.ConsumersForServerRemoved
+          }
+        logger.debug(
+          s"STOP: stopping session handler for server ${serverId.value}"
+        )
+        Behaviors.stopped
+    }
+  }
+
+  private[this] def initSessionHandler(
+      active: ActiveSessions,
+      is: InitSession
+  )(
+      implicit ec: ExecutionContext,
+      cfg: AppCfg,
+      producer: SessionDataProducer
+  ): Behavior[Protocol] = {
+    logger.debug(
+      s"INIT_SESSION: initialise session ${is.groupId.value} " +
+        s"with limit ${is.consumerLimit}"
+    )
+    active.find(is.groupId) match {
+      case Some(s) =>
+        logger.debug(
+          s"INIT_SESSION: session ${is.groupId.value} already initialised."
+        )
+        is.replyTo ! Session.SessionInitialised(s)
+        Behaviors.same
+
+      case None =>
+        val s = Session(is.groupId, is.consumerLimit)
+        producer.publish(s).map { _ =>
+          logger.debug(
+            s"INIT_SESSION: session ${is.groupId.value} initialised."
+          )
+          is.replyTo ! Session.SessionInitialised(s)
+        }
+        active.add(s).map(as => behavior(as)).getOrElse(Behaviors.same)
+    }
+  }
+
+  private[this] def addConsumerHandler(
+      active: ActiveSessions,
+      ac: AddConsumer
+  )(
+      implicit ec: ExecutionContext,
+      producer: SessionDataProducer
+  ): Behavior[Protocol] = {
+    logger.debug(
+      s"ADD_CONSUMER: adding consumer ${ac.consumerId.value} connected to " +
+        s"server ${ac.serverId.value} to session ${ac.groupId.value}..."
+    )
+    active.find(ac.groupId) match {
+      case None =>
+        logger.debug(
+          s"ADD_CONSUMER: session ${ac.groupId.value} was not found."
+        )
+        ac.replyTo ! Session.SessionNotFound(ac.groupId)
+        Behaviors.same
+
+      case Some(session) =>
+        session.addConsumer(ac.consumerId, ac.serverId) match {
+          case added @ Session.ConsumerAdded(s) =>
+            producer.publish(s).map { _ =>
+              logger.debug(
+                s"ADD_CONSUMER: consumer ${ac.consumerId.value} added to " +
+                  s"session ${ac.groupId.value} from instance " +
+                  s"${ac.serverId.value}"
+              )
+              ac.replyTo ! added
+            }
+            Behaviors.same
+
+          case notAdded =>
+            logger.debug(
+              s"ADD_CONSUMER: session op result for session " +
+                s"${ac.groupId.value} trying to add consumer " +
+                s"${ac.consumerId.value} on instance ${ac.serverId.value}: " +
+                s"${notAdded.asString}"
+            )
+            ac.replyTo ! notAdded
+            Behaviors.same
+        }
+    }
+  }
+
+  private[this] def removeConsumerHandler(
+      active: ActiveSessions,
+      rc: RemoveConsumer
+  )(
+      implicit ec: ExecutionContext,
+      producer: SessionDataProducer
+  ): Behavior[Protocol] = {
+    logger.debug(
+      s"REMOVE_CONSUMER: remove consumer ${rc.consumerId.value} from " +
+        s"session ${rc.groupId.value} on server..."
+    )
+    active.find(rc.groupId) match {
+      case None =>
+        logger.debug(
+          s"REMOVE_CONSUMER: session ${rc.groupId.value} was not found"
+        )
+        rc.replyTo ! Session.SessionNotFound(rc.groupId)
+        Behaviors.same
+
+      case Some(session) =>
+        session.removeConsumer(rc.consumerId) match {
+          case removed @ Session.ConsumerRemoved(s) =>
+            producer.publish(s).map { _ =>
+              logger.debug(
+                s"REMOVE_CONSUMER: consumer ${rc.consumerId.value} removed " +
+                  s"from session ${rc.groupId.value}"
+              )
+              rc.replyTo ! removed
+            }
+            Behaviors.same
+
+          case notRemoved =>
+            logger.debug(
+              "REMOVE_CONSUMER: session op result " +
+                s"for ${rc.groupId.value}: ${notRemoved.asString}"
+            )
+            rc.replyTo ! notRemoved
+            Behaviors.same
+        }
+    }
+  }
+
+  private[this] def getSessionHandler(
+      active: ActiveSessions,
+      gs: GetSession
+  ): Behavior[Protocol] = {
+    gs.replyTo ! active.find(gs.groupId)
+    Behaviors.same
+  }
+
+  private[this] def internalProtocolHandler(
+      active: ActiveSessions,
+      ip: InternalProtocol
+  )(
+      implicit ec: ExecutionContext,
+      cfg: AppCfg,
+      producer: SessionDataProducer
+  ) = ip match {
+    case UpdateSession(gid, s) =>
+      logger.debug(s"INTERNAL: Updating session ${gid.value}...")
+      nextOrSame(active.updateSession(gid, s))(behavior)
+
+    case RemoveSession(gid) =>
+      logger.debug(s"INTERNAL: Removing session ${gid.value}..")
+      nextOrSame(active.removeSession(gid))(behavior)
+  }
+
 }

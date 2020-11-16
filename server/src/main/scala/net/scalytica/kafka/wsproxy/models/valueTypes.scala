@@ -5,7 +5,7 @@ case class WsGroupId(value: String)
 object WsGroupId {
 
   def fromOption(mgid: Option[WsGroupId])(or: WsClientId): WsGroupId =
-    mgid.getOrElse(WsGroupId(s"$or-group"))
+    mgid.getOrElse(WsGroupId(s"${or.value}-group"))
 
 }
 

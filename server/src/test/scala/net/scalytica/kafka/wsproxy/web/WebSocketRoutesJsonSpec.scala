@@ -355,7 +355,7 @@ class WebSocketRoutesJsonSpec
           val rejectionMsg =
             s"WebSocket for consumer json-test-$topicCounter in session " +
               s"json-test-group-$topicCounter not established because a" +
-              " consumer with the same ID is already registered"
+              " consumer with the same ID is already registered."
 
           val out = "/socket/out?" +
             s"clientId=json-test-$topicCounter" +

@@ -1,7 +1,11 @@
 import com.typesafe.sbt.SbtGit
 import com.typesafe.sbt.packager.Keys._
-import com.typesafe.sbt.packager.docker.{Cmd, DockerAlias}
 import com.typesafe.sbt.packager.docker.DockerPlugin.autoImport.Docker
+import com.typesafe.sbt.packager.docker.{Cmd, DockerAlias}
+import com.typesafe.sbt.packager.universal.UniversalPlugin.autoImport.Universal
+import net.scalytica.sbt.plugin.ExtLibTaskPlugin
+import net.scalytica.sbt.plugin.ExtLibTaskPlugin.autoImport._
+import net.scalytica.sbt.plugin.PrometheusConfigPlugin.autoImport._
 import org.scalafmt.sbt.ScalafmtPlugin.autoImport.scalafmtOnCompile
 import sbt.Keys._
 import sbt.TestFrameworks.ScalaTest
@@ -62,7 +66,7 @@ object Settings {
     )),
     scalaVersion := Versions.ScalaVersion,
     scalacOptions := BaseScalacOpts ++ ExperimentalScalacOpts,
-    scalacOptions in Test ++= Seq("-Yrangepos"),
+    Test / scalacOptions ++= Seq("-Yrangepos"),
     // Require compilation against JDK 11.
     javacOptions ++= Seq("-source", "11", "-target", "11"),
     javaOptions ++= Seq(
@@ -138,14 +142,117 @@ object Settings {
       },
       dockerUpdateLatest := !isSnapshot.value,
       dockerBaseImage := "azul/zulu-openjdk-debian:11",
-      dockerExposedPorts in Docker := Seq(exposedPort),
+      Docker / dockerExposedPorts := Seq(exposedPort),
       dockerCommands := {
         val (front, back) = dockerCommands.value.splitAt(12)
-        val cmd = Cmd(
+        val aptCmd = Cmd(
           "RUN",
           "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y apt-utils curl"
         )
-        front ++ Seq(cmd) ++ back
+        front ++ Seq(aptCmd) ++ back
+      },
+      //----------------------------------------------------
+      // Extra file mappings to external libs and configs
+      //----------------------------------------------------
+      prometheusConfigFileTargetDir := target.value / externalLibsDirName.value,
+      Docker / stage := (
+        (Docker / stage) dependsOn (prometheusGenerate dependsOn retrieveExtLibs)
+      ).value,
+      Universal / mappings ++= {
+        externalJarFiles.value.map { ejf =>
+          ejf -> s"${externalLibsDirName.value}/${ejf.name}"
+        } ++ Seq(
+          prometheusConfigFile.value -> s"${externalLibsDirName.value}/${prometheusConfigFileName.value}"
+        )
+      },
+      //----------------------------------------------------
+      // enable JMX
+      //----------------------------------------------------
+      bashScriptExtraDefines += {
+        """addJava "-Dcom.sun.management.jmxremote """ +
+          """-Dcom.sun.management.jmxremote.authenticate=false """ +
+          """-Dcom.sun.management.jmxremote.ssl=false """ +
+          """-Dcom.sun.management.jmxremote.port=7776 """ +
+          """-Dcom.sun.management.jmxremote.local.only=true""""
+      },
+      //----------------------------------------------------
+      // Jolokia
+      //----------------------------------------------------
+      bashScriptExtraDefines ++= Seq(
+        """declare -a jolokia_enabled""",
+        """declare -a jolokia_config""",
+        "",
+        """if [[ "$ENABLE_JOLOKIA" == "true" ]]; then""",
+        """    jolokia_enabled=true;""",
+        """else""",
+        """    jolokia_enabled=false;""",
+        """fi""",
+        """# See: https://jolokia.org/reference/html/agents.html#agent-jvm-config""",
+        """if [[ -z "$JOLOKIA_CONFIG" ]]; then""",
+        """    jolokia_config="port=7777,host=localhost";""",
+        """else""",
+        """    jolokia_config=$JOLOKIA_CONFIG;""",
+        """fi""",
+        ""
+      ),
+      bashScriptExtraDefines ++= {
+        val ld =
+          s"${(Docker / defaultLinuxInstallLocation).value}/${externalLibsDirName.value}"
+        val jolokiaJar = ExtLibTaskPlugin.moduleIdToDestFileName(
+          Dependencies.Monitoring.JolokiaAgent
+        )
+        Seq(
+          """if [[ "$jolokia_enabled" == "true" ]]; then """,
+          s"""    addJava "-javaagent:$ld/$jolokiaJar=""" + """$jolokia_config";""",
+          """fi""",
+          ""
+        )
+      },
+      //----------------------------------------------------
+      // Prometheus JMX exporter
+      //----------------------------------------------------
+      bashScriptExtraDefines ++= {
+        val promCfg =
+          s"${(Docker / defaultLinuxInstallLocation).value}/" +
+            s"${externalLibsDirName.value}/" +
+            s"${prometheusConfigFileName.value}"
+        Seq(
+          """declare -a prometheus_exporter_enabled""",
+          """declare -a prometheus_exporter_port""",
+          """declare -a prometheus_exporter_config""",
+          "",
+          """if [[ "$ENABLE_PROMETHEUS_EXPORTER" == "true" ]]; then""",
+          """    prometheus_exporter_enabled=true;""",
+          """else""",
+          """    prometheus_exporter_enabled=false;""",
+          """fi""",
+          """if [[ -z "$PROMETHEUS_EXPORTER_PORT" ]]; then""",
+          """    prometheus_exporter_port="7778";""",
+          """else""",
+          """    prometheus_exporter_port=$PROMETHEUS_EXPORTER_PORT;""",
+          """fi""",
+          """if [[ -z "$PROMETHEUS_EXPORTER_CONFIG" ]]; then""",
+          s"""    prometheus_exporter_config=$promCfg;""",
+          """else""",
+          """    prometheus_exporter_config=$PROMETHEUS_EXPORTER_CONFIG;""",
+          """fi"""
+        )
+      },
+      bashScriptExtraDefines ++= {
+        val ld =
+          s"${(Docker / defaultLinuxInstallLocation).value}/${externalLibsDirName.value}"
+        val promJar = ExtLibTaskPlugin.moduleIdToDestFileName(
+          Dependencies.Monitoring.PrometheusAgent
+        )
+        val prometheusJar = s"$ld/$promJar"
+        Seq(
+          """if [[ "$prometheus_exporter_enabled" == "true" ]]; then """,
+          s"""    prometheus_arg="-javaagent:$prometheusJar""" + """=$prometheus_exporter_port:$prometheus_exporter_config";""",
+          """     echo "Setting prometheus agent arg: $prometheus_arg"""",
+          """     addJava $prometheus_arg""",
+          """fi""",
+          ""
+        )
       }
     )
 

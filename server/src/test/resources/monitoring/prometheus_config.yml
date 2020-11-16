@@ -1,0 +1,10 @@
+---
+
+ssl: false
+startDelaySeconds: 0
+#whitelistObjectNames: [
+#    "net.scalytica.kafka.wsproxy:*",
+#    "kafka.*"
+#]
+lowercaseOutputName: false
+lowercaseOutputLabelNames: false

@@ -3,24 +3,28 @@ package net.scalytica.kafka.wsproxy
 import akka.Done
 import akka.actor.CoordinatedShutdown
 import akka.actor.CoordinatedShutdown._
+import akka.actor.typed.scaladsl.adapter._
 import akka.http.scaladsl.Http
 import akka.stream.Materializer
+import akka.util.Timeout
+import net.scalytica.kafka.wsproxy.auth.OpenIdClient
+import net.scalytica.kafka.wsproxy.config.Configuration
 import net.scalytica.kafka.wsproxy.config.Configuration.{
   AppCfg,
   OpenIdConnectCfg
 }
-import net.scalytica.kafka.wsproxy.auth.OpenIdClient
-import net.scalytica.kafka.wsproxy.config.Configuration
-import net.scalytica.kafka.wsproxy.web.{ServerBindings, ServerRoutes}
+import net.scalytica.kafka.wsproxy.jmx.JmxManager
 import net.scalytica.kafka.wsproxy.logging.{
   WithProxyLogger,
   WsProxyEnvLoggerConfigurator
 }
 import net.scalytica.kafka.wsproxy.session.SessionHandler
+import net.scalytica.kafka.wsproxy.session.SessionHandler._
 import net.scalytica.kafka.wsproxy.utils.HostResolver.{
   resolveKafkaBootstrapHosts,
   HostResolutionError
 }
+import net.scalytica.kafka.wsproxy.web.{ServerBindings, ServerRoutes}
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
@@ -61,7 +65,6 @@ object Server
 
   WsProxyEnvLoggerConfigurator.load()
 
-  private[this] val evalOpt  = Future.successful(None)
   private[this] val evalDone = Future.successful(Done)
 
   val config = Configuration.loadTypesafeConfig()
@@ -93,6 +96,8 @@ object Server
     case oidc: OpenIdConnectCfg if oidc.enabled => OpenIdClient(cfg)
   }
 
+  implicit val jmxMngr = Option(JmxManager())
+
   implicit val sessionHandlerRef = SessionHandler.init
 
   private[this] val plainPort = cfg.server.port
@@ -115,23 +120,29 @@ object Server
     val cs = CoordinatedShutdown(classicSys)
 
     cs.addTask(PhaseServiceUnbind, "http-unbind") { () =>
+      logger.info("Gracefully terminating HTTP network bindings...")
       for {
-        _ <- ctrl.drainAndShutdown(
-               Future.successful(logger.info("Session data consumer shutdown."))
-             )
-        _ <- bindingPlain.map(_.flatMap(_.unbind())).getOrElse(evalOpt)
-        _ <- bindingSecure.map(_.flatMap(_.unbind())).getOrElse(evalOpt)
+        _ <- bindingPlain.map(unbindConnection).getOrElse(evalDone)
+        _ <- bindingSecure.map(unbindConnection).getOrElse(evalDone)
       } yield Done
     }
 
-    cs.addTask(PhaseServiceRequestsDone, "http-graceful-terminate") { () =>
-      /** Unbind from network interface and port, shutting down the server. */
-      bindingPlain.map(unbindConnection).getOrElse(evalDone)
-      bindingSecure.map(unbindConnection).getOrElse(evalDone)
+    cs.addTask(PhaseServiceStop, "http-shutdown-connection-pools") { () =>
+      logger.info("Shutting down HTTP connection pools...")
+      Http().shutdownAllConnectionPools().map(_ => Done)
     }
 
-    cs.addTask(PhaseServiceStop, "http-shutdown") { () =>
-      Http().shutdownAllConnectionPools().map(_ => Done)
+    cs.addTask(PhaseBeforeClusterShutdown, "session-cleanup-state") { () =>
+      implicit val timeout: Timeout = 10 seconds
+      implicit val typedScheduler   = classicSys.scheduler.toTyped
+      logger.info("Cleaning up session state...")
+      sessionHandlerRef.shRef.sessionShutdown().map(_ => Done)
+    }
+
+    cs.addTask(PhaseBeforeActorSystemTerminate, "session-consumer-shutdown") {
+      () =>
+        logger.info("Session data consumer shutting down...")
+        ctrl.drainAndShutdown(evalDone)
     }
 
     cs
