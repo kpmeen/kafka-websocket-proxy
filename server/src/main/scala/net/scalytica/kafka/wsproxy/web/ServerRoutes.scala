@@ -28,13 +28,8 @@ import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
 }
 import net.scalytica.kafka.wsproxy.codecs.Encoders.brokerInfoEncoder
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
-import net.scalytica.kafka.wsproxy.errors.{
-  AuthenticationError,
-  AuthorisationError,
-  InvalidPublicKeyError,
-  TopicNotFoundError
-}
-import net.scalytica.kafka.wsproxy.web.Headers.XKafkaAuthHeader
+import net.scalytica.kafka.wsproxy.errors._
+import net.scalytica.kafka.wsproxy.jmx.JmxManager
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models.{
   AclCredentials,
@@ -46,6 +41,7 @@ import net.scalytica.kafka.wsproxy.session.SessionHandler.{
   SessionHandlerOpExtensions,
   SessionHandlerRef
 }
+import net.scalytica.kafka.wsproxy.web.Headers.XKafkaAuthHeader
 import net.scalytica.kafka.wsproxy.web.websockets.{
   InboundWebSocket,
   OutboundWebSocket
@@ -223,6 +219,14 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
     }
   }
 
+  private[this] def notAuthenticatedRejection(
+      proxyError: ProxyError,
+      clientError: ClientError
+  ) = extractUri { uri =>
+    logger.info(s"Request to $uri could not be authenticated.", proxyError)
+    rejectAndComplete(jsonResponseMsg(clientError, proxyError.getMessage))
+  }
+
   implicit def serverErrorHandler: ExceptionHandler =
     ExceptionHandler {
       case t: TopicNotFoundError =>
@@ -232,22 +236,13 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
         }
 
       case a: InvalidPublicKeyError =>
-        extractUri { uri =>
-          logger.info(s"Request to $uri could not be authenticated.", a)
-          rejectAndComplete(jsonResponseMsg(Unauthorized, a.getMessage))
-        }
+        notAuthenticatedRejection(a, Unauthorized)
 
       case a: AuthenticationError =>
-        extractUri { uri =>
-          logger.info(s"Request to $uri could not be authenticated.", a)
-          rejectAndComplete(jsonResponseMsg(Unauthorized, a.getMessage))
-        }
+        notAuthenticatedRejection(a, Unauthorized)
 
       case a: AuthorisationError =>
-        extractUri { uri =>
-          logger.info(s"Request to $uri could not be authenticated.", a)
-          rejectAndComplete(jsonResponseMsg(Forbidden, a.message))
-        }
+        notAuthenticatedRejection(a, Forbidden)
 
       case k: KafkaException =>
         extractUri { uri =>
@@ -317,6 +312,8 @@ trait ServerRoutes
    *   Implicitly provided [[Materializer]]
    * @param ctx
    *   Implicitly provided [[ExecutionContext]]
+   * @param jmx
+   *   Implicitly provided optional [[JmxManager]]
    * @return
    *   a tuple containing a [[RunnableGraph]] and the [[Route]] definition
    */
@@ -326,7 +323,8 @@ trait ServerRoutes
       maybeOpenIdClient: Option[OpenIdClient],
       sys: ActorSystem,
       mat: Materializer,
-      ctx: ExecutionContext
+      ctx: ExecutionContext,
+      jmx: Option[JmxManager] = None
   ): (RunnableGraph[Consumer.Control], Route) = {
     sessionHandler = sessionHandlerRef // TODO: This mutation hurts my pride
     implicit val sh = sessionHandler.shRef
@@ -369,6 +367,7 @@ trait StatusRoutes { self: BaseRoutes =>
               complete {
                 val admin = new WsKafkaAdminClient(cfg)
                 try {
+                  logger.debug("Fetching Kafka cluster info...")
                   val ci = admin.clusterInfo
 
                   HttpResponse(

@@ -163,6 +163,7 @@ object Configuration extends WithProxyLogger {
   )
 
   final case class ServerSslCfg(
+      enabled: Boolean,
       sslOnly: Boolean,
       bindInterface: Option[String],
       port: Option[Int],
@@ -214,7 +215,7 @@ object Configuration extends WithProxyLogger {
       openidConnect: Option[OpenIdConnectCfg]
   ) {
 
-    def isSslEnabled: Boolean = ssl.isDefined
+    def isSslEnabled: Boolean = ssl.exists(_.enabled)
 
     def isPlainEnabled: Boolean = !ssl.exists(_.sslOnly)
 

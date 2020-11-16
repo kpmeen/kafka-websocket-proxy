@@ -1,8 +1,8 @@
 package net.scalytica.kafka.wsproxy.web.websockets
 
 import akka.actor.ActorSystem
-import akka.actor.typed.ActorRef
 import akka.actor.typed.scaladsl.adapter._
+import akka.actor.typed.{ActorRef, Scheduler}
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.{Route, ValidationRejection}
@@ -16,8 +16,7 @@ import io.circe.Encoder
 import io.circe.Printer.noSpaces
 import io.circe.parser.parse
 import io.circe.syntax._
-import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
-import net.scalytica.kafka.wsproxy.web.SocketProtocol.{AvroPayload, JsonPayload}
+import net.scalytica.kafka.wsproxy._
 import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
 import net.scalytica.kafka.wsproxy.codecs.Decoders._
 import net.scalytica.kafka.wsproxy.codecs.Encoders._
@@ -25,18 +24,16 @@ import net.scalytica.kafka.wsproxy.codecs.ProtocolSerdes.{
   avroCommitSerde,
   avroConsumerRecordSerde
 }
+import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.consumer.{CommitStackHandler, WsConsumer}
+import net.scalytica.kafka.wsproxy.jmx.JmxManager
+import net.scalytica.kafka.wsproxy.jmx.mbeans.ConsumerClientStatsProtocol._
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
-import net.scalytica.kafka.wsproxy.models.{
-  Formats,
-  OutSocketArgs,
-  WsCommit,
-  WsConsumerRecord
-}
+import net.scalytica.kafka.wsproxy.models._
 import net.scalytica.kafka.wsproxy.session.SessionHandler._
 import net.scalytica.kafka.wsproxy.session.{Session, SessionHandlerProtocol}
 import net.scalytica.kafka.wsproxy.streams.ProxyFlowExtras
-import net.scalytica.kafka.wsproxy._
+import net.scalytica.kafka.wsproxy.web.SocketProtocol.{AvroPayload, JsonPayload}
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
@@ -50,6 +47,40 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
     logger.error(message, t)
     throw t
   }
+
+  /** Prepare the session for a given client */
+  private[this] def initSessionForConsumer(
+      serverId: WsServerId,
+      groupId: WsGroupId,
+      clientId: WsClientId,
+      numPartitions: Int,
+      sh: ActorRef[SessionHandlerProtocol.Protocol]
+  )(
+      implicit ec: ExecutionContext,
+      scheduler: Scheduler
+  ) = {
+    for {
+      ir     <- sh.initSession(groupId, numPartitions)
+      _      <- logger.debugf(s"Session ${ir.session.consumerGroupId} ready.")
+      addRes <- sh.addConsumer(groupId, clientId, serverId)
+    } yield addRes
+  }
+
+  /** Setup the JMX flows for the websocket stream */
+  private[this] def prepareJmx(groupId: WsGroupId, clientId: WsClientId)(
+      implicit jmx: Option[JmxManager],
+      as: ActorSystem
+  ): ActorRef[ConsumerClientStatsCommand] = jmx
+    .map { implicit j =>
+      // Update the number of active consumer connections
+      j.addConsumerConnection()
+      // Init consumer client stats actor
+      j.initConsumerClientStatsActor(clientId, groupId)
+    }
+    .getOrElse {
+      implicit val tas = as.toTyped
+      tas.ignoreRef[ConsumerClientStatsCommand]
+    }
 
   // scalastyle:off method.length
   /**
@@ -66,6 +97,8 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
    * @param sessionHandler
    *   Implicitly provided typed [[ActorRef]] for the
    *   [[SessionHandlerProtocol.Protocol]]
+   * @param jmxManager
+   *   Implicitly provided optional [[JmxManager]]
    * @return
    *   a [[Route]] for accessing the outbound WebSocket functionality.
    */
@@ -76,7 +109,8 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
       as: ActorSystem,
       mat: Materializer,
       ec: ExecutionContext,
-      sessionHandler: ActorRef[SessionHandlerProtocol.Protocol]
+      sessionHandler: ActorRef[SessionHandlerProtocol.Protocol],
+      jmxManager: Option[JmxManager]
   ): Route = {
     logger.debug("Initialising outbound websocket")
 
@@ -89,27 +123,35 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
     val clientId = args.clientId
     val groupId  = args.groupId
 
-    val consumerAddResult = for {
-      ir     <- sessionHandler.initSession(groupId, topicPartitions)
-      _      <- logger.debugf(s"Session ${ir.session.consumerGroupId} ready.")
-      addRes <- sessionHandler.addConsumer(groupId, clientId, serverId)
-    } yield addRes
-
-    lazy val initSocket = () =>
-      prepareOutboundWebSocket(args) { () =>
-        sessionHandler.removeConsumer(groupId, clientId).map(_ => Done)
-      }
+    val consumerAddResult = initSessionForConsumer(
+      serverId = serverId,
+      groupId = groupId,
+      clientId = clientId,
+      numPartitions = topicPartitions,
+      sh = sessionHandler
+    )
 
     onSuccess(consumerAddResult) {
       case Session.ConsumerAdded(_) =>
-        initSocket()
+        prepareOutboundWebSocket(args) { () =>
+          // Decrease the number of active consumer connections.
+          jmxManager.foreach(_.removeConsumerConnection())
+          // Remove the consumer from the session handler
+          sessionHandler
+            .removeConsumer(groupId, clientId)
+            .map(_ => Done)
+            .recoverWith { case t: Throwable =>
+              logger.trace("Removal failed due to an error", t)
+              Future.successful(Done)
+            }
+        }
 
       case Session.ConsumerExists(_) =>
         reject(
           ValidationRejection(
             s"WebSocket for consumer ${clientId.value} in session " +
               s"${groupId.value} not established because a consumer with the" +
-              " same ID is already registered"
+              " same ID is already registered."
           )
         )
 
@@ -124,7 +166,7 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
       case Session.SessionNotFound(_) =>
         reject(
           ValidationRejection(
-            s"Could not find an active session for ${groupId.value}"
+            s"Could not find an active session for ${groupId.value}."
           )
         )
 
@@ -137,7 +179,7 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
           new InternalError(
             "An unexpected error occurred when trying to establish the " +
               s"WebSocket consumer ${clientId.value} in session" +
-              s" ${groupId.value}"
+              s" ${groupId.value}."
           )
         )
     }
@@ -159,6 +201,8 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
    *   the implicit [[Materializer]] to use
    * @param ec
    *   the implicit [[ExecutionContext]] to use
+   * @param jmxManager
+   *   Implicitly provided optional [[JmxManager]]
    * @return
    *   the WebSocket [[Route]]
    */
@@ -168,18 +212,26 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
       implicit cfg: AppCfg,
       as: ActorSystem,
       mat: Materializer,
-      ec: ExecutionContext
+      ec: ExecutionContext,
+      jmxManager: Option[JmxManager]
   ): Route = {
     val commitHandlerRef =
       if (args.autoCommit) None
       else Some(as.spawn(CommitStackHandler.commitStack, args.clientId.value))
 
+    implicit val statsActorRef = prepareJmx(args.groupId, args.clientId)
+
+    // Init monitoring flows
+    val jmxInFlow = jmxManager
+      .map(_.consumerStatsInboundWireTap(statsActorRef))
+      .getOrElse(Flow[WsCommit])
+
     val messageParser = args.socketPayload match {
-      case JsonPayload => jsonMessageToWsCommit
-      case AvroPayload => avroMessageToWsCommit
+      case JsonPayload => jsonMessageToWsCommit via jmxInFlow
+      case AvroPayload => avroMessageToWsCommit via jmxInFlow
     }
 
-    val sink   = prepareSink(messageParser, commitHandlerRef)
+    val sink   = prepareSink(args, messageParser, commitHandlerRef)
     val source = kafkaSource(args, commitHandlerRef)
 
     handleWebSocketMessages {
@@ -194,11 +246,20 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
           termination.onComplete {
             case scala.util.Success(_) =>
               m._2.drainAndShutdown(Future.successful(Done))
-              logger.info(s"Consumer client has disconnected.")
+              logger.info(
+                "Outbound WebSocket connect with clientId " +
+                  s"${args.clientId.value} for topic ${args.topic.value} has " +
+                  "been disconnected."
+              )
 
             case scala.util.Failure(e) =>
               m._2.drainAndShutdown(Future.successful(Done))
-              logger.error("Disconnection failure", e)
+              logger.error(
+                "Outbound WebSocket connection with clientId " +
+                  s"${args.clientId.value} for topic ${args.topic.value} has " +
+                  "been disconnected due to an unexpected error",
+                e
+              )
           }
         }
     }
@@ -213,6 +274,8 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
    *     representation of [[WsCommit]] messages. These are then passed on to an
    *     Actor with [[CommitStackHandler]] behaviour.
    *
+   * @param args
+   *   the [[OutSocketArgs]]
    * @param messageParser
    *   parser to use for decoding incoming messages.
    * @param aref
@@ -223,6 +286,7 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
    *   [[CommitStackHandler.commitStack]]
    */
   private[this] def prepareSink(
+      args: OutSocketArgs,
       messageParser: Flow[Message, WsCommit, NotUsed],
       aref: Option[ActorRef[CommitStackHandler.CommitProtocol]]
   ): Sink[Message, _] =
@@ -235,8 +299,13 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
               ref = ar,
               onCompleteMessage = CommitStackHandler.Stop,
               onFailureMessage = { t: Throwable =>
-                logger.error("An error occurred processing commit message", t)
-                CommitStackHandler.Continue
+                logger.error(
+                  "Commit stack handler encountered an error while processing" +
+                    s" commit message for client ${args.clientId.value} " +
+                    s"in group ${args.groupId.value}",
+                  t
+                )
+                CommitStackHandler.Terminate(t)
               }
             )
           )
@@ -305,21 +374,33 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
    *   the application configuration.
    * @param as
    *   the actor system to use.
+   * @param jmxManager
+   *   Implicitly provided optional [[JmxManager]]
+   * @param clientStatsActorRef
+   *   Implicitly provided ActorRef for an instance of
+   *   {{ConsumerClientStatsMXBeanActor}}
    * @return
    *   a [[Source]] producing [[TextMessage]] s for the outbound WebSocket.
    */
-  private[this] def kafkaSource(
+  private[this] def kafkaSource[K, V](
       args: OutSocketArgs,
       commitHandlerRef: Option[ActorRef[CommitStackHandler.CommitProtocol]]
   )(
       implicit cfg: AppCfg,
-      as: ActorSystem
+      as: ActorSystem,
+      jmxManager: Option[JmxManager],
+      clientStatsActorRef: ActorRef[ConsumerClientStatsCommand]
   ): Source[Message, Consumer.Control] = {
     val keyTpe = args.keyType.getOrElse(Formats.NoType)
     val valTpe = args.valType
 
     type Key = keyTpe.Aux
     type Val = valTpe.Aux
+
+    // Init monitoring flow
+    val jmxOutFlow = jmxManager
+      .map(_.consumerStatsOutboundWireTap[Key, Val](clientStatsActorRef))
+      .getOrElse(Flow[WsConsumerRecord[Key, Val]])
 
     // Kafka serdes
     implicit val keyDes = keyTpe.deserializer
@@ -337,6 +418,7 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
       WsConsumer
         .consumeAutoCommit[Key, Val](args)
         .map(cr => enrichWithFormatType(args, cr))
+        .via(jmxOutFlow)
         .map(cr => msgConverter(cr))
     } else {
       // if auto-commit is disabled, we need to ensure messages are sent to a
@@ -346,6 +428,7 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
       WsConsumer
         .consumeManualCommit[Key, Val](args)
         .map(cr => enrichWithFormatType(args, cr))
+        .via(jmxOutFlow)
         .alsoTo(sink) // also send each message to the commit handler sink
         .map(cr => msgConverter(cr))
     }

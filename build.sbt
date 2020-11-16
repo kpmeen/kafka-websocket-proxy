@@ -1,6 +1,10 @@
 import Dependencies._
 import Settings._
-import net.scalytica.sbt.plugin.DockerTasksPlugin
+import net.scalytica.sbt.plugin.{
+  DockerTasksPlugin,
+  ExtLibTaskPlugin,
+  PrometheusConfigPlugin
+}
 import sbtrelease.ReleaseStateTransformations._
 
 import scala.language.postfixOps
@@ -25,6 +29,7 @@ releaseProcess := Seq[ReleaseStep](
 Global / excludeLintKeys ++= Set(
   releaseProcess,
   packageDoc / publishArtifact,
+  server / externalJars,
   server / dockerRepository
 )
 
@@ -49,7 +54,13 @@ lazy val avro = (project in file("avro"))
   .settings(dependencyOverrides ++= Overrides.Deps: _*)
 
 lazy val server = (project in file("server"))
-  .enablePlugins(JavaServerAppPackaging, DockerPlugin)
+  .enablePlugins(
+    ExtLibTaskPlugin,
+    JavaServerAppPackaging,
+    DockerPlugin,
+    PrometheusConfigPlugin
+  )
+  .settings(externalJars := Dependencies.Monitoring.All)
   .settings(NoPublish)
   .settings(BaseSettings: _*)
   .settings(dockerSettings(8078))

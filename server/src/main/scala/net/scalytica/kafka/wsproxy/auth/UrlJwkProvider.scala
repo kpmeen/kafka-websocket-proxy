@@ -70,8 +70,17 @@ class UrlJwkProvider private[auth] (url: String, enforceHttps: Boolean = true)
                 .flatMap(_.asArray.map(_.toList))
                 .getOrElse(List.empty)
 
-              // TODO: Handle parsing error
-              jsObjs.map(js => js.as[Jwk]).collect { case Right(jwk) => jwk }
+              jsObjs
+                .map(js => js.as[Jwk])
+                .map {
+                  case ok @ Right(jwk) =>
+                    logger.trace(s"Successfully parsed JWK object $jwk")
+                    ok
+                  case ko @ Left(err) =>
+                    logger.error(s"Error parsing JWK object", err)
+                    ko
+                }
+                .collect { case Right(jwk) => jwk }
           }
         case _ =>
           logger.info("JWK config could not be found.")

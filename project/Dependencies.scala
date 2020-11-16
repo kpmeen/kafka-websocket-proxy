@@ -33,6 +33,9 @@ object Versions {
 
   val ScalaTestVersion = "3.2.2"
 
+  val JolokiaAgentVersion    = "1.6.2"
+  val PrometheusAgentVersion = "0.14.0"
+
   val GatlingVersion = "3.1.1"
 }
 
@@ -219,6 +222,17 @@ object Dependencies {
     val Slf4jNop       = "org.slf4j"      % "slf4j-nop"        % Slf4JVersion
 
     val All = Seq(ScalaLogging, Slf4j, Logback)
+  }
+
+  object Monitoring {
+
+    val JolokiaAgent =
+      "org.jolokia" % "jolokia-jvm" % JolokiaAgentVersion classifier "agent"
+
+    val PrometheusAgent =
+      "io.prometheus.jmx" % "jmx_prometheus_javaagent" % PrometheusAgentVersion
+
+    val All = Seq(JolokiaAgent, PrometheusAgent)
   }
 
   object Overrides {

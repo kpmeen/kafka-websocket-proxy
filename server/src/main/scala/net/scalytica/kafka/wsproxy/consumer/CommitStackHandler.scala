@@ -15,9 +15,10 @@ object CommitStackHandler {
 
   case class Stash(record: WsConsumerRecord[_, _])   extends CommitProtocol
   case class Commit(commit: WsCommit)                extends CommitProtocol
+  case class GetStack(sender: ActorRef[CommitStack]) extends CommitProtocol
   case object Continue                               extends CommitProtocol
   case object Stop                                   extends CommitProtocol
-  case class GetStack(sender: ActorRef[CommitStack]) extends CommitProtocol
+  case class Terminate(cause: Throwable)             extends CommitProtocol
 
   /** Behaviour initialising the message commit stack */
   def commitStack(
@@ -68,6 +69,10 @@ object CommitStackHandler {
 
         case Stop =>
           ctx.log.debug(s"Received stop message")
+          Behaviors.stopped
+
+        case Terminate(cause) =>
+          ctx.log.error("Terminating commit stack handler due to error", cause)
           Behaviors.stopped
       }
     }

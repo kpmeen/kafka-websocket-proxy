@@ -6,18 +6,23 @@ import akka.http.scaladsl.model.ws.Message
 import akka.kafka.scaladsl.Producer
 import akka.kafka.{ProducerMessage, ProducerSettings}
 import akka.stream.Materializer
-import akka.stream.scaladsl.{Flow, Source}
+import akka.stream.scaladsl._
 import io.circe.Decoder
-import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroProducerRecord
 import net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde
+import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.errors.{
   AuthenticationError,
   AuthorisationError
 }
+import net.scalytica.kafka.wsproxy.jmx.JmxManager
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models._
-import net.scalytica.kafka.wsproxy.{mapToProperties, producerMetricsProperties}
+import net.scalytica.kafka.wsproxy.{
+  mapToProperties,
+  producerMetricsProperties,
+  SaslJaasConfig
+}
 import org.apache.kafka.clients.producer.{
   KafkaProducer,
   ProducerConfig,
@@ -36,12 +41,6 @@ import scala.jdk.CollectionConverters._
 
 /** Functions for initialising Kafka producer sinks and flows. */
 object WsProducer extends ProducerFlowExtras with WithProxyLogger {
-
-  private[this] val SaslJaasConfig: String = "sasl.jaas.config"
-
-  private[this] val PlainLogin = (u: String, p: String) =>
-    "org.apache.kafka.common.security.plain.PlainLoginModule required " +
-      s"""username="$u" password="$p";"""
 
   implicit def seqToSource[Out](s: Seq[Out]): Source[Out, NotUsed] = {
     val it = new scala.collection.immutable.Iterable[Out] {
@@ -71,13 +70,7 @@ object WsProducer extends ProducerFlowExtras with WithProxyLogger {
       aclCredentials: Option[AclCredentials]
   )(ps: ProducerSettings[K, V])(implicit cfg: AppCfg): KafkaProducer[K, V] = {
     val props = {
-      val jaasProps = aclCredentials match {
-        case Some(c) =>
-          Map(SaslJaasConfig -> PlainLogin(c.username, c.password))
-
-        case None =>
-          Map(SaslJaasConfig -> "")
-      }
+      val jaasProps = AclCredentials.buildSaslJaasProps(aclCredentials)
 
       // Strip away the default sasl_jaas_config, since the client needs to
       // use their own credentials for auth.
@@ -214,6 +207,8 @@ object WsProducer extends ProducerFlowExtras with WithProxyLogger {
    *   the JSON decoder to use for the message key
    * @param vd
    *   the JSON decoder to use for the message value
+   * @param jmxManager
+   *   the JmxManager to use for setting up monitoring
    * @tparam K
    *   the message key type
    * @tparam V
@@ -230,7 +225,8 @@ object WsProducer extends ProducerFlowExtras with WithProxyLogger {
       ks: Serializer[K],
       vs: Serializer[V],
       kd: Decoder[K],
-      vd: Decoder[V]
+      vd: Decoder[V],
+      jmxManager: Option[JmxManager]
   ): Flow[Message, WsProducerResult, NotUsed] = {
     implicit val ec: ExecutionContext = as.dispatcher
 
@@ -239,7 +235,21 @@ object WsProducer extends ProducerFlowExtras with WithProxyLogger {
 
     checkClient(args.topic, producerClient)
 
+    val (jmxIn, jmxOut) = jmxManager
+      .map { jmx =>
+        // Init producer client stats actor
+        val ref = jmx.initProducerClientStatsActor(args.clientId)
+        // Setup wiretaps
+        val in  = jmx.producerStatsInboundWireTap[K, V](ref)
+        val out = jmx.producerStatsOutboundWireTap(ref)
+        (in, out)
+      }
+      .getOrElse {
+        (Flow[WsProducerRecord[K, V]], Flow[WsProducerResult])
+      }
+
     rateLimitedJsonToWsProducerRecordFlow[K, V](args)
+      .via(jmxIn)
       .map { wpr =>
         val record = asKafkaProducerRecord(args.topic, wpr)
         ProducerMessage.Message(record, wpr)
@@ -247,13 +257,15 @@ object WsProducer extends ProducerFlowExtras with WithProxyLogger {
       .via(Producer.flexiFlow(settings.withProducer(producerClient)))
       .map(r => WsProducerResult.fromProducerResult(r))
       .flatMapConcat(seqToSource)
+      .via(jmxOut)
   }
 
   def produceAvro[K, V](args: InSocketArgs)(
       implicit cfg: AppCfg,
       as: ActorSystem,
       mat: Materializer,
-      serde: WsProxyAvroSerde[AvroProducerRecord]
+      serde: WsProxyAvroSerde[AvroProducerRecord],
+      jmxManager: Option[JmxManager]
   ): Flow[Message, WsProducerResult, NotUsed] = {
     implicit val ec: ExecutionContext = as.dispatcher
 
@@ -269,16 +281,35 @@ object WsProducer extends ProducerFlowExtras with WithProxyLogger {
 
     checkClient(args.topic, producerClient)
 
+    val (jmxIn, jmxOut) = jmxManager
+      .map { jmx =>
+        // Init producer client stats actor
+        val ref = jmx.initProducerClientStatsActor(args.clientId)
+        // Setup wiretaps
+        val in  = jmx.producerStatsInboundWireTap[keyType.Aux, valType.Aux](ref)
+        val out = jmx.producerStatsOutboundWireTap(ref)
+        (in, out)
+      }
+      .getOrElse {
+        (
+          Flow[WsProducerRecord[keyType.Aux, valType.Aux]],
+          Flow[WsProducerResult]
+        )
+      }
+
     rateLimitedAvroToWsProducerRecordFlow[keyType.Aux, valType.Aux](
       args = args,
       keyType = keyType,
       valType = valType
-    ).map { wpr =>
-      val record = asKafkaProducerRecord(args.topic, wpr)
-      ProducerMessage.Message(record, wpr)
-    }.via(Producer.flexiFlow(settings.withProducer(producerClient)))
+    ).via(jmxIn)
+      .map { wpr =>
+        val record = asKafkaProducerRecord(args.topic, wpr)
+        ProducerMessage.Message(record, wpr)
+      }
+      .via(Producer.flexiFlow(settings.withProducer(producerClient)))
       .map(r => WsProducerResult.fromProducerResult(r))
       .flatMapConcat(seqToSource)
+      .via(jmxOut)
   }
 
 }

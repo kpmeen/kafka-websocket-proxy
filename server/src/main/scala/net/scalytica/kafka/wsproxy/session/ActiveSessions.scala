@@ -1,6 +1,6 @@
 package net.scalytica.kafka.wsproxy.session
 
-import net.scalytica.kafka.wsproxy.models.WsGroupId
+import net.scalytica.kafka.wsproxy.models.{WsGroupId, WsServerId}
 
 /**
  * Data type for keeping track of active sessions. Each active session is
@@ -16,6 +16,17 @@ case class ActiveSessions(
 ) {
 
   def find(groupId: WsGroupId): Option[Session] = sessions.get(groupId)
+
+  def removeConsumersFromServerId(
+      serverId: WsServerId
+  ): ActiveSessions = {
+    val s = sessions.map { case (gid, session) =>
+      gid -> session.copy(consumers =
+        session.consumers.filterNot(_.serverId == serverId)
+      )
+    }
+    copy(sessions = s)
+  }
 
   def add(session: Session): Either[String, ActiveSessions] = {
     sessions.find(_._1 == session.consumerGroupId) match {

@@ -13,7 +13,11 @@ import net.scalytica.kafka.wsproxy.errors.{
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails
 import net.scalytica.kafka.wsproxy.models._
-import net.scalytica.kafka.wsproxy.{consumerMetricsProperties, mapToProperties}
+import net.scalytica.kafka.wsproxy.{
+  consumerMetricsProperties,
+  mapToProperties,
+  SaslJaasConfig
+}
 import org.apache.kafka.clients.consumer.ConsumerConfig._
 import org.apache.kafka.clients.consumer.{ConsumerRecord, KafkaConsumer}
 import org.apache.kafka.common.errors.{
@@ -28,13 +32,6 @@ import scala.util.{Failure, Success, Try}
 
 /** Functions for initialising Kafka consumer sources. */
 object WsConsumer extends WithProxyLogger {
-
-  // scalastyle:off
-  private[this] val SaslJaasConfig = "sasl.jaas.config"
-
-  private[this] val PlainLogin = (uname: String, pass: String) =>
-    s"""org.apache.kafka.common.security.plain.PlainLoginModule required username="$uname" password="$pass";"""
-  // scalastyle:on
 
   /**
    * Instantiates an instance of [[ConsumerSettings]] to be used when creating
@@ -96,14 +93,7 @@ object WsConsumer extends WithProxyLogger {
       cs: ConsumerSettings[K, V]
   )(implicit cfg: AppCfg): KafkaConsumer[K, V] = {
     val props = {
-      val jaasProps = aclCredentials match {
-        case Some(c) =>
-          Map(SaslJaasConfig -> PlainLogin(c.username, c.password))
-
-        case None =>
-          Map(SaslJaasConfig -> "")
-      }
-
+      val jaasProps = AclCredentials.buildSaslJaasProps(aclCredentials)
       // Strip away the default sasl_jaas_config, since the client needs to
       // use their own credentials for auth.
       val kcp = cfg.consumer.kafkaClientProperties - SaslJaasConfig
@@ -126,7 +116,6 @@ object WsConsumer extends WithProxyLogger {
       case Success(c)         => c
       case Failure(exception) => throw exception
     }
-
   }
 
   /** Convenience function for logging a [[ConsumerRecord]]. */
@@ -270,8 +259,7 @@ object WsConsumer extends WithProxyLogger {
       vd: Deserializer[V]
   ): Source[WsConsumerRecord[K, V], Consumer.Control] = {
     logger.debug("Setting up consumer with auto-commit DISABLED")
-    val settings = consumerSettings[K, V](args, autoCommit = false)
-
+    val settings     = consumerSettings[K, V](args, autoCommit = false)
     val subscription = Subscriptions.topics(Set(args.topic.value))
 
     Consumer

@@ -176,7 +176,7 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
    *   a List of [[BrokerInfo]] data.
    */
   def clusterInfo: List[BrokerInfo] = {
-    logger.info("Fetching Kafka cluster information...")
+    logger.trace("Fetching Kafka cluster information...")
     underlying
       .describeCluster()
       .nodes()

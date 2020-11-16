@@ -20,8 +20,8 @@ trait ServerBindings {
   ): Option[Future[Http.ServerBinding]] = {
     if (cfg.server.ssl.exists(_.sslOnly.equals(true))) None
     else {
-      // scalastyle:off
       if (!cfg.server.isAuthSecurelyEnabled) {
+        // scalastyle:off
         println(
           s"""
             |-------------------------------------------------------------------
@@ -37,8 +37,8 @@ trait ServerBindings {
             |-------------------------------------------------------------------
             |""".stripMargin
         )
+        // scalastyle:on
       }
-      // scalastyle:on
       Option(
         Http()
           .newServerAt(
