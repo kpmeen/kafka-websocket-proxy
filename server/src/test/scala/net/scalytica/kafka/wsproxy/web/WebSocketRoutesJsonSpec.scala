@@ -28,7 +28,7 @@ class WebSocketRoutesJsonSpec
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(2, Minutes))
 
-  implicit val timeout = RouteTestTimeout(20 seconds)
+  implicit val timeout = RouteTestTimeout(2 minutes)
 
   import TestServerRoutes.{serverErrorHandler, serverRejectionHandler}
 
@@ -365,14 +365,16 @@ class WebSocketRoutesJsonSpec
             "&autoCommit=false"
 
           val probe1 = WSProbe()
+          val probe2 = ctx.consumerProbe
 
           WS(out, probe1.flow) ~> ctx.route ~> check {
             isWebSocketUpgrade mustBe true
 
             // Make sure consumer socket 1 is ready and registered in session
-            Thread.sleep((4 seconds).toMillis)
+            // FIXME: This test is really flaky!!!
+            Thread.sleep((10 seconds).toMillis)
 
-            WS(out, ctx.consumerProbe.flow) ~> ctx.route ~> check {
+            WS(out, probe2.flow) ~> ctx.route ~> check {
               rejection match {
                 case vr: ValidationRejection => vr.message mustBe rejectionMsg
                 case _                       => fail("Unexpected Rejection")
