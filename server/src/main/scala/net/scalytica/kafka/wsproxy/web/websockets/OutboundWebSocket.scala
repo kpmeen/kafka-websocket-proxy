@@ -40,7 +40,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
 
-  implicit private[this] val timeout: Timeout = 3 seconds
+  implicit private[this] val timeout: Timeout = 10 seconds
 
   /** Convenience function for logging and throwing an error in a Flow */
   def logAndThrow[T](message: String, t: Throwable): T = {
