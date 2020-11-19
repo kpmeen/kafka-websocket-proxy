@@ -9,10 +9,11 @@ import net.scalytica.kafka.wsproxy.models.TopicName
 import net.scalytica.kafka.wsproxy.web.SocketProtocol.JsonPayload
 import net.scalytica.test._
 import org.scalatest.Inspectors.forAll
-import org.scalatest.{Assertion, OptionValues}
 import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.tagobjects.Retryable
 import org.scalatest.time.{Minutes, Span}
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.{Assertion, OptionValues}
 
 import scala.concurrent.duration._
 
@@ -23,7 +24,8 @@ class WebSocketRoutesJsonSpec
     with ScalaFutures
     with WsProxyConsumerKafkaSpec
     with MockOpenIdServer
-    with TestDataGenerators {
+    with TestDataGenerators
+    with FlakyTests {
 
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(2, Minutes))
@@ -343,8 +345,8 @@ class WebSocketRoutesJsonSpec
             }
         }
 
-      "reject a new connection if the consumer already exists" in
-        plainJsonConsumerContext(
+      "reject a new connection if the consumer already exists" taggedAs
+        Retryable in plainJsonConsumerContext(
           topic = nextTopic,
           keyType = None,
           valType = StringType,
