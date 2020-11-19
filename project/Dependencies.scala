@@ -4,7 +4,7 @@ object Versions {
 
   val ScalaVersion = "2.13.3"
 
-  val ConfigVersion     = "1.4.0"
+  val ConfigVersion     = "1.4.1"
   val PureConfigVersion = "0.14.0"
 
   val Avro4sVersion                 = "4.0.1"
