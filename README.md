@@ -338,7 +338,7 @@ default values are.
 | net.scalytica.kafka.wsproxy  | WS_PROXY_APP_LOG_LEVEL           |  DEBUG  |
 | root                         | WS_PROXY_ROOT_LOG_LEVEL          |  ERROR  |
 
-**2. Overriding full configuration through environment** 
+**3. Overriding full configuration through environment** 
 
 Another option that is useful when running the application in a docker container,
 or another environment where configuration is primarily done through
@@ -349,6 +349,15 @@ configurations will be ignored. So if e.g. both `WSPROXY_LOGBACK_XML_CONFIG` and
 `WS_PROXY_KAFKA_CLIENTS_LOG_LEVEL` are set, the latter will be ignored
 completely. The same applies when an external logback configuration file is
 provided through `-Dlogback.configurationFile=<file_path>`.
+
+**4. Disabling ANSI colours in log output**
+
+Sometimes the log output needs to be free from ANSI colours. For example if the
+log contents is being passed on to a log aggregator like Splunk or Logstash.
+In these cases, the coloured output can be disabled by starting the application
+with `-Dwsproxy.log.noformat=true` or setting the environment variable
+`WSPROXY_LOG_ANSI_OFF=true`. Either way the log output will be written without
+any ANSI codes.
 
 ### Monitoring
 
