@@ -10,11 +10,11 @@ import io.circe._
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.auto._
 import io.circe.parser._
+import net.scalytica.kafka.wsproxy.OptionExtensions
 import net.scalytica.kafka.wsproxy.config.Configuration.{
   AppCfg,
   OpenIdConnectCfg
 }
-import net.scalytica.kafka.wsproxy.OptionExtensions
 import net.scalytica.kafka.wsproxy.errors.{
   AuthenticationError,
   OpenIdConnectError
@@ -22,8 +22,7 @@ import net.scalytica.kafka.wsproxy.errors.{
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import pdi.jwt.{JwtAlgorithm, JwtBase64, JwtCirce, JwtClaim}
 
-import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 
 class OpenIdClient private (
@@ -46,15 +45,11 @@ class OpenIdClient private (
 
   implicit private[this] val clock = Clock.systemUTC()
 
-  private[this] val awaitDuration = 10 seconds
-
   // A regex that defines the JWT pattern and allows us to
   // extract the header, claims and signature
   private[this] val jwtRegex      = """(.+?)\.(.+?)\.(.+?)""".r
   private[this] val audience      = oidcCfg.audience.getUnsafe
   private[this] val oidcWellKnown = oidcCfg.wellKnownUrl.getUnsafe
-
-  private[this] val oidcConfiguration = wellKnownOidcConfig
 
   private[this] val splitToken = (jwt: String) =>
     jwt match {
@@ -75,12 +70,14 @@ class OpenIdClient private (
         throw AuthenticationError("Token is not valid a valid JWT", Option(t))
       }
 
-  private[this] def getJwk(token: String): Future[Try[Jwk]] = {
+  private[this] def getJwk(
+      token: String
+  )(implicit oidcConfig: OpenIdConnectConfig): Future[Try[Jwk]] = {
     Future.fromTry((splitToken andThen decodeElements)(token)).flatMap {
       case (header, _, _) =>
         val jwtHeader = Try(JwtCirce.parseHeader(header)).toOption
         val jwkProvider =
-          UrlJwkProvider(oidcConfiguration.jwksUri, enforceHttps)
+          UrlJwkProvider(oidcConfig.jwksUri, enforceHttps)
 
         // Use jwkProvider to load the JWK data and return the JWK
         jwtHeader
@@ -113,9 +110,11 @@ class OpenIdClient private (
    * @return
    *   a Try with the [[JwtClaim]] if successfully validated
    */
-  private[this] def validateClaims(jwtClaim: JwtClaim): Try[JwtClaim] = {
+  private[this] def validateClaims(
+      jwtClaim: JwtClaim
+  )(implicit oidcConfig: OpenIdConnectConfig): Try[JwtClaim] = {
     logger.trace("Validating jwt claim...")
-    if (jwtClaim.isValid(oidcConfiguration.issuer, audience)) {
+    if (jwtClaim.isValid(oidcConfig.issuer, audience)) {
       logger.trace("Jwt claim is valid!")
       Success(jwtClaim)
     } else {
@@ -135,24 +134,29 @@ class OpenIdClient private (
    */
   def validate(bearerToken: OAuth2BearerToken): Future[Try[JwtClaim]] = {
     val t = cleanToken(bearerToken)
-    getJwk(t).map { tryJwk =>
-      for {
-        // Get the secret key for this token
-        jwk <- tryJwk
-        // generate public key
-        pubKey <- Jwk.generatePublicKey(jwk)
-        // Decode the token using the secret key
-        claims <- JwtCirce.decode(t, pubKey, Seq(JwtAlgorithm.RS256))
-        // validate the data stored inside the token
-        _ <- validateClaims(claims)
-      } yield claims
+    wellKnownOidcConfig.flatMap { implicit oidcCfg =>
+      getJwk(t).map { tryJwk =>
+        for {
+          // Get the secret key for this token
+          jwk <- tryJwk
+          // generate public key
+          pubKey <- Jwk.generatePublicKey(jwk)
+          // Decode the token using the secret key
+          claims <- JwtCirce.decode(t, pubKey, Seq(JwtAlgorithm.RS256))
+          // validate the data stored inside the token
+          _ <- validateClaims(claims)
+        } yield claims
+      }
     }
   }
 
-  private[auth] def wellKnownOidcConfig: OpenIdConnectConfig = {
+  // scalastyle:off
+  private[auth] def wellKnownOidcConfig: Future[OpenIdConnectConfig] = {
     logger.debug(s"Fetching openid-connect config from $oidcWellKnown...")
-    val eventuallyCfg =
-      Http().singleRequest(HttpRequest(uri = oidcWellKnown)).flatMap { res =>
+
+    Http()
+      .singleRequest(HttpRequest(uri = oidcWellKnown))
+      .flatMap { res =>
         logger.info(s"OpenID well-known request status: ${res.status}")
         res match {
           case HttpResponse(StatusCodes.OK, _, body, _) =>
@@ -185,17 +189,22 @@ class OpenIdClient private (
             }
         }
       }
-    Await.result(
-      eventuallyCfg.map { cfg =>
-        cfg.orThrow(
-          OpenIdConnectError(
-            s"Could not load ${oidcCfg.wellKnownUrl.getOrElse("")}"
+      .map { maybeCfg =>
+        maybeCfg.orThrow(OpenIdConnectError(s"Could not load $oidcWellKnown"))
+      }
+      .recover {
+        case o: OpenIdConnectError =>
+          throw o
+
+        case t: Throwable =>
+          logger.error(s"Error fetching OpenID well-known from $oidcWellKnown")
+          throw OpenIdConnectError(
+            message = "OpenID Connect server does not seem to be available.",
+            cause = Option(t)
           )
-        )
-      },
-      awaitDuration
-    )
+      }
   }
+  // scalastyle:on
 
   // FOR USE IN TESTS!
   def generateToken(
@@ -204,43 +213,44 @@ class OpenIdClient private (
       audience: String,
       grantType: String
   ): Future[Option[AccessToken]] = {
-    val url = oidcConfiguration.tokenEndpoint
-    val req = TokenRequest(clientId, clientSecret, audience, grantType)
+    wellKnownOidcConfig.flatMap { oidcCfg =>
+      val req = TokenRequest(clientId, clientSecret, audience, grantType)
 
-    Http().singleRequest(req.request(url)).flatMap { res =>
-      logger.info(s"Token request status: ${res.status}")
-      logger.trace(
-        "Token response headers: [" +
-          res.headers.mkString("\n  ", "\n  ", "\n") +
-          s"]"
-      )
+      Http().singleRequest(req.request(oidcCfg.tokenEndpoint)).flatMap { res =>
+        logger.info(s"Token request status: ${res.status}")
+        logger.trace(
+          "Token response headers: [" +
+            res.headers.mkString("\n  ", "\n  ", "\n") +
+            s"]"
+        )
 
-      res match {
-        case HttpResponse(StatusCodes.OK, _, body, _) =>
-          foldBody(body.dataBytes).map { ms =>
-            ms.flatMap { bodyStr =>
-              val js = parse(bodyStr).toOption.getOrElse(Json.Null)
-              logger.trace(s"Token response body:\n${js.spaces2}")
-              js.as[AccessToken].toOption
-            }.orElse {
-              logger.info(s"Token request returned no body")
-              None
-            }
-          }
-
-        case HttpResponse(_, _, body, _) =>
-          foldBody(body.dataBytes).map {
-            case Some(bodyStr) =>
-              logger.whenTraceEnabled {
+        res match {
+          case HttpResponse(StatusCodes.OK, _, body, _) =>
+            foldBody(body.dataBytes).map { ms =>
+              ms.flatMap { bodyStr =>
                 val js = parse(bodyStr).toOption.getOrElse(Json.Null)
                 logger.trace(s"Token response body:\n${js.spaces2}")
+                js.as[AccessToken].toOption
+              }.orElse {
+                logger.info(s"Token request returned no body")
+                None
               }
-              None
+            }
 
-            case None =>
-              logger.info(s"Token request returned no body")
-              None
-          }
+          case HttpResponse(_, _, body, _) =>
+            foldBody(body.dataBytes).map {
+              case Some(bodyStr) =>
+                logger.whenTraceEnabled {
+                  val js = parse(bodyStr).toOption.getOrElse(Json.Null)
+                  logger.trace(s"Token response body:\n${js.spaces2}")
+                }
+                None
+
+              case None =>
+                logger.info(s"Token request returned no body")
+                None
+            }
+        }
       }
     }
   }

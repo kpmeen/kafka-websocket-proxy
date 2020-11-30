@@ -252,4 +252,26 @@ trait MockOpenIdServer
           .value
         block(h, p, client, cfg, token)
     }
+
+  def withUnavailableOpenIdConnectServerAndToken[T](
+      host: String = "localhost",
+      port: Int = availablePort
+  )(block: (OpenIdClient, OpenIdConnectCfg, AccessToken) => T)(
+      implicit mat: Materializer
+  ): T = {
+    val cfg = OpenIdConnectCfg(
+      wellKnownUrl = Option(wellKnownOpenIdUrlString(host, port)),
+      audience = Option(oidAudience),
+      realm = None,
+      enabled = true,
+      requireHttps = false
+    )
+    lazy val client = OpenIdClient(
+      oidcCfg = cfg,
+      enforceHttps = false
+    )
+    val token = accessToken(host, port)
+    block(client, cfg, token)
+  }
+
 }

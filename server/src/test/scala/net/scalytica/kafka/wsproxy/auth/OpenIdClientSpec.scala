@@ -1,6 +1,7 @@
 package net.scalytica.kafka.wsproxy.auth
 
 import akka.util.Timeout
+import net.scalytica.kafka.wsproxy.errors.OpenIdConnectError
 import net.scalytica.test.{MockOpenIdServer, WsProxyKafkaSpec}
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.must.Matchers
@@ -9,6 +10,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.{OptionValues, TryValues}
 import pdi.jwt._
 
+import scala.concurrent.Await
 import scala.concurrent.duration._
 
 class OpenIdClientSpec
@@ -30,12 +32,15 @@ class OpenIdClientSpec
     "fetch the .well-known openid-connect configuration" in
       withEmbeddedOpenIdConnectServerAndClient() {
         case (host, port, client, _) =>
-          client.wellKnownOidcConfig mustBe openIdConnectConfig(host, port)
+          client.wellKnownOidcConfig.futureValue mustBe openIdConnectConfig(
+            host,
+            port
+          )
       }
 
     "fetch openid-connect config and then the jwks config" in
       withEmbeddedOpenIdConnectServerAndClient() { case (_, _, client, _) =>
-        val oidc     = client.wellKnownOidcConfig
+        val oidc     = client.wellKnownOidcConfig.futureValue
         val provider = new UrlJwkProvider(oidc.jwksUri, enforceHttps = false)
         val res      = provider.load().futureValue
 
@@ -78,6 +83,14 @@ class OpenIdClientSpec
         tokenRes.expiration.value mustBe expirationMillis
         tokenRes.issuedAt.value mustBe issuedAtMillis
     }
+
+    "gracefully handle that keycloak isn't available" in
+      withUnavailableOpenIdConnectServerAndToken() { case (client, _, token) =>
+        val e = intercept[OpenIdConnectError] {
+          Await.result(client.validate(token.bearerToken), 10 seconds)
+        }
+        e.message mustBe "OpenID Connect server does not seem to be available."
+      }
 
   }
 

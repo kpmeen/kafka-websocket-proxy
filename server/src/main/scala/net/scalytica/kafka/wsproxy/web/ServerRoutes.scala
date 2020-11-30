@@ -55,7 +55,7 @@ import scala.util.{Failure, Success, Try}
 
 trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
 
-  implicit private[this] val timeout: Timeout = 3 seconds
+  implicit private[this] val sessionHandlerTimeout: Timeout = 3 seconds
 
   protected var sessionHandler: SessionHandlerRef = _
 
@@ -243,6 +243,12 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
 
       case a: AuthorisationError =>
         notAuthenticatedRejection(a, Forbidden)
+
+      case o: OpenIdConnectError =>
+        extractUri { uri =>
+          logger.warn(s"Request to $uri failed with an OpenIDConnectError.", o)
+          rejectAndComplete(jsonResponseMsg(ServiceUnavailable, o.getMessage))
+        }
 
       case k: KafkaException =>
         extractUri { uri =>
