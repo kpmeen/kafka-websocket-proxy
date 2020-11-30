@@ -15,8 +15,8 @@ case class ImpossibleError(
 ) extends ProxyError(msg, cause)
     with NoStackTrace
 
-case class OpenIdConnectError(message: String)
-    extends ProxyError(message)
+case class OpenIdConnectError(message: String, cause: Option[Throwable] = None)
+    extends ProxyError(message, cause)
     with NoStackTrace
 
 case class TopicNotFoundError(message: String)

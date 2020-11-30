@@ -563,6 +563,34 @@ class WebSocketRoutesAvroSpec
             }
           }
         }
+
+      "return HTTP 503 when OpenID server is unavailable enabled" in
+        withUnavailableOpenIdConnectServerAndToken() { case (_, cfg, token) =>
+          secureServerProducerContext(
+            topic = nextTopic,
+            serverOpenIdCfg = Option(cfg)
+          ) { ctx =>
+            implicit val wsClient = ctx.producerProbe
+
+            val baseUri = baseProducerUri(
+              clientId = producerClientId("avro", topicCounter),
+              topicName = ctx.topicName,
+              payloadType = AvroPayload,
+              keyType = NoType,
+              valType = StringType
+            )
+
+            checkWebSocket(
+              uri = baseUri,
+              routes = Route.seal(ctx.route),
+              creds = Some(token.bearerToken),
+              kafkaCreds = Some(creds)
+            ) {
+              println(responseAs[String])
+              status mustBe ServiceUnavailable
+            }
+          }
+        }
     }
   }
 }
