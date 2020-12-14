@@ -238,11 +238,9 @@ object WsProducer extends ProducerFlowExtras with WithProxyLogger {
     val (jmxIn, jmxOut) = jmxManager
       .map { jmx =>
         // Init producer client stats actor
-        val ref = jmx.initProducerClientStatsActor(args.clientId)
+        val ref = jmx.initProducerClientStatsActorForConnection(args.clientId)
         // Setup wiretaps
-        val in  = jmx.producerStatsInboundWireTap[K, V](ref)
-        val out = jmx.producerStatsOutboundWireTap(ref)
-        (in, out)
+        jmx.producerStatsWireTaps[K, V](ref)
       }
       .getOrElse {
         (Flow[WsProducerRecord[K, V]], Flow[WsProducerResult])
@@ -284,11 +282,9 @@ object WsProducer extends ProducerFlowExtras with WithProxyLogger {
     val (jmxIn, jmxOut) = jmxManager
       .map { jmx =>
         // Init producer client stats actor
-        val ref = jmx.initProducerClientStatsActor(args.clientId)
+        val ref = jmx.initProducerClientStatsActorForConnection(args.clientId)
         // Setup wiretaps
-        val in  = jmx.producerStatsInboundWireTap[keyType.Aux, valType.Aux](ref)
-        val out = jmx.producerStatsOutboundWireTap(ref)
-        (in, out)
+        jmx.producerStatsWireTaps[keyType.Aux, valType.Aux](ref)
       }
       .getOrElse {
         (
