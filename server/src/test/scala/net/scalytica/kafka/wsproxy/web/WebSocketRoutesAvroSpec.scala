@@ -586,7 +586,6 @@ class WebSocketRoutesAvroSpec
               creds = Some(token.bearerToken),
               kafkaCreds = Some(creds)
             ) {
-              println(responseAs[String])
               status mustBe ServiceUnavailable
             }
           }

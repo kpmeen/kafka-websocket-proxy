@@ -1,5 +1,7 @@
 package net.scalytica.kafka.wsproxy.jmx
 
+import java.util.UUID
+
 import akka.NotUsed
 import akka.actor.Cancellable
 import akka.actor.typed.scaladsl.adapter._
@@ -116,11 +118,12 @@ trait JmxConsumerStatsOps { self: BaseJmxManager =>
   def initConsumerClientStatsActor(
       clientId: WsClientId,
       groupId: WsGroupId
-  ): ActorRef[ConsumerClientStatsCommand] =
+  ): ActorRef[ConsumerClientStatsCommand] = {
     sys.systemActorOf(
       behavior = ConsumerClientStatsMXBeanActor(clientId, groupId),
       name = consumerStatsName(clientId, groupId)
     )
+  }
 
   final protected val totalConsumerClientStatsActor =
     initConsumerClientStatsActor(WsClientId("total"), WsGroupId("all"))
@@ -170,45 +173,67 @@ trait JmxProducerStatsOps { self: BaseJmxManager =>
 
   def initProducerClientStatsActor(
       clientId: WsClientId
-  ): ActorRef[ProducerClientStatsCommand] =
+  ): ActorRef[ProducerClientStatsCommand] = {
     sys.systemActorOf(
       behavior = ProducerClientStatsMXBeanActor(clientId),
       name = producerStatsName(clientId)
     )
+  }
+
+  def initProducerClientStatsActorForConnection(
+      clientId: WsClientId
+  ): ActorRef[ProducerClientStatsCommand] = {
+    val suffix = UUID.randomUUID()
+    val cid    = WsClientId(s"${clientId.value}-${suffix.toString}")
+    initProducerClientStatsActor(cid)
+  }
 
   final protected def setupProducerStatsSink(
       ref: ActorRef[ProducerClientStatsCommand]
-  ) = ActorSink.actorRef[ProducerClientStatsCommand](
-    ref = ref,
-    onCompleteMessage = ProducerClientStatsProtocol.Stop,
-    onFailureMessage = _ => ProducerClientStatsProtocol.Stop
-  )
+  ): Sink[ProducerClientStatsCommand, NotUsed] =
+    ActorSink.actorRef[ProducerClientStatsCommand](
+      ref = ref,
+      onCompleteMessage = ProducerClientStatsProtocol.Stop,
+      onFailureMessage = _ => ProducerClientStatsProtocol.Stop
+    )
+
+  type ProducerInWireTapFlow[K, V] =
+    Flow[WsProducerRecord[K, V], WsProducerRecord[K, V], NotUsed]
+
+  type ProducerOutWireTapFlow =
+    Flow[WsProducerResult, WsProducerResult, NotUsed]
+
+  def producerStatsWireTaps[K, V](
+      pcsRef: ActorRef[ProducerClientStatsCommand]
+  ): (ProducerInWireTapFlow[K, V], ProducerOutWireTapFlow) = {
+    val sink = setupProducerStatsSink(pcsRef)
+    val in   = producerStatsInboundWireTap[K, V](sink)
+    val out  = producerStatsOutboundWireTap(sink)
+
+    (in, out)
+  }
 
   def producerStatsInboundWireTap[K, V](
-      pcsRef: ActorRef[ProducerClientStatsCommand]
-  ): Flow[WsProducerRecord[K, V], WsProducerRecord[K, V], NotUsed] =
-    Flow[WsProducerRecord[K, V]].wireTap {
-      val sink = setupProducerStatsSink(pcsRef)
-      Flow[WsProducerRecord[K, V]]
-        .map { _ =>
-          ProducerClientStatsProtocol.IncrementRecordsReceived(sys.ignoreRef)
-        }
-        .alsoTo(Sink.foreach(_ => incrementTotalProducerRecordsReceived()))
-        .to(sink)
-    }
+      sink: Sink[ProducerClientStatsCommand, NotUsed]
+  ): ProducerInWireTapFlow[K, V] = Flow[WsProducerRecord[K, V]].wireTap {
+    Flow[WsProducerRecord[K, V]]
+      .map { _ =>
+        ProducerClientStatsProtocol.IncrementRecordsReceived(sys.ignoreRef)
+      }
+      .alsoTo(Sink.foreach(_ => incrementTotalProducerRecordsReceived()))
+      .to(sink)
+  }
 
   def producerStatsOutboundWireTap(
-      pcsRef: ActorRef[ProducerClientStatsCommand]
-  ): Flow[WsProducerResult, WsProducerResult, NotUsed] =
-    Flow[WsProducerResult].wireTap {
-      val sink = setupProducerStatsSink(pcsRef)
-      Flow[WsProducerResult]
-        .map { _ =>
-          ProducerClientStatsProtocol.IncrementAcksSent(sys.ignoreRef)
-        }
-        .alsoTo(Sink.foreach(_ => incrementTotalProducerAcksSent()))
-        .to(sink)
-    }
+      sink: Sink[ProducerClientStatsCommand, NotUsed]
+  ): ProducerOutWireTapFlow = Flow[WsProducerResult].wireTap {
+    Flow[WsProducerResult]
+      .map { _ =>
+        ProducerClientStatsProtocol.IncrementAcksSent(sys.ignoreRef)
+      }
+      .alsoTo(Sink.foreach(_ => incrementTotalProducerAcksSent()))
+      .to(sink)
+  }
 
   def incrementTotalProducerRecordsReceived(): Unit =
     totalProducerClientStatsActor.tell(
