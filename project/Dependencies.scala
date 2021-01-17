@@ -2,10 +2,10 @@ import sbt._
 
 object Versions {
 
-  val ScalaVersion = "2.13.3"
+  val ScalaVersion = "2.13.4"
 
-  val ConfigVersion     = "1.4.1"
-  val PureConfigVersion = "0.14.0"
+  val LightbendConfigVersion = "1.4.1"
+  val PureConfigVersion      = "0.14.0"
 
   val Avro4sVersion                 = "4.0.4"
   val ConfluentPlatformVersion      = "6.0.1"
@@ -146,7 +146,7 @@ object Dependencies {
   }
 
   object Config {
-    val TypeSafeConfig = "com.typesafe"           % "config"     % ConfigVersion
+    val TypeSafeConfig = "com.typesafe"           % "config"     % LightbendConfigVersion
     val PureConfig     = "com.github.pureconfig" %% "pureconfig" % PureConfigVersion
 
     val All = Seq(TypeSafeConfig, PureConfig)

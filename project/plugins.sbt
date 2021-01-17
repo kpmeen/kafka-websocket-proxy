@@ -14,17 +14,17 @@ resolvers ++= Seq(
 addSbtPlugin("com.typesafe.sbt" % "sbt-git" % "1.0.0")
 
 // Dependency handling
-addSbtPlugin("com.timushev.sbt" % "sbt-updates" % "0.5.0")
+addSbtPlugin("com.timushev.sbt" % "sbt-updates" % "0.5.1")
 
 // Formatting and style checking
-addSbtPlugin("org.scalameta"   % "sbt-scalafmt"          % "2.4.0")
+addSbtPlugin("org.scalameta"   % "sbt-scalafmt"          % "2.4.2")
 addSbtPlugin("org.scalastyle" %% "scalastyle-sbt-plugin" % "1.0.0")
 
 // Code coverage
 addSbtPlugin("org.scoverage" %% "sbt-scoverage" % "1.6.1")
 
 // Native packaging plugin
-addSbtPlugin("com.typesafe.sbt" %% "sbt-native-packager" % "1.6.1")
+addSbtPlugin("com.typesafe.sbt" %% "sbt-native-packager" % "1.8.0")
 
 // Release plugin
 addSbtPlugin("com.github.gseitz" % "sbt-release" % "1.0.13")
