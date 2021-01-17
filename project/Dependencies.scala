@@ -9,8 +9,8 @@ object Versions {
 
   val Avro4sVersion                 = "4.0.4"
   val ConfluentPlatformVersion      = "6.0.1"
-  val KafkaVersion                  = "2.6.0"
-  val EmbeddedKafkaVersion          = "2.6.0"
+  val KafkaVersion                  = "2.7.0"
+  val EmbeddedKafkaVersion          = "2.7.0"
   val EmbeddedSchemaRegistryVersion = "6.0.0"
   val KafkaStreamsQueryVersion      = "0.1.1"
 
