@@ -18,7 +18,7 @@ trait ServerBindings {
       routes: Route,
       sys: ActorSystem
   ): Option[Future[Http.ServerBinding]] = {
-    if (cfg.server.ssl.exists(_.sslOnly.equals(true))) None
+    if (cfg.server.ssl.exists(_.sslOnly)) None
     else {
       if (!cfg.server.isAuthSecurelyEnabled) {
         // scalastyle:off
