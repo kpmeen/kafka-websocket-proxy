@@ -235,6 +235,43 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
       cfg.commitHandler.autoCommitMaxAge mustBe 20.seconds
     }
 
+    "successfully load the default configuration with the custom JWT Kafka" +
+      "credential keys set" in {
+        val tcfg = ConfigFactory.defaultApplication
+          .withValue(
+            "kafka.ws.proxy.kafka-client.bootstrap-hosts",
+            ConfigValueFactory.fromAnyRef("localhost:29092")
+          )
+          .withValue(
+            "kafka.ws.proxy.server.openid-connect.custom-jwt.jwt-kafka-username-key", // scalastyle:ignore
+            ConfigValueFactory.fromAnyRef("test.username.key")
+          )
+          .withValue(
+            "kafka.ws.proxy.server.openid-connect.custom-jwt.jwt-kafka-password-key", // scalastyle:ignore
+            ConfigValueFactory.fromAnyRef("test.password.key")
+          )
+        val cfg    = Configuration.loadConfig(tcfg)
+        val jwtCfg = cfg.server.openidConnect.value.customJwt.value
+
+        jwtCfg.jwtKafkaUsernameKey mustBe "test.username.key"
+        jwtCfg.jwtKafkaPasswordKey mustBe "test.password.key"
+      }
+
+    "not assign a value to the custom jwt config when one of the keys have " +
+      "no value" in {
+        val tcfg = ConfigFactory.defaultApplication
+          .withValue(
+            "kafka.ws.proxy.kafka-client.bootstrap-hosts",
+            ConfigValueFactory.fromAnyRef("localhost:29092")
+          )
+          .withValue(
+            "kafka.ws.proxy.server.openid-connect.custom-jwt.jwt-kafka-username-key", // scalastyle:ignore
+            ConfigValueFactory.fromAnyRef("test.username.key")
+          )
+        val cfg = Configuration.loadConfig(tcfg)
+        cfg.server.openidConnect.value.customJwt mustBe None
+      }
+
     "fail when trying to load the default config without providing the " +
       "bootstrap-hosts with a value" in {
         a[ConfigurationError] should be thrownBy Configuration

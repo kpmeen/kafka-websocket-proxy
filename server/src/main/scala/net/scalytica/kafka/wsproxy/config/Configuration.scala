@@ -1,7 +1,5 @@
 package net.scalytica.kafka.wsproxy.config
 
-import java.nio.file.Path
-
 import com.typesafe.config.{Config, ConfigFactory}
 import net.scalytica.kafka.wsproxy.errors.ConfigurationError
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
@@ -11,8 +9,9 @@ import pureconfig.error.ConfigReaderFailures
 import pureconfig.generic.auto._
 import pureconfig.{ConfigReader, ConfigSource}
 
-import scala.jdk.CollectionConverters._
+import java.nio.file.Path
 import scala.concurrent.duration.FiniteDuration
+import scala.jdk.CollectionConverters._
 
 object Configuration extends WithProxyLogger {
 
@@ -71,6 +70,25 @@ object Configuration extends WithProxyLogger {
             Right[ConfigReaderFailures, Option[SchemaRegistryCfg]](None)
           }
       }
+    }
+  }
+
+  implicit lazy val customJwtCfgReader = {
+    ConfigReader.fromCursor[Option[CustomJwtCfg]] { c =>
+      c.fluent
+        .at("jwt-kafka-username-key")
+        .asString
+        .toOption
+        .flatMap { u =>
+          c.fluent.at("jwt-kafka-password-key").asString.toOption.map { p =>
+            Right[ConfigReaderFailures, Option[CustomJwtCfg]](
+              Option(CustomJwtCfg(u, p))
+            )
+          }
+        }
+        .getOrElse {
+          Right[ConfigReaderFailures, Option[CustomJwtCfg]](None)
+        }
     }
   }
 
@@ -189,12 +207,18 @@ object Configuration extends WithProxyLogger {
       )
   }
 
+  final case class CustomJwtCfg(
+      jwtKafkaUsernameKey: String,
+      jwtKafkaPasswordKey: String
+  )
+
   final case class OpenIdConnectCfg(
       wellKnownUrl: Option[String],
       audience: Option[String],
       realm: Option[String],
       enabled: Boolean = false,
-      requireHttps: Boolean = true
+      requireHttps: Boolean = true,
+      customJwt: Option[CustomJwtCfg] = None
   ) {
     if (enabled)
       require(
@@ -229,6 +253,14 @@ object Configuration extends WithProxyLogger {
 
     def isOpenIdConnectEnabled: Boolean =
       openidConnect.isDefined && openidConnect.exists(_.enabled)
+
+    def customJwtKafkaCredsKeys: Option[(String, String)] = {
+      openidConnect.flatMap { oidc =>
+        oidc.customJwt.map { custom =>
+          (custom.jwtKafkaUsernameKey, custom.jwtKafkaPasswordKey)
+        }
+      }
+    }
 
   }
 

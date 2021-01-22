@@ -59,7 +59,9 @@ trait WsProxyKafkaSpec
   self: Suite =>
 
   val testKeyPass: String         = "scalytica"
-  val creds: BasicHttpCredentials = BasicHttpCredentials("client", "client")
+  val kafkaUser: String           = "client"
+  val kafkaPass: String           = kafkaUser
+  val creds: BasicHttpCredentials = BasicHttpCredentials(kafkaUser, kafkaPass)
 
   implicit val routeTestTimeout = RouteTestTimeout(20 seconds)
 
@@ -93,7 +95,7 @@ trait WsProxyKafkaSpec
     ).toAbsolutePath.toString,
     SSL_KEYSTORE_PASSWORD_CONFIG -> testKeyPass,
     SSL_KEY_PASSWORD_CONFIG      -> testKeyPass,
-    SASL_JAAS_CONFIG             -> """org.apache.kafka.common.security.plain.PlainLoginModule required username="client" password="client";"""
+    SASL_JAAS_CONFIG             -> s"""org.apache.kafka.common.security.plain.PlainLoginModule required username="$kafkaUser" password="$kafkaPass";"""
     // scalastyle:on line.size.limit
   )
 
@@ -105,11 +107,11 @@ trait WsProxyKafkaSpec
 
     val brokerSasl =
       "org.apache.kafka.common.security.plain.PlainLoginModule required " +
-        "username=\"admin\" " +
-        "password=\"admin\" " +
-        "user_admin=\"admin\" " +
-        "user_broker1=\"broker1\" " +
-        "user_client=\"client\";"
+        """username="admin" """ +
+        """password="admin" """ +
+        """user_admin="admin" """ +
+        """user_broker1="broker1" """ +
+        s"""user_$kafkaUser="$kafkaPass";"""
 
     val listeners =
       s"PLAINTEXT://localhost:$brokerPortPlain," +
@@ -820,7 +822,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
             valType = valType,
             messages = msgs,
             kafkaCreds =
-              if (secureKafka) Some(BasicHttpCredentials("client", "client"))
+              if (secureKafka) Some(BasicHttpCredentials(kafkaUser, kafkaPass))
               else None
           )(pctx.producerProbe)
 
@@ -838,7 +840,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
             routes = pctx.route,
             messages = messages,
             kafkaCreds =
-              if (secureKafka) Some(BasicHttpCredentials("client", "client"))
+              if (secureKafka) Some(BasicHttpCredentials(kafkaUser, kafkaPass))
               else None
           )(pctx.producerProbe)
 

@@ -5,10 +5,7 @@ import akka.actor.typed.scaladsl.adapter._
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model._
-import akka.http.scaladsl.model.headers.{
-  BasicHttpCredentials,
-  OAuth2BearerToken
-}
+import akka.http.scaladsl.model.headers.OAuth2BearerToken
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.directives.Credentials
@@ -33,7 +30,11 @@ import net.scalytica.kafka.wsproxy.jmx.JmxManager
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models.{
   AclCredentials,
+  AuthDisabled,
+  AuthenticationResult,
+  BasicAuthResult,
   InSocketArgs,
+  JwtAuthResult,
   OutSocketArgs,
   SocketArgs
 }
@@ -61,7 +62,7 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
 
   protected def basicAuthCredentials(
       creds: Credentials
-  )(implicit cfg: AppCfg): Option[String] = {
+  )(implicit cfg: AppCfg): Option[AuthenticationResult] = {
     cfg.server.basicAuth
       .flatMap { bac =>
         for {
@@ -74,22 +75,23 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
           case p @ Credentials.Provided(id) // constant time comparison
               if usr.equals(id) && p.verify(pwd) =>
             logger.trace("Successfully authenticated bearer token.")
-            Some(id)
+            Some(BasicAuthResult(id))
 
           case _ =>
             logger.info("Could not authenticate basic auth credentials")
             None
         }
       }
-      .getOrElse(Some("basic auth not configured"))
+      .getOrElse(Some(AuthDisabled))
   }
 
   protected def openIdAuth(
       creds: Credentials
   )(
-      implicit maybeOpenIdClient: Option[OpenIdClient],
+      implicit appCfg: AppCfg,
+      maybeOpenIdClient: Option[OpenIdClient],
       mat: Materializer
-  ): Future[Option[String]] = {
+  ): Future[Option[AuthenticationResult]] = {
     logger.trace(s"Going to validate openid token $creds")
     implicit val ec = mat.executionContext
 
@@ -97,13 +99,13 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
       case Some(oidcClient) =>
         creds match {
           case Credentials.Provided(token) =>
-            oidcClient.validate(OAuth2BearerToken(token)).map {
-              case Success(_) =>
+            oidcClient.validate(OAuth2BearerToken(token)).flatMap {
+              case Success(jwtClaim) =>
                 logger.trace("Successfully authenticated bearer token.")
-                Some(token)
+                Future.successful(Some(JwtAuthResult(jwtClaim)))
               case Failure(err) =>
                 logger.info("Could not authenticate bearer token", err)
-                None
+                Future.failed(err)
             }
           case _ =>
             logger.info("Could not authenticate bearer token")
@@ -119,7 +121,7 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
       implicit cfg: AppCfg,
       maybeOpenIdClient: Option[OpenIdClient],
       mat: Materializer
-  ): Directive1[String] = {
+  ): Directive1[AuthenticationResult] = {
     logger.debug("Attempting authentication using openid-connect...")
     cfg.server.openidConnect
       .flatMap { oidcCfg =>
@@ -129,13 +131,13 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
       }
       .getOrElse {
         logger.info("OpenID Connect is not enabled.")
-        provide("OpenID Connect not enabled")
+        provide(AuthDisabled)
       }
   }
 
   protected def maybeAuthenticateBasic[T](
       implicit cfg: AppCfg
-  ): Directive1[String] = {
+  ): Directive1[AuthenticationResult] = {
     logger.debug("Attempting authentication using basic authentication...")
     cfg.server.basicAuth
       .flatMap { ba =>
@@ -145,7 +147,7 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
       }
       .getOrElse {
         logger.info("Basic authentication is not enabled.")
-        provide("Basic auth not enabled")
+        provide(AuthDisabled)
       }
   }
 
@@ -153,10 +155,10 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
       implicit cfg: AppCfg,
       maybeOpenIdClient: Option[OpenIdClient],
       mat: Materializer
-  ): Directive1[String] = {
+  ): Directive1[AuthenticationResult] = {
     if (cfg.server.isOpenIdConnectEnabled) maybeAuthenticateOpenId[T]
     else if (cfg.server.isBasicAuthEnabled) maybeAuthenticateBasic[T]
-    else provide("Authentication not enabled")
+    else provide(AuthDisabled)
   }
 
   private[this] def jsonMessageFromString(msg: String): Json =
@@ -236,12 +238,15 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
         }
 
       case a: InvalidPublicKeyError =>
+        logger.warn(s"Request failed with an InvalidPublicKeyError.", a)
         notAuthenticatedRejection(a, Unauthorized)
 
       case a: AuthenticationError =>
+        logger.warn(s"Request failed with an AuthenticationError.", a)
         notAuthenticatedRejection(a, Unauthorized)
 
       case a: AuthorisationError =>
+        logger.warn(s"Request failed with an AuthorizationError.", a)
         notAuthenticatedRejection(a, Forbidden)
 
       case o: OpenIdConnectError =>
@@ -485,21 +490,12 @@ trait WebSocketRoutes { self: BaseRoutes =>
     else reject(ValidationRejection(s"Topic ${topic.value} does not exist"))
   }
 
-  /**
-   * @param creds
-   *   Optional [[XKafkaAuthHeader]] header object
-   * @return
-   *   [[AclCredentials]] if the header exists and contains basic auth
-   *   credentials, otherwise returns None.
-   */
-  private[this] def aclCredentials(creds: Option[XKafkaAuthHeader]) = {
-    creds.map(_.credentials) match {
-      case Some(BasicHttpCredentials(uname, pass)) =>
-        Some(AclCredentials(uname, pass))
-
-      case _ =>
-        None
-    }
+  private[this] def extractKafkaCreds(
+      authRes: AuthenticationResult,
+      kafkaAuthHeader: Option[XKafkaAuthHeader]
+  ): Option[AclCredentials] = {
+    // Always prefer the JWT token
+    authRes.aclCredentials.orElse(kafkaAuthHeader.map(_.aclCredentials))
   }
 
   /**
@@ -522,19 +518,21 @@ trait WebSocketRoutes { self: BaseRoutes =>
     extractMaterializer { implicit mat =>
       pathPrefix("socket") {
         path("in") {
-          maybeAuthenticate(cfg, maybeOpenIdClient, mat) { _ =>
-            optionalHeaderValueByType(XKafkaAuthHeader) { creds =>
+          maybeAuthenticate(cfg, maybeOpenIdClient, mat) { authResult =>
+            optionalHeaderValueByType(XKafkaAuthHeader) { headerCreds =>
+              val creds = extractKafkaCreds(authResult, headerCreds)
               inParams { inArgs =>
-                val args = inArgs.withAclCredentials(aclCredentials(creds))
+                val args = inArgs.withAclCredentials(creds)
                 validateAndHandleWebSocket(args)(inbound(args))
               }
             }
           }
         } ~ path("out") {
-          maybeAuthenticate(cfg, maybeOpenIdClient, mat) { _ =>
-            optionalHeaderValueByType(XKafkaAuthHeader) { creds =>
+          maybeAuthenticate(cfg, maybeOpenIdClient, mat) { authResult =>
+            optionalHeaderValueByType(XKafkaAuthHeader) { headerCreds =>
+              val creds = extractKafkaCreds(authResult, headerCreds)
               outParams { outArgs =>
-                val args = outArgs.withAclCredentials(aclCredentials(creds))
+                val args = outArgs.withAclCredentials(creds)
                 validateAndHandleWebSocket(args)(outbound(args))
               }
             }

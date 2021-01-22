@@ -68,6 +68,8 @@ package object wsproxy {
     def niceClassNameShort: String = niceClassName.split("""\.""").last
 
     def niceClassSimpleName: String = c.getClass.getSimpleName.stripSuffix("$")
+
+    def packageName: String = c.getClass.getPackageName
   }
 
   implicit class OptionExtensions[T](underlying: Option[T]) {

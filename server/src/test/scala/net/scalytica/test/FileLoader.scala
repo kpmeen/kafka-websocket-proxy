@@ -27,14 +27,21 @@ trait FileLoader { self =>
 
   def testConfigPath: Path = filePath("/application-test.conf")
 
-  def testLogbackConfig(implicit mat: Materializer): String =
+  private[this] def loadLogbackTestConfig(
+      fileName: String
+  )(implicit mat: Materializer): String =
     Await.result(
-      FileIO.fromPath(filePath("/logback-test.xml")).runFold("") {
-        case (str, bs) =>
-          str + bs.decodeString(Charset.forName("UTF-8"))
+      FileIO.fromPath(filePath(s"/$fileName")).runFold("") { case (str, bs) =>
+        str + bs.decodeString(Charset.forName("UTF-8"))
       },
       2 seconds
     )
+
+  def testLogbackConfig(implicit mat: Materializer): String =
+    loadLogbackTestConfig("logback-test.xml")
+
+  def logbackConfigForTest(implicit mat: Materializer): String =
+    loadLogbackTestConfig("logback-config-for-test.xml")
 
   def filePath(f: String): Path = {
     val fileUrl = self.getClass.getResource(f)

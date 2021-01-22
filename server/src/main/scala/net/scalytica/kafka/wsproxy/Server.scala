@@ -14,10 +14,8 @@ import net.scalytica.kafka.wsproxy.config.Configuration.{
   OpenIdConnectCfg
 }
 import net.scalytica.kafka.wsproxy.jmx.JmxManager
-import net.scalytica.kafka.wsproxy.logging.{
-  WithProxyLogger,
-  WsProxyEnvLoggerConfigurator
-}
+import net.scalytica.kafka.wsproxy.logging.DefaultProxyLogger._
+import net.scalytica.kafka.wsproxy.logging.WsProxyEnvLoggerConfigurator
 import net.scalytica.kafka.wsproxy.session.SessionHandler
 import net.scalytica.kafka.wsproxy.session.SessionHandler._
 import net.scalytica.kafka.wsproxy.utils.HostResolver.{
@@ -29,11 +27,7 @@ import net.scalytica.kafka.wsproxy.web.{ServerBindings, ServerRoutes}
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
 
-object Server
-    extends App
-    with ServerRoutes
-    with ServerBindings
-    with WithProxyLogger {
+object Server extends App with ServerRoutes with ServerBindings {
 
   // scalastyle:off
   println(
@@ -79,12 +73,12 @@ object Server
   val resStatus = resolveKafkaBootstrapHosts(cfg.kafkaClient.bootstrapHosts)
 
   if (!resStatus.hasErrors) {
-    logger.info("All Kafka broker hosts were correctly resolved")
+    info("All Kafka broker hosts were correctly resolved")
   } else {
     val reasons = resStatus.results.collect {
       case HostResolutionError(reason) => reason
     }
-    logger.warn(
+    warn(
       "Some hosts could not be resolved. Reasons:" +
         s"\n${reasons.mkString("  - ", "\n", "")}"
     )
@@ -120,7 +114,7 @@ object Server
     val cs = CoordinatedShutdown(classicSys)
 
     cs.addTask(PhaseServiceUnbind, "http-unbind") { () =>
-      logger.info("Gracefully terminating HTTP network bindings...")
+      info("Gracefully terminating HTTP network bindings...")
       for {
         _ <- bindingPlain.map(unbindConnection).getOrElse(evalDone)
         _ <- bindingSecure.map(unbindConnection).getOrElse(evalDone)
@@ -128,20 +122,20 @@ object Server
     }
 
     cs.addTask(PhaseServiceStop, "http-shutdown-connection-pools") { () =>
-      logger.info("Shutting down HTTP connection pools...")
+      info("Shutting down HTTP connection pools...")
       Http().shutdownAllConnectionPools().map(_ => Done)
     }
 
     cs.addTask(PhaseBeforeClusterShutdown, "session-cleanup-state") { () =>
       implicit val timeout: Timeout = 10 seconds
       implicit val typedScheduler   = classicSys.scheduler.toTyped
-      logger.info("Cleaning up session state...")
+      info("Cleaning up session state...")
       sessionHandlerRef.shRef.sessionShutdown().map(_ => Done)
     }
 
     cs.addTask(PhaseBeforeActorSystemTerminate, "session-consumer-shutdown") {
       () =>
-        logger.info("Session data consumer shutting down...")
+        info("Session data consumer shutting down...")
         ctrl.drainAndShutdown(evalDone)
     }
 

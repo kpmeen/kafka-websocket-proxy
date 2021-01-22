@@ -5,6 +5,7 @@ import akka.http.scaladsl.model.headers.{
   ModeledCustomHeader,
   ModeledCustomHeaderCompanion
 }
+import net.scalytica.kafka.wsproxy.models.AclCredentials
 
 import scala.util.Try
 
@@ -31,6 +32,9 @@ object Headers {
     override def renderInResponses(): Boolean = false
 
     override def value(): String = credentials.token()
+
+    def aclCredentials: AclCredentials =
+      AclCredentials(credentials.username, credentials.password)
   }
 
 }
