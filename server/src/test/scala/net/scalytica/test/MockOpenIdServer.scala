@@ -1,9 +1,5 @@
 package net.scalytica.test
 
-import java.security.KeyPairGenerator
-import java.security.interfaces.{RSAPrivateKey, RSAPublicKey}
-import java.util.{Base64, UUID}
-
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
@@ -13,7 +9,6 @@ import io.circe.JsonObject
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.auto._
 import io.circe.syntax._
-import net.scalytica.kafka.wsproxy.config.Configuration.OpenIdConnectCfg
 import net.scalytica.kafka.wsproxy.auth.{
   AccessToken,
   Jwk,
@@ -21,10 +16,17 @@ import net.scalytica.kafka.wsproxy.auth.{
   OpenIdConnectConfig,
   PubKeyAlgo
 }
+import net.scalytica.kafka.wsproxy.config.Configuration.{
+  CustomJwtCfg,
+  OpenIdConnectCfg
+}
 import org.scalatest.OptionValues
 import org.scalatest.concurrent.ScalaFutures
 import pdi.jwt._
 
+import java.security.KeyPairGenerator
+import java.security.interfaces.{RSAPrivateKey, RSAPublicKey}
+import java.util.{Base64, UUID}
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
@@ -41,6 +43,12 @@ trait MockOpenIdServer
   val oidClientId = "GIczqrC3HUhnZNw67dTM5Q5977sOR9Gp"
   val oidAudience = "http://kptest.scalytica.net"
   val oidGrantTpe = "client_credentials"
+
+  val jwtKafkaCredsUsernameKey = "net.scalytica.jwt.username"
+  val jwtKafkaCredsPasswordKey = "net.scalytica.jwt.password"
+
+  val customJwtCfg =
+    CustomJwtCfg(jwtKafkaCredsUsernameKey, jwtKafkaCredsPasswordKey)
 
   val keyAlgorithm = PubKeyAlgo
   // Generate RSA private/public key pair for mocking OIDC
@@ -86,6 +94,15 @@ trait MockOpenIdServer
       |  "gty": "client-credentials"
       |}""".stripMargin
 
+  val jwtKafkaUsernameJson = s""""$jwtKafkaCredsUsernameKey":"client""""
+  val jwtKafkaPasswordJson = s""""$jwtKafkaCredsPasswordKey":"client""""
+
+  val jwtKafkaCredsJson =
+    s"""{
+      |  $jwtKafkaUsernameJson,
+      |  $jwtKafkaPasswordJson
+      |}""".stripMargin
+
   val supportedResponseTypes = List(
     "code",
     "token",
@@ -117,9 +134,10 @@ trait MockOpenIdServer
   def jwtData(
       issuerUrl: String,
       expiration: Long,
-      issuedAt: Long
+      issuedAt: Long,
+      useJwtKafkaCreds: Boolean
   ): JwtClaim = {
-    JwtClaim(
+    val claim = JwtClaim(
       content = jwtDataContentJson,
       issuer = Option(issuerUrl),
       subject = Option("GIczqrC3HUhnZNw67dTM5Q5977sOR9Gp@clients"),
@@ -127,6 +145,8 @@ trait MockOpenIdServer
       expiration = Option(expiration),
       issuedAt = Option(issuedAt)
     )
+    if (useJwtKafkaCreds) claim + jwtKafkaCredsJson
+    else claim
   }
 
   def generateJwt(jwtClaim: JwtClaim): String = {
@@ -140,9 +160,15 @@ trait MockOpenIdServer
 
   def accessToken(
       host: String,
-      port: Int
+      port: Int,
+      useJwtKafkaCreds: Boolean
   ): AccessToken = {
-    val jd    = jwtData(s"http://$host:$port", expirationMillis, issuedAtMillis)
+    val jd = jwtData(
+      issuerUrl = s"http://$host:$port",
+      expiration = expirationMillis,
+      issuedAt = issuedAtMillis,
+      useJwtKafkaCreds = useJwtKafkaCreds
+    )
     val token = generateJwt(jd)
     AccessToken(
       tokenType = "Bearer",
@@ -152,8 +178,8 @@ trait MockOpenIdServer
     )
   }
 
-  def tokenRoute(host: String, port: Int): Route = {
-    val body = accessToken(host, port).asJson.spaces2
+  def tokenRoute(host: String, port: Int, useJwtKafkaCreds: Boolean): Route = {
+    val body = accessToken(host, port, useJwtKafkaCreds).asJson.spaces2
     path("token") {
       post {
         complete(
@@ -191,9 +217,9 @@ trait MockOpenIdServer
     }
   }
 
-  def oauthRoutes(host: String, port: Int): Route =
+  def oauthRoutes(host: String, port: Int, useJwtKafkaCreds: Boolean): Route =
     pathPrefix("oauth") {
-      tokenRoute(host, port) ~ pathPrefix(".well-known") {
+      tokenRoute(host, port, useJwtKafkaCreds) ~ pathPrefix(".well-known") {
         wellKnownOpenIdUrl(host, port) ~ wellKnownJwkUrl
       }
     }
@@ -201,34 +227,41 @@ trait MockOpenIdServer
   def wellKnownOpenIdUrlString(host: String, port: Int): String =
     s"http://$host:$port/oauth/.well-known/openid-connect"
 
-  def withEmbeddedOpenIdConnectServer[T](
+  def withOpenIdConnectServer[T](
       host: String = "localhost",
-      port: Int = availablePort
+      port: Int = availablePort,
+      useJwtKafkaCreds: Boolean
   )(block: (String, Int, OpenIdConnectCfg) => T)(
       implicit sys: ActorSystem,
       ec: ExecutionContext
   ): T = {
-    withEmbeddedServerForRoute(host, port)(oauthRoutes) { case (h, p) =>
+    withHttpServerForRoute(host, port)((h, p) =>
+      oauthRoutes(h, p, useJwtKafkaCreds)
+    ) { case (h, p) =>
       val cfg = OpenIdConnectCfg(
         wellKnownUrl = Option(wellKnownOpenIdUrlString(host, port)),
         audience = Option(oidAudience),
         realm = None,
         enabled = true,
-        requireHttps = false
+        requireHttps = false,
+        customJwt =
+          if (useJwtKafkaCreds) Some(customJwtCfg)
+          else None
       )
       block(h, p, cfg)
     }
   }
 
-  def withEmbeddedOpenIdConnectServerAndClient[T](
+  def withOpenIdConnectServerAndClient[T](
       host: String = "localhost",
-      port: Int = availablePort
+      port: Int = availablePort,
+      useJwtKafkaCreds: Boolean
   )(block: (String, Int, OpenIdClient, OpenIdConnectCfg) => T)(
       implicit sys: ActorSystem,
       mat: Materializer,
       ec: ExecutionContext
   ): T =
-    withEmbeddedOpenIdConnectServer(host, port) { case (h, p, cfg) =>
+    withOpenIdConnectServer(host, port, useJwtKafkaCreds) { case (h, p, cfg) =>
       val client = OpenIdClient(
         oidcCfg = cfg,
         enforceHttps = false
@@ -236,15 +269,16 @@ trait MockOpenIdServer
       block(h, p, client, cfg)
     }
 
-  def withEmbeddedOpenIdConnectServerAndToken[T](
+  def withOpenIdConnectServerAndToken[T](
       host: String = "localhost",
-      port: Int = availablePort
+      port: Int = availablePort,
+      useJwtKafkaCreds: Boolean
   )(block: (String, Int, OpenIdClient, OpenIdConnectCfg, AccessToken) => T)(
       implicit sys: ActorSystem,
       mat: Materializer,
       ec: ExecutionContext
   ): T =
-    withEmbeddedOpenIdConnectServerAndClient(host, port) {
+    withOpenIdConnectServerAndClient(host, port, useJwtKafkaCreds) {
       case (h, p, client, cfg) =>
         lazy val token = client
           .generateToken(oidClientId, oidClientSecret, oidAudience, oidGrantTpe)
@@ -255,7 +289,8 @@ trait MockOpenIdServer
 
   def withUnavailableOpenIdConnectServerAndToken[T](
       host: String = "localhost",
-      port: Int = availablePort
+      port: Int = availablePort,
+      useJwtKafkaCreds: Boolean
   )(block: (OpenIdClient, OpenIdConnectCfg, AccessToken) => T)(
       implicit mat: Materializer
   ): T = {
@@ -264,13 +299,16 @@ trait MockOpenIdServer
       audience = Option(oidAudience),
       realm = None,
       enabled = true,
-      requireHttps = false
+      requireHttps = false,
+      customJwt =
+        if (useJwtKafkaCreds) Some(customJwtCfg)
+        else None
     )
     lazy val client = OpenIdClient(
       oidcCfg = cfg,
       enforceHttps = false
     )
-    val token = accessToken(host, port)
+    val token = accessToken(host, port, useJwtKafkaCreds)
     block(client, cfg, token)
   }
 

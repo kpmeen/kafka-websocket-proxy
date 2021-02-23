@@ -1,11 +1,9 @@
 package net.scalytica.kafka.wsproxy.auth
 
-import java.time.Clock
-
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers.OAuth2BearerToken
-import akka.stream.Materializer
+import akka.stream.{Materializer, StreamTcpException}
 import io.circe._
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.auto._
@@ -22,6 +20,7 @@ import net.scalytica.kafka.wsproxy.errors.{
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import pdi.jwt.{JwtAlgorithm, JwtBase64, JwtCirce, JwtClaim}
 
+import java.time.Clock
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 
@@ -110,7 +109,7 @@ class OpenIdClient private (
    * @return
    *   a Try with the [[JwtClaim]] if successfully validated
    */
-  private[this] def validateClaims(
+  private[this] def validateClaim(
       jwtClaim: JwtClaim
   )(implicit oidcConfig: OpenIdConnectConfig): Try[JwtClaim] = {
     logger.trace("Validating jwt claim...")
@@ -134,20 +133,24 @@ class OpenIdClient private (
    */
   def validate(bearerToken: OAuth2BearerToken): Future[Try[JwtClaim]] = {
     val t = cleanToken(bearerToken)
-    wellKnownOidcConfig.flatMap { implicit oidcCfg =>
-      getJwk(t).map { tryJwk =>
-        for {
-          // Get the secret key for this token
-          jwk <- tryJwk
-          // generate public key
-          pubKey <- Jwk.generatePublicKey(jwk)
-          // Decode the token using the secret key
-          claims <- JwtCirce.decode(t, pubKey, Seq(JwtAlgorithm.RS256))
-          // validate the data stored inside the token
-          _ <- validateClaims(claims)
-        } yield claims
+    wellKnownOidcConfig
+      .flatMap { implicit oidcCfg =>
+        getJwk(t).map { tryJwk =>
+          for {
+            // Get the secret key for this token
+            jwk <- tryJwk
+            // generate public key
+            pubKey <- Jwk.generatePublicKey(jwk)
+            // Decode the token using the secret key
+            claim <- JwtCirce.decode(t, pubKey, Seq(JwtAlgorithm.RS256))
+            // validate the data stored inside the token
+            validClaim <- validateClaim(claim)
+          } yield validClaim
+        }
       }
-    }
+      .recoverWith { case t: Throwable =>
+        Future.successful(Failure(t))
+      }
   }
 
   // scalastyle:off
@@ -156,6 +159,14 @@ class OpenIdClient private (
 
     Http()
       .singleRequest(HttpRequest(uri = oidcWellKnown))
+      .recover { case ste: StreamTcpException =>
+        // Handle any HTTP/TCP errors
+        logger.error(s"Error fetching config from $oidcWellKnown", ste)
+        throw OpenIdConnectError(
+          message = "OpenID Connect server does not seem to be available.",
+          cause = Option(ste.getCause)
+        )
+      }
       .flatMap { res =>
         logger.info(s"OpenID well-known request status: ${res.status}")
         res match {
@@ -163,7 +174,9 @@ class OpenIdClient private (
             foldBody(body.dataBytes).map {
               case Some(bodyStr) =>
                 val js = parse(bodyStr).toOption.getOrElse(Json.Null)
-                logger.trace(s"OpenID well-known response body:\n${js.spaces2}")
+                logger.trace(
+                  s"OpenID well-known response body:\n${js.spaces2}"
+                )
                 js.as[OpenIdConnectConfig].toOption
 
               case None =>
@@ -192,17 +205,6 @@ class OpenIdClient private (
       .map { maybeCfg =>
         maybeCfg.orThrow(OpenIdConnectError(s"Could not load $oidcWellKnown"))
       }
-      .recover {
-        case o: OpenIdConnectError =>
-          throw o
-
-        case t: Throwable =>
-          logger.error(s"Error fetching OpenID well-known from $oidcWellKnown")
-          throw OpenIdConnectError(
-            message = "OpenID Connect server does not seem to be available.",
-            cause = Option(t)
-          )
-      }
   }
   // scalastyle:on
 
@@ -213,6 +215,7 @@ class OpenIdClient private (
       audience: String,
       grantType: String
   ): Future[Option[AccessToken]] = {
+    logger.debug(s"Generating token for $clientId...")
     wellKnownOidcConfig.flatMap { oidcCfg =>
       val req = TokenRequest(clientId, clientSecret, audience, grantType)
 

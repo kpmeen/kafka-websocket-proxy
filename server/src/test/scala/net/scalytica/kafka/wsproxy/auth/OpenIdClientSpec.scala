@@ -30,7 +30,7 @@ class OpenIdClientSpec
   "The OAuth2 client" should {
 
     "fetch the .well-known openid-connect configuration" in
-      withEmbeddedOpenIdConnectServerAndClient() {
+      withOpenIdConnectServerAndClient(useJwtKafkaCreds = false) {
         case (host, port, client, _) =>
           client.wellKnownOidcConfig.futureValue mustBe openIdConnectConfig(
             host,
@@ -39,57 +39,88 @@ class OpenIdClientSpec
       }
 
     "fetch openid-connect config and then the jwks config" in
-      withEmbeddedOpenIdConnectServerAndClient() { case (_, _, client, _) =>
-        val oidc     = client.wellKnownOidcConfig.futureValue
-        val provider = new UrlJwkProvider(oidc.jwksUri, enforceHttps = false)
-        val res      = provider.load().futureValue
+      withOpenIdConnectServerAndClient(useJwtKafkaCreds = false) {
+        case (_, _, client, _) =>
+          val oidc     = client.wellKnownOidcConfig.futureValue
+          val provider = new UrlJwkProvider(oidc.jwksUri, enforceHttps = false)
+          val res      = provider.load().futureValue
 
-        res must have size 1
-        val jwk = res.headOption.value
+          res must have size 1
+          val jwk = res.headOption.value
 
-        jwk.kty mustBe keyAlgorithm
-        jwk.kid.value mustBe keyId
-        jwk.alg.value mustBe JwtAlgorithm.RS256.name
-        jwk.use.value mustBe "sig"
-        jwk.x5c mustBe empty
-        jwk.x5t mustBe empty
-        jwk.x5u mustBe empty
-        jwk.n must not be empty
-        jwk.e must not be empty
+          jwk.kty mustBe keyAlgorithm
+          jwk.kid.value mustBe keyId
+          jwk.alg.value mustBe JwtAlgorithm.RS256.name
+          jwk.use.value mustBe "sig"
+          jwk.x5c mustBe None
+          jwk.x5t mustBe None
+          jwk.x5u mustBe None
+          jwk.n must not be None
+          jwk.e must not be None
       }
 
-    "get a bearer token" in withEmbeddedOpenIdConnectServerAndClient() {
-      case (_, _, client, _) =>
-        val res = client
-          .generateToken(oidClientId, oidClientSecret, oidAudience, oidGrantTpe)
-          .futureValue
-          .value
+    "get a bearer token" in
+      withOpenIdConnectServerAndClient(useJwtKafkaCreds = false) {
+        case (_, _, client, _) =>
+          val res = client
+            .generateToken(
+              oidClientId,
+              oidClientSecret,
+              oidAudience,
+              oidGrantTpe
+            )
+            .futureValue
+            .value
 
-        res.tokenType mustBe "Bearer"
-        res.bearerToken.value must not be empty
-        res.expiresIn mustBe expirationMillis
-        res.refreshToken mustBe None
-    }
+          res.tokenType mustBe "Bearer"
+          res.bearerToken.value must not be empty
+          res.expiresIn mustBe expirationMillis
+          res.refreshToken mustBe None
+      }
 
-    "validate a bearer token" in withEmbeddedOpenIdConnectServerAndToken() {
-      case (host, port, client, _, token) =>
-        val bearerToken = token.bearerToken
+    "validate a bearer token" in
+      withOpenIdConnectServerAndToken(useJwtKafkaCreds = false) {
+        case (host, port, client, _, token) =>
+          val bearerToken = token.bearerToken
 
-        val response = client.validate(bearerToken).futureValue
-        val tokenRes = response.success.value
+          val response = client.validate(bearerToken).futureValue
+          val tokenRes = response.success.value
 
-        tokenRes.audience.value must contain(oidAudience)
-        tokenRes.issuer.value mustBe s"http://$host:$port"
-        tokenRes.expiration.value mustBe expirationMillis
-        tokenRes.issuedAt.value mustBe issuedAtMillis
-    }
+          tokenRes.audience.value must contain(oidAudience)
+          tokenRes.issuer.value mustBe s"http://$host:$port"
+          tokenRes.expiration.value mustBe expirationMillis
+          tokenRes.issuedAt.value mustBe issuedAtMillis
+      }
+
+    "validate a bearer token containing Kafka credentials" in
+      withOpenIdConnectServerAndToken(useJwtKafkaCreds = true) {
+        case (host, port, client, _, token) =>
+          val bearerToken = token.bearerToken
+
+          val response = client.validate(bearerToken).futureValue
+          val tokenRes = response.success.value
+
+          tokenRes.audience.value must contain(oidAudience)
+          tokenRes.issuer.value mustBe s"http://$host:$port"
+          tokenRes.expiration.value mustBe expirationMillis
+          tokenRes.issuedAt.value mustBe issuedAtMillis
+
+          tokenRes.content must include(jwtKafkaUsernameJson)
+          tokenRes.content must include(jwtKafkaPasswordJson)
+      }
 
     "gracefully handle that keycloak isn't available" in
-      withUnavailableOpenIdConnectServerAndToken() { case (client, _, token) =>
-        val e = intercept[OpenIdConnectError] {
-          Await.result(client.validate(token.bearerToken), 10 seconds)
-        }
-        e.message mustBe "OpenID Connect server does not seem to be available."
+      withUnavailableOpenIdConnectServerAndToken(useJwtKafkaCreds = false) {
+        case (client, _, token) =>
+          val expected = "OpenID Connect server does not seem to be available."
+          val e = Await
+            .result(client.validate(token.bearerToken), 10 seconds)
+            .failure
+            .exception
+          e mustBe an[OpenIdConnectError]
+          val oi = e.asInstanceOf[OpenIdConnectError]
+          oi.message mustBe expected
+          oi.cause must not be None
       }
 
   }

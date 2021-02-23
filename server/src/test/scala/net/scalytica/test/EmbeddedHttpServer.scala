@@ -23,7 +23,7 @@ trait EmbeddedHttpServer {
       )
     }
 
-  def withEmbeddedServerForRoute[T](
+  def withHttpServerForRoute[T](
       host: String = "localhost",
       port: Int = availablePort
   )(routes: (String, Int) => Route)(block: (String, Int) => T)(

@@ -1,0 +1,38 @@
+<configuration>
+
+  <!-- DO NOT MODIFY -->
+
+  <conversionRule conversionWord="colouredLevel"
+                  converterClass="net.scalytica.kafka.wsproxy.logging.ColouredLevel"/>
+
+  <contextListener class="ch.qos.logback.classic.jul.LevelChangePropagator">
+    <resetJUL>true</resetJUL>
+  </contextListener>
+
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>
+        %d{HH:mm:ss.SSS} %colouredLevel %logger{36} - %msg%n
+      </pattern>
+    </encoder>
+  </appender>
+
+  <appender name="ASYNC_STDOUT" class="ch.qos.logback.classic.AsyncAppender">
+    <appender-ref ref="STDOUT"/>
+  </appender>
+
+  <logger name="akka.actor" level="OFF"/>
+  <logger name="akka.stream" level="OFF"/>
+  <logger name="akka.kafka" level="OFF"/>
+  <logger name="akka.http" level="OFF"/>
+
+  <logger name="org.apache.kafka.clients" level="OFF"/>
+
+  <logger name="net.scalytica" level="OFF"/>
+
+  <!-- Root loggers catch all other events that are not explicitly handled-->
+  <root level="OFF">
+    <appender-ref ref="ASYNC_STDOUT"/>
+  </root>
+
+</configuration>

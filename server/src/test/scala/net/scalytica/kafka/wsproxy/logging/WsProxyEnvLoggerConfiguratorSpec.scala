@@ -38,7 +38,7 @@ class WsProxyEnvLoggerConfiguratorSpec
   private val testEnvLogger =
     s"$loggerEnvPrefix$testLogger"
 
-  private val testLogbackConfigFileString = FileLoader.testLogbackConfig
+  private val testLogbackConfigFileString = FileLoader.logbackConfigForTest
 
   private val logbackConfigString =
     """<configuration>

@@ -105,41 +105,43 @@ class StatusRoutesSpec
       }
 
     "return the kafka cluster info when secured with OpenID Connect" in
-      withEmbeddedOpenIdConnectServerAndToken() { case (_, _, _, cfg, token) =>
-        secureServerContext(serverOpenIdCfg = Option(cfg)) {
-          case (kcfg, _, route) =>
-            Get("/kafka/cluster/info") ~> addCredentials(
-              token.bearerToken
-            ) ~> Route.seal(route) ~> check {
-              status mustBe OK
-              responseEntity.contentType mustBe `application/json`
+      withOpenIdConnectServerAndToken(useJwtKafkaCreds = false) {
+        case (_, _, _, cfg, token) =>
+          secureServerContext(serverOpenIdCfg = Option(cfg)) {
+            case (kcfg, _, route) =>
+              Get("/kafka/cluster/info") ~> addCredentials(
+                token.bearerToken
+              ) ~> Route.seal(route) ~> check {
+                status mustBe OK
+                responseEntity.contentType mustBe `application/json`
 
-              val ci = parse(responseAs[String])
-                .map(_.as[Seq[BrokerInfo]])
-                .flatMap(identity)
-                .rightValue
+                val ci = parse(responseAs[String])
+                  .map(_.as[Seq[BrokerInfo]])
+                  .flatMap(identity)
+                  .rightValue
 
-              ci must have size 1
-              ci.headOption.value mustBe BrokerInfo(
-                id = 0,
-                host = "localhost",
-                port = kcfg.kafkaPort,
-                rack = None
-              )
-            }
-        }
+                ci must have size 1
+                ci.headOption.value mustBe BrokerInfo(
+                  id = 0,
+                  host = "localhost",
+                  port = kcfg.kafkaPort,
+                  rack = None
+                )
+              }
+          }
       }
 
     "return 401 when accessing kafka cluster info with invalid bearer token" in
-      withEmbeddedOpenIdConnectServerAndClient() { case (_, _, _, cfg) =>
-        secureServerContext(serverOpenIdCfg = Option(cfg)) {
-          case (_, _, route) =>
-            Get("/kafka/cluster/info") ~> addCredentials(
-              OAuth2BearerToken("invalid-token")
-            ) ~> Route.seal(route) ~> check {
-              status mustBe Unauthorized
-            }
-        }
+      withOpenIdConnectServerAndClient(useJwtKafkaCreds = false) {
+        case (_, _, _, cfg) =>
+          secureServerContext(serverOpenIdCfg = Option(cfg)) {
+            case (_, _, route) =>
+              Get("/kafka/cluster/info") ~> addCredentials(
+                OAuth2BearerToken("invalid-token")
+              ) ~> Route.seal(route) ~> check {
+                status mustBe Unauthorized
+              }
+          }
       }
   }
 

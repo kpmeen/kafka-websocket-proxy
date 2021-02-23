@@ -32,8 +32,6 @@ class WebSocketRoutesJsonSpec
 
   implicit val timeout = RouteTestTimeout(2 minutes)
 
-  import TestServerRoutes.{serverErrorHandler, serverRejectionHandler}
-
   override protected val testTopicPrefix: String = "json-test-topic"
 
   private[this] def testRequiredQueryParamReject(
