@@ -153,6 +153,15 @@ look in the `X-Kafka-Auth` header for Base64 encoded credentials.
 | kafka.ws.proxy.server.openid-connect.custom-jwt.jwt-kafka-username-key | WSPROXY_JWT_KAFKA_USERNAME_KEY | not set | (Optional) JWT attribute key name for the Kafka username when Kafka credentials are passed via a JWT token. |
 | kafka.ws.proxy.server.openid-connect.custom-jwt.jwt-kafka-password-key | WSPROXY_JWT_KAFKA_PASSWORD_KEY | not set | (Optional) JWT attribute key name for the Kafka password when Kafka credentials are passed via a JWT token. |
 
+Example:
+
+```
+kafka.ws.proxy.server.openid-connect.custom-jwt {
+  jwt-kafka-username-key = "net.scalytica.jwt.username"
+  jwt-kafka-password-key = "net.scalytica.jwt.password"
+}
+```
+
 ### Internal Session Handler
 
 The `kafka-websocket-proxy` needs to keep some state about the different active
