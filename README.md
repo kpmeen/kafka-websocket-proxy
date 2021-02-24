@@ -128,12 +128,30 @@ configuration properties can be omitted.
 > should be set to `true`.
 
 | Config key                                          | Environment              | Default | Description   |
-|:---                                                 |:----                     |:-------:|:-----         |
+|:---                                                 |:----                     |:-------:|:-----------   |
 | kafka.ws.proxy.server.openid-connect.enabled        | WSPROXY_OPENID_ENABLED   | `false` | Indicates if the server should use OpenID Connect to authenticate Bearer tokens for the endpoints. |
 | kafka.ws.proxy.server.openid-connect.well-known-url | WSPROXY_OPENID_WELLKNOWN | not set | The full URL pointing to the OIDC `.well-known` OIDC configuration. |
 | kafka.ws.proxy.server.openid-connect.audience       | WSPROXY_OPENID_AUDIENCE  | not set | The OIDC audience to be used when communicating with the OIDC server. |
-| kafka.ws.proxy.server.openid-connect.realm          | WSPROXY_OPENID_REALM     | `""`    | Optional configuration that isn't really used by OIDC, but it's present in akka-http for API consistency. If not set, an empty string will be used. |
+| kafka.ws.proxy.server.openid-connect.realm          | WSPROXY_OPENID_REALM     | `""`    | (Optional) Configuration that isn't really used by OIDC, but it's present in akka-http for API consistency. If not set, an empty string will be used. |
 
+##### Using JWT token as the bearer for Kafka credentials 
+
+Some OpenID services allow adding extra attributes to the JWT token being
+provided to authenticated clients. In some cases these attributes can be used
+to provide things like credentials and connection info to clients. The
+`kafka-websocket-proxy` has built-in support for using credentials found in JWT
+tokens to authenticate against Kafka.
+
+To enable this feature, in addition to configuring OpenID Connect, the _attribute
+key names_ for the username and password attributes must be provided. Once these
+have been defined in the configuration, the `kafka-websocket-proxy` will attempt
+to find the credentials in the JWT token _first_. If not successful, it will
+look in the `X-Kafka-Auth` header for Base64 encoded credentials.  
+
+| Config key                                                             | Environment                    | Default | Description   |
+|:---                                                                    |:----                           |:-------:|:-----------   |
+| kafka.ws.proxy.server.openid-connect.custom-jwt.jwt-kafka-username-key | WSPROXY_JWT_KAFKA_USERNAME_KEY | not set | (Optional) JWT attribute key name for the Kafka username when Kafka credentials are passed via a JWT token. |
+| kafka.ws.proxy.server.openid-connect.custom-jwt.jwt-kafka-password-key | WSPROXY_JWT_KAFKA_PASSWORD_KEY | not set | (Optional) JWT attribute key name for the Kafka password when Kafka credentials are passed via a JWT token. |
 
 ### Internal Session Handler
 
