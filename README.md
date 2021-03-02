@@ -127,12 +127,13 @@ configuration properties can be omitted.
 > For production environments the `kafka.ws.proxy.server.ssl.ssl-only` property
 > should be set to `true`.
 
-| Config key                                          | Environment              | Default | Description   |
-|:---                                                 |:----                     |:-------:|:-----------   |
-| kafka.ws.proxy.server.openid-connect.enabled        | WSPROXY_OPENID_ENABLED   | `false` | Indicates if the server should use OpenID Connect to authenticate Bearer tokens for the endpoints. |
-| kafka.ws.proxy.server.openid-connect.well-known-url | WSPROXY_OPENID_WELLKNOWN | not set | The full URL pointing to the OIDC `.well-known` OIDC configuration. |
-| kafka.ws.proxy.server.openid-connect.audience       | WSPROXY_OPENID_AUDIENCE  | not set | The OIDC audience to be used when communicating with the OIDC server. |
-| kafka.ws.proxy.server.openid-connect.realm          | WSPROXY_OPENID_REALM     | `""`    | (Optional) Configuration that isn't really used by OIDC, but it's present in akka-http for API consistency. If not set, an empty string will be used. |
+| Config key                                                  | Environment                           | Default | Description   |
+|:---                                                         |:----                                  |:-------:|:-----------   |
+| kafka.ws.proxy.server.openid-connect.enabled                | WSPROXY_OPENID_ENABLED                | `false` | Indicates if the server should use OpenID Connect to authenticate Bearer tokens for the endpoints. |
+| kafka.ws.proxy.server.openid-connect.well-known-url         | WSPROXY_OPENID_WELLKNOWN              | not set | The full URL pointing to the OIDC `.well-known` OIDC configuration. |
+| kafka.ws.proxy.server.openid-connect.audience               | WSPROXY_OPENID_AUDIENCE               | not set | The OIDC audience to be used when communicating with the OIDC server. |
+| kafka.ws.proxy.server.openid-connect.realm                  | WSPROXY_OPENID_REALM                  | `""`    | (Optional) Configuration that isn't really used by OIDC, but it's present in akka-http for API consistency. If not set, an empty string will be used. |
+| kafka.ws.proxy.server.openid-connect.allow-detailed-logging | WSPROXY_OPENID_ALLOW_DETAILED_LOGGING | `false` | If set to `true` the proxy will log some details of the tokens being validated. Not recommended for use in production. |
 
 ##### Using JWT token as the bearer for Kafka credentials 
 

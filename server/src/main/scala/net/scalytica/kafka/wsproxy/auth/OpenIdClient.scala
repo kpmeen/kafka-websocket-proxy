@@ -18,7 +18,7 @@ import net.scalytica.kafka.wsproxy.errors.{
   OpenIdConnectError
 }
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
-import pdi.jwt.{JwtAlgorithm, JwtBase64, JwtCirce, JwtClaim}
+import pdi.jwt.{JwtBase64, JwtCirce, JwtClaim}
 
 import java.time.Clock
 import scala.concurrent.Future
@@ -114,10 +114,18 @@ class OpenIdClient private (
   )(implicit oidcConfig: OpenIdConnectConfig): Try[JwtClaim] = {
     logger.trace("Validating jwt claim...")
     if (jwtClaim.isValid(oidcConfig.issuer, audience)) {
-      logger.trace("Jwt claim is valid!")
+      val jwtId = if (oidcCfg.allowDetailedLogging) jwtClaim.jwtId else None
+      val msg =
+        s"Jwt claim${jwtId.map(jid => s" with jti: [$jid]").getOrElse("")} " +
+          "is valid!"
+      logger.trace(msg)
       Success(jwtClaim)
     } else {
-      logger.trace("Jwt claim is NOT valid!")
+      val jwtId = if (oidcCfg.allowDetailedLogging) jwtClaim.jwtId else None
+      val msg =
+        s"Jwt claim${jwtId.map(jid => s" with jti: [$jid]").getOrElse("")} " +
+          "is NOT valid!"
+      logger.trace(msg)
       Failure(AuthenticationError("The JWT is not valid"))
     }
   }
@@ -142,7 +150,7 @@ class OpenIdClient private (
             // generate public key
             pubKey <- Jwk.generatePublicKey(jwk)
             // Decode the token using the secret key
-            claim <- JwtCirce.decode(t, pubKey, Seq(JwtAlgorithm.RS256))
+            claim <- JwtCirce.decode(t, pubKey)
             // validate the data stored inside the token
             validClaim <- validateClaim(claim)
           } yield validClaim

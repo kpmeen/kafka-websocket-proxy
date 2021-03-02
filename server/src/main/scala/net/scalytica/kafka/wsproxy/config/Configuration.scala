@@ -218,7 +218,8 @@ object Configuration extends WithProxyLogger {
       realm: Option[String],
       enabled: Boolean = false,
       requireHttps: Boolean = true,
-      customJwt: Option[CustomJwtCfg] = None
+      customJwt: Option[CustomJwtCfg] = None,
+      allowDetailedLogging: Boolean = false
   ) {
     if (enabled)
       require(
