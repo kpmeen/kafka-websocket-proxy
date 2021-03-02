@@ -2,7 +2,7 @@ import sbt._
 
 object Versions {
 
-  val ScalaVersion = "2.13.4"
+  val ScalaVersion = "2.13.5"
 
   val LightbendConfigVersion = "1.4.1"
   val PureConfigVersion      = "0.14.0"
