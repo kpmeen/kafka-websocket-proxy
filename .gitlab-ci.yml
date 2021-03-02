@@ -74,7 +74,7 @@ publish docker containers:
 
 include:
   - template: SAST.gitlab-ci.yml
-  - template: Dependency-Scanning.gitlab-ci.yml
+#  - template: Dependency-Scanning.gitlab-ci.yml
   - template: Code-Quality.gitlab-ci.yml
   - template: Secret-Detection.gitlab-ci.yml
 
@@ -87,13 +87,13 @@ code_quality:
     paths:
       - gl-code-quality-report.json
 
-dependency_scanning:
-  variables:
-    CI_DEBUG_TRACE: "true"
-    SBT_CLI_OPTS: "-Dsbt.coursier=false -Dsbt.ivy=true"
-  artifacts:
-    paths:
-      - gl-dependency-scanning-report.json
+#dependency_scanning:
+#  variables:
+#    CI_DEBUG_TRACE: "true"
+#    SBT_CLI_OPTS: "-Dsbt.coursier=false -Dsbt.ivy=true"
+#  artifacts:
+#    paths:
+#      - gl-dependency-scanning-report.json
 
 
 # To have the container scanning execute in the desired stage, the below is copied
