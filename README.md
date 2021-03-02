@@ -244,16 +244,36 @@ behaviour of the commit handler
 Exposed configuration properties for the Kafka clients initialised and used by
 the `kafka-websocket-proxy` whenever a WebSocket connection is established.  
 
-| Config key                                                                                           | Environment                              | Required | Default       | Description   |
-|:---                                                                                                  |:----                                     |:--------:|:-------------:|:-----         |
-| kafka.ws.proxy.kafka-client.bootstrap-hosts                                                          | WSPROXY_KAFKA_BOOTSTRAP_HOSTS            |    y     | not set       | A string with the Kafka brokers to bootstrap against, in the form `<host>:<port>`, separated by comma. |
-| kafka.ws.proxy.kafka-client.schema-registry.url                                                      | WSPROXY_SCHEMA_REGISTRY_URL              |    n     | not set       | URLs for the Confluent Schema Registry. If _not_ set, any other schema registry configs will be ignored. |
-| kafka.ws.proxy.kafka-client.schema-registry.auto-register-schemas                                    | WSPROXY_SCHEMA_AUTO_REGISTER             |    n     | `true`        | By default, the proxy will automatically register any internal Avro schemas it needs. If disabled, these schemas must be registered with the schema registry manually. |
-| kafka.ws.proxy.kafka-client.schema-registry.properties.schema.registry.basic.auth.credentials.source | WSPROXY_SCHEMA_BASIC_AUTH_CREDS_SRC      |    n     | `USER_INFO`   | Basic auth mechanism to use for Confluent Schema Registry. |
-| kafka.ws.proxy.kafka-client.schema-registry.properties.schema.registry.basic.auth.user.info          | WSPROXY_SCHEMA_BASIC_AUTH_USER_INFO      |    n     | `true`        | User info for basic auth against Confluent Schema Registry. |
-| kafka.ws.proxy.kafka-client.properties.request.timeout.ms                                            | WSPROXY_KAFKA_CLIENT_REQUEST_TIMEOUT_MS  |    n     | `20000`       | Defines the request timeout period for the kafka clients. |
-| kafka.ws.proxy.kafka-client.properties.retry.backoff.ms                                              | WSPROXY_KAFKA_CLIENT_RETRY_BACKOFF_MS    |    n     | `500`         | Defines the amount of time to wait before retrying a request. | 
-| kafka.ws.proxy.kafka-client.monitoring-enabled                                                       | WSPROXY_CONFLUENT_MONITORING_ENABLED     |    n     | `false`       | When this flag is set to `true`, it will enable the Confluent Metrics Reporter |
+| Config key                                                                                           | Environment                               | Required | Default       | Description   |
+|:---                                                                                                  |:----                                      |:--------:|:-------------:|:-----         |
+| kafka.ws.proxy.kafka-client.bootstrap-hosts                                                          | WSPROXY_KAFKA_BOOTSTRAP_HOSTS             |    y     | not set       | A string with the Kafka brokers to bootstrap against, in the form `<host>:<port>`, separated by comma. |
+| kafka.ws.proxy.kafka-client.schema-registry.url                                                      | WSPROXY_SCHEMA_REGISTRY_URL               |    n     | not set       | URLs for the Confluent Schema Registry. If _not_ set, any other schema registry configs will be ignored. |
+| kafka.ws.proxy.kafka-client.schema-registry.auto-register-schemas                                    | WSPROXY_SCHEMA_AUTO_REGISTER              |    n     | `true`        | By default, the proxy will automatically register any internal Avro schemas it needs. If disabled, these schemas must be registered with the schema registry manually. |
+| kafka.ws.proxy.kafka-client.schema-registry.properties.schema.registry.basic.auth.credentials.source | WSPROXY_SCHEMA_BASIC_AUTH_CREDS_SRC       |    n     | `USER_INFO`   | Basic auth mechanism to use for Confluent Schema Registry. |
+| kafka.ws.proxy.kafka-client.schema-registry.properties.schema.registry.basic.auth.user.info          | WSPROXY_SCHEMA_BASIC_AUTH_USER_INFO       |    n     | `true`        | User info for basic auth against Confluent Schema Registry. |
+| kafka.ws.proxy.kafka-client.properties.request.timeout.ms                                            | WSPROXY_KAFKA_CLIENT_REQUEST_TIMEOUT_MS   |    n     | `30000`       | Defines the amount of time the client will wait for a response to a request. Note that this property affect consumer and producer clients differently. See official Kafka docs for more details. |
+| kafka.ws.proxy.kafka-client.properties.retries                                                       | WSPROXY_KAFKA_CLIENT_NUM_RETRIES          |    n     | `2147483647`  | Setting a value greater than zero will cause the client to resend any record whose send fails with a potentially transient error. Note that this retry is no different than if the client resent the record upon receiving the error. |
+| kafka.ws.proxy.kafka-client.properties.retry.backoff.ms                                              | WSPROXY_KAFKA_CLIENT_RETRY_BACKOFF_MS     |    n     | `100`         | Defines the amount of time to wait before retrying a request. |
+| kafka.ws.proxy.kafka-client.monitoring-enabled                                                       | WSPROXY_CONFLUENT_MONITORING_ENABLED      |    n     | `false`       | When this flag is set to `true`, it will enable the Confluent Metrics Reporter |
+
+##### Producer specific configuration
+
+| Config key                                                                            | Environment                               | Required | Default       | Description   |
+|:---                                                                                   |:----                                      |:--------:|:-------------:|:-----         |
+| kafka.ws.proxy.producer.kafka-client.properties.request.timeout.ms                    | WSPROXY_KAFKA_PRODUCER_REQUEST_TIMEOUT_MS |    n     | `30000`       | Defines the amount of time the client will wait for a response to a request. Note that this property affect consumer and producer clients differently. See official Kafka docs for more details. |
+| kafka.ws.proxy.producer.kafka-client.properties.retries                               | WSPROXY_KAFKA_PRODUCER_NUM_RETRIES        |    n     | `2147483647`  | Setting a value greater than zero will cause the client to resend any record whose send fails with a potentially transient error. Note that this retry is no different than if the client resent the record upon receiving the error. |
+| kafka.ws.proxy.producer.kafka-client.properties.retry.backoff.ms                      | WSPROXY_KAFKA_PRODUCER_RETRY_BACKOFF_MS   |    n     | `100`         | Defines the amount of time to wait before retrying a request. |
+| kafka.ws.proxy.producer.kafka-client-properties.delivery.timeout.ms                   | WSPROXY_KAFKA_PRODUCER_DELIVER_TIMEOUT_MS |    n     | `20000`       | Defines the amount of time to wait before abandoning the attempt to deliver a message to Kafka. |
+| kafka.ws.proxy.producer.kafka-client-properties.max.in.flight.requests.per.connection | WSPROXY_KAFKA_PRODUCER_MAX_IN_FLIGHT_REQ  |    n     | `5`           | The maximum number of unacknowledged requests the client will send on a single connection before blocking. Note that if this setting is set to be greater than 1 and there are failed sends, there is a risk of message re-ordering due to retries. |
+
+##### Consumer specific configuration
+
+| Config key                                                                            | Environment                               | Required | Default       | Description   |
+|:---                                                                                   |:----                                      |:--------:|:-------------:|:-----         |
+| kafka.ws.proxy.consumer.kafka-client.properties.request.timeout.ms                    | WSPROXY_KAFKA_CONSUMER_REQUEST_TIMEOUT_MS |    n     | `30000`       | Defines the amount of time the client will wait for a response to a request. Note that this property affect consumer and producer clients differently. See official Kafka docs for more details. |
+| kafka.ws.proxy.consumer.kafka-client.properties.retries                               | WSPROXY_KAFKA_CONSUMER_NUM_RETRIES        |    n     | `2147483647`  | Setting a value greater than zero will cause the client to resend any record whose send fails with a potentially transient error. Note that this retry is no different than if the client resent the record upon receiving the error. |
+| kafka.ws.proxy.consumer.kafka-client.properties.retry.backoff.ms                      | WSPROXY_KAFKA_CONSUMER_RETRY_BACKOFF_MS   |    n     | `100`         | Defines the amount of time to wait before retrying a request. |
+
 
 ### Kafka Security
 
