@@ -142,7 +142,7 @@ class OpenIdClient private (
             // generate public key
             pubKey <- Jwk.generatePublicKey(jwk)
             // Decode the token using the secret key
-            claim <- JwtCirce.decode(t, pubKey, Seq(JwtAlgorithm.RS256))
+            claim <- JwtCirce.decode(t, pubKey)
             // validate the data stored inside the token
             validClaim <- validateClaim(claim)
           } yield validClaim
