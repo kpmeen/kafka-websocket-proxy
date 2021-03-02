@@ -16,7 +16,7 @@ import scala.concurrent.duration._
 
 class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
 
-  val invalidCfg1 = ConfigFactory
+  lazy val invalidCfg1 = ConfigFactory
     .parseString(
       s"""kafka.ws.proxy {
       |  server {
@@ -78,7 +78,7 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
     )
     .resolve()
 
-  val invalidCfg2 = ConfigFactory
+  lazy val invalidCfg2 = ConfigFactory
     .parseString(
       s"""kafka.ws.proxy {
       |  server {
@@ -119,7 +119,9 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
       |      default-messages-per-second = 0
       |      client-limits: []
       |    }
-      |    kafka-client-properties = $${kafka.ws.proxy.kafka-client.properties}
+      |    kafka-client-properties = $${kafka.ws.proxy.kafka-client.properties} {
+      |      delivery.timeout.ms = 20000
+      |    }
       |  }
       |
       |  session-handler {
@@ -167,12 +169,13 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
       cfg.commitHandler.autoCommitMaxAge mustBe 20.seconds
     }
 
-    "successfully load the default configuration without the" +
+    "successfully load the default configuration without the " +
       "schema-registry-url key set" in {
         val tcfg = ConfigFactory.defaultApplication.withValue(
           "kafka.ws.proxy.kafka-client.bootstrap-hosts",
           ConfigValueFactory.fromAnyRef("localhost:29092")
         )
+
         val cfg = Configuration.loadConfig(tcfg)
 
         cfg.server.serverId.value mustBe "node-1"
@@ -235,7 +238,7 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
       cfg.commitHandler.autoCommitMaxAge mustBe 20.seconds
     }
 
-    "successfully load the default configuration with the custom JWT Kafka" +
+    "successfully load the default configuration with the custom JWT Kafka " +
       "credential keys set" in {
         val tcfg = ConfigFactory.defaultApplication
           .withValue(
