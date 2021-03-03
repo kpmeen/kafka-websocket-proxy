@@ -24,7 +24,7 @@ object Versions {
   val CirceGenericExtrasVersion = CirceVersion
   val CirceOpticsVersion        = CirceVersion
 
-  val JwtScalaVersion = "4.3.0"
+  val JwtScalaVersion = "6.0.0"
 
   val ScalaLoggingVersion = "3.9.2"
   val Slf4JVersion        = "1.7.30"
@@ -89,8 +89,8 @@ object Dependencies {
   }
 
   object OAuth {
-    val JwtScala = "com.pauldijou" %% "jwt-core"  % JwtScalaVersion
-    val JwtCirce = "com.pauldijou" %% "jwt-circe" % JwtScalaVersion
+    val JwtScala = "com.github.jwt-scala" %% "jwt-core"  % JwtScalaVersion
+    val JwtCirce = "com.github.jwt-scala" %% "jwt-circe" % JwtScalaVersion
 
     val All = Seq(JwtScala, JwtCirce)
   }
