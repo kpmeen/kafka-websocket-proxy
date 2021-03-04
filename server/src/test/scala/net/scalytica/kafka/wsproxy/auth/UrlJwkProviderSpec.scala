@@ -8,6 +8,7 @@ import org.scalatest.matchers.must.Matchers
 import org.scalatest.time.{Minute, Span}
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.{Assertion, OptionValues, TryValues}
+import pdi.jwt.JwtAlgorithm
 
 import scala.concurrent.duration._
 
@@ -37,7 +38,7 @@ class UrlJwkProviderSpec
   private[this] def validateJwk(jwk: Jwk): Assertion = {
     jwk.kty mustBe Jwk.PubKeyAlgo
     jwk.use.value mustBe "sig"
-    jwk.alg.value mustBe "RS256"
+    jwk.alg.value mustBe JwtAlgorithm.RS256.name
     jwk.kid must not be empty
     jwk.n must not be empty
     jwk.e must not be empty

@@ -113,19 +113,12 @@ class OpenIdClient private (
       jwtClaim: JwtClaim
   )(implicit oidcConfig: OpenIdConnectConfig): Try[JwtClaim] = {
     logger.trace("Validating jwt claim...")
+    val allowDetailedLogging = oidcCfg.allowDetailedLogging
     if (jwtClaim.isValid(oidcConfig.issuer, audience)) {
-      val jwtId = if (oidcCfg.allowDetailedLogging) jwtClaim.jwtId else None
-      val msg =
-        s"Jwt claim${jwtId.map(jid => s" with jti: [$jid]").getOrElse("")} " +
-          "is valid!"
-      logger.trace(msg)
+      jwtClaim.logValidity(logger, isValid = true, allowDetailedLogging)
       Success(jwtClaim)
     } else {
-      val jwtId = if (oidcCfg.allowDetailedLogging) jwtClaim.jwtId else None
-      val msg =
-        s"Jwt claim${jwtId.map(jid => s" with jti: [$jid]").getOrElse("")} " +
-          "is NOT valid!"
-      logger.trace(msg)
+      jwtClaim.logValidity(logger, isValid = false, allowDetailedLogging)
       Failure(AuthenticationError("The JWT is not valid"))
     }
   }
