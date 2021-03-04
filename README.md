@@ -149,10 +149,11 @@ have been defined in the configuration, the `kafka-websocket-proxy` will attempt
 to find the credentials in the JWT token _first_. If not successful, it will
 look in the `X-Kafka-Auth` header for Base64 encoded credentials.  
 
-| Config key                                                             | Environment                    | Default | Description   |
-|:---                                                                    |:----                           |:-------:|:-----------   |
-| kafka.ws.proxy.server.openid-connect.custom-jwt.jwt-kafka-username-key | WSPROXY_JWT_KAFKA_USERNAME_KEY | not set | (Optional) JWT attribute key name for the Kafka username when Kafka credentials are passed via a JWT token. |
-| kafka.ws.proxy.server.openid-connect.custom-jwt.jwt-kafka-password-key | WSPROXY_JWT_KAFKA_PASSWORD_KEY | not set | (Optional) JWT attribute key name for the Kafka password when Kafka credentials are passed via a JWT token. |
+| Config key                                                             | Environment                       | Default | Description   |
+|:---                                                                    |:----                              |:-------:|:-----------   |
+| kafka.ws.proxy.server.openid-connect.custom-jwt.kafka-token-auth-only  | WSPROXY_JWT_KAFKA_TOKEN_AUTH_ONLY | `false` | When set to `true` the proxy will only allow Kafka authentication through the JWT token. |
+| kafka.ws.proxy.server.openid-connect.custom-jwt.jwt-kafka-username-key | WSPROXY_JWT_KAFKA_USERNAME_KEY    | not set | (Optional) JWT attribute key name for the Kafka username when Kafka credentials are passed via a JWT token. |
+| kafka.ws.proxy.server.openid-connect.custom-jwt.jwt-kafka-password-key | WSPROXY_JWT_KAFKA_PASSWORD_KEY    | not set | (Optional) JWT attribute key name for the Kafka password when Kafka credentials are passed via a JWT token. |
 
 Example:
 
