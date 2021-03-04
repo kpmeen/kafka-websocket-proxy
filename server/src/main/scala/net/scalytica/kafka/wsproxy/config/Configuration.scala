@@ -209,7 +209,8 @@ object Configuration extends WithProxyLogger {
 
   final case class CustomJwtCfg(
       jwtKafkaUsernameKey: String,
-      jwtKafkaPasswordKey: String
+      jwtKafkaPasswordKey: String,
+      kafkaTokenAuthOnly: Boolean = false
   )
 
   final case class OpenIdConnectCfg(
@@ -221,11 +222,15 @@ object Configuration extends WithProxyLogger {
       customJwt: Option[CustomJwtCfg] = None,
       allowDetailedLogging: Boolean = false
   ) {
-    if (enabled)
+    if (enabled) {
       require(
         wellKnownUrl.isDefined && audience.isDefined,
         "well-known-url and audience must be defined when openid is enabled"
       )
+    }
+
+    def isKafkaTokenAuthOnlyEnabled: Boolean =
+      customJwt.exists(_.kafkaTokenAuthOnly)
   }
 
   final case class ServerCfg(

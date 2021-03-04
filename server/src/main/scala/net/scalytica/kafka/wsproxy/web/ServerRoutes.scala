@@ -493,9 +493,28 @@ trait WebSocketRoutes { self: BaseRoutes =>
   private[this] def extractKafkaCreds(
       authRes: AuthenticationResult,
       kafkaAuthHeader: Option[XKafkaAuthHeader]
-  ): Option[AclCredentials] = {
-    // Always prefer the JWT token
-    authRes.aclCredentials.orElse(kafkaAuthHeader.map(_.aclCredentials))
+  )(implicit cfg: AppCfg): Option[AclCredentials] = {
+    cfg.server.openidConnect
+      .map { oidcfg =>
+        if (oidcfg.isKafkaTokenAuthOnlyEnabled) {
+          logger.trace("Only allowing Kafka auth through JWT token.")
+          authRes.aclCredentials
+        } else {
+          logger.trace(
+            s"Allowing Kafka auth through JWT token or the" +
+              s" ${Headers.KafkaAuthHeaderName} header."
+          )
+          // Always prefer the JWT token
+          authRes.aclCredentials.orElse(kafkaAuthHeader.map(_.aclCredentials))
+        }
+      }
+      .getOrElse {
+        logger.trace(
+          "OpenID Connect is not configured. Using" +
+            s" ${Headers.KafkaAuthHeaderName} header."
+        )
+        kafkaAuthHeader.map(_.aclCredentials)
+      }
   }
 
   /**
