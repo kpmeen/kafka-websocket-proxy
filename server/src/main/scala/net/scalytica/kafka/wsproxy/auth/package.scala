@@ -3,8 +3,9 @@ package net.scalytica.kafka.wsproxy
 import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
+import com.typesafe.scalalogging.Logger
 import io.circe.generic.extras.{Configuration => CirceConfiguration}
-import pdi.jwt.JwtBase64
+import pdi.jwt.{JwtBase64, JwtClaim}
 
 import scala.concurrent.Future
 
@@ -31,5 +32,25 @@ package object auth {
         case None         => decoded
       }
     }
+  }
+
+  implicit private[auth] class JwtClaimExtensions(jc: JwtClaim) {
+
+    def logValidity(
+        logger: Logger,
+        isValid: Boolean,
+        detailedLogging: Boolean = false
+    ): Unit = {
+      val jwtId =
+        if (detailedLogging) jc.jwtId.map(jid => s" with jti: [$jid]")
+        else None
+      val aud      = jc.audience.map(_.mkString(", ")).getOrElse("not set")
+      val iss      = jc.issuer.getOrElse("not set")
+      val logMsg   = "Jwt claim%s for audience [%s] from issuer [%s] is %s!"
+      val validStr = if (isValid) "valid" else "NOT valid"
+
+      logger.debug(logMsg.format(jwtId.getOrElse(""), aud, iss, validStr))
+    }
+
   }
 }

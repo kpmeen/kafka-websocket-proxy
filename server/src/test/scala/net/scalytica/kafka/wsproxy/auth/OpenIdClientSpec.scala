@@ -1,7 +1,10 @@
 package net.scalytica.kafka.wsproxy.auth
 
 import akka.util.Timeout
-import net.scalytica.kafka.wsproxy.errors.OpenIdConnectError
+import net.scalytica.kafka.wsproxy.errors.{
+  AuthenticationError,
+  OpenIdConnectError
+}
 import net.scalytica.test.{MockOpenIdServer, WsProxyKafkaSpec}
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.must.Matchers
@@ -107,6 +110,17 @@ class OpenIdClientSpec
 
           tokenRes.content must include(jwtKafkaUsernameJson)
           tokenRes.content must include(jwtKafkaPasswordJson)
+      }
+
+    "fail to validate a bearer token containing with wrong audience" in
+      withOpenIdConnectServerAndToken(
+        tokenAudience = Some("not-for-me"),
+        useJwtKafkaCreds = true
+      ) { case (_, _, client, _, token) =>
+        val bearerToken = token.bearerToken
+
+        val response = client.validate(bearerToken).futureValue
+        response.failure.exception mustBe an[AuthenticationError]
       }
 
     "gracefully handle that keycloak isn't available" in
