@@ -36,6 +36,10 @@ case class AuthorisationError(message: String, cause: Option[Throwable] = None)
     extends ProxyAuthError(message, cause)
     with NoStackTrace
 
+case class InvalidTokenError(message: String, cause: Option[Throwable] = None)
+    extends ProxyAuthError(message, cause)
+    with NoStackTrace
+
 sealed abstract class JwkError(msg: String, throwable: Option[Throwable])
     extends ProxyAuthError(msg, throwable)
 

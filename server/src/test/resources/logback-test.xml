@@ -28,6 +28,7 @@
 
   <logger name="net.scalytica" level="OFF"/>
   <!--  <logger name="net.scalytica.kafka.wsproxy" level="TRACE"/>-->
+  <!--  <logger name="net.scalytica.kafka.wsproxy.auth.JwtValidationTickerFlow" level="TRACE"/>-->
   <!--  <logger name="net.scalytica.kafka.wsproxy.auth.OpenIdClient" level="DEBUG"/>-->
   <!--  <logger name="net.scalytica.kafka.wsproxy.auth.UrlJwkProvider" level="TRACE"/>-->
   <!--  <logger name="net.scalytica.kafka.wsproxy.admin" level="OFF"/>-->
@@ -40,11 +41,10 @@
   <!--  <logger name="net.scalytica.kafka.wsproxy.producer" level="TRACE"/>-->
   <!--  <logger name="net.scalytica.kafka.wsproxy.session" level="INFO"/>-->
   <!--  <logger name="net.scalytica.kafka.wsproxy.utils" level="INFO"/>-->
-  <!--  <logger name="net.scalytica.kafka.wsproxy.web" level="TRACE"/>-->
 
   <!-- Root loggers catch all other events that are not explicitly handled-->
   <root level="OFF">
-    <appender-ref ref="ASYNC_STDOUT"/>
+    <appender-ref ref="STDOUT"/>
   </root>
 
 </configuration>

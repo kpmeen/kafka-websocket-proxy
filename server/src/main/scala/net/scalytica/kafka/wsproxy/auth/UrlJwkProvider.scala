@@ -12,7 +12,6 @@ import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.utils.HostResolver
 
 import scala.concurrent.Future
-import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -45,9 +44,6 @@ class UrlJwkProvider private[auth] (url: String, enforceHttps: Boolean = true)
 
   require(host.nonEmpty, "The URL must contain a valid host")
   require(HostResolver.resolveHost(host).isSuccess, s"Could not resolve $host")
-
-  val connectionTimeout = 30 seconds
-  val readTimeout       = 30 seconds
 
   /** Load the JWK configuration from the provided URL */
   private[auth] def load()(implicit mat: Materializer): Future[List[Jwk]] = {

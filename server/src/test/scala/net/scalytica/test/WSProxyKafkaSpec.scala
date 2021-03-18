@@ -152,7 +152,7 @@ trait WsProxyKafkaSpec
   lazy val defaultTypesafeConfig: Config = loadConfig("/application-test.conf")
 
   lazy val defaultTestAppCfg: AppCfg =
-    Configuration.loadFile(filePath("/application-test.conf"))
+    Configuration.loadConfig(testConfig)
 
   lazy val defaultTestAppCfgWithServerId: String => AppCfg = (sid: String) =>
     defaultTestAppCfg.copy(

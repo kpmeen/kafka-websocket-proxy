@@ -127,13 +127,33 @@ configuration properties can be omitted.
 > For production environments the `kafka.ws.proxy.server.ssl.ssl-only` property
 > should be set to `true`.
 
-| Config key                                                  | Environment                           | Default | Description   |
-|:---                                                         |:----                                  |:-------:|:-----------   |
-| kafka.ws.proxy.server.openid-connect.enabled                | WSPROXY_OPENID_ENABLED                | `false` | Indicates if the server should use OpenID Connect to authenticate Bearer tokens for the endpoints. |
-| kafka.ws.proxy.server.openid-connect.well-known-url         | WSPROXY_OPENID_WELLKNOWN              | not set | The full URL pointing to the OIDC `.well-known` OIDC configuration. |
-| kafka.ws.proxy.server.openid-connect.audience               | WSPROXY_OPENID_AUDIENCE               | not set | The OIDC audience to be used when communicating with the OIDC server. |
-| kafka.ws.proxy.server.openid-connect.realm                  | WSPROXY_OPENID_REALM                  | `""`    | (Optional) Configuration that isn't really used by OIDC, but it's present in akka-http for API consistency. If not set, an empty string will be used. |
-| kafka.ws.proxy.server.openid-connect.allow-detailed-logging | WSPROXY_OPENID_ALLOW_DETAILED_LOGGING | `false` | If set to `true` the proxy will log some details of the tokens being validated. Not recommended for use in production. |
+| Config key                                                     | Environment                              | Default      | Description   |
+|:---                                                            |:----                                     |:------------:|:-----------   |
+| kafka.ws.proxy.server.openid-connect.enabled                   | WSPROXY_OPENID_ENABLED                   | `false`      | Indicates if the server should use OpenID Connect to authenticate Bearer tokens for the endpoints. |
+| kafka.ws.proxy.server.openid-connect.well-known-url            | WSPROXY_OPENID_WELLKNOWN                 | not set      | The full URL pointing to the OIDC `.well-known` OIDC configuration. |
+| kafka.ws.proxy.server.openid-connect.audience                  | WSPROXY_OPENID_AUDIENCE                  | not set      | The OIDC audience to be used when communicating with the OIDC server. |
+| kafka.ws.proxy.server.openid-connect.realm                     | WSPROXY_OPENID_REALM                     | `""`         | (Optional) Configuration that isn't really used by OIDC, but it's present in akka-http for API consistency. If not set, an empty string will be used. |
+| kafka.ws.proxy.server.openid-connect.allow-detailed-logging    | WSPROXY_OPENID_ALLOW_DETAILED_LOGGING    | `false`      | If set to `true` the proxy will log some details of the tokens being validated. Not recommended for use in production. |
+| kafka.ws.proxy.server.openid-connect.revalidation-interval     | WSPROXY_OPENID_REVALIDATION_INTERVAL     | `10 minutes` | The interval to verify that the JWT token is valid when a WebSocket connection is open. |
+| kafka.ws.proxy.server.openid-connect.revalidation-errors-limit | WSPROXY_OPENID_REVALIDATION_ERRORS_LIMIT | `-1`         | The number of times the JWT validation check for an open WebSocket may fail due to e.g. OpenID Connect server being unavailable. Once the limit is reached, the connection is terminated. A value of `-1` will disable the limit. |
+
+##### Revalidation of JWT token on open WebSocket connections 
+
+When OpenID Connect is enabled, `kafka-websocket-proxy` will periodically
+revalidate the JWT token used for authentication. The duration of the interval
+between revalidation is configurable. It is also possible to set an error limit
+threshold for transient errors, like networking issues, between the proxy and
+OIDC server. See the table above for details on these configuration parameters.
+
+The JWT revalidation process will terminate the WebSocket connection in the
+following scenarios:
+
+* The JWT token is no longer valid.
+* Revalidation fails due to a transient error when trying to communicate with the OIDC server, and the `kafka.ws.proxy.server.openid-connect.revalidation-errors-limit` has a value that is `>` than `-1`.
+
+Note that the `kafka-websocket-proxy` has the revalidation error limit set to
+`-1` by default. Meaning, it will _not_ disconnect open connections due to
+transient errors.
 
 ##### Using JWT token as the bearer for Kafka credentials 
 
@@ -379,13 +399,16 @@ It is possible to set the log levels of some important loggers through
 environment variables. The below table shows which are available, and what their
 default values are.
 
-| Logger                       | Environment                      | Default |
-|:---                          |:----                             |:-------:|
-| akka.actor                   | WS_PROXY_AKKA_ACTOR_LOG_LEVEL    |  WARN   |
-| akka.kafka                   | WS_PROXY_AKKA_KAFKA_LOG_LEVEL    |  WARN   |
-| org.apache.kafka.clients     | WS_PROXY_KAFKA_CLIENTS_LOG_LEVEL |  ERROR  |
-| net.scalytica.kafka.wsproxy  | WS_PROXY_APP_LOG_LEVEL           |  DEBUG  |
-| root                         | WS_PROXY_ROOT_LOG_LEVEL          |  ERROR  |
+| Logger                            | Environment                      | Default |
+|:---                               |:----                             |:-------:|
+| akka.actor                        | WS_PROXY_AKKA_ACTOR_LOG_LEVEL    |  WARN   |
+| akka.http                         | WS_PROXY_AKKA_HTTP_LOG_LEVEL     |  WARN   |
+| akka.kafka                        | WS_PROXY_AKKA_KAFKA_LOG_LEVEL    |  WARN   |
+| org.apache.kafka.clients          | WS_PROXY_KAFKA_CLIENTS_LOG_LEVEL |  ERROR  |
+| net.scalytica.kafka.wsproxy       | WS_PROXY_APP_LOG_LEVEL           |  DEBUG  |
+| net.scalytica.kafka.wsproxy.auth  | WS_PROXY_AUTH_LOG_LEVEL          |  DEBUG  |
+| net.scalytica.kafka.wsproxy.admin | WS_PROXY_ADMIN_LOG_LEVEL         |  WARN   |
+| root                              | WS_PROXY_ROOT_LOG_LEVEL          |  ERROR  |
 
 **3. Overriding full configuration through environment** 
 

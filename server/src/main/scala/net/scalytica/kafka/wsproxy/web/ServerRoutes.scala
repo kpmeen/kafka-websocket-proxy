@@ -99,13 +99,19 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
       case Some(oidcClient) =>
         creds match {
           case Credentials.Provided(token) =>
-            oidcClient.validate(OAuth2BearerToken(token)).flatMap {
+            val bearerToken = OAuth2BearerToken(token)
+            oidcClient.validate(bearerToken).flatMap {
               case Success(jwtClaim) =>
                 logger.trace("Successfully authenticated bearer token.")
-                Future.successful(Some(JwtAuthResult(jwtClaim)))
+                Future.successful(Some(JwtAuthResult(bearerToken, jwtClaim)))
               case Failure(err) =>
-                logger.info("Could not authenticate bearer token", err)
-                Future.failed(err)
+                err match {
+                  case err: ProxyAuthError =>
+                    logger.info("Could not authenticate bearer token", err)
+                    Future.successful(None)
+                  case err =>
+                    Future.failed(err)
+                }
             }
           case _ =>
             logger.info("Could not authenticate bearer token")
@@ -229,6 +235,12 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
     rejectAndComplete(jsonResponseMsg(clientError, proxyError.getMessage))
   }
 
+  private[this] def invalidTokenRejection(tokenError: InvalidTokenError) =
+    extractUri { uri =>
+      logger.info(s"JWT token in request $uri is not valid.", tokenError)
+      rejectAndComplete(jsonResponseMsg(Unauthorized, tokenError.getMessage))
+    }
+
   implicit def serverErrorHandler: ExceptionHandler =
     ExceptionHandler {
       case t: TopicNotFoundError =>
@@ -237,9 +249,13 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
           rejectAndComplete(jsonResponseMsg(BadRequest, t.message))
         }
 
-      case a: InvalidPublicKeyError =>
-        logger.warn(s"Request failed with an InvalidPublicKeyError.", a)
-        notAuthenticatedRejection(a, Unauthorized)
+      case i: InvalidPublicKeyError =>
+        logger.warn(s"Request failed with an InvalidPublicKeyError.", i)
+        notAuthenticatedRejection(i, Unauthorized)
+
+      case i: InvalidTokenError =>
+        logger.warn(s"Request failed with an InvalidTokenError.", i)
+        invalidTokenRejection(i)
 
       case a: AuthenticationError =>
         logger.warn(s"Request failed with an AuthenticationError.", a)
@@ -541,7 +557,9 @@ trait WebSocketRoutes { self: BaseRoutes =>
             optionalHeaderValueByType(XKafkaAuthHeader) { headerCreds =>
               val creds = extractKafkaCreds(authResult, headerCreds)
               inParams { inArgs =>
-                val args = inArgs.withAclCredentials(creds)
+                val args = inArgs
+                  .withAclCredentials(creds)
+                  .withBearerToken(authResult.maybeBearerToken)
                 validateAndHandleWebSocket(args)(inbound(args))
               }
             }
@@ -551,7 +569,9 @@ trait WebSocketRoutes { self: BaseRoutes =>
             optionalHeaderValueByType(XKafkaAuthHeader) { headerCreds =>
               val creds = extractKafkaCreds(authResult, headerCreds)
               outParams { outArgs =>
-                val args = outArgs.withAclCredentials(creds)
+                val args = outArgs
+                  .withAclCredentials(creds)
+                  .withBearerToken(authResult.maybeBearerToken)
                 validateAndHandleWebSocket(args)(outbound(args))
               }
             }

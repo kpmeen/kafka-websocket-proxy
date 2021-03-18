@@ -18,6 +18,7 @@ import io.circe.parser.parse
 import io.circe.syntax._
 import net.scalytica.kafka.wsproxy._
 import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
+import net.scalytica.kafka.wsproxy.auth.{JwtValidationTickerFlow, OpenIdClient}
 import net.scalytica.kafka.wsproxy.codecs.Decoders._
 import net.scalytica.kafka.wsproxy.codecs.Encoders._
 import net.scalytica.kafka.wsproxy.codecs.ProtocolSerdes.{
@@ -88,6 +89,11 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
    *
    * @param args
    *   the output arguments to pass on to the consumer.
+   * @param cfg
+   *   Implicitly provided [[AppCfg]]
+   * @param maybeOpenIdClient
+   *   Implicitly provided Option that contains an [[OpenIdClient]] if OIDC is
+   *   enabled.
    * @param as
    *   Implicitly provided [[ActorSystem]]
    * @param mat
@@ -106,6 +112,7 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
       args: OutSocketArgs
   )(
       implicit cfg: AppCfg,
+      maybeOpenIdClient: Option[OpenIdClient],
       as: ActorSystem,
       mat: Materializer,
       ec: ExecutionContext,
@@ -201,6 +208,9 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
    *   the implicit [[Materializer]] to use
    * @param ec
    *   the implicit [[ExecutionContext]] to use
+   * @param maybeOpenIdClient
+   *   Implicitly provided Option that contains an [[OpenIdClient]] if OIDC is
+   *   enabled.
    * @param jmxManager
    *   Implicitly provided optional [[JmxManager]]
    * @return
@@ -213,6 +223,7 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
       as: ActorSystem,
       mat: Materializer,
       ec: ExecutionContext,
+      maybeOpenIdClient: Option[OpenIdClient],
       jmxManager: Option[JmxManager]
   ): Route = {
     val commitHandlerRef =
@@ -235,33 +246,36 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
     val source = kafkaSource(args, commitHandlerRef)
 
     handleWebSocketMessages {
-      Flow
-        .fromSinkAndSourceCoupledMat(sink, source)(Keep.both)
-        .watchTermination() { (m, f) =>
-          val termination = for {
-            done <- f
-            _    <- terminateConsumer()
-          } yield done
+      val socketFlow = Flow.fromSinkAndSourceCoupledMat(sink, source)(Keep.both)
 
-          termination.onComplete {
-            case scala.util.Success(_) =>
-              m._2.drainAndShutdown(Future.successful(Done))
-              logger.info(
-                "Outbound WebSocket connect with clientId " +
-                  s"${args.clientId.value} for topic ${args.topic.value} has " +
-                  "been disconnected."
-              )
+      val jwtValidationFlow =
+        JwtValidationTickerFlow.flow[Message](args.clientId, args.bearerToken)
 
-            case scala.util.Failure(e) =>
-              m._2.drainAndShutdown(Future.successful(Done))
-              logger.error(
-                "Outbound WebSocket connection with clientId " +
-                  s"${args.clientId.value} for topic ${args.topic.value} has " +
-                  "been disconnected due to an unexpected error",
-                e
-              )
-          }
+      (socketFlow via jwtValidationFlow).watchTermination() { (m, f) =>
+        val termination = for {
+          done <- f
+          _    <- terminateConsumer()
+        } yield done
+
+        termination.onComplete {
+          case scala.util.Success(_) =>
+            m._2.drainAndShutdown(Future.successful(Done))
+            logger.info(
+              "Outbound WebSocket connect with clientId " +
+                s"${args.clientId.value} for topic ${args.topic.value} has " +
+                "been disconnected."
+            )
+
+          case scala.util.Failure(e) =>
+            m._2.drainAndShutdown(Future.successful(Done))
+            logger.error(
+              "Outbound WebSocket connection with clientId " +
+                s"${args.clientId.value} for topic ${args.topic.value} has " +
+                "been disconnected due to an unexpected error",
+              e
+            )
         }
+      }
     }
   }
 

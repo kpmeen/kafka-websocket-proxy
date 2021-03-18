@@ -1,6 +1,7 @@
 package net.scalytica.test
 
 import akka.actor.ActorSystem
+import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
@@ -27,8 +28,9 @@ import pdi.jwt._
 import java.security.KeyPairGenerator
 import java.security.interfaces.{RSAPrivateKey, RSAPublicKey}
 import java.util.{Base64, UUID}
-import scala.concurrent.ExecutionContext
+import scala.annotation.tailrec
 import scala.concurrent.duration._
+import scala.concurrent.{Await, ExecutionContext}
 
 trait MockOpenIdServer
     extends EmbeddedHttpServer
@@ -242,10 +244,31 @@ trait MockOpenIdServer
   def wellKnownOpenIdUrlString(host: String, port: Int): String =
     s"http://$host:$port/oauth/.well-known/openid-connect"
 
+  private[this] def hasStarted(
+      host: String,
+      port: Int
+  )(implicit sys: ActorSystem, ec: ExecutionContext) = {
+    val uri = wellKnownOpenIdUrlString(host, port)
+    @tailrec
+    def check(retries: Int = 0): Boolean = {
+      if (retries <= 5) {
+        val res    = Http().singleRequest(HttpRequest(uri = uri))
+        val status = Await.result(res.map(_.status), 1 second)
+        if (status == StatusCodes.OK) true
+        else check(retries + 1)
+      } else {
+        false
+      }
+    }
+    check()
+  }
+
   def withOpenIdConnectServer[T](
       host: String = "localhost",
       port: Int = availablePort,
       useJwtKafkaCreds: Boolean,
+      validationInterval: FiniteDuration = 10 minutes,
+      errorLimit: Int = -1,
       tokenAudience: Option[String] = Some(oidAudience)
   )(block: (String, Int, OpenIdConnectCfg) => T)(
       implicit sys: ActorSystem,
@@ -260,11 +283,20 @@ trait MockOpenIdServer
         realm = None,
         enabled = true,
         requireHttps = false,
+        revalidationInterval = validationInterval,
+        revalidationErrorsLimit = errorLimit,
         customJwt =
           if (useJwtKafkaCreds) Some(customJwtCfg)
           else None
       )
-      block(h, p, cfg)
+
+      if (hasStarted(host, port)) {
+        block(h, p, cfg)
+      } else {
+        throw new IllegalStateException(
+          "Could not verify that MockOpenIdServer was started"
+        )
+      }
     }
   }
 
@@ -272,26 +304,37 @@ trait MockOpenIdServer
       host: String = "localhost",
       port: Int = availablePort,
       useJwtKafkaCreds: Boolean,
+      validationInterval: FiniteDuration = 10 minutes,
+      errorLimit: Int = -1,
       tokenAudience: Option[String] = Some(oidAudience)
   )(block: (String, Int, OpenIdClient, OpenIdConnectCfg) => T)(
       implicit sys: ActorSystem,
       mat: Materializer,
       ec: ExecutionContext
   ): T =
-    withOpenIdConnectServer(host, port, useJwtKafkaCreds, tokenAudience) {
-      case (h, p, cfg) =>
-        val client = OpenIdClient(
-          oidcCfg = cfg,
-          enforceHttps = false
-        )
-        block(h, p, client, cfg)
+    withOpenIdConnectServer(
+      host,
+      port,
+      useJwtKafkaCreds,
+      validationInterval,
+      errorLimit,
+      tokenAudience
+    ) { case (h, p, cfg) =>
+      val client = OpenIdClient(
+        oidcCfg = cfg,
+        enforceHttps = false
+      )
+      block(h, p, client, cfg)
     }
 
+  // scalastyle:off parameter.number
   def withOpenIdConnectServerAndToken[T](
       host: String = "localhost",
       port: Int = availablePort,
       audience: String = oidAudience,
       useJwtKafkaCreds: Boolean,
+      validationInterval: FiniteDuration = 10 minutes,
+      errorLimit: Int = -1,
       tokenAudience: Option[String] = Some(oidAudience)
   )(block: (String, Int, OpenIdClient, OpenIdConnectCfg, AccessToken) => T)(
       implicit sys: ActorSystem,
@@ -302,6 +345,8 @@ trait MockOpenIdServer
       host,
       port,
       useJwtKafkaCreds,
+      validationInterval,
+      errorLimit,
       tokenAudience
     ) { case (h, p, client, cfg) =>
       lazy val token = client
@@ -310,11 +355,14 @@ trait MockOpenIdServer
         .value
       block(h, p, client, cfg, token)
     }
+  // scalastyle:on parameter.number
 
   def withUnavailableOpenIdConnectServerAndToken[T](
       host: String = "localhost",
       port: Int = availablePort,
       useJwtKafkaCreds: Boolean,
+      validationInterval: FiniteDuration = 10 minutes,
+      errorLimit: Int = -1,
       tokenAudience: Option[String] = Some(oidAudience)
   )(block: (OpenIdClient, OpenIdConnectCfg, AccessToken) => T)(
       implicit mat: Materializer
@@ -325,6 +373,8 @@ trait MockOpenIdServer
       realm = None,
       enabled = true,
       requireHttps = false,
+      revalidationInterval = validationInterval,
+      revalidationErrorsLimit = errorLimit,
       customJwt =
         if (useJwtKafkaCreds) Some(customJwtCfg)
         else None

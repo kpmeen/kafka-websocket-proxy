@@ -219,6 +219,8 @@ object Configuration extends WithProxyLogger {
       realm: Option[String],
       enabled: Boolean = false,
       requireHttps: Boolean = true,
+      revalidationInterval: FiniteDuration,
+      revalidationErrorsLimit: Int = -1,
       customJwt: Option[CustomJwtCfg] = None,
       allowDetailedLogging: Boolean = false
   ) {

@@ -1,5 +1,6 @@
 package net.scalytica.kafka.wsproxy.models
 
+import akka.http.scaladsl.model.headers.OAuth2BearerToken
 import net.scalytica.kafka.wsproxy.models.Formats.FormatType
 import net.scalytica.kafka.wsproxy.web.SocketProtocol.SocketPayload
 import org.apache.kafka.clients.consumer.OffsetResetStrategy
@@ -48,7 +49,8 @@ case class OutSocketArgs(
     offsetResetStrategy: OffsetResetStrategy = OffsetResetStrategy.EARLIEST,
     rateLimit: Option[Int] = None,
     batchSize: Option[Int] = None,
-    autoCommit: Boolean = true
+    autoCommit: Boolean = true,
+    bearerToken: Option[OAuth2BearerToken] = None
 ) extends SocketArgs {
 
   def offsetResetStrategyString: String = offsetResetStrategy.name.toLowerCase
@@ -56,6 +58,9 @@ case class OutSocketArgs(
   def withAclCredentials(
       aclCredentials: Option[AclCredentials]
   ): OutSocketArgs = copy(aclCredentials = aclCredentials)
+
+  def withBearerToken(token: Option[OAuth2BearerToken]): OutSocketArgs =
+    copy(bearerToken = token)
 }
 
 object OutSocketArgs {
@@ -138,12 +143,15 @@ case class InSocketArgs(
     socketPayload: SocketPayload,
     aclCredentials: Option[AclCredentials] = None,
     keyType: Option[Formats.FormatType] = None,
-    valType: Formats.FormatType = Formats.StringType
+    valType: Formats.FormatType = Formats.StringType,
+    bearerToken: Option[OAuth2BearerToken] = None
 ) extends SocketArgs {
 
   def withAclCredentials(aclCredentials: Option[AclCredentials]): InSocketArgs =
     copy(aclCredentials = aclCredentials)
 
+  def withBearerToken(token: Option[OAuth2BearerToken]): InSocketArgs =
+    copy(bearerToken = token)
 }
 
 object InSocketArgs {
