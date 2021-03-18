@@ -1,17 +1,29 @@
 package net.scalytica.kafka.wsproxy.web
 
-import java.nio.file.{Files, Path}
-import java.security.{KeyStore, SecureRandom}
-
 import akka.actor.ActorSystem
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.{ConnectionContext, Http, HttpsConnectionContext}
-import javax.net.ssl.{KeyManagerFactory, SSLContext, TrustManagerFactory}
 import net.scalytica.kafka.wsproxy.config.Configuration.{AppCfg, ServerSslCfg}
 
+import java.nio.file.{Files, Path}
+import java.security.{KeyStore, SecureRandom}
+import javax.net.ssl.{KeyManagerFactory, SSLContext, TrustManagerFactory}
 import scala.concurrent.Future
 
 trait ServerBindings {
+
+  private[this] def initialiseBinding(
+      interface: String,
+      port: Int,
+      routes: Route,
+      httpsCtx: Option[HttpsConnectionContext] = None
+  )(implicit sys: ActorSystem): Future[Http.ServerBinding] = {
+    val sb = Http().newServerAt(
+      interface = interface,
+      port = port
+    )
+    httpsCtx.map(sb.enableHttps).getOrElse(sb).bindFlow(routes)
+  }
 
   def initialisePlainBinding(
       implicit cfg: AppCfg,
@@ -40,12 +52,7 @@ trait ServerBindings {
         // scalastyle:on
       }
       Option(
-        Http()
-          .newServerAt(
-            interface = cfg.server.bindInterface,
-            port = cfg.server.port
-          )
-          .bindFlow(routes)
+        initialiseBinding(cfg.server.bindInterface, cfg.server.port, routes)
       )
     }
   }
@@ -74,15 +81,12 @@ trait ServerBindings {
         val sslCtx   = initSslContext(ks, sslCfg)
         val httpsCtx = httpsContext(sslCtx)
 
-        Http()
-          .newServerAt(
-            interface =
-              sslCfg.bindInterface.getOrElse(cfg.server.bindInterface),
-            port = port
-          )
-          .enableHttps(httpsCtx)
-          .bindFlow(routes)
-
+        initialiseBinding(
+          interface = sslCfg.bindInterface.getOrElse(cfg.server.bindInterface),
+          port = port,
+          routes = routes,
+          httpsCtx = Some(httpsCtx)
+        )
       }
     }
   }

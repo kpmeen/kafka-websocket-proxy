@@ -20,18 +20,25 @@
   </appender>
 
   <variable name="WS_PROXY_AKKA_ACTOR_LOG_LEVEL" value="${WS_PROXY_AKKA_ACTOR_LOG_LEVEL:-WARN}" />
+  <variable name="WS_PROXY_AKKA_HTTP_LOG_LEVEL" value="${WS_PROXY_AKKA_HTTP_LOG_LEVEL:-WARN}" />
   <variable name="WS_PROXY_AKKA_KAFKA_LOG_LEVEL" value="${WS_PROXY_AKKA_KAFKA_LOG_LEVEL:-WARN}" />
   <variable name="WS_PROXY_KAFKA_CLIENTS_LOG_LEVEL" value="${WS_PROXY_KAFKA_CLIENTS_LOG_LEVEL:-ERROR}" />
 
   <variable name="WS_PROXY_APP_LOG_LEVEL" value="${WS_PROXY_APP_LOG_LEVEL:-DEBUG}" />
+  <variable name="WS_PROXY_AUTH_LOG_LEVEL" value="${WS_PROXY_AUTH_LOG_LEVEL:-DEBUG}" />
+  <variable name="WS_PROXY_ADMIN_LOG_LEVEL" value="${WS_PROXY_ADMIN_LOG_LEVEL:-WARN}" />
   <variable name="WS_PROXY_ROOT_LOG_LEVEL" value="${WS_PROXY_ROOT_LOG_LEVEL:-ERROR}" />
 
   <logger name="akka.actor" level="${WS_PROXY_AKKA_ACTOR_LOG_LEVEL}"/>
+  <logger name="akka.http" level="${WS_PROXY_AKKA_HTTP_LOG_LEVEL}"/>
   <logger name="akka.kafka" level="${WS_PROXY_AKKA_KAFKA_LOG_LEVEL}"/>
 
   <logger name="org.apache.kafka.clients" level="${WS_PROXY_KAFKA_CLIENTS_LOG_LEVEL}"/>
 
   <logger name="net.scalytica.kafka.wsproxy" level="${WS_PROXY_APP_LOG_LEVEL}"/>
+  <logger name="net.scalytica.kafka.wsproxy.auth" level="${WS_PROXY_AUTH_LOG_LEVEL}"/>
+  <logger name="net.scalytica.kafka.wsproxy.admin" level="${WS_PROXY_ADMIN_LOG_LEVEL}"/>
+  <logger name="net.scalytica.kafka.wsproxy.jmx" level="${WS_PROXY_ADMIN_LOG_LEVEL}"/>
 
   <!-- Root loggers catch all other events that are not explicitly handled-->
   <root level="${WS_PROXY_ROOT_LOG_LEVEL}">

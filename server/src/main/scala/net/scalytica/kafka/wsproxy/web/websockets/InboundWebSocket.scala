@@ -8,6 +8,7 @@ import akka.stream.Materializer
 import akka.util.ByteString
 import io.circe.Printer.noSpaces
 import io.circe.syntax._
+import net.scalytica.kafka.wsproxy.auth.{JwtValidationTickerFlow, OpenIdClient}
 import net.scalytica.kafka.wsproxy.codecs.Encoders._
 import net.scalytica.kafka.wsproxy.codecs.ProtocolSerdes.{
   avroProducerRecordSerde,
@@ -29,10 +30,15 @@ trait InboundWebSocket extends WithProxyLogger {
    *
    * @param args
    *   the input arguments to pass on to the producer.
+   * @param cfg
+   *   Implicitly provided [[AppCfg]]
    * @param as
    *   Implicitly provided [[ActorSystem]]
    * @param mat
    *   Implicitly provided [[Materializer]]
+   * @param maybeOpenIdClient
+   *   Implicitly provided Option that contains an [[OpenIdClient]] if OIDC is
+   *   enabled.
    * @param jmx
    *   Implicitly provided optional [[JmxManager]]
    * @return
@@ -46,6 +52,7 @@ trait InboundWebSocket extends WithProxyLogger {
       implicit cfg: AppCfg,
       as: ActorSystem,
       mat: Materializer,
+      maybeOpenIdClient: Option[OpenIdClient],
       jmx: Option[JmxManager]
   ): Route = {
     handleWebSocketMessages {
@@ -82,7 +89,10 @@ trait InboundWebSocket extends WithProxyLogger {
             .map[Message](BinaryMessage.apply)
       }
 
-      socketFlow.watchTermination() { (_, f) =>
+      val jwtValidationFlow =
+        JwtValidationTickerFlow.flow[Message](args.clientId, args.bearerToken)
+
+      (jwtValidationFlow via socketFlow).watchTermination() { (_, f) =>
         f.foreach { _ =>
           jmx.foreach(_.removeProducerConnection())
           logger.debug(

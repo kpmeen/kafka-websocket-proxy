@@ -15,11 +15,15 @@ import net.scalytica.kafka.wsproxy.config.Configuration.{
 }
 import net.scalytica.kafka.wsproxy.errors.{
   AuthenticationError,
-  OpenIdConnectError
+  InvalidTokenError,
+  OpenIdConnectError,
+  ProxyAuthError
 }
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
+import pdi.jwt.exceptions.JwtException
 import pdi.jwt.{JwtBase64, JwtCirce, JwtClaim}
 
+import java.security.PublicKey
 import java.time.Clock
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
@@ -123,12 +127,19 @@ class OpenIdClient private (
     }
   }
 
+  private[this] def decodeToken(token: String, pubKey: PublicKey) = {
+    JwtCirce.decode(token, pubKey).recoverWith {
+      case ex: JwtException => Failure(InvalidTokenError(ex.getMessage))
+      case ex               => Failure(ex)
+    }
+  }
+
   /**
    * Validates a JWT and potentially returns the claims if the token was
    * successfully parsed and validated
    *
    * @param bearerToken
-   *   The JWT token String
+   *   The JWT token
    * @return
    *   Eventually a [[JwtClaim]] if successfully decoded and validated
    */
@@ -143,15 +154,30 @@ class OpenIdClient private (
             // generate public key
             pubKey <- Jwk.generatePublicKey(jwk)
             // Decode the token using the secret key
-            claim <- JwtCirce.decode(t, pubKey)
+            claim <- decodeToken(t, pubKey)
             // validate the data stored inside the token
             validClaim <- validateClaim(claim)
           } yield validClaim
         }
       }
-      .recoverWith { case t: Throwable =>
-        Future.successful(Failure(t))
-      }
+      .recoverWith { case t => Future.successful(Failure(t)) }
+  }
+
+  private[auth] def validateToken[A](bearerToken: OAuth2BearerToken)(
+      valid: JwtClaim => A,
+      invalid: ProxyAuthError => A,
+      errorHandler: Throwable => A
+  ): Future[A] = {
+    validate(bearerToken).map {
+      case Success(claim) => valid(claim)
+      case Failure(err) =>
+        err match {
+          case ae: ProxyAuthError => invalid(ae)
+          case ex =>
+            logger.warn("Error connecting to OpenID Connect server", ex)
+            errorHandler(ex)
+        }
+    }
   }
 
   // scalastyle:off
