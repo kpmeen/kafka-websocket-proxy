@@ -8,7 +8,7 @@ object Versions {
   val PureConfigVersion      = "0.14.1"
 
   val Avro4sVersion                 = "4.0.4"
-  val ConfluentPlatformVersion      = "6.0.1"
+  val ConfluentPlatformVersion      = "6.1.0"
   val KafkaVersion                  = s"$ConfluentPlatformVersion-ccs"
   val EmbeddedSchemaRegistryVersion = ConfluentPlatformVersion
   val KafkaStreamsQueryVersion      = "0.1.1"
@@ -30,7 +30,7 @@ object Versions {
   val Slf4JVersion        = "1.7.30"
   val LogbackVersion      = "1.2.3"
 
-  val ScalaTestVersion = "3.2.5"
+  val ScalaTestVersion = "3.2.6"
 
   val JolokiaAgentVersion    = "1.6.2"
   val PrometheusAgentVersion = "0.14.0"
