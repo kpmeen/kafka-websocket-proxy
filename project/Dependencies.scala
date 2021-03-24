@@ -26,7 +26,7 @@ object Versions {
 
   val JwtScalaVersion = "7.1.3"
 
-  val ScalaLoggingVersion = "3.9.2"
+  val ScalaLoggingVersion = "3.9.3"
   val Slf4JVersion        = "1.7.30"
   val LogbackVersion      = "1.2.3"
 
