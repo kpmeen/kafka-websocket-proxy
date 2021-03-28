@@ -37,7 +37,7 @@ lazy val root = (project in file("."))
   .enablePlugins(DockerTasksPlugin)
   .settings(BaseSettings: _*)
   .settings(NoPublish)
-  .aggregate(avro, server, docs)
+  .aggregate(avro, server)
 
 lazy val avro = (project in file("avro"))
   .settings(BaseSettings: _*)
