@@ -74,8 +74,9 @@ publish docker containers:
       when: never
 
 include:
-  - template: SAST.gitlab-ci.yml
+#  - template: SAST.gitlab-ci.yml
 #  - template: Dependency-Scanning.gitlab-ci.yml
+  - template: Security/SAST.gitlab-ci.yml
   - template: Code-Quality.gitlab-ci.yml
   - template: Secret-Detection.gitlab-ci.yml
 
@@ -84,12 +85,15 @@ secret_detection:
     SECRET_DETECTION_HISTORIC_SCAN: "false"
 
 code_quality:
+  variables:
+    SAST_EXCLUDED_ANALYZERS: "eslint"
   artifacts:
     paths:
       - gl-code-quality-report.json
 
 #dependency_scanning:
 #  variables:
+#    DS_DEFAULT_ANALYZERS: "gemnasium-maven"
 #    CI_DEBUG_TRACE: "true"
 #    SBT_CLI_OPTS: "-Dsbt.coursier=false -Dsbt.ivy=true"
 #  artifacts:
