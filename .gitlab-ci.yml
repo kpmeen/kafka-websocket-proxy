@@ -26,8 +26,8 @@ cache:
 stages:
   - test
   - publish-docker
-  - scan
   - deploy
+  - scan
 
 check style and formatting:
   stage: test
@@ -131,10 +131,12 @@ container_scanning:
     - if: '$CONTAINER_SCANNING_DISABLED'
       when: never
 
+# Publish docs to GitLab pages
 pages:
   stage: deploy
   image: node:15.12-alpine3.13
   script:
+    - sbt docs/mdoc
     - cd website
     - yarn install
     - yarn build
@@ -143,4 +145,9 @@ pages:
     paths:
       - public
   only:
-    - master
+    refs:
+      - master
+    changes:
+      - docs/**/*
+      - kafka-websocket-proxy-docs/**/*
+      - website/**/*
