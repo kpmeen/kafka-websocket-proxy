@@ -27,6 +27,7 @@ stages:
   - test
   - publish-docker
   - scan
+  - deploy
 
 check style and formatting:
   stage: test
@@ -129,3 +130,17 @@ container_scanning:
       when: always
     - if: '$CONTAINER_SCANNING_DISABLED'
       when: never
+
+pages:
+  stage: deploy
+  image: node:15.12-alpine3.13
+  script:
+    - cd website
+    - yarn install
+    - yarn build
+    - mv ./build ../public
+  artifacts:
+    paths:
+      - public
+  only:
+    - master

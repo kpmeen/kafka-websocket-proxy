@@ -37,7 +37,7 @@ lazy val root = (project in file("."))
   .enablePlugins(DockerTasksPlugin)
   .settings(BaseSettings: _*)
   .settings(NoPublish)
-  .aggregate(avro, server)
+  .aggregate(avro, server, docs)
 
 lazy val avro = (project in file("avro"))
   .settings(BaseSettings: _*)
@@ -106,3 +106,12 @@ lazy val server = (project in file("server"))
   )
   .settings(dependencyOverrides ++= Overrides.Deps: _*)
   .dependsOn(avro)
+
+lazy val docs = (project in file("kafka-websocket-proxy-docs"))
+  .enablePlugins(MdocPlugin, DocusaurusPlugin)
+  .settings(
+    moduleName := "kafka-websocket-proxy-docs",
+    mdocVariables := Map(
+      "VERSION" -> version.value
+    )
+  )
