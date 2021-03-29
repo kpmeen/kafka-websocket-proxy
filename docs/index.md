@@ -17,4 +17,5 @@ intermediate networking components.
 
 Since WebSockets are bidirectional, they open up for client - server
 implementations that are much closer to the regular Kafka client. The WebSocket
-becomes more like an extension to the consumer/producer streams used internally. 
+becomes more like an extension to the Kafka consumer/producer clients used
+internally in the proxy. 
