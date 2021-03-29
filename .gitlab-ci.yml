@@ -14,7 +14,9 @@ variables:
   CI_APPLICATION_TAG: $CI_COMMIT_SHA
   # Static Application Security Testing properties
   SAST_JAVA_VERSION: 11
-  SAST_EXCLUDED_PATHS: 'target, */target, */src/test'
+  SAST_EXCLUDED_PATHS: "target, */target, */src/test, website"
+  SAST_DEFAULT_ANALYZERS: "spotbugs, kubesec, mobsf"
+  SAST_EXCLUDED_ANALYZERS: "eslint, nodejs-scan"
   # Dependency scan properties
   DS_DEFAULT_ANALYZERS: "gemnasium-maven"
 
@@ -24,9 +26,10 @@ cache:
     - cache
 
 stages:
+  - site-build
+  - site-deploy
   - test
   - publish-docker
-  - deploy
   - scan
 
 check style and formatting:
@@ -48,9 +51,11 @@ run test suites:
     - sbt coverageAggregate
   artifacts:
     paths:
-      - target/scala-2.13/scoverage-report/
-      - ./**/target/scala-2.13/scoverage-report/
-      - ./**/target/test-reports/TEST-*.xml
+      - target/
+      - ./**/target/
+    #      - target/scala-2.13/scoverage-report/
+    #      - ./**/target/scala-2.13/scoverage-report/
+    #      - ./**/target/test-reports/TEST-*.xml
     reports:
       junit: ./**/target/test-reports/TEST-*.xml
 
@@ -69,15 +74,16 @@ publish docker containers:
     - run test suites
   rules:
     - if: '$CI_COMMIT_BRANCH || $CI_COMMIT_TAG'
-      when: always
+      when: on_success
     - if: '$CI_MERGE_REQUEST_ID'
       when: never
 
 include:
-  - template: SAST.gitlab-ci.yml
-#  - template: Dependency-Scanning.gitlab-ci.yml
+  #  - template: SAST.gitlab-ci.yml
+  #  - template: Dependency-Scanning.gitlab-ci.yml
   - template: Code-Quality.gitlab-ci.yml
-  - template: Secret-Detection.gitlab-ci.yml
+  - template: Security/SAST.gitlab-ci.yml
+  - template: Security/Secret-Detection.gitlab-ci.yml
 
 secret_detection:
   variables:
@@ -120,7 +126,8 @@ container_scanning:
   artifacts:
     reports:
       container_scanning: gl-container-scanning-report.json
-  dependencies: []
+  dependencies:
+    - publish docker containers
   rules:
     - if: '$CI_COMMIT_BRANCH'
       when: always
@@ -131,12 +138,33 @@ container_scanning:
     - if: '$CONTAINER_SCANNING_DISABLED'
       when: never
 
-# Publish docs to GitLab pages
-pages:
-  stage: deploy
-  image: node:15.12-alpine3.13
+################################################################################
+# GitLab pages pipeline
+################################################################################
+site:build:
+  stage: site-build
+  tags:
+    - docker
   script:
     - sbt docs/mdoc
+  artifacts:
+    paths:
+      - kafka-websocket-proxy-docs/target
+      - website
+  only:
+    refs:
+      - master
+    changes:
+      - docs/**/*
+      - kafka-websocket-proxy-docs/**/*
+      - website/**/*
+
+site:deploy:
+  stage: site-deploy
+  image: node:15.12-alpine3.13
+  dependencies:
+    - site:build
+  script:
     - cd website
     - yarn install
     - yarn build
