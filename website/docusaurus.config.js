@@ -2,7 +2,7 @@
 module.exports = {
   title: 'Kafka WebSocket Proxy',
   tagline: 'documentation site',
-  url: 'https://your-docusaurus-test-site.com', // TOOD: Change me
+  url: 'https://kpmeen.gitlab.io/kafka-websocket-proxy',
   baseUrl: '/',
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
