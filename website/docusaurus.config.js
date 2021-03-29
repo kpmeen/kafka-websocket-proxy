@@ -2,8 +2,8 @@
 module.exports = {
   title: 'Kafka WebSocket Proxy',
   tagline: 'documentation site',
-  url: 'https://kpmeen.gitlab.io/kafka-websocket-proxy',
-  baseUrl: '/',
+  url: 'https://kpmeen.gitlab.io',
+  baseUrl: '/kafka-websocket-proxy/',
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
   favicon: 'img/favicon.ico',
