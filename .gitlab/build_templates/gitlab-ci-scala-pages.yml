@@ -33,7 +33,7 @@ pages:
   stage: site-deploy
   image: node:15.12-alpine3.13
   dependencies:
-    - site:build
+    - pages:build
   script:
     - cd website
     - yarn install

@@ -23,7 +23,7 @@ the distribution. Or, more easily, added to the `JAVA_OPTS` environment variable
 
 ## 2. Overriding log levels for predefined loggers
 
-It is possible to set the log levels of some important loggers through
+It is possible to set the log levels for some of the important loggers through
 environment variables. The below table shows which are available, and what their
 default values are.
 
