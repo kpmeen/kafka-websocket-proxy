@@ -26,10 +26,10 @@ cache:
     - cache
 
 stages:
-  - site-build
-  - site-deploy
+  - build
   - test
   - publish-docker
+  - deploy
   - scan
 
 include:

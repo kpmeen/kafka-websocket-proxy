@@ -9,8 +9,8 @@ The `kafka-websocket-proxy` is built around libraries that themselves expose
 telemetry and monitoring data via JMX. The most important ones are [akka-http](https://doc.akka.io/docs/akka-http/current/index.html)
 and [kafka-clients](https://kafka.apache.org/documentation/#monitoring).
 
-In addition to these `kafka-websocket-proxy` exposes relevant metrics for the
-inner workings.
+In addition to these the `kafka-websocket-proxy` exposes relevant metrics for
+some of the inner workings.
 
 ## Enable JMX
 
