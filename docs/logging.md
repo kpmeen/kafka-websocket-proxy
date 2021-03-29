@@ -4,9 +4,10 @@ title: Logging
 slug: /logging
 ---
 
-The `kafka-websocket-proxy` uses Logback for logging, and comes pre-packaged
-with a configuration file with reasonable defaults. If there is a need to use a
-different configuration, there are 3 recommended alternatives.
+The `kafka-websocket-proxy` uses [Logback](http://logback.qos.ch) for logging,
+and comes pre-packaged with a configuration file with reasonable defaults. If
+there is a need to use a different configuration, there are 3 recommended
+alternatives.
 
 ## 1. Providing an external log configuration file
 
