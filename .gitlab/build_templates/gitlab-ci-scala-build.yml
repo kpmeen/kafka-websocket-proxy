@@ -1,0 +1,45 @@
+################################################################################
+# GitLab CI build script for Scala applications published as docker images     #
+################################################################################
+image: registry.gitlab.com/kpmeen/docker-scala-sbt:scala_2.13_jdk11
+
+variables:
+  CI: "true"
+  DOCKER_DRIVER: overlay
+  # Setting specific folder for sbt-coursier to cache artifacts
+  COURSIER_CACHE: "/root/cache/coursier"
+
+cache:
+  untracked: true
+  paths:
+    - cache
+
+stages:
+  - test
+
+check style and formatting:
+  stage: test
+  tags:
+    - docker
+  script:
+    # Ensure that the pipeline fails fast if there are issues with the
+    # style or formatting
+    - sbt clean scalastyle scalafmt
+    - git diff --exit-code || (echo "ERROR Code formatting check failed, see differences above."; false)
+
+run test suites:
+  stage: test
+  tags:
+    - docker
+  script:
+    - sbt coverage test coverageReport
+    - sbt coverageAggregate
+  artifacts:
+    paths:
+      - target/
+      - ./**/target/
+    #      - target/scala-2.13/scoverage-report/
+    #      - ./**/target/scala-2.13/scoverage-report/
+    #      - ./**/target/test-reports/TEST-*.xml
+    reports:
+      junit: ./**/target/test-reports/TEST-*.xml

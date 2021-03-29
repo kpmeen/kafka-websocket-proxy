@@ -1,0 +1,34 @@
+################################################################################
+# GitLab CI build script for Scala applications published as docker images     #
+################################################################################
+image: registry.gitlab.com/kpmeen/docker-scala-sbt:scala_2.13_jdk11
+
+variables:
+  CI: "true"
+  DOCKER_DRIVER: overlay
+  # Setting specific folder for sbt-coursier to cache artifacts
+  COURSIER_CACHE: "/root/cache/coursier"
+
+cache:
+  untracked: true
+  paths:
+    - cache
+
+stages:
+  - publish-docker
+
+publish docker containers:
+  stage: publish-docker
+  tags:
+    - docker
+  services:
+    - docker:dind
+  script:
+    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN registry.gitlab.com
+    - docker login -u kpmeen -p $DOCKERHUB_TOKEN
+    - sbt docker:publish
+  rules:
+    - if: '$CI_COMMIT_BRANCH || $CI_COMMIT_TAG'
+      when: on_success
+    - if: '$CI_MERGE_REQUEST_ID'
+      when: never

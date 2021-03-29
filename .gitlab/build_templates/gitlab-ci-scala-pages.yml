@@ -1,0 +1,51 @@
+################################################################################
+# GitLab pages pipeline
+################################################################################
+variables:
+  CI: "true"
+  DOCKER_DRIVER: overlay
+  SBT_MDOCS_MODULE_DIR: '$CI_PROJECT_NAME-docs'
+
+stages:
+  - site-build
+  - site-deploy
+
+pages:build:
+  stage: site-build
+  image: registry.gitlab.com/kpmeen/docker-scala-sbt:scala_2.13_jdk11
+  tags:
+    - docker
+  script:
+    - sbt docs/mdoc
+  artifacts:
+    paths:
+      - $SBT_MDOCS_MODULE_DIR/target
+      - website
+  only:
+    refs:
+      - master
+    changes:
+      - docs/**/*
+      - $SBT_MDOCS_MODULE_DIR/**/*
+      - website/**/*
+
+pages:
+  stage: site-deploy
+  image: node:15.12-alpine3.13
+  dependencies:
+    - site:build
+  script:
+    - cd website
+    - yarn install
+    - yarn build
+    - mv ./build ../public
+  artifacts:
+    paths:
+      - public
+  only:
+    refs:
+      - master
+    changes:
+      - docs/**/*
+      - $SBT_MDOCS_MODULE_DIR/**/*
+      - website/**/*

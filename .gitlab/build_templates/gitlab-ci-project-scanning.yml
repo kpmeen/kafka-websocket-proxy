@@ -1,0 +1,76 @@
+variables:
+  CI: "true"
+  DOCKER_DRIVER: overlay
+  # Container scanning properties
+  CS_MAJOR_VERSION: 2
+  CI_APPLICATION_REPOSITORY: $CI_REGISTRY_IMAGE/server
+  CI_APPLICATION_TAG: $CI_COMMIT_SHA
+  # Static Application Security Testing properties
+  SAST_JAVA_VERSION: 11
+  SAST_EXCLUDED_PATHS: "target, */target, */src/test, website"
+  SAST_DEFAULT_ANALYZERS: "spotbugs, kubesec, mobsf"
+  SAST_EXCLUDED_ANALYZERS: "eslint, nodejs-scan"
+  # Dependency scan properties
+  DS_DEFAULT_ANALYZERS: "gemnasium-maven"
+
+stages:
+  - test
+  - publish-docker
+  - scan
+
+include:
+  #  - template: SAST.gitlab-ci.yml
+  #  - template: Dependency-Scanning.gitlab-ci.yml
+  - template: Code-Quality.gitlab-ci.yml
+  - template: Security/SAST.gitlab-ci.yml
+  - template: Security/Secret-Detection.gitlab-ci.yml
+
+secret_detection:
+  variables:
+    SECRET_DETECTION_HISTORIC_SCAN: "false"
+
+code_quality:
+  artifacts:
+    paths:
+      - gl-code-quality-report.json
+
+#dependency_scanning:
+#  variables:
+#    CI_DEBUG_TRACE: "true"
+#    SBT_CLI_OPTS: "-Dsbt.coursier=false -Dsbt.ivy=true"
+#  artifacts:
+#    paths:
+#      - gl-dependency-scanning-report.json
+
+# To have the container scanning execute in the desired stage, the below is copied
+# directly from https://gitlab.com/gitlab-org/gitlab/blob/master/lib/gitlab/ci/templates/Security/Container-Scanning.gitlab-ci.yml
+container_scanning:
+  stage: scan
+  image: registry.gitlab.com/gitlab-org/security-products/analyzers/klar:$CS_MAJOR_VERSION
+  variables:
+    # By default, use the latest clair vulnerabilities database, however, allow it to be overridden here with a specific image
+    # to enable container scanning to run offline, or to provide a consistent list of vulnerabilities for integration testing purposes
+    CLAIR_DB_IMAGE_TAG: "latest"
+    CLAIR_DB_IMAGE: "arminc/clair-db:$CLAIR_DB_IMAGE_TAG"
+    # Override the GIT_STRATEGY variable in your `.gitlab-ci.yml` file and set it to `fetch` if you want to provide a `clair-whitelist.yml`
+    # file. See https://docs.gitlab.com/ee/user/application_security/container_scanning/index.html#overriding-the-container-scanning-template
+    # for details
+    GIT_STRATEGY: none
+  allow_failure: true
+  services:
+    - name: $CLAIR_DB_IMAGE
+      alias: clair-vulnerabilities-db
+  script:
+    - /analyzer run
+  artifacts:
+    reports:
+      container_scanning: gl-container-scanning-report.json
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+      when: on_success
+    - if: '$CI_MERGE_REQUEST_ID'
+      when: never
+    - if: '$GITLAB_FEATURES =~ /\bcontainer_scanning\b/'
+      when: always
+    - if: '$CONTAINER_SCANNING_DISABLED'
+      when: never
