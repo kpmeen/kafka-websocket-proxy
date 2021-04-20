@@ -7,7 +7,7 @@ object Versions {
   val LightbendConfigVersion = "1.4.1"
   val PureConfigVersion      = "0.14.1"
 
-  val Avro4sVersion                 = "4.0.4"
+  val Avro4sVersion                 = "4.0.7"
   val ConfluentPlatformVersion      = "6.1.0"
   val KafkaVersion                  = s"$ConfluentPlatformVersion-ccs"
   val EmbeddedSchemaRegistryVersion = ConfluentPlatformVersion
