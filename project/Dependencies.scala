@@ -30,7 +30,7 @@ object Versions {
   val Slf4JVersion        = "1.7.30"
   val LogbackVersion      = "1.2.3"
 
-  val ScalaTestVersion = "3.2.6"
+  val ScalaTestVersion = "3.2.8"
 
   val JolokiaAgentVersion    = "1.6.2"
   val PrometheusAgentVersion = "0.14.0"
