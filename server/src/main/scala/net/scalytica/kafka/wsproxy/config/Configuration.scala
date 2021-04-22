@@ -243,6 +243,7 @@ object Configuration extends WithProxyLogger {
       brokerResolutionTimeout: FiniteDuration,
       brokerResolutionRetries: Int,
       brokerResolutionRetryInterval: FiniteDuration,
+      secureHealthCheckEndpoint: Boolean,
       basicAuth: Option[BasicAuthCfg],
       openidConnect: Option[OpenIdConnectCfg]
   ) {

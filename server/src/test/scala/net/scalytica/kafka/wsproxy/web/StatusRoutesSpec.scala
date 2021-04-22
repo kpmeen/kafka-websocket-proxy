@@ -58,6 +58,13 @@ class StatusRoutesSpec
         }
       }
 
+    "respond with OK to the healthcheck endpoint" in
+      plainServerContext { case (_, _, route) =>
+        Get("/healthcheck") ~> Route.seal(route) ~> check {
+          status mustBe OK
+        }
+      }
+
     "ignore basic auth header when not enabled" in
       plainServerContext { case (_, _, route) =>
         Get("/kafka/cluster/info") ~> addCredentials(basicHttpCreds) ~> Route
@@ -68,7 +75,7 @@ class StatusRoutesSpec
       }
 
     "return the kafka cluster info when secured with basic auth" in
-      plainServerContext { case (kcfg, _, route) =>
+      secureServerContext(useServerBasicAuth = true) { case (kcfg, _, route) =>
         Get("/kafka/cluster/info") ~> addCredentials(basicHttpCreds) ~> Route
           .seal(route) ~> check {
           status mustBe OK
@@ -86,6 +93,35 @@ class StatusRoutesSpec
             port = kcfg.kafkaPort,
             rack = None
           )
+        }
+      }
+
+    "return OK to the healthcheck endpoint when basic auth is enabled" in
+      secureServerContext(useServerBasicAuth = true) { case (_, _, route) =>
+        Get("/healthcheck") ~> addCredentials(basicHttpCreds) ~> Route.seal(
+          route
+        ) ~> check {
+          status mustBe OK
+        }
+      }
+
+    "return 401 when accessing the healthcheck endpoint with invalid basic " +
+      "auth credentials" in secureServerContext(useServerBasicAuth = true) {
+        case (_, _, route) =>
+          Get("/healthcheck") ~> addCredentials(
+            invalidBasicHttpCreds
+          ) ~> Route.seal(route) ~> check {
+            status mustBe Unauthorized
+          }
+      }
+
+    "return OK when server is secured but bypassed for the healthcheck " +
+      "endpoint" in secureServerContext(
+        useServerBasicAuth = true,
+        secureHealthCheckEndpoint = false
+      ) { case (_, _, route) =>
+        Get("/healthcheck") ~> Route.seal(route) ~> check {
+          status mustBe OK
         }
       }
 

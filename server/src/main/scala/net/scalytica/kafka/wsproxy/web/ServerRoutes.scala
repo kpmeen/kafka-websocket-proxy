@@ -28,16 +28,7 @@ import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.errors._
 import net.scalytica.kafka.wsproxy.jmx.JmxManager
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
-import net.scalytica.kafka.wsproxy.models.{
-  AclCredentials,
-  AuthDisabled,
-  AuthenticationResult,
-  BasicAuthResult,
-  InSocketArgs,
-  JwtAuthResult,
-  OutSocketArgs,
-  SocketArgs
-}
+import net.scalytica.kafka.wsproxy.models.{WsProxyAuthResult, _}
 import net.scalytica.kafka.wsproxy.session.SessionHandler.{
   SessionHandlerOpExtensions,
   SessionHandlerRef
@@ -62,7 +53,7 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
 
   protected def basicAuthCredentials(
       creds: Credentials
-  )(implicit cfg: AppCfg): Option[AuthenticationResult] = {
+  )(implicit cfg: AppCfg): Option[WsProxyAuthResult] = {
     cfg.server.basicAuth
       .flatMap { bac =>
         for {
@@ -91,7 +82,7 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
       implicit appCfg: AppCfg,
       maybeOpenIdClient: Option[OpenIdClient],
       mat: Materializer
-  ): Future[Option[AuthenticationResult]] = {
+  ): Future[Option[WsProxyAuthResult]] = {
     logger.trace(s"Going to validate openid token $creds")
     implicit val ec = mat.executionContext
 
@@ -127,7 +118,7 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
       implicit cfg: AppCfg,
       maybeOpenIdClient: Option[OpenIdClient],
       mat: Materializer
-  ): Directive1[AuthenticationResult] = {
+  ): Directive1[WsProxyAuthResult] = {
     logger.debug("Attempting authentication using openid-connect...")
     cfg.server.openidConnect
       .flatMap { oidcCfg =>
@@ -143,7 +134,7 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
 
   protected def maybeAuthenticateBasic[T](
       implicit cfg: AppCfg
-  ): Directive1[AuthenticationResult] = {
+  ): Directive1[WsProxyAuthResult] = {
     logger.debug("Attempting authentication using basic authentication...")
     cfg.server.basicAuth
       .flatMap { ba =>
@@ -161,7 +152,7 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
       implicit cfg: AppCfg,
       maybeOpenIdClient: Option[OpenIdClient],
       mat: Materializer
-  ): Directive1[AuthenticationResult] = {
+  ): Directive1[WsProxyAuthResult] = {
     if (cfg.server.isOpenIdConnectEnabled) maybeAuthenticateOpenId[T]
     else if (cfg.server.isBasicAuthEnabled) maybeAuthenticateBasic[T]
     else provide(AuthDisabled)
@@ -382,47 +373,55 @@ trait ServerRoutes
 
 trait StatusRoutes { self: BaseRoutes =>
 
+  private[this] def serveHealthCheck = {
+    complete {
+      HttpResponse(
+        status = OK,
+        entity = HttpEntity(
+          contentType = ContentTypes.`application/json`,
+          string = """{ "response": "I'm healthy" }"""
+        )
+      )
+    }
+  }
+
+  private[this] def serveClusterInfo(implicit cfg: AppCfg) = {
+    complete {
+      val admin = new WsKafkaAdminClient(cfg)
+      try {
+        logger.debug("Fetching Kafka cluster info...")
+        val ci = admin.clusterInfo
+
+        HttpResponse(
+          status = OK,
+          entity = HttpEntity(
+            contentType = ContentTypes.`application/json`,
+            string = ci.asJson.printWith(Printer.spaces2)
+          )
+        )
+      } finally {
+        admin.close()
+      }
+    }
+  }
+
   def statusRoutes(
       implicit cfg: AppCfg,
-      maybeOpenIdClient: Option[OpenIdClient]
+      maybeOidcClient: Option[OpenIdClient]
   ): Route = {
     extractMaterializer { implicit mat =>
       pathPrefix("kafka") {
         pathPrefix("cluster") {
           path("info") {
-            maybeAuthenticate(cfg, maybeOpenIdClient, mat) { _ =>
-              complete {
-                val admin = new WsKafkaAdminClient(cfg)
-                try {
-                  logger.debug("Fetching Kafka cluster info...")
-                  val ci = admin.clusterInfo
-
-                  HttpResponse(
-                    status = OK,
-                    entity = HttpEntity(
-                      contentType = ContentTypes.`application/json`,
-                      string = ci.asJson.printWith(Printer.spaces2)
-                    )
-                  )
-                } finally {
-                  admin.close()
-                }
-              }
-            }
+            maybeAuthenticate(cfg, maybeOidcClient, mat)(_ => serveClusterInfo)
           }
         }
       } ~
         path("healthcheck") {
-          maybeAuthenticate(cfg, maybeOpenIdClient, mat) { _ =>
-            complete {
-              HttpResponse(
-                status = OK,
-                entity = HttpEntity(
-                  contentType = ContentTypes.`application/json`,
-                  string = """{ "response": "I'm healthy" }"""
-                )
-              )
-            }
+          if (cfg.server.secureHealthCheckEndpoint) {
+            maybeAuthenticate(cfg, maybeOidcClient, mat)(_ => serveHealthCheck)
+          } else {
+            serveHealthCheck
           }
         }
     }
@@ -507,7 +506,7 @@ trait WebSocketRoutes { self: BaseRoutes =>
   }
 
   private[this] def extractKafkaCreds(
-      authRes: AuthenticationResult,
+      authRes: WsProxyAuthResult,
       kafkaAuthHeader: Option[XKafkaAuthHeader]
   )(implicit cfg: AppCfg): Option[AclCredentials] = {
     cfg.server.openidConnect

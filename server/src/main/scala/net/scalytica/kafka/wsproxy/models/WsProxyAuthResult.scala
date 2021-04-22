@@ -5,7 +5,7 @@ import io.circe.parser._
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import pdi.jwt.JwtClaim
 
-sealed trait AuthenticationResult {
+sealed trait WsProxyAuthResult {
 
   def aclCredentials: Option[AclCredentials]      = None
   def maybeBearerToken: Option[OAuth2BearerToken] = None
@@ -16,7 +16,7 @@ case class JwtAuthResult(
     bearerToken: OAuth2BearerToken,
     claim: JwtClaim
 )(implicit cfg: AppCfg)
-    extends AuthenticationResult {
+    extends WsProxyAuthResult {
 
   private[this] val maybeCreds = cfg.server.customJwtKafkaCredsKeys
 
@@ -35,6 +35,6 @@ case class JwtAuthResult(
 
 }
 
-case class BasicAuthResult(id: String) extends AuthenticationResult
+case class BasicAuthResult(id: String) extends WsProxyAuthResult
 
-case object AuthDisabled extends AuthenticationResult
+case object AuthDisabled extends WsProxyAuthResult

@@ -23,6 +23,7 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
       |    server-id = "node-1"
       |    bind-interface = "localhost"
       |    // port = 8078 // missing key
+      |    secure-health-check-endpoint = true
       |  }
       |
       |  kafka-client {
@@ -85,6 +86,7 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
       |    serverId = "node-1" // wrong key
       |    bind-interface = "localhost"
       |    port = 8078
+      |    secure-health-check-endpoint = true
       |  }
       |
       |  kafka-client {
@@ -148,6 +150,7 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
       cfg.server.serverId.value mustBe "node-1"
       cfg.server.bindInterface mustBe "0.0.0.0"
       cfg.server.port mustBe 8078
+      cfg.server.secureHealthCheckEndpoint mustBe true
 
       // format: off
       cfg.kafkaClient.bootstrapHosts mustBe KafkaBootstrapHosts(List("localhost:29092")) // scalastyle:ignore
@@ -181,6 +184,7 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
         cfg.server.serverId.value mustBe "node-1"
         cfg.server.bindInterface mustBe "0.0.0.0"
         cfg.server.port mustBe 8078
+        cfg.server.secureHealthCheckEndpoint mustBe true
 
         // format: off
         cfg.kafkaClient.bootstrapHosts mustBe KafkaBootstrapHosts(List("localhost:29092")) // scalastyle:ignore
@@ -217,6 +221,7 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
       cfg.server.serverId.value mustBe "node-1"
       cfg.server.bindInterface mustBe "0.0.0.0"
       cfg.server.port mustBe 8078
+      cfg.server.secureHealthCheckEndpoint mustBe true
 
       // format: off
       cfg.kafkaClient.bootstrapHosts mustBe KafkaBootstrapHosts(List("localhost:29092")) // scalastyle:ignore

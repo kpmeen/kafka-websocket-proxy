@@ -16,6 +16,9 @@ import net.manub.embeddedkafka.schemaregistry.{
   EmbeddedKafka,
   EmbeddedKafkaConfig
 }
+import net.scalytica.kafka.wsproxy.auth.OpenIdClient
+import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroProducerRecord
+import net.scalytica.kafka.wsproxy.config.Configuration
 import net.scalytica.kafka.wsproxy.config.Configuration.{
   AdminClientCfg,
   AppCfg,
@@ -24,13 +27,10 @@ import net.scalytica.kafka.wsproxy.config.Configuration.{
   OpenIdConnectCfg,
   SchemaRegistryCfg
 }
-import net.scalytica.kafka.wsproxy.auth.OpenIdClient
-import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroProducerRecord
-import net.scalytica.kafka.wsproxy.config.Configuration
+import net.scalytica.kafka.wsproxy.mapToProperties
 import net.scalytica.kafka.wsproxy.models.Formats._
 import net.scalytica.kafka.wsproxy.models.{TopicName, WsClientId, WsServerId}
 import net.scalytica.kafka.wsproxy.session.SessionHandler
-import net.scalytica.kafka.wsproxy.mapToProperties
 import net.scalytica.test.TestDataGenerators._
 import org.apache.kafka.clients.CommonClientConfigs._
 import org.apache.kafka.clients.admin.AdminClientConfig.{
@@ -230,7 +230,8 @@ trait WsProxyKafkaSpec
       kafkaPort: Int,
       schemaRegistryPort: Option[Int] = None,
       useServerBasicAuth: Boolean = false,
-      serverOpenIdCfg: Option[OpenIdConnectCfg] = None
+      serverOpenIdCfg: Option[OpenIdConnectCfg] = None,
+      secureHealthCheckEndpoint: Boolean = true
   ): Configuration.AppCfg = {
     val serverId = s"test-server-${Random.nextInt(50000)}"
     val srUrl =
@@ -246,7 +247,8 @@ trait WsProxyKafkaSpec
       server = defaultTestAppCfg.server.copy(
         serverId = WsServerId(serverId),
         basicAuth = basicAuthCreds,
-        openidConnect = serverOpenIdCfg
+        openidConnect = serverOpenIdCfg,
+        secureHealthCheckEndpoint = secureHealthCheckEndpoint
       ),
       kafkaClient = defaultTestAppCfg.kafkaClient.copy(
         bootstrapHosts = KafkaBootstrapHosts(List(serverHost(Some(kafkaPort)))),
@@ -374,7 +376,8 @@ trait WsProxyKafkaSpec
 
   def secureServerContext[T](
       useServerBasicAuth: Boolean = false,
-      serverOpenIdCfg: Option[OpenIdConnectCfg] = None
+      serverOpenIdCfg: Option[OpenIdConnectCfg] = None,
+      secureHealthCheckEndpoint: Boolean = true
   )(
       body: (EmbeddedKafkaConfig, AppCfg, Route) => T
   ): T =
@@ -383,7 +386,8 @@ trait WsProxyKafkaSpec
         kafkaPort = kcfg.kafkaPort,
         schemaRegistryPort = Some(kcfg.schemaRegistryPort),
         useServerBasicAuth = useServerBasicAuth,
-        serverOpenIdCfg = serverOpenIdCfg
+        serverOpenIdCfg = serverOpenIdCfg,
+        secureHealthCheckEndpoint = secureHealthCheckEndpoint
       )
 
       implicit val oidClient = wsCfg.server.openidConnect
