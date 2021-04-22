@@ -221,7 +221,7 @@ the key and value are captured in a single message through the socket.
 }
 ```
 
-#### `/schemas/avro/producer/result`
+### `/schemas/avro/producer/result`
 
 Returns the Avro result schema containing metadata about the produced message.
 
@@ -251,7 +251,7 @@ Returns the Avro result schema containing metadata about the produced message.
 }
 ```
 
-#### `/schemas/avro/consumer/record`
+### `/schemas/avro/consumer/record`
 
 Returns the Avro wrapper schema used for sending consumed messages over the
 WebSocket.
@@ -304,7 +304,7 @@ WebSocket.
 }
 ```
 
-#### `/schemas/avro/producer/commit`
+### `/schemas/avro/consumer/commit`
 
 Avro schema to use for committing offsets when consuming data with the query
 parameter option `autoCommit` set to `false`.
