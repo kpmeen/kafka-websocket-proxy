@@ -257,8 +257,8 @@ object Settings {
     )
 
   val NoPublish = Seq(
-    publish := {},
-    publishLocal := {}
+    publishLocal := {},
+    publish := {}
   )
 
 }
