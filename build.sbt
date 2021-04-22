@@ -110,6 +110,8 @@ lazy val server = (project in file("server"))
 lazy val docs = (project in file("kafka-websocket-proxy-docs"))
   .enablePlugins(MdocPlugin, DocusaurusPlugin)
   .settings(
+    organization := "net.scalytica",
+    scalaVersion := Versions.ScalaVersion,
     moduleName := "kafka-websocket-proxy-docs",
     mdocVariables := Map(
       "VERSION" -> version.value
