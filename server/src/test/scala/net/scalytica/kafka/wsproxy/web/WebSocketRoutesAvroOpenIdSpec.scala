@@ -38,6 +38,30 @@ class WebSocketRoutesAvroOpenIdSpec extends WebSocketRoutesAvroScaffolding {
             }
         }
 
+      "allow connections with a valid bearer token including " +
+        "Kafka credentials when OpenID is enabled" in
+        withOpenIdConnectServerAndToken(useJwtKafkaCreds = true) {
+          case (_, _, _, cfg, token) =>
+            secureServerProducerContext(
+              topic = nextTopic,
+              serverOpenIdCfg = Option(cfg)
+            ) { ctx =>
+              implicit val wsClient = ctx.producerProbe
+
+              val messages = createAvroProducerRecordNoneAvro(1)
+
+              produceAndCheckAvro(
+                clientId = producerClientId("avro", topicCounter),
+                topic = ctx.topicName,
+                routes = Route.seal(ctx.route),
+                keyType = None,
+                valType = AvroType,
+                messages = messages,
+                creds = Some(token.bearerToken)
+              )
+            }
+        }
+
       "return HTTP 401 when bearer token is invalid with OpenID enabled" in
         withOpenIdConnectServerAndClient(useJwtKafkaCreds = false) {
           case (_, _, _, cfg) =>
@@ -62,6 +86,36 @@ class WebSocketRoutesAvroOpenIdSpec extends WebSocketRoutesAvroScaffolding {
                 routes = Route.seal(ctx.route),
                 creds = Some(token.bearerToken),
                 kafkaCreds = Some(creds)
+              ) {
+                status mustBe Unauthorized
+              }
+            }
+        }
+
+      "return HTTP 401 when bearer token is valid but JWT keys for Kafka " +
+        "creds are incorrect with OpenID enabled" in
+        withOpenIdConnectServerAndClient(useJwtKafkaCreds = true) {
+          case (oidcHost, oidcPort, _, cfg) =>
+            secureServerProducerContext(
+              topic = nextTopic,
+              serverOpenIdCfg = Option(cfg)
+            ) { ctx =>
+              implicit val wsClient = ctx.producerProbe
+
+              val token = invalidAccessToken(oidcHost, oidcPort)
+
+              val baseUri = baseProducerUri(
+                clientId = producerClientId("avro", topicCounter),
+                topicName = ctx.topicName,
+                payloadType = AvroPayload,
+                keyType = NoType,
+                valType = StringType
+              )
+
+              checkWebSocket(
+                uri = baseUri,
+                routes = Route.seal(ctx.route),
+                creds = Some(token.bearerToken)
               ) {
                 status mustBe Unauthorized
               }

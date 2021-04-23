@@ -263,6 +263,9 @@ object Configuration extends WithProxyLogger {
     def isOpenIdConnectEnabled: Boolean =
       openidConnect.isDefined && openidConnect.exists(_.enabled)
 
+    def isKafkaTokenAuthOnlyEnabled: Boolean =
+      openidConnect.exists(_.isKafkaTokenAuthOnlyEnabled)
+
     def customJwtKafkaCredsKeys: Option[(String, String)] = {
       openidConnect.flatMap { oidc =>
         oidc.customJwt.map { custom =>

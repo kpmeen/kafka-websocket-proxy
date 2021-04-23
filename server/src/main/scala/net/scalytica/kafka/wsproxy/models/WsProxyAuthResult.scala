@@ -1,8 +1,10 @@
 package net.scalytica.kafka.wsproxy.models
 
 import akka.http.scaladsl.model.headers.OAuth2BearerToken
+import io.circe.Json
 import io.circe.parser._
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import pdi.jwt.JwtClaim
 
 sealed trait WsProxyAuthResult {
@@ -16,20 +18,71 @@ case class JwtAuthResult(
     bearerToken: OAuth2BearerToken,
     claim: JwtClaim
 )(implicit cfg: AppCfg)
-    extends WsProxyAuthResult {
+    extends WsProxyAuthResult
+    with WithProxyLogger {
 
   private[this] val maybeCreds = cfg.server.customJwtKafkaCredsKeys
 
+  private[this] def mapClaim[T](
+      userKey: String,
+      passwordKey: String
+  )(
+      valid: (String, String) => T
+  )(
+      invalid: => T
+  ): T = {
+    parse(claim.toJson).toOption
+      .flatMap { js =>
+        for {
+          user <- parseKey(userKey, js)
+          pass <- parseKey(passwordKey, js)
+        } yield {
+          logger.trace("Correctly parsed custom JWT attributes")
+          valid(user, pass)
+        }
+      }
+      .getOrElse {
+        // This should _really_ not happen. Since the claim must have been
+        // correctly parsed before this function is executed.
+        logger.warn("JWT Claim has an invalid format.")
+        invalid
+      }
+  }
+
   override def maybeBearerToken = Option(bearerToken)
+
+  def isValid: Boolean = {
+    maybeCreds
+      .map { case (uk, pk) =>
+        mapClaim(uk, pk)((_, _) => true)(false)
+      }
+      .getOrElse {
+        if (cfg.server.isKafkaTokenAuthOnlyEnabled) false
+        else true
+      }
+  }
 
   override def aclCredentials: Option[AclCredentials] = {
     maybeCreds.flatMap { case (uk, pk) =>
-      parse(claim.toJson).toOption.flatMap { js =>
-        for {
-          user <- js.hcursor.downField(uk).as[String].toOption
-          pass <- js.hcursor.downField(pk).as[String].toOption
-        } yield AclCredentials(user, pass)
-      }
+      mapClaim[Option[AclCredentials]](uk, pk) { (user, pass) =>
+        Option(AclCredentials(user, pass))
+      }(None)
+    }
+  }
+
+  private[this] def parseKey(
+      key: String,
+      json: Json
+  ): Option[String] = {
+    json.hcursor.downField(key).as[String] match {
+      case Right(value) =>
+        logger.trace(s"Found JWT Kafka credentials key $key with value $value")
+        Some(value)
+      case Left(err) =>
+        val msg = "Could not find expected Kafka credentials key " +
+          s"'$key' in OAuth Bearer token."
+        logger.warn(msg, err)
+        None
     }
   }
 

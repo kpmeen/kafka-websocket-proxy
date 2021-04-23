@@ -46,11 +46,20 @@ trait MockOpenIdServer
   val oidAudience = "http://kptest.scalytica.net"
   val oidGrantTpe = "client_credentials"
 
-  val jwtKafkaCredsUsernameKey = "net.scalytica.jwt.username"
-  val jwtKafkaCredsPasswordKey = "net.scalytica.jwt.password"
+  val jwtKafkaCredsUsernameKey        = "net.scalytica.jwt.username"
+  val jwtKafkaCredsPasswordKey        = "net.scalytica.jwt.password"
+  val invalidJwtKafkaCredsUsernameKey = "net.scalytica.jwt.bad_username_key"
+  val invalidJwtKafkaCredsPasswordKey = "net.scalytica.jwt.bad_password_key"
 
-  val customJwtCfg =
-    CustomJwtCfg(jwtKafkaCredsUsernameKey, jwtKafkaCredsPasswordKey)
+  val customJwtCfg = CustomJwtCfg(
+    jwtKafkaUsernameKey = jwtKafkaCredsUsernameKey,
+    jwtKafkaPasswordKey = jwtKafkaCredsPasswordKey
+  )
+
+  val invalidCustomJwtCfg = CustomJwtCfg(
+    jwtKafkaUsernameKey = invalidJwtKafkaCredsUsernameKey,
+    jwtKafkaPasswordKey = invalidJwtKafkaCredsPasswordKey
+  )
 
   val keyAlgorithm = PubKeyAlgo
   // Generate RSA private/public key pair for mocking OIDC
@@ -105,6 +114,18 @@ trait MockOpenIdServer
       |  $jwtKafkaPasswordJson
       |}""".stripMargin
 
+  val invalidJwtKafkaUsernameJson =
+    s""""$invalidJwtKafkaCredsUsernameKey":"client""""
+
+  val invalidJwtKafkaPasswordJson =
+    s""""$invalidJwtKafkaCredsPasswordKey":"client""""
+
+  val invalidJwtKafkaCredsJson =
+    s"""{
+       |  $invalidJwtKafkaUsernameJson,
+       |  $invalidJwtKafkaPasswordJson
+       |}""".stripMargin
+
   val supportedResponseTypes = List(
     "code",
     "token",
@@ -133,6 +154,21 @@ trait MockOpenIdServer
     )
   }
 
+  def createBaseJwtClaim(
+      issuerUrl: String,
+      expiration: Long,
+      issuedAt: Long,
+      audience: Option[String]
+  ): JwtClaim =
+    JwtClaim(
+      content = jwtDataContentJson,
+      issuer = Option(issuerUrl),
+      subject = Option("GIczqrC3HUhnZNw67dTM5Q5977sOR9Gp@clients"),
+      expiration = Option(expiration),
+      issuedAt = Option(issuedAt),
+      audience = audience.map(aud => Set(aud))
+    )
+
   def jwtData(
       issuerUrl: String,
       expiration: Long,
@@ -140,15 +176,20 @@ trait MockOpenIdServer
       useJwtKafkaCreds: Boolean,
       audience: Option[String]
   ): JwtClaim = {
-    val claim = JwtClaim(
-      content = jwtDataContentJson,
-      issuer = Option(issuerUrl),
-      subject = Option("GIczqrC3HUhnZNw67dTM5Q5977sOR9Gp@clients"),
-      audience = audience.map(aud => Set(aud)),
-      expiration = Option(expiration),
-      issuedAt = Option(issuedAt)
-    )
+    val claim = createBaseJwtClaim(issuerUrl, expiration, issuedAt, audience)
     if (useJwtKafkaCreds) claim + jwtKafkaCredsJson
+    else claim
+  }
+
+  def invalidJwtData(
+      issuerUrl: String,
+      expiration: Long,
+      issuedAt: Long,
+      useJwtKafkaCreds: Boolean,
+      audience: Option[String]
+  ): JwtClaim = {
+    val claim = createBaseJwtClaim(issuerUrl, expiration, issuedAt, audience)
+    if (useJwtKafkaCreds) claim + invalidJwtKafkaCredsJson
     else claim
   }
 
@@ -178,6 +219,26 @@ trait MockOpenIdServer
     AccessToken(
       tokenType = "Bearer",
       accessToken = token,
+      expiresIn = expirationMillis,
+      refreshToken = None
+    )
+  }
+
+  def invalidAccessToken(
+      host: String,
+      port: Int,
+      audience: Option[String] = Some(oidAudience)
+  ): AccessToken = {
+    val jd = invalidJwtData(
+      issuerUrl = s"http://$host:$port",
+      expiration = expirationMillis,
+      issuedAt = issuedAtMillis,
+      useJwtKafkaCreds = true,
+      audience = audience
+    )
+    AccessToken(
+      tokenType = "Bearer",
+      accessToken = generateJwt(jd),
       expiresIn = expirationMillis,
       refreshToken = None
     )
@@ -253,7 +314,7 @@ trait MockOpenIdServer
     def check(retries: Int = 0): Boolean = {
       if (retries <= 5) {
         val res    = Http().singleRequest(HttpRequest(uri = uri))
-        val status = Await.result(res.map(_.status), 1 second)
+        val status = Await.result(res.map(_.status), 5 seconds)
         if (status == StatusCodes.OK) true
         else check(retries + 1)
       } else {

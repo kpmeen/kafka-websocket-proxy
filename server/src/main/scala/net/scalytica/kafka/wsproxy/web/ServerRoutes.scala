@@ -94,7 +94,9 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
             oidcClient.validate(bearerToken).flatMap {
               case Success(jwtClaim) =>
                 logger.trace("Successfully authenticated bearer token.")
-                Future.successful(Some(JwtAuthResult(bearerToken, jwtClaim)))
+                val jar = JwtAuthResult(bearerToken, jwtClaim)
+                if (jar.isValid) Future.successful(Some(jar))
+                else Future.successful(None)
               case Failure(err) =>
                 err match {
                   case err: ProxyAuthError =>
