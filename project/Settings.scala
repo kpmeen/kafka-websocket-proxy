@@ -83,9 +83,9 @@ object Settings {
     Test / testOptions ++= Seq(Tests.Argument(ScalaTest, "-oD")),
     updateOptions := updateOptions.value.withCachedResolution(true),
     // Disable ScalaDoc generation
-    publishArtifact in (Compile, packageDoc) := false,
+    Compile / packageDoc / publishArtifact := false,
     packageDoc / publishArtifact := false,
-    sources in (Compile, doc) := Seq.empty,
+    Compile / doc / sources := Seq.empty,
     turbo := true,
     resolvers ++= Dependencies.Resolvers,
     scalafmtOnCompile := true

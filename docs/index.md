@@ -3,9 +3,12 @@ id: index
 title: Kafka WebSocket Proxy 
 slug: /
 keywords:
-  - kafka  
+  - kafka
   - websockets
   - proxy
+  - streaming
+  - ingestion
+  - consumption
 ---
 
 The Kafka WebSocket Proxy is mainly created as a more efficient alternative to
