@@ -15,7 +15,7 @@ object Versions {
 
   val AkkaVersion            = "2.6.14"
   val AkkaHttpVersion        = "10.2.4"
-  val AkkaStreamKafkaVersion = "2.0.7"
+  val AkkaStreamKafkaVersion = "2.1.0"
 
   val AlpakkaVersion = "1.0.2"
 
