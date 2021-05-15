@@ -9,7 +9,7 @@ slug: /getting-started
 The `kafka-websocket-proxy` is available pre-installed in a docker image from
 Docker Hub at [kpmeen/kafka-websocket-proxy](https://hub.docker.com/r/kpmeen/kafka-websocket-proxy/tags).
 
-For configuration, please see [Configuration](/configuration) for details on
+For configuration, please see [Configuration](configuration.md) for details on
 which environment properties should be used.
 
 ### Healthcheck
