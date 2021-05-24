@@ -293,9 +293,9 @@ trait WsProxyKafkaSpec
     )
   }
 
-  private[this] val zkSessionTimeoutMs    = 10000
-  private[this] val zkConnectionTimeoutMs = 10000
-  private[this] val topicCreationTimeout  = 5 seconds
+  override val zkSessionTimeoutMs    = 10000
+  override val zkConnectionTimeoutMs = 10000
+  override val topicCreationTimeout  = 5 seconds
 
   def initialiseTopic(
       topic: String,
