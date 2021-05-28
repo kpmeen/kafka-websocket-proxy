@@ -20,7 +20,7 @@ object Versions {
   val AlpakkaVersion = "1.0.2"
 
   val AkkaHttpCirceVersion      = "1.25.2"
-  val CirceVersion              = "0.13.0"
+  val CirceVersion              = "0.14.1"
   val CirceGenericExtrasVersion = CirceVersion
   val CirceOpticsVersion        = CirceVersion
 

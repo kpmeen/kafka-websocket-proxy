@@ -71,11 +71,7 @@ object Settings {
     javacOptions ++= Seq("-source", "11", "-target", "11"),
     javaOptions ++= Seq(
       // Set timezone to UTC
-      "-Duser.timezone=UTC",
-      // Enable the Graal JIT!!!
-      "-XX:+UnlockExperimentalVMOptions",
-      "-XX:+EnableJVMCI",
-      "-XX:+UseJVMCICompiler"
+      "-Duser.timezone=UTC"
     ),
     run / fork := true,
     Test / fork := true,
