@@ -1,0 +1,35 @@
+{
+  "type" : "record",
+  "name" : "album",
+  "namespace" : "foo.bar",
+  "fields" : [
+    {
+      "name" : "albumId",
+      "type" : "string"
+    },
+    {
+      "name" : "artist",
+      "type" : "string"
+    }, {
+      "name" : "title",
+      "type" : "string"
+    }, {
+      "name" : "tracks",
+      "type" : {
+        "type" : "array",
+        "items" : {
+          "type" : "record",
+          "name" : "track",
+          "namespace" : "foo.bar",
+          "fields" : [ {
+            "name" : "name",
+            "type" : "string"
+          }, {
+            "name" : "duration",
+            "type" : "long"
+          } ]
+        }
+      }
+    }
+  ]
+}

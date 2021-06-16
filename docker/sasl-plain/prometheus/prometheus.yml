@@ -1,0 +1,11 @@
+global:
+  scrape_interval: 10s
+  evaluation_interval: 10s
+
+scrape_configs:
+- job_name: 'kafka'
+  static_configs:
+    - targets: ['kafka1:39998']
+- job_name: 'kafka-connect'
+  static_configs:
+    - targets: ['connect:39999']

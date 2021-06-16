@@ -20,7 +20,7 @@ object DockerTasksPlugin extends AutoPlugin {
   override def globalSettings: Seq[Setting[_]] = {
     def initScript(cmd: String, clean: Boolean) = {
       val args = if (clean) " -c" else ""
-      s"./docker/single-node/init.sh $cmd$args"
+      s"./docker/plain/init.sh $cmd$args"
     }
 
     Seq(

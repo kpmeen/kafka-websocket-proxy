@@ -1,0 +1,82 @@
+---
+version: '3'
+
+networks:
+  kafka_dev_sandbox:
+    driver: bridge
+
+services:
+
+  connect:
+    build:
+      context: ./kafka-connect-envcfg
+      args:
+        IMAGE_VERSION: ${CONFLUENT_VERSION}
+    container_name: connect
+    depends_on:
+      - zookeeper
+      - kafka1
+      - schema-registry
+    hostname: connect
+    ports:
+      - "8083:8083"
+      - "39999:39999"
+    restart: unless-stopped
+    environment:
+      # The hostname + port for accessing the Kafka cluster. See Confluent Cloud dashboard for details.
+      CONNECT_BOOTSTRAP_SERVERS: kafka1:9092
+      # Misc Kafka configs
+      CONNECT_REQUEST_TIMEOUT_MS: 2000
+      CONNECT_RETRY_BACKOFF_MS: 500
+      # The hostname that the client USES to get access to the REST API
+      # (if accessing via a proxy, the proxy hostname should be used)
+      CONNECT_REST_ADVERTISED_HOST_NAME: connect
+      # The port where the REST API will be exposed
+      CONNECT_REST_PORT: 8083
+      # Specify the groupId to use for the connect worker/cluster
+      CONNECT_GROUP_ID: test-connect-group
+      # Specify topics to use for connector related data
+      CONNECT_CONFIG_STORAGE_TOPIC: connect-configs
+      CONNECT_OFFSET_STORAGE_TOPIC: connect-offsets
+      CONNECT_STATUS_STORAGE_TOPIC: connect-status
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+      # Specify default key and value converters to use
+      CONNECT_KEY_CONVERTER: io.confluent.connect.avro.AvroConverter
+      CONNECT_VALUE_CONVERTER: io.confluent.connect.avro.AvroConverter
+      # Schema registry URLs for keys and values. See Confluent Cloud dashboard for details.
+      CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      # The internal key/value converters
+      CONNECT_INTERNAL_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_INTERNAL_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      # Consumer configs
+      CONNECT_CONSUMER_REQUEST_TIMEOUT_MS: 2000
+      CONNECT_CONSUMER_RETRY_BACKOFF_MS: 500
+      CONNECT_CONSUMER_BOOTSTRAP_SERVERS: kafka1:9092
+      # Producer configs
+      CONNECT_PRODUCER_REQUEST_TIMEOUT_MS: 2000
+      CONNECT_PRODUCER_RETRY_BACKOFF_MS: 500
+      CONNECT_PRODUCER_BOOTSTRAP_SERVERS: kafka1:9092
+      #CONNECT_PRODUCER_COMPRESSION_TYPE: snappy
+      # The path where connectors are downloaded from confluent-hub,
+      # or added via docker volume mounts.
+      CONNECT_PLUGIN_PATH: '/usr/share/confluent-hub-components'
+      # Confluent metrics reporter
+      CONNECT_PRODUCER_INTERCEPTOR_CLASSES: io.confluent.monitoring.clients.interceptor.MonitoringProducerInterceptor
+      CONNECT_CONSUMER_INTERCEPTOR_CLASSES: io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor
+      # Set sensible default log levels
+      CONNECT_LOG4J_ROOT_LOGLEVEL: INFO
+      CONNECT_LOG4J_LOGGERS: "org.apache.zookeeper=ERROR,org.reflections=ERROR,org.I0Itec.zkclient=ERROR,com.github.jcustenborder=WARN"
+      # Comment out below to disable prometheus jmx exporter
+      KAFKA_OPTS: -javaagent:/opt/prometheus/jmx_prometheus_javaagent.jar=39999:/opt/prometheus/connect-prom-jmx-agent-config.yml
+    extra_hosts:
+      - "moby:127.0.0.1"
+    networks:
+      - kafka_dev_sandbox
+    volumes:
+      - ./kafka-connect-data:/opt/kafka-connect-data
+      - ./prometheus:/opt/prometheus:ro
+    labels:
+      kafka.sandbox.container.type: "kafka-connect"

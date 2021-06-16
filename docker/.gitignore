@@ -1,0 +1,12 @@
+.idea/
+*.tmp
+*.swp
+*.log
+*.orig
+
+*.jks
+*_creds
+*.csr
+*.srl
+*.key
+*.crt
