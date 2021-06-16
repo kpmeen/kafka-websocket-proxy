@@ -1,0 +1,3 @@
+[submodule "docker"]
+	path = docker
+	url = git@gitlab.com:kpmeen/kafka-dev-sandbox.git
