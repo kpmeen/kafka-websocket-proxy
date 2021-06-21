@@ -40,8 +40,10 @@ trait FileLoader { self =>
   def testLogbackConfig(implicit mat: Materializer): String =
     loadLogbackTestConfig("logback-test.xml")
 
-  def logbackConfigForTest(implicit mat: Materializer): String =
-    loadLogbackTestConfig("logback-config-for-test.xml")
+  def logbackConfigForTestcase(testCase: Int = 1)(
+      implicit mat: Materializer
+  ): String =
+    loadLogbackTestConfig(s"logback-config-testcase-$testCase.xml")
 
   def filePath(f: String): Path = {
     val fileUrl = self.getClass.getResource(f)

@@ -2,7 +2,7 @@ package net.scalytica.kafka.wsproxy.logging
 
 import akka.actor.ActorSystem
 import akka.stream.Materializer
-import ch.qos.logback.classic.{Logger => LogbackLogger}
+import ch.qos.logback.classic.{LoggerContext, Logger => LogbackLogger}
 import com.typesafe.config.ConfigFactory
 import net.scalytica.test.FileLoader
 import org.scalatest.matchers.must.Matchers
@@ -10,9 +10,9 @@ import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.{Assertion, BeforeAndAfterAll, OptionValues}
 import org.slf4j.LoggerFactory
 
-import scala.jdk.CollectionConverters._
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
 
 // INFO: This class is prefixed with capital A to enforce being executed first
 class WsProxyEnvLoggerConfiguratorSpec
@@ -35,10 +35,7 @@ class WsProxyEnvLoggerConfiguratorSpec
   private val logbackConfigEnv   = WsProxyEnvLoggerConfigurator.LogbackCfgEnv
   private val loggerEnvPrefix    = WsProxyEnvLoggerConfigurator.PropPrefix
 
-  private val testEnvLogger =
-    s"$loggerEnvPrefix$testLogger"
-
-  private val testLogbackConfigFileString = FileLoader.logbackConfigForTest
+  private val testEnvLogger = s"$loggerEnvPrefix$testLogger"
 
   private val logbackConfigString =
     """<configuration>
@@ -88,9 +85,10 @@ class WsProxyEnvLoggerConfiguratorSpec
   }
 
   private def testContext(
+      testCase: Int,
       props: (String, String)*
   )(
-      body: Map[String, Option[String]] => Assertion
+      body: (LoggerContext, Map[String, Option[String]]) => Assertion
   ): Unit = {
     props.foreach(p => sys.props += p._1 -> p._2)
 
@@ -104,53 +102,55 @@ class WsProxyEnvLoggerConfiguratorSpec
       l.getName -> Option(l.getLevel).map(_.toString)
     }.toMap
 
-    body(configuredLevels)
+    body(logCtx, configuredLevels)
 
     WsProxyEnvLoggerConfigurator.reset()
-    WsProxyEnvLoggerConfigurator.loadConfigString(testLogbackConfigFileString)
+    WsProxyEnvLoggerConfigurator.loadConfigString(
+      FileLoader.logbackConfigForTestcase(testCase)
+    )
   }
 
   "The WsProxyEnvLoggerConfigurator" should {
 
     // IMPORTANT: Do NOT change the order of the below tests.
 
-    "not modify loggers if there are no logger configs defined " +
-      "in the env" in testContext() { configuredLevels =>
-        configuredLevels.keys must not contain testLogger
-        configuredLevels must contain allElementsOf defaultLoggers
+    "not modify loggers when no logger configs are defined in the env" in
+      testContext(1) { (_, levels) =>
+        levels.keys must not contain testLogger
+        levels must contain allElementsOf defaultLoggers
       }
 
     "set level for logger from environment" in
-      testContext(testEnvLogger -> "DEBUG") { configuredLevels =>
-        configuredLevels must contain(testLogger -> Some("DEBUG"))
-        configuredLevels must contain allElementsOf defaultLoggers
+      testContext(1, testEnvLogger -> "DEBUG") { (_, levels) =>
+        levels must contain(testLogger -> Some("DEBUG"))
+        levels must contain allElementsOf defaultLoggers
       }
 
     "udpate level for pre-configured logger" in
-      testContext(s"$loggerEnvPrefix$scalyticaLogger" -> "DEBUG") {
-        configuredLevels =>
-          configuredLevels must contain(scalyticaLogger -> Some("DEBUG"))
-          configuredLevels must contain(rootLogger -> Some("OFF"))
-          configuredLevels must contain(akkaActorLogger -> Some("OFF"))
-          configuredLevels must contain(akkaKafkaLogger -> Some("OFF"))
-          configuredLevels must contain(kafkaClientsLogger -> Some("OFF"))
+      testContext(1, s"$loggerEnvPrefix$scalyticaLogger" -> "DEBUG") {
+        (_, levels) =>
+          levels must contain(scalyticaLogger -> Some("DEBUG"))
+          levels must contain(rootLogger -> Some("OFF"))
+          levels must contain(akkaActorLogger -> Some("OFF"))
+          levels must contain(akkaKafkaLogger -> Some("OFF"))
+          levels must contain(kafkaClientsLogger -> Some("OFF"))
       }
 
     "set the configuration from an environment string value" in
-      testContext(logbackConfigEnv -> logbackConfigString) { configuredLevels =>
+      testContext(1, logbackConfigEnv -> logbackConfigString) { (_, levels) =>
         // assert keys with value null
-        configuredLevels.get(scalyticaLogger).value mustBe None
-        configuredLevels.get("akka").value mustBe None
-        configuredLevels.get("net").value mustBe None
-        configuredLevels.get("org").value mustBe None
-        configuredLevels.get("org.apache").value mustBe None
+        levels.get(scalyticaLogger).value mustBe None
+        levels.get("akka").value mustBe None
+        levels.get("net").value mustBe None
+        levels.get("org").value mustBe None
+        levels.get("org.apache").value mustBe None
         // assert values
-        configuredLevels.get(rootLogger).value mustBe Some("ERROR")
-        configuredLevels.get(akkaActorLogger).value mustBe Some("WARN")
-        configuredLevels.get(akkaKafkaLogger).value mustBe Some("WARN")
-        configuredLevels.get(proxyLogger).value mustBe Some("DEBUG")
+        levels.get(rootLogger).value mustBe Some("ERROR")
+        levels.get(akkaActorLogger).value mustBe Some("WARN")
+        levels.get(akkaKafkaLogger).value mustBe Some("WARN")
+        levels.get(proxyLogger).value mustBe Some("DEBUG")
         // assert non-existing keys
-        configuredLevels.get("io.confluent") mustBe None
+        levels.get("io.confluent") mustBe None
       }
 
   }

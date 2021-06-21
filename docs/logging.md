@@ -50,6 +50,14 @@ configurations will be ignored. So if e.g. both `WSPROXY_LOGBACK_XML_CONFIG` and
 completely. The same applies when an external logback configuration file is
 provided through `-Dlogback.configurationFile=<file_path>`.
 
+## Use JSON format for logging
+
+The log configuration supports enabling log messages to be printed in JSON
+format. This can be achieved by setting the environment property
+`WS_PROXY_USE_JSON_LOG_FORMAT` to `true`. If the variable has not been set, or
+has been given any other value, the log output will use the standard pattern
+layout.
+
 ## Disabling ANSI colours in log output
 
 Sometimes the log output needs to be free from ANSI colours. For example if the

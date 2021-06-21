@@ -29,6 +29,8 @@ object Versions {
   val ScalaLoggingVersion = "3.9.3"
   val Slf4JVersion        = "1.7.30"
   val LogbackVersion      = "1.2.3"
+  val LogbackJsVersion    = "0.1.5"
+  val JaninoVersion       = "3.0.6"
 
   val ScalaTestVersion = "3.2.9"
 
@@ -47,7 +49,6 @@ object Dependencies {
     DefaultOptions.resolvers(snapshot = true) ++ Seq(
       Resolver.typesafeRepo("releases"),
       Resolver.jcenterRepo,
-      Resolver.bintrayRepo("hseeberger", "maven"),
       MavenRepo("Confluent", "https://packages.confluent.io/maven/"),
       MavenRepo(
         "MuleSoft",
@@ -205,16 +206,28 @@ object Dependencies {
 
   object Logging {
 
+    private[this] val lbPkg = "ch.qos.logback"
+
     val ScalaLogging =
       "com.typesafe.scala-logging" %% "scala-logging" % ScalaLoggingVersion
-    val Logback        = "ch.qos.logback" % "logback-classic"  % LogbackVersion
-    val Slf4j          = "org.slf4j"      % "slf4j-api"        % Slf4JVersion
-    val Log4jOverSlf4j = "org.slf4j"      % "log4j-over-slf4j" % Slf4JVersion
-    val Slf4jLog4j     = "org.slf4j"      % "slf4j-log4j12"    % Slf4JVersion
-    val JulToSlf4j     = "org.slf4j"      % "jul-to-slf4j"     % Slf4JVersion
-    val Slf4jNop       = "org.slf4j"      % "slf4j-nop"        % Slf4JVersion
 
-    val All = Seq(ScalaLogging, Slf4j, Logback)
+    val Logback = lbPkg % "logback-classic" % LogbackVersion
+
+    val LogbackJson =
+      s"$lbPkg.contrib" % "logback-json-classic" % LogbackJsVersion
+
+    val LogbackJackson =
+      s"$lbPkg.contrib" % "logback-jackson" % LogbackJsVersion
+
+    val Janino         = "org.codehaus.janino" % "janino"           % JaninoVersion
+    val Slf4j          = "org.slf4j"           % "slf4j-api"        % Slf4JVersion
+    val Log4jOverSlf4j = "org.slf4j"           % "log4j-over-slf4j" % Slf4JVersion
+    val Slf4jLog4j     = "org.slf4j"           % "slf4j-log4j12"    % Slf4JVersion
+    val JulToSlf4j     = "org.slf4j"           % "jul-to-slf4j"     % Slf4JVersion
+    val Slf4jNop       = "org.slf4j"           % "slf4j-nop"        % Slf4JVersion
+
+    val All =
+      Seq(ScalaLogging, Slf4j, Logback, LogbackJson, LogbackJackson, Janino)
   }
 
   object Monitoring {

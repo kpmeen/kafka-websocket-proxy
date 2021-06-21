@@ -1,0 +1,46 @@
+<configuration>
+
+  <!-- DO NOT MODIFY -->
+
+  <conversionRule conversionWord="colouredLevel"
+                  converterClass="net.scalytica.kafka.wsproxy.logging.ColouredLevel"/>
+
+  <contextListener class="ch.qos.logback.classic.jul.LevelChangePropagator">
+    <resetJUL>true</resetJUL>
+  </contextListener>
+
+  <if condition='property("WS_PROXY_USE_JSON_LOG_FORMAT").contains("true")'>
+    <!-- If the WS_PROXY_USE_JSON_LOG_FORMAT env is true, the application will log using the JSON layout -->
+    <then>
+      <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+          <layout class="ch.qos.logback.contrib.json.classic.JsonLayout">
+            <jsonFormatter class="ch.qos.logback.contrib.jackson.JacksonJsonFormatter">
+              <prettyPrint>false</prettyPrint>
+            </jsonFormatter>
+            <timestampFormat>yyyy-MM-dd' 'HH:mm:ss.SSS</timestampFormat>
+            <appendLineSeparator>true</appendLineSeparator>
+          </layout>
+        </encoder>
+      </appender>
+    </then>
+    <!-- By default the application will use the regular pattern layout -->
+    <else>
+      <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+          <pattern>
+            %d{HH:mm:ss.SSS} %colouredLevel %logger{36} - %msg%n
+          </pattern>
+        </encoder>
+      </appender>
+    </else>
+  </if>
+
+  <logger name="test.me" level="TRACE"/>
+
+  <!-- Root loggers catch all other events that are not explicitly handled-->
+  <root level="DEBUG">
+    <appender-ref ref="STDOUT"/>
+  </root>
+
+</configuration>
