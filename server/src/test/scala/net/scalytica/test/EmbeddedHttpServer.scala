@@ -34,14 +34,20 @@ trait EmbeddedHttpServer {
   def withEmbeddedServer[T](
       host: String = "localhost",
       port: Int = availablePort,
-      routes: Route
+      routes: Route,
+      completionWaitDuration: Option[FiniteDuration] = None
   )(block: (String, Int) => T)(
       implicit sys: ActorSystem,
       ec: ExecutionContext
   ): T = {
     val server = Http().newServerAt(host, port).bindFlow(Route.seal(routes))
     try {
-      block(host, port)
+      val res = block(host, port)
+      completionWaitDuration match {
+        case Some(waitDuration) => Thread.sleep(waitDuration.toMillis)
+        case None               => ()
+      }
+      res
     } finally {
       val _ = server.flatMap(_.terminate(shutdownDeadline))
     }

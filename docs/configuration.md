@@ -38,6 +38,7 @@ Allows for changing things like network interface, port number, etc.
 | kafka.ws.proxy.server.broker-resolution-retries        | WSPROXY_BROKER_RESOLUTION_RETRIES        | `25`                     | Max number of retries for host resolution of Kafka brokers. |
 | kafka.ws.proxy.server.broker-resolution-retry-interval | WSPROXY_BROKER_RESOLUTION_RETRY_INTERVAL | `1 second`               | Interval duration between retries when resolving the Kafka broker hosts. |
 | kafka.ws.proxy.server.secure-health-check-endpoint     | WSPROXY_SECURE_HEALTHCHECK_ENDPOINT      | `true`                   | When set to `true`, will enforce the same auth requirements as other endpoints. If `false` the `/healthcheck` endpoint will not require auth. |
+| kafka.ws.proxy.server.jmx.proxy.status.interval        | WSPROXY_JMX_PROXY_STATUS_INTERVAL        | `5 seconds`              | Sets the frequency the Kafka WebSocket Proxy will update the values in the `ProxyStatusMXBean` |
 
 ## Internal Session Handler
 

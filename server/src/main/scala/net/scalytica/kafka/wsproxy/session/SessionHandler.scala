@@ -13,9 +13,13 @@ import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.jmx.WsProxyJmxRegistrar
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models.{WsClientId, WsGroupId, WsServerId}
-import net.scalytica.kafka.wsproxy.session.Session.SessionOpResult
+import net.scalytica.kafka.wsproxy.session.Session.{
+  IncompleteOperation,
+  SessionOpResult
+}
 import net.scalytica.kafka.wsproxy.session.SessionHandlerProtocol._
 
+import java.util.concurrent.TimeoutException
 import scala.concurrent.{ExecutionContext, Future}
 
 /**
@@ -82,8 +86,56 @@ object SessionHandler extends SessionHandler {
       sh: ActorRef[SessionHandlerProtocol.Protocol]
   ) {
 
+    private[this] def handleError[T](
+        groupId: WsGroupId,
+        clientId: Option[WsClientId] = None,
+        serverId: Option[WsServerId] = None
+    )(timeoutResponse: String => T)(throwable: Throwable): Future[T] = {
+      val op = throwable.getStackTrace
+        .dropWhile(ste => !ste.getClassName.equals(getClass.getName))
+        .headOption
+        .map(_.getMethodName)
+        .getOrElse("unknown")
+      val cid = clientId.map(c => s"on $c").getOrElse("")
+      val sid = serverId.map(s => s"on $s").getOrElse("")
+
+      throwable match {
+        case t: TimeoutException =>
+          logger.debug(s"Timeout calling $op $cid in $groupId $sid", t)
+          Future.successful(timeoutResponse(t.getMessage))
+
+        case t: Throwable =>
+          logger.warn(
+            s"An unknown error occurred calling $op $cid in $groupId $sid",
+            t
+          )
+          throw t
+      }
+    }
+
+    private[this] def handleSessionOpError(
+        groupId: WsGroupId,
+        clientId: WsClientId,
+        serverId: WsServerId
+    )(throwable: Throwable): Future[SessionOpResult] = {
+      handleSessionOpError(groupId, Some(clientId), Some(serverId))(throwable)
+    }
+
+    private[this] def handleSessionOpError(
+        groupId: WsGroupId,
+        clientId: Option[WsClientId] = None,
+        serverId: Option[WsServerId] = None
+    )(throwable: Throwable): Future[SessionOpResult] = {
+      handleError[SessionOpResult](
+        groupId = groupId,
+        clientId = clientId,
+        serverId = serverId
+      )(reason => IncompleteOperation(reason))(throwable)
+    }
+
     def initSession(groupId: WsGroupId, consumerLimit: Int)(
-        implicit timeout: Timeout,
+        implicit ec: ExecutionContext,
+        timeout: Timeout,
         scheduler: Scheduler
     ): Future[SessionOpResult] = {
       sh.ask[SessionOpResult] { ref =>
@@ -92,7 +144,7 @@ object SessionHandler extends SessionHandler {
           consumerLimit = consumerLimit,
           replyTo = ref
         )
-      }
+      }.recoverWith(handleSessionOpError(groupId)(_))
     }
 
     def addConsumer(
@@ -104,14 +156,16 @@ object SessionHandler extends SessionHandler {
         timeout: Timeout,
         scheduler: Scheduler
     ): Future[SessionOpResult] = {
-      def add() = sh.ask[SessionOpResult] { ref =>
-        SessionHandlerProtocol.AddConsumer(
-          groupId = groupId,
-          consumerId = clientId,
-          serverId = serverId,
-          replyTo = ref
-        )
-      }
+      def add() = sh
+        .ask[SessionOpResult] { ref =>
+          SessionHandlerProtocol.AddConsumer(
+            groupId = groupId,
+            consumerId = clientId,
+            serverId = serverId,
+            replyTo = ref
+          )
+        }
+        .recoverWith(handleSessionOpError(groupId, clientId, serverId)(_))
 
       WsProxyJmxRegistrar.findConsumerClientMBean(clientId, groupId) match {
         case Some(_) =>
@@ -125,38 +179,53 @@ object SessionHandler extends SessionHandler {
           // avoid not being able to connect the consumer after an unexpected
           // disconnect.
           for {
-            _      <- removeConsumer(groupId, clientId)
+            _      <- removeConsumer(groupId, clientId, serverId)
             addRes <- add()
           } yield addRes
 
       }
     }
 
-    def removeConsumer(groupId: WsGroupId, clientId: WsClientId)(
-        implicit timeout: Timeout,
+    def removeConsumer(
+        groupId: WsGroupId,
+        clientId: WsClientId,
+        serverId: WsServerId
+    )(
+        implicit ec: ExecutionContext,
+        timeout: Timeout,
         scheduler: Scheduler
     ): Future[SessionOpResult] = {
       sh.ask[SessionOpResult] { ref =>
         SessionHandlerProtocol.RemoveConsumer(groupId, clientId, ref)
-      }
+      }.recoverWith(handleSessionOpError(groupId, clientId, serverId)(_))
     }
 
     def sessionShutdown()(
-        implicit timeout: Timeout,
+        implicit ec: ExecutionContext,
+        timeout: Timeout,
         scheduler: Scheduler
     ): Future[SessionOpResult] = {
       sh.ask[SessionOpResult] { ref =>
         SessionHandlerProtocol.Stop(ref)
+      }.recoverWith {
+        case t: TimeoutException =>
+          logger.debug("Timeout calling sessionShutdown()", t)
+          Future.successful(IncompleteOperation(t.getMessage))
+
+        case t: Throwable =>
+          logger.warn("An unknown error occurred calling sessionShutdown()", t)
+          throw t
       }
     }
 
     def getSession(groupId: WsGroupId)(
-        implicit timeout: Timeout,
+        implicit ec: ExecutionContext,
+        timeout: Timeout,
         scheduler: Scheduler
     ): Future[Option[Session]] = {
       sh.ask[Option[Session]] { ref =>
         SessionHandlerProtocol.GetSession(groupId, ref)
-      }
+      }.recoverWith(handleError[Option[Session]](groupId)(_ => None)(_))
     }
 
   }
@@ -250,7 +319,9 @@ trait SessionHandler extends WithProxyLogger {
             logger.debug(s"Consumed message: $ip")
             ref ! ip
 
-          case _ => ()
+          case _ =>
+            logger.debug(s"No previous sessions found...")
+            ()
         }
       }
 
@@ -277,8 +348,13 @@ trait SessionHandler extends WithProxyLogger {
       producer: SessionDataProducer
   ): Behavior[Protocol] = {
     Behaviors.receiveMessage {
-      case c: ClientSessionProtocol => clientSessionProtocolHandler(active, c)
-      case i: InternalProtocol      => internalProtocolHandler(active, i)
+      case c: ClientSessionProtocol =>
+        logger.trace(s"Received a ClientSessionProtocol message [$c]")
+        clientSessionProtocolHandler(active, c)
+
+      case i: InternalProtocol =>
+        logger.trace(s"Received an InternalProtocol message [$i]")
+        internalProtocolHandler(active, i)
     }
   }
 
@@ -291,6 +367,8 @@ trait SessionHandler extends WithProxyLogger {
       producer: SessionDataProducer
   ): Behavior[Protocol] = {
     val serverId = cfg.server.serverId
+
+    logger.trace(s"CLIENT_SESSION: got client session protocol message $csp")
 
     csp match {
       case is: InitSession    => initSessionHandler(active, is)
@@ -342,6 +420,10 @@ trait SessionHandler extends WithProxyLogger {
         Behaviors.same
 
       case None =>
+        logger.debug(
+          s"INIT_SESSION: no active sessions for ${is.groupId.value}. " +
+            "Creating a new one..."
+        )
         val s = Session(is.groupId, is.consumerLimit)
         producer.publish(s).map { _ =>
           logger.debug(
@@ -366,8 +448,9 @@ trait SessionHandler extends WithProxyLogger {
     )
     active.find(ac.groupId) match {
       case None =>
-        logger.debug(
-          s"ADD_CONSUMER: session ${ac.groupId.value} was not found."
+        logger.warn(
+          s"ADD_CONSUMER: session ${ac.groupId.value} was not found. " +
+            s"Consumer ID ${ac.consumerId} will not be added."
         )
         ac.replyTo ! Session.SessionNotFound(ac.groupId)
         Behaviors.same
@@ -420,7 +503,7 @@ trait SessionHandler extends WithProxyLogger {
       case Some(session) =>
         session.removeConsumer(rc.consumerId) match {
           case removed @ Session.ConsumerRemoved(s) =>
-            producer.publish(s).map { _ =>
+            producer.publish(s).foreach { _ =>
               logger.debug(
                 s"REMOVE_CONSUMER: consumer ${rc.consumerId.value} removed " +
                   s"from session ${rc.groupId.value}"
@@ -455,7 +538,7 @@ trait SessionHandler extends WithProxyLogger {
       implicit ec: ExecutionContext,
       cfg: AppCfg,
       producer: SessionDataProducer
-  ) = ip match {
+  ): Behavior[Protocol] = ip match {
     case UpdateSession(gid, s) =>
       logger.debug(s"INTERNAL: Updating session ${gid.value}...")
       nextOrSame(active.updateSession(gid, s))(behavior)

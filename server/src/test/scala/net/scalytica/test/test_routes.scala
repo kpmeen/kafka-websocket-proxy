@@ -1,5 +1,6 @@
 package net.scalytica.test
 
+import net.scalytica.kafka.wsproxy.models.WsServerId
 import net.scalytica.kafka.wsproxy.web.{
   BaseRoutes,
   SchemaRoutes,
@@ -7,11 +8,20 @@ import net.scalytica.kafka.wsproxy.web.{
   StatusRoutes
 }
 
-trait TestSchemaRoutes  extends SchemaRoutes with BaseRoutes
-object TestSchemaRoutes extends TestSchemaRoutes
+trait TestSchemaRoutes extends SchemaRoutes with BaseRoutes
 
-trait TestStatusRoutes  extends StatusRoutes with BaseRoutes
-object TestStatusRoutes extends TestStatusRoutes
+object TestSchemaRoutes extends TestSchemaRoutes {
+  override val serverId = WsServerId("node-1")
+}
 
-trait TestServerRoutes  extends ServerRoutes
-object TestServerRoutes extends TestServerRoutes
+trait TestStatusRoutes extends StatusRoutes with BaseRoutes
+
+object TestStatusRoutes extends TestStatusRoutes {
+  override val serverId = WsServerId("node-1")
+}
+
+trait TestServerRoutes extends ServerRoutes
+
+object TestServerRoutes extends TestServerRoutes {
+  override val serverId = WsServerId("node-1")
+}

@@ -16,9 +16,14 @@ trait WsProxyJmxQueries extends WithProxyLogger {
 
   def findMBean(on: ObjectName): Option[MBeanInfo] = {
     val tryRes = Try(mbs.getMBeanInfo(on))
-    tryRes.recoverWith { case t: Throwable =>
-      logger.trace(s"Error querying MBean with ObjectName ${on.toString}")
-      throw t
+    tryRes.recoverWith {
+      case t: InstanceNotFoundException =>
+        logger.debug(s"MBean with ObjectName ${on.toString} could not be found")
+        throw t
+
+      case t: Throwable =>
+        logger.info(s"Error querying MBean with ObjectName ${on.toString}", t)
+        throw t
     }
     tryRes.toOption
   }
@@ -51,12 +56,25 @@ trait WsProxyJmxQueries extends WithProxyLogger {
       attribute: String
   ): Option[AnyRef] = {
     val tryRes = Try(mbs.getAttribute(on, attribute))
-    tryRes.recoverWith { case t: Throwable =>
-      logger.trace(
-        s"Error querying MBean with ObjectName ${on.toString} " +
-          s"and attribute ${attribute.mkString(", ")}"
-      )
-      throw t
+    tryRes.recoverWith {
+      case t: InstanceNotFoundException =>
+        logger.debug(s"MBean with ObjectName ${on.toString} could not be found")
+        throw t
+
+      case t: AttributeNotFoundException =>
+        logger.debug(
+          s"Attribute $attribute was not found on " +
+            s"MBean with ObjectName ${on.toString}"
+        )
+        throw t
+
+      case t: Throwable =>
+        logger.trace(
+          s"Error querying MBean with ObjectName ${on.toString} " +
+            s"and attribute ${attribute.mkString(", ")}",
+          t
+        )
+        throw t
     }
     tryRes.toOption
   }

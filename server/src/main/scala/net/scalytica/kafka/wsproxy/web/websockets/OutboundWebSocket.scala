@@ -145,10 +145,10 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
           jmxManager.foreach(_.removeConsumerConnection())
           // Remove the consumer from the session handler
           sessionHandler
-            .removeConsumer(groupId, clientId)
+            .removeConsumer(groupId, clientId, serverId)
             .map(_ => Done)
             .recoverWith { case t: Throwable =>
-              logger.trace("Removal failed due to an error", t)
+              logger.trace("Consumer removal failed due to an error", t)
               Future.successful(Done)
             }
         }
