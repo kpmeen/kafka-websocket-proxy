@@ -87,6 +87,14 @@ case object Session {
       )
   }
 
+  case class IncompleteOperation(reason: String) extends SessionOpResult {
+
+    override def session =
+      throw new NoSuchElementException(
+        "Cannot access session value when it's not found"
+      )
+  }
+
 }
 
 /**

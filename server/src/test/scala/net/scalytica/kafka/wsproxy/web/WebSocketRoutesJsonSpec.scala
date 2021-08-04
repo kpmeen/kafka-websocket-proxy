@@ -1,8 +1,12 @@
 package net.scalytica.kafka.wsproxy.web
 
+import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.model.headers.Upgrade
+import akka.http.scaladsl.model.ws.{Message, WebSocketRequest}
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.testkit.{RouteTestTimeout, WSProbe}
+import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import net.manub.embeddedkafka.Codecs.stringDeserializer
 import net.scalytica.kafka.wsproxy.models.Formats.{JsonType, NoType, StringType}
 import net.scalytica.kafka.wsproxy.models.TopicName
@@ -24,6 +28,7 @@ class WebSocketRoutesJsonSpec
     with ScalaFutures
     with WsProxyConsumerKafkaSpec
     with MockOpenIdServer
+    with EmbeddedHttpServer
     with TestDataGenerators
     with FlakyTests {
 
@@ -62,6 +67,42 @@ class WebSocketRoutesJsonSpec
       messages = messages,
       producerUri = Some(uri)
     )
+  }
+
+  def checkWS(
+      host: String,
+      port: Int,
+      uri: String,
+      expectFailure: Boolean = false,
+      numExpMsgs: Int = 0
+  )(
+      initialDelay: FiniteDuration = 0 seconds,
+      openConnectionDuration: FiniteDuration = 5 seconds
+  ): Assertion = {
+    val ioIn   = Source.maybe[Message]
+    val ioOut  = Sink.seq[Message]
+    val ioFlow = Flow.fromSinkAndSourceMat(ioOut, ioIn)(Keep.both)
+
+    Thread.sleep(initialDelay.toMillis)
+
+    val (upgradeRes, (closed, promise)) = Http().singleWebSocketRequest(
+      request = WebSocketRequest(s"ws://$host:$port$uri"),
+      clientFlow = ioFlow
+    )
+    val connected = upgradeRes.futureValue
+
+    if (expectFailure) connected.response.status must not be SwitchingProtocols
+    else connected.response.status mustBe SwitchingProtocols
+
+    if (expectFailure) connected.response.header[Upgrade] mustBe empty
+    else connected.response.header[Upgrade].exists(_.hasWebSocket) mustBe true
+
+    Thread.sleep(openConnectionDuration.toMillis)
+
+    promise.success(None)
+
+    val result = closed.futureValue
+    result.size mustBe numExpMsgs
   }
 
   "Using JSON payloads with WebSockets" when {
@@ -369,7 +410,6 @@ class WebSocketRoutesJsonSpec
 
           WS(out, probe1.flow) ~> ctx.route ~> check {
             isWebSocketUpgrade mustBe true
-
             // Make sure consumer socket 1 is ready and registered in session
             // FIXME: This test is really flaky!!!
             Thread.sleep((10 seconds).toMillis)
@@ -379,6 +419,31 @@ class WebSocketRoutesJsonSpec
                 case vr: ValidationRejection => vr.message mustBe rejectionMsg
                 case _                       => fail("Unexpected Rejection")
               }
+            }
+          }
+        }
+
+      "allow a consumer to reconnect if a connection is terminated" in
+        plainJsonConsumerContext(
+          topic = nextTopic,
+          keyType = None,
+          valType = StringType,
+          partitions = 2
+        ) { ctx =>
+          val out = "/socket/out?" +
+            s"clientId=json-test-$topicCounter" +
+            s"&groupId=json-test-group-$topicCounter" +
+            s"&topic=${ctx.topicName.value}" +
+            s"&valType=${StringType.name}" +
+            "&autoCommit=false"
+
+          withEmbeddedServer(
+            routes = ctx.route,
+            completionWaitDuration = Some(10 seconds)
+          ) { (host, port) =>
+            // validate first request
+            forAll(1 to 10) { _ =>
+              checkWS(host, port, out, numExpMsgs = 1)(initialDelay = 2 seconds)
             }
           }
         }
@@ -407,7 +472,6 @@ class WebSocketRoutesJsonSpec
 
           WS(out("a"), probe1.flow) ~> ctx.route ~> check {
             isWebSocketUpgrade mustBe true
-
             // Make sure consumer socket 1 is ready and registered in session
             Thread.sleep((4 seconds).toMillis)
 

@@ -29,6 +29,11 @@ connections from the same host as the application is running on.
 -Dcom.sun.management.jmxremote.local.only=tru
 ```
 
+### Configuring JMX
+
+See [Server Configuration](/configuration/#server-configuration) for details on
+how to configure the JMX related application properties.
+
 ## Enable Jolokia
 
 To enable [Jolokia](https://jolokia.org) it is necessary to configure a

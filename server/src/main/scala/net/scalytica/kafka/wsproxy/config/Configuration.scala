@@ -92,6 +92,16 @@ object Configuration extends WithProxyLogger {
     }
   }
 
+  implicit lazy val jmxManagerCfgReader = {
+    ConfigReader.fromCursor[JmxManagerConfig] { c =>
+      c.fluent
+        .at("proxy", "status", "interval")
+        .cursor
+        .flatMap(cc => ConfigReader.finiteDurationConfigReader.from(cc))
+        .map(fd => JmxManagerConfig(fd))
+    }
+  }
+
   final case class KafkaBootstrapHosts(hosts: List[String]) {
     def mkString(): String = hosts.mkString(",")
 
@@ -235,6 +245,10 @@ object Configuration extends WithProxyLogger {
       customJwt.exists(_.kafkaTokenAuthOnly)
   }
 
+  final case class JmxConfig(manager: JmxManagerConfig)
+
+  case class JmxManagerConfig(proxyStatusInterval: FiniteDuration)
+
   final case class ServerCfg(
       serverId: WsServerId,
       bindInterface: String,
@@ -245,7 +259,8 @@ object Configuration extends WithProxyLogger {
       brokerResolutionRetryInterval: FiniteDuration,
       secureHealthCheckEndpoint: Boolean,
       basicAuth: Option[BasicAuthCfg],
-      openidConnect: Option[OpenIdConnectCfg]
+      openidConnect: Option[OpenIdConnectCfg],
+      jmx: JmxConfig
   ) {
 
     def isSslEnabled: Boolean = ssl.exists(_.enabled)

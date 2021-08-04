@@ -11,6 +11,7 @@ import akka.http.scaladsl.testkit.{
   ScalatestRouteTest,
   WSProbe
 }
+import akka.testkit.TestDuration
 import net.scalytica.kafka.wsproxy.codecs.ProtocolSerdes
 import net.scalytica.kafka.wsproxy.web.Headers.XKafkaAuthHeader
 import org.scalatest.Suite
@@ -23,7 +24,8 @@ trait WsClientSpec
     with Matchers
     with ProtocolSerdes { self: Suite =>
 
-  implicit private[this] val routeTestTimeout = RouteTestTimeout(20 seconds)
+  implicit private[this] val routeTestTimeout =
+    RouteTestTimeout((20 seconds).dilated)
 
   implicit val testRejectHandler = TestServerRoutes.serverRejectionHandler
   implicit val testErrorHandler  = TestServerRoutes.serverErrorHandler

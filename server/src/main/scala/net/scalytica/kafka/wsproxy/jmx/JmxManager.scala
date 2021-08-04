@@ -66,8 +66,8 @@ trait JmxProxyStatusOps { self: BaseJmxManager with WithProxyLogger =>
   }
 
   final protected def scheduleProxyStatus(): Cancellable = {
-    // TODO: Make interval configurable!
-    sys.scheduler.scheduleAtFixedRate(0 seconds, 5 seconds) { () =>
+    val interval = appCfg.server.jmx.manager.proxyStatusInterval
+    sys.scheduler.scheduleAtFixedRate(0 seconds, interval) { () =>
       updateKafkaClusterInfo(sys.ignoreRef)
     }
   }

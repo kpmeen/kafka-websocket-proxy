@@ -24,6 +24,12 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
       |    bind-interface = "localhost"
       |    // port = 8078 // missing key
       |    secure-health-check-endpoint = true
+      |
+      |    jmx {
+      |      manager {
+      |        proxy.status.interval = 5 seconds
+      |      }
+      |    }
       |  }
       |
       |  kafka-client {
@@ -87,6 +93,12 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
       |    bind-interface = "localhost"
       |    port = 8078
       |    secure-health-check-endpoint = true
+      |
+      |    jmx {
+      |      manager {
+      |        proxy.status.interval = 5 seconds
+      |      }
+      |    }
       |  }
       |
       |  kafka-client {

@@ -10,7 +10,8 @@ module.exports = {
         'logging',
         'monitoring',
         'apis',
-        'development'
+        'development',
+        'faq'
       ],
     },
   ],

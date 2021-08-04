@@ -82,6 +82,7 @@ private[session] class SessionDataProducer(
             s"offset: ${rm.offset()}" +
             "]"
         )
+        logger.trace(s"Session data written was: $session")
 
       case Failure(ex) =>
         logger.error(

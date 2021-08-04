@@ -51,6 +51,8 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
 
   protected var sessionHandler: SessionHandlerRef = _
 
+  protected val serverId: WsServerId
+
   protected def basicAuthCredentials(
       creds: Credentials
   )(implicit cfg: AppCfg): Option[WsProxyAuthResult] = {
@@ -186,17 +188,18 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
           implicit val e = sys.dispatcher
 
           args.foreach { case (cid, gid) =>
-            sessionHandler.shRef.removeConsumer(gid, cid).onComplete {
+            sessionHandler.shRef.removeConsumer(gid, cid, serverId).onComplete {
               case Success(res) =>
                 logger.debug(
                   s"Removing consumer ${cid.value} from group" +
-                    s" ${gid.value} returned: ${res.asString}"
+                    s" ${gid.value} on server ${serverId.value}" +
+                    s" returned: ${res.asString}"
                 )
               case Failure(err) =>
                 logger.warn(
                   "An error occurred when trying to remove consumer" +
-                    s" ${cid.value} from group" +
-                    s" ${gid.value}",
+                    s" ${cid.value} from group ${gid.value} " +
+                    s"on server ${serverId.value}",
                   err
                 )
             }

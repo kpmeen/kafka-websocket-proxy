@@ -104,7 +104,9 @@ object WsConsumer extends WithProxyLogger {
         jaasProps
     }
 
-    logger.trace(s"Using consumer configuration:\n${props.mkString("\n")}")
+    logger.trace(
+      s"Using consumer configuration: ${props.mkString("\n  ", "\n  ", "")}"
+    )
 
     val consumer = new KafkaConsumer[K, V](
       props,
