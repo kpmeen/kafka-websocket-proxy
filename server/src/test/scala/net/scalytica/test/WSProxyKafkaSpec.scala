@@ -11,8 +11,8 @@ import com.typesafe.config.Config
 import io.confluent.kafka.schemaregistry.rest.SchemaRegistryConfig._
 import jdk.jshell.spi.ExecutionControl.NotImplementedException
 import kafka.server.KafkaConfig._
-import net.manub.embeddedkafka.ConsumerExtensions.ConsumerRetryConfig
-import net.manub.embeddedkafka.schemaregistry.{
+import io.github.embeddedkafka.ConsumerExtensions.ConsumerRetryConfig
+import io.github.embeddedkafka.schemaregistry.{
   EmbeddedKafka,
   EmbeddedKafkaConfig
 }

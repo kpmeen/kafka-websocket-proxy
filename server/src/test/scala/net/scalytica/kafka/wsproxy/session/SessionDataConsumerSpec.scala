@@ -2,7 +2,7 @@ package net.scalytica.kafka.wsproxy.session
 
 import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.stream.scaladsl.Sink
-import net.manub.embeddedkafka.schemaregistry.{
+import io.github.embeddedkafka.schemaregistry.{
   EmbeddedKafka,
   EmbeddedKafkaConfig
 }

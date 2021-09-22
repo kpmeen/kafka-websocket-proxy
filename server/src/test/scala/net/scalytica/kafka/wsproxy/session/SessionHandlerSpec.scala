@@ -5,7 +5,7 @@ import akka.actor.typed.scaladsl.adapter._
 import akka.actor.typed.Scheduler
 import akka.actor.typed.ActorRef
 import akka.util.Timeout
-import net.manub.embeddedkafka.schemaregistry._
+import io.github.embeddedkafka.schemaregistry._
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.codecs.Decoders.sessionDecoder
 import net.scalytica.kafka.wsproxy.codecs.Encoders.sessionEncoder
