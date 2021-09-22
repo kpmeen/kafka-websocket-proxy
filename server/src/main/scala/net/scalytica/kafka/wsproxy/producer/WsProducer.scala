@@ -25,7 +25,6 @@ import net.scalytica.kafka.wsproxy.{
 }
 import org.apache.kafka.clients.producer.{
   KafkaProducer,
-  Producer => IProducer,
   ProducerConfig,
   ProducerRecord
 }
@@ -61,6 +60,7 @@ object WsProducer extends ProducerFlowExtras with WithProxyLogger {
     val kafkaUrl = cfg.kafkaClient.bootstrapHosts.mkString()
 
     ProducerSettings(as, ks, vs)
+      .withCloseProducerOnStop(true)
       .withBootstrapServers(kafkaUrl)
       .withProducerFactory(initialiseProducer(args.aclCredentials))
       .withProperty(ProducerConfig.CLIENT_ID_CONFIG, args.clientId.value)
@@ -156,39 +156,43 @@ object WsProducer extends ProducerFlowExtras with WithProxyLogger {
    *
    * @param topic
    *   the [[TopicName]] to fetch partitions for
-   * @param producerClient
-   *   the configured [[IProducer]] to use.
+   * @param producerSettings
+   *   the configured [[ProducerSettings]] to use.
    * @tparam K
-   *   the key type of the [[IProducer]]
+   *   the key type of the [[ProducerSettings]]
    * @tparam V
-   *   the value type of the [[IProducer]]
+   *   the value type of the [[ProducerSettings]]
    */
   @throws[AuthenticationError]
   @throws[AuthorisationError]
   @throws[Throwable]
   private[this] def checkClient[K, V](
       topic: TopicName,
-      producerClient: IProducer[K, V]
-  ): Unit =
+      producerSettings: ProducerSettings[K, V]
+  ): Unit = {
+    val client = producerSettings.createKafkaProducer()
     try {
-      val _ = producerClient.partitionsFor(topic.value)
+      val _ = client.partitionsFor(topic.value)
     } catch {
       case ae: AuthenticationException =>
-        producerClient.close()
+        client.close()
         throw AuthenticationError(ae.getMessage, Some(ae))
 
       case ae: AuthorizationException =>
-        producerClient.close()
+        client.close()
         throw AuthorisationError(ae.getMessage, Some(ae))
 
       case t: Throwable =>
-        producerClient.close()
+        client.close()
         logger.error(
           s"Unhandled error fetching topic partitions for topic ${topic.value}",
           t
         )
         throw t
+    } finally {
+      client.close()
     }
+  }
 
   /**
    * @param args
@@ -230,10 +234,9 @@ object WsProducer extends ProducerFlowExtras with WithProxyLogger {
   ): Flow[Message, WsProducerResult, NotUsed] = {
     implicit val ec: ExecutionContext = as.dispatcher
 
-    val settings       = producerSettingsWithKey[K, V](args)
-    val producerClient = settings.createKafkaProducer()
+    val settings = producerSettingsWithKey[K, V](args)
 
-    checkClient(args.topic, producerClient)
+    checkClient(args.topic, settings)
 
     val (jmxIn, jmxOut) = jmxManager
       .map { jmx =>
@@ -252,7 +255,7 @@ object WsProducer extends ProducerFlowExtras with WithProxyLogger {
         val record = asKafkaProducerRecord(args.topic, wpr)
         ProducerMessage.Message(record, wpr)
       }
-      .via(Producer.flexiFlow(settings.withProducer(producerClient)))
+      .via(Producer.flexiFlow(settings))
       .map(r => WsProducerResult.fromProducerResult(r))
       .flatMapConcat(seqToSource)
       .via(jmxOut)
@@ -272,12 +275,11 @@ object WsProducer extends ProducerFlowExtras with WithProxyLogger {
     val valType                = args.valType
     implicit val valSerializer = valType.serializer
 
-    val settings       = producerSettingsWithKey[keyType.Aux, valType.Aux](args)
-    val producerClient = settings.createKafkaProducer()
+    val settings = producerSettingsWithKey[keyType.Aux, valType.Aux](args)
 
     logger.trace(s"Using serde $serde")
 
-    checkClient(args.topic, producerClient)
+    checkClient(args.topic, settings)
 
     val (jmxIn, jmxOut) = jmxManager
       .map { jmx =>
@@ -302,7 +304,7 @@ object WsProducer extends ProducerFlowExtras with WithProxyLogger {
         val record = asKafkaProducerRecord(args.topic, wpr)
         ProducerMessage.Message(record, wpr)
       }
-      .via(Producer.flexiFlow(settings.withProducer(producerClient)))
+      .via(Producer.flexiFlow(settings))
       .map(r => WsProducerResult.fromProducerResult(r))
       .flatMapConcat(seqToSource)
       .via(jmxOut)

@@ -7,7 +7,7 @@ import akka.http.scaladsl.model.ws.{Message, WebSocketRequest}
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.testkit.{RouteTestTimeout, WSProbe}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
-import net.manub.embeddedkafka.Codecs.stringDeserializer
+import io.github.embeddedkafka.Codecs.stringDeserializer
 import net.scalytica.kafka.wsproxy.models.Formats.{JsonType, NoType, StringType}
 import net.scalytica.kafka.wsproxy.models.TopicName
 import net.scalytica.kafka.wsproxy.web.SocketProtocol.JsonPayload

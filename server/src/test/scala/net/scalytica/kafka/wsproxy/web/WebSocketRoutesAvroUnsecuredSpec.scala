@@ -2,7 +2,7 @@ package net.scalytica.kafka.wsproxy.web
 
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server._
-import net.manub.embeddedkafka.Codecs._
+import io.github.embeddedkafka.Codecs._
 import net.scalytica.kafka.wsproxy.models.Formats.{
   AvroType,
   LongType,

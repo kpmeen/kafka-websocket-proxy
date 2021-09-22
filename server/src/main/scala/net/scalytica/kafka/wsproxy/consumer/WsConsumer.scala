@@ -28,7 +28,6 @@ import org.apache.kafka.common.serialization.Deserializer
 
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
-import scala.util.{Failure, Success, Try}
 
 /** Functions for initialising Kafka consumer sources. */
 object WsConsumer extends WithProxyLogger {
@@ -47,9 +46,8 @@ object WsConsumer extends WithProxyLogger {
       vd: Deserializer[V]
   ) = {
     val kafkaUrl = cfg.kafkaClient.bootstrapHosts.mkString()
-    val gid      = args.groupId.value
 
-    val cs = ConsumerSettings(as, kd, vd)
+    ConsumerSettings(as, kd, vd)
       .withBootstrapServers(kafkaUrl)
       .withProperties(
         AUTO_OFFSET_RESET_CONFIG       -> args.offsetResetStrategyString,
@@ -57,22 +55,13 @@ object WsConsumer extends WithProxyLogger {
         AUTO_COMMIT_INTERVAL_MS_CONFIG -> s"${50.millis.toMillis}"
       )
       .withClientId(args.clientId.value)
-      .withGroupId(gid)
-      .withConsumerFactory(initialiseConsumer(args.topic, args.aclCredentials))
-
-    checkClientConfig(args.topic, args.aclCredentials, cs) match {
-      case Success(_)         => logger.debug("Client config verified...")
-      case Failure(exception) => throw exception
-    }
-
-    cs
+      .withGroupId(args.groupId.value)
+      .withConsumerFactory(initialiseConsumer(args.aclCredentials))
   }
 
   /**
    * Initialise a new [[KafkaConsumer]] instance
    *
-   * @param topic
-   *   [[TopicName]] to use for the consumer
    * @param aclCredentials
    *   Option containing the [[AclCredentials]] to use
    * @param cs
@@ -87,7 +76,6 @@ object WsConsumer extends WithProxyLogger {
    *   a [[KafkaConsumer]] instance for keys of type [[K]] and value [[V]]
    */
   private[this] def initialiseConsumer[K, V](
-      topic: TopicName,
       aclCredentials: Option[AclCredentials]
   )(
       cs: ConsumerSettings[K, V]
@@ -108,16 +96,11 @@ object WsConsumer extends WithProxyLogger {
       s"Using consumer configuration: ${props.mkString("\n  ", "\n  ", "")}"
     )
 
-    val consumer = new KafkaConsumer[K, V](
+    new KafkaConsumer[K, V](
       props,
       cs.keyDeserializerOpt.orNull,
       cs.valueDeserializerOpt.orNull
     )
-
-    checkClient(topic, consumer) match {
-      case Success(c)         => c
-      case Failure(exception) => throw exception
-    }
   }
 
   /** Convenience function for logging a [[ConsumerRecord]]. */
@@ -130,17 +113,6 @@ object WsConsumer extends WithProxyLogger {
       f"timestamp: $ts%-20s"
   }
 
-  private[this] def checkClientConfig[K, V](
-      topic: TopicName,
-      credentials: Option[AclCredentials],
-      cs: ConsumerSettings[K, V]
-  )(implicit cfg: AppCfg): Try[Unit] = {
-    checkClient(topic, initialiseConsumer(topic, credentials)(cs)) match {
-      case Success(c) => Success(c.close())
-      case Failure(e) => Failure(e)
-    }
-  }
-
   /**
    * Call partitionsFor with the client to validate auth etc. This is a
    * workaround for the following issues identified in alpakka-kafka client:
@@ -150,39 +122,43 @@ object WsConsumer extends WithProxyLogger {
    *
    * @param topic
    *   the [[TopicName]] to fetch partitions for
-   * @param consumerClient
-   *   the configured [[KafkaConsumer]] to use.
+   * @param settings
+   *   the configured [[ConsumerSettings]] to use.
    * @tparam K
-   *   the key type of the [[KafkaConsumer]]
+   *   the key type of the [[ConsumerSettings]]
    * @tparam V
-   *   the value type of the [[KafkaConsumer]]
-   * @return
-   *   A [[Try]] with the [[KafkaConsumer]] that was passed in if ok
+   *   the value type of the [[ConsumerSettings]]
    */
+  @throws[AuthenticationError]
+  @throws[AuthorisationError]
+  @throws[Throwable]
   private[this] def checkClient[K, V](
       topic: TopicName,
-      consumerClient: KafkaConsumer[K, V]
-  ): Try[KafkaConsumer[K, V]] =
-    Try {
-      val _ = consumerClient.partitionsFor(topic.value)
-      consumerClient
-    }.recover {
+      settings: ConsumerSettings[K, V]
+  ): Unit = {
+    val client = settings.createKafkaConsumer()
+    try {
+      val _ = client.partitionsFor(topic.value)
+    } catch {
       case ae: AuthenticationException =>
-        consumerClient.close()
+        client.close()
         throw AuthenticationError(ae.getMessage, Some(ae))
 
       case ae: AuthorizationException =>
-        consumerClient.close()
+        client.close()
         throw AuthorisationError(ae.getMessage, Some(ae))
 
       case t: Throwable =>
-        consumerClient.close()
+        client.close()
         logger.error(
           s"Unhandled error fetching topic partitions for topic ${topic.value}",
           t
         )
         throw t
+    } finally {
+      client.close()
     }
+  }
 
   /**
    * Creates an akka-streams based Kafka Source for messages where the keys are
@@ -218,6 +194,8 @@ object WsConsumer extends WithProxyLogger {
   ): Source[WsConsumerRecord[K, V], Consumer.Control] = {
     logger.debug("Setting up consumer with auto-commit ENABLED")
     val settings = consumerSettings[K, V](args, autoCommit = true)
+
+    checkClient(args.topic, settings)
 
     val subscription = Subscriptions.topics(Set(args.topic.value))
 
@@ -261,7 +239,10 @@ object WsConsumer extends WithProxyLogger {
       vd: Deserializer[V]
   ): Source[WsConsumerRecord[K, V], Consumer.Control] = {
     logger.debug("Setting up consumer with auto-commit DISABLED")
-    val settings     = consumerSettings[K, V](args, autoCommit = false)
+    val settings = consumerSettings[K, V](args, autoCommit = false)
+
+    checkClient(args.topic, settings)
+
     val subscription = Subscriptions.topics(Set(args.topic.value))
 
     Consumer
