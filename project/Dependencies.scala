@@ -7,13 +7,12 @@ object Versions {
   val LightbendConfigVersion = "1.4.1"
   val PureConfigVersion      = "0.16.0"
 
-  val Avro4sVersion                 = "4.0.10"
-  val ConfluentPlatformVersion      = "6.1.0"
+  val Avro4sVersion                 = "4.0.11"
+  val ConfluentPlatformVersion      = "6.2.0"
   val KafkaVersion                  = s"$ConfluentPlatformVersion-ccs"
   val EmbeddedSchemaRegistryVersion = ConfluentPlatformVersion
-  val KafkaStreamsQueryVersion      = "0.1.1"
 
-  val AkkaVersion            = "2.6.15"
+  val AkkaVersion            = "2.6.16"
   val AkkaHttpVersion        = "10.2.4"
   val AkkaStreamKafkaVersion = "2.1.1"
 
@@ -28,11 +27,11 @@ object Versions {
 
   val ScalaLoggingVersion = "3.9.4"
   val Slf4JVersion        = "1.7.32"
-  val LogbackVersion      = "1.2.3"
+  val LogbackVersion      = "1.2.6"
   val LogbackJsVersion    = "0.1.5"
   val JaninoVersion       = "3.1.6"
 
-  val ScalaTestVersion = "3.2.9"
+  val ScalaTestVersion = "3.2.10"
 
   val JolokiaAgentVersion    = "1.6.2"
   val PrometheusAgentVersion = "0.14.0"
@@ -110,18 +109,8 @@ object Dependencies {
     val Clients =
       "org.apache.kafka" % "kafka-clients" % KafkaVersion excludeAll (Exclusions: _*)
 
-    val Streams =
-      "org.apache.kafka" % "kafka-streams" % KafkaVersion excludeAll (Exclusions: _*)
-
     val Kafka =
       "org.apache.kafka" %% "kafka" % KafkaVersion excludeAll (Exclusions: _*)
-
-    // kafka-streams-scala libs
-    val StreamsScala =
-      "org.apache.kafka" %% "kafka-streams-scala" % KafkaVersion excludeAll (Exclusions: _*)
-
-    val StreamsQuery =
-      "com.lightbend" %% "kafka-streams-query" % KafkaStreamsQueryVersion excludeAll (Exclusions: _*)
   }
 
   object ConfluentKafka {
