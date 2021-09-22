@@ -2,7 +2,7 @@ package net.scalytica.kafka.wsproxy.logging
 
 import akka.actor.ActorSystem
 import akka.stream.Materializer
-import ch.qos.logback.classic.{LoggerContext, Logger => LogbackLogger}
+import ch.qos.logback.classic.{Logger => LogbackLogger, LoggerContext}
 import com.typesafe.config.ConfigFactory
 import net.scalytica.test.FileLoader
 import org.scalatest.matchers.must.Matchers

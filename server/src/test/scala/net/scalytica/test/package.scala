@@ -54,7 +54,7 @@ package object test {
       .map { _ =>
         // scalastyle:off
         Map(
-          SCHEMA_REGISTRY_URL_CONFIG    -> s"http://${serverHost(schemaRegistryPort)}",
+          SCHEMA_REGISTRY_URL_CONFIG -> s"http://${serverHost(schemaRegistryPort)}",
           AUTO_REGISTER_SCHEMAS         -> true,
           "key.subject.name.strategy"   -> keySubjNameStrategy.getCanonicalName,
           "value.subject.name.strategy" -> valSubjNameStrategy.getCanonicalName

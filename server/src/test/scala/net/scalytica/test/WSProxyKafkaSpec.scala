@@ -95,7 +95,7 @@ trait WsProxyKafkaSpec
     ).toAbsolutePath.toString,
     SSL_KEYSTORE_PASSWORD_CONFIG -> testKeyPass,
     SSL_KEY_PASSWORD_CONFIG      -> testKeyPass,
-    SASL_JAAS_CONFIG             -> s"""org.apache.kafka.common.security.plain.PlainLoginModule required username="$kafkaUser" password="$kafkaPass";"""
+    SASL_JAAS_CONFIG -> s"""org.apache.kafka.common.security.plain.PlainLoginModule required username="$kafkaUser" password="$kafkaPass";"""
     // scalastyle:on line.size.limit
   )
 
