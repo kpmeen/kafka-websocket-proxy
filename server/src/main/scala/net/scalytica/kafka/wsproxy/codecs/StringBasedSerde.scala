@@ -5,8 +5,8 @@ import java.util.{Map => JMap}
 import org.apache.kafka.common.serialization.{
   Deserializer,
   Serde,
-  Serializer,
-  Serdes => KSerdes
+  Serdes => KSerdes,
+  Serializer
 }
 
 /** Scaffolding for Serdes based on the basic String Serde */

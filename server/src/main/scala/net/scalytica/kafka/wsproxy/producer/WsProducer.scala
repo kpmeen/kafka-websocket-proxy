@@ -25,9 +25,9 @@ import net.scalytica.kafka.wsproxy.{
 }
 import org.apache.kafka.clients.producer.{
   KafkaProducer,
+  Producer => IProducer,
   ProducerConfig,
-  ProducerRecord,
-  Producer => IProducer
+  ProducerRecord
 }
 import org.apache.kafka.common.errors.{
   AuthenticationException,

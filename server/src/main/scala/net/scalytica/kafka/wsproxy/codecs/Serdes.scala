@@ -13,8 +13,8 @@ import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
 import org.apache.kafka.common.serialization.{
   Deserializer,
   Serde,
-  Serializer,
-  Serdes => KSerdes
+  Serdes => KSerdes,
+  Serializer
 }
 
 /**
