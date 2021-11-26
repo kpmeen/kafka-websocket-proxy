@@ -118,15 +118,19 @@ trait InboundWebSocket extends WithProxyLogger {
     )
     implicit val scheduler = as.scheduler.toTyped
 
-    val serverId  = cfg.server.serverId
-    val clientId  = args.clientId
-    val sessionId = SessionId(clientId)
+    val serverId     = cfg.server.serverId
+    val clientId     = args.clientId
+    val sessionId    = SessionId(clientId)
+    val prodLimitCfg = cfg.producer.limits.forProducer(clientId)
+    val maxCons = prodLimitCfg
+      .flatMap(_.maxConnections)
+      .getOrElse(cfg.producer.limits.defaultMaxConnectionsPerClient)
 
     val producerAddResult = initSessionForProducer(
       serverId = serverId,
       sessionId = sessionId,
       clientId = clientId,
-      maxConnections = cfg.producer.limits.defaultMaxConnectionsPerClient,
+      maxConnections = maxCons,
       sh = sessionHandler
     )
 

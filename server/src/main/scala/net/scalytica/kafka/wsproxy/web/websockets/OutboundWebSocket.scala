@@ -139,11 +139,18 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
     val clientId = args.clientId
     val groupId  = args.groupId
 
+    val consLimitCfg = cfg.consumer.limits.forConsumer(groupId)
+    val maxCons = consLimitCfg.flatMap(_.maxConnections).getOrElse {
+      val defaultCons = cfg.consumer.limits.defaultMaxConnectionsPerClient
+      if (defaultCons > topicPartitions) topicPartitions
+      else defaultCons
+    }
+
     val consumerAddResult = initSessionForConsumer(
       serverId = serverId,
       groupId = groupId,
       clientId = clientId,
-      maxConnections = topicPartitions,
+      maxConnections = maxCons,
       sh = sessionHandler
     )
 
