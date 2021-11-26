@@ -1,6 +1,7 @@
 package net.scalytica.kafka.wsproxy.codecs
 
 import io.circe._
+import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.semiauto._
 import net.scalytica.kafka.wsproxy.models.Formats.FormatType
 import net.scalytica.kafka.wsproxy.models.ValueDetails.{
@@ -8,22 +9,14 @@ import net.scalytica.kafka.wsproxy.models.ValueDetails.{
   OutValueDetails
 }
 import net.scalytica.kafka.wsproxy.models._
-import net.scalytica.kafka.wsproxy.session.{ConsumerInstance, Session}
+import net.scalytica.kafka.wsproxy.session._
 
+import scala.annotation.nowarn
 import scala.util.{Failure, Success}
 
 trait Decoders {
 
   implicit val brokerInfoDecoder: Decoder[BrokerInfo] = deriveConfiguredDecoder
-
-  implicit val sessionDecoder: Decoder[Session] = deriveConfiguredDecoder
-
-  implicit val consumerInstDecoder: Decoder[ConsumerInstance] =
-    deriveConfiguredDecoder
-
-  implicit val wsMessageIdDecoder: Decoder[WsMessageId] = { json =>
-    json.as[String].map(WsMessageId.apply)
-  }
 
   implicit val wsClientIdDecoder: Decoder[WsClientId] = { json =>
     json.as[String].map(WsClientId.apply)
@@ -35,6 +28,36 @@ trait Decoders {
 
   implicit val wsServerIdDecoder: Decoder[WsServerId] = { json =>
     json.as[String].map(WsServerId.apply)
+  }
+
+  implicit val sessionIdDecoder: Decoder[SessionId] = { json =>
+    json.as[String].map(SessionId.apply)
+  }
+
+  implicit val sessionClientInstanceDecoder: Decoder[ClientInstance] = {
+    @nowarn("msg=is never used")
+    implicit val cfg =
+      Configuration.default.withDiscriminator("client_instance_type")
+    deriveConfiguredDecoder
+  }
+
+  implicit val sessionDecoder: Decoder[Session] = {
+    @nowarn("msg=is never used")
+    implicit val cfg = Configuration.default.withDiscriminator("session_type")
+    deriveConfiguredDecoder
+  }
+
+  // ------------------------------------------------------------
+  // Decoders for old consumer session format
+  implicit val oldConsumerInstanceDecoder: Decoder[OldConsumerInstance] =
+    deriveConfiguredDecoder
+
+  implicit val oldSessionDecoder: Decoder[OldSession] =
+    deriveConfiguredDecoder
+  // ------------------------------------------------------------
+
+  implicit val wsMessageIdDecoder: Decoder[WsMessageId] = { json =>
+    json.as[String].map(WsMessageId.apply)
   }
 
   implicit val topicNameDecoder: Decoder[TopicName] = { json =>

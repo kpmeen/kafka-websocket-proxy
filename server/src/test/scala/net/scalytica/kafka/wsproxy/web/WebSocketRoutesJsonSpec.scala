@@ -457,7 +457,7 @@ class WebSocketRoutesJsonSpec
           prePopulate = false
         ) { ctx =>
           val rejectionMsg =
-            s"The maximum number of WebSockets for session " +
+            s"The max number of WebSockets for session " +
               s"json-test-group-$topicCounter has been reached. Limit is 1"
 
           val out = (cid: String) =>

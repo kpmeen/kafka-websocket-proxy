@@ -7,6 +7,7 @@ import akka.http.scaladsl.testkit.{
   ScalatestRouteTest,
   WSProbe
 }
+import akka.actor.typed.scaladsl.adapter._
 import com.typesafe.config.Config
 import io.confluent.kafka.schemaregistry.rest.SchemaRegistryConfig._
 import jdk.jshell.spi.ExecutionControl.NotImplementedException
@@ -30,7 +31,10 @@ import net.scalytica.kafka.wsproxy.config.Configuration.{
 import net.scalytica.kafka.wsproxy.mapToProperties
 import net.scalytica.kafka.wsproxy.models.Formats._
 import net.scalytica.kafka.wsproxy.models.{TopicName, WsClientId, WsServerId}
-import net.scalytica.kafka.wsproxy.session.SessionHandler
+import net.scalytica.kafka.wsproxy.session.{
+  SessionHandler,
+  SessionHandlerProtocol
+}
 import net.scalytica.test.TestDataGenerators._
 import org.apache.kafka.clients.CommonClientConfigs._
 import org.apache.kafka.clients.admin.AdminClientConfig.{
@@ -369,6 +373,10 @@ trait WsProxyKafkaSpec
 
       val res = body(kcfg, wsCfg, testRoutes)
 
+      sessionHandlerRef.shRef.tell(
+        SessionHandlerProtocol.StopSessionHandler(system.toTyped.ignoreRef)
+      )
+
       ctrl.shutdown()
 
       res
@@ -399,6 +407,10 @@ trait WsProxyKafkaSpec
       val ctrl                    = sdcStream.run()
 
       val res = body(kcfg, wsCfg, testRoutes)
+
+      sessionHandlerRef.shRef.tell(
+        SessionHandlerProtocol.StopSessionHandler(system.toTyped.ignoreRef)
+      )
 
       ctrl.shutdown()
 
@@ -486,6 +498,10 @@ trait WsProxyProducerKafkaSpec
         producerProbe = producerProbe
       )
       val res = body(ctx)
+
+      sessionHandlerRef.shRef.tell(
+        SessionHandlerProtocol.StopSessionHandler(system.toTyped.ignoreRef)
+      )
 
       ctrl.shutdown()
 

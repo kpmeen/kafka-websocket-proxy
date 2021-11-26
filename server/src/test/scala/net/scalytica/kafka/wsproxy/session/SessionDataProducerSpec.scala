@@ -2,8 +2,7 @@ package net.scalytica.kafka.wsproxy.session
 
 import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import io.github.embeddedkafka.schemaregistry._
-import net.scalytica.kafka.wsproxy.codecs.Implicits._
-import net.scalytica.kafka.wsproxy.codecs.{SessionSerde, WsGroupIdSerde}
+import net.scalytica.kafka.wsproxy.codecs.{SessionIdSerde, SessionSerde}
 import net.scalytica.kafka.wsproxy.models.WsGroupId
 import net.scalytica.test.WsProxyKafkaSpec
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
@@ -34,7 +33,7 @@ class SessionDataProducerSpec
   val atk          = ActorTestKit("session-data-producer-test", config)
   implicit val sys = atk.system
 
-  implicit val keyDes = new WsGroupIdSerde().deserializer()
+  implicit val keyDes = new SessionIdSerde().deserializer()
   implicit val valDes = new SessionSerde().deserializer()
 
   override def afterAll(): Unit = {
@@ -42,13 +41,15 @@ class SessionDataProducerSpec
     super.afterAll()
   }
 
-  private[this] def testSession(i: Int): Session =
-    Session(WsGroupId(s"c$i"), consumerLimit = i)
+  private[this] def testConsumerSession(i: Int): Session = {
+    val grpStr = s"c$i"
+    ConsumerSession(SessionId(grpStr), WsGroupId(grpStr), maxConnections = i)
+  }
 
-  val session1 = testSession(1)
-  val session2 = testSession(2)
-  val session3 = testSession(3)
-  val session4 = testSession(4)
+  val session1 = testConsumerSession(1)
+  val session2 = testConsumerSession(2)
+  val session3 = testConsumerSession(3)
+  val session4 = testConsumerSession(4)
 
   "The SessionDataProducer" should {
 
@@ -64,12 +65,14 @@ class SessionDataProducerSpec
         sdp.publish(session1)
         // Verify the data can be consumed
         val (key, value) =
-          consumeFirstKeyedMessageFrom[WsGroupId, Session](sessionTopic.value)
+          consumeFirstKeyedMessageFrom[SessionId, Session](
+            sessionTopic.value
+          )
 
-        key mustBe session1.consumerGroupId
-        value.consumerGroupId mustBe session1.consumerGroupId
-        value.consumerLimit mustBe session1.consumerLimit
-        value.consumers mustBe empty
+        key mustBe session1.sessionId
+        value.sessionId mustBe session1.sessionId
+        value.maxConnections mustBe session1.maxConnections
+        value.instances mustBe empty
 
         sdp.close()
       }
@@ -88,7 +91,7 @@ class SessionDataProducerSpec
         expected.foreach(s => sdp.publish(s))
 
         val recs =
-          consumeNumberKeyedMessagesFrom[WsGroupId, Session](
+          consumeNumberKeyedMessagesFrom[SessionId, Session](
             topic = sessionTopic.value,
             number = 4
           )
@@ -96,7 +99,7 @@ class SessionDataProducerSpec
         val keys   = recs.map(_._1)
         val values = recs.map(_._2)
 
-        keys must contain allElementsOf expected.map(_.consumerGroupId)
+        keys must contain allElementsOf expected.map(_.sessionId)
         values must contain allElementsOf expected
       }
 
@@ -114,10 +117,10 @@ class SessionDataProducerSpec
         // Write the session data to Kafka
         in.foreach(s => sdp.publish(s))
         // Remove session2
-        sdp.publishRemoval(session2.consumerGroupId)
+        sdp.publishRemoval(session2.sessionId)
         // Verify the presence of all expected messages
         val r1 =
-          consumeNumberKeyedMessagesFrom[WsGroupId, Session](
+          consumeNumberKeyedMessagesFrom[SessionId, Session](
             topic = sessionTopic.value,
             number = 5
           )

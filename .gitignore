@@ -4,6 +4,7 @@
 *.orig
 *.class
 *.iml
+.run
 .history
 .idea
 .idea_modules

@@ -4,12 +4,10 @@ import akka.Done
 import akka.actor.typed.ActorSystem
 import akka.actor.typed.scaladsl.adapter._
 import akka.kafka.ProducerSettings
-import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy._
-import net.scalytica.kafka.wsproxy.codecs.Implicits._
 import net.scalytica.kafka.wsproxy.codecs.{BasicSerdes, SessionSerde}
+import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
-import net.scalytica.kafka.wsproxy.models.WsGroupId
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -63,10 +61,12 @@ private[session] class SessionDataProducer(
    * @return
    *   eventually returns [[Done]] when successfully completed
    */
-  def publish(session: Session)(implicit ec: ExecutionContext): Future[Done] = {
+  def publish(
+      session: Session
+  )(implicit ec: ExecutionContext): Future[Done] = {
     val record = new ProducerRecord[String, Session](
       sessionStateTopic,
-      session.consumerGroupId.value,
+      session.sessionId.value,
       session
     )
 
@@ -75,8 +75,8 @@ private[session] class SessionDataProducer(
     res.onComplete {
       case Success(rm) =>
         logger.debug(
-          "Successfully sent session record for consumer group" +
-            s" ${session.consumerGroupId.value} to Kafka. [" +
+          "Successfully sent session record for session id" +
+            s" ${session.sessionId.value} to Kafka. [" +
             s"topic: ${rm.topic()}," +
             s"partition: ${rm.partition()}," +
             s"offset: ${rm.offset()}" +
@@ -86,8 +86,8 @@ private[session] class SessionDataProducer(
 
       case Failure(ex) =>
         logger.error(
-          "Failed to send session record for consumer group" +
-            s" ${session.consumerGroupId.value} to Kafka",
+          "Failed to send session record for session id" +
+            s" ${session.sessionId.value} to Kafka",
           ex
         )
     }
@@ -96,23 +96,23 @@ private[session] class SessionDataProducer(
   }
 
   def publishRemoval(
-      groupId: WsGroupId
+      sessionId: SessionId
   )(implicit ec: ExecutionContext): Unit = {
     val record = new ProducerRecord[String, Session](
       sessionStateTopic,
-      groupId.value,
+      sessionId.value,
       null // scalastyle:ignore
     )
     producer.send(record).toScalaFuture.onComplete {
       case Success(_) =>
         logger.debug(
-          s"Successfully sent tombstone for consumer group ${groupId.value}" +
+          s"Successfully sent tombstone for session id ${sessionId.value}" +
             " to Kafka"
         )
 
       case Failure(ex) =>
         logger.error(
-          s"Failed to send tombstone for consumer group ${groupId.value}" +
+          s"Failed to send tombstone for session id ${sessionId.value}" +
             " to Kafka",
           ex
         )

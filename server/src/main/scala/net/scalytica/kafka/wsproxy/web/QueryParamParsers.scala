@@ -1,11 +1,13 @@
 package net.scalytica.kafka.wsproxy.web
 
+import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.unmarshalling.Unmarshaller
 import net.scalytica.kafka.wsproxy.web.SocketProtocol._
 import net.scalytica.kafka.wsproxy.models.Formats._
 import net.scalytica.kafka.wsproxy.models._
+import net.scalytica.kafka.wsproxy.session.SessionId
 import org.apache.kafka.clients.consumer.OffsetResetStrategy
 
 import scala.util.Try
@@ -59,11 +61,52 @@ trait QueryParamParsers {
       }
     }
 
-  def paramsOnError: Directive[Tuple1[Option[(WsClientId, WsGroupId)]]] = {
-    parameters(
-      Symbol("clientId").as[WsClientId] ?,
-      Symbol("groupId").as[WsGroupId] ?
-    ).tmap(t => t._1.map(cid => (cid, WsGroupId.fromOption(t._2)(cid))))
+  sealed trait ParamError
+  case object InvalidPath          extends ParamError
+  case object MissingRequiredParam extends ParamError
+
+  case class ConsumerParamError(
+      sessionId: SessionId,
+      wsClientId: WsClientId,
+      wsGroupId: WsGroupId
+  ) extends ParamError
+
+  case class ProducerParamError(
+      sessionId: SessionId,
+      wsClientId: WsClientId
+  ) extends ParamError
+
+  def paramsOnError(
+      request: HttpRequest
+  ): Directive[Tuple1[ParamError]] = {
+    if (request.uri.path.endsWith("in", ignoreTrailingSlash = true)) {
+      parameters(
+        Symbol("clientId").as[WsClientId] ?
+      ).tmap { t =>
+        t._1
+          .map[ParamError] { cid =>
+            ProducerParamError(SessionId.forProducer(None)(cid), cid)
+          }
+          .getOrElse(MissingRequiredParam)
+      }
+    } else if (request.uri.path.endsWith("out", ignoreTrailingSlash = true)) {
+      parameters(
+        Symbol("clientId").as[WsClientId] ?,
+        Symbol("groupId").as[WsGroupId] ?
+      ).tmap { t =>
+        t._1
+          .map[ParamError] { cid =>
+            ConsumerParamError(
+              SessionId.forConsumer(None)(cid),
+              cid,
+              WsGroupId.fromOption(t._2)(cid)
+            )
+          }
+          .getOrElse(MissingRequiredParam)
+      }
+    } else {
+      Directives.provide[ParamError](InvalidPath)
+    }
   }
 
   /**

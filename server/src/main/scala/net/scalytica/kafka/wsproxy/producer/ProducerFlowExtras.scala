@@ -10,7 +10,7 @@ import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroProducerRecord
 import net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde
 import net.scalytica.kafka.wsproxy.config.Configuration.{
   AppCfg,
-  ClientSpecificRateLimitCfg
+  ClientSpecificLimitCfg
 }
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models.Formats.FormatType
@@ -92,22 +92,22 @@ private[producer] trait ProducerFlowExtras
   def rateLimiter(args: InSocketArgs)(
       implicit cfg: AppCfg
   ): Flow[Message, Message, NotUsed] = {
-    val defaultMps = cfg.producer.rateLimit.defaultMessagesPerSecond
+    val defaultMps = cfg.producer.limits.defaultMessagesPerSecond
     rateLimitFlow(
       args.clientId,
       defaultMps,
-      cfg.producer.rateLimit.clientLimits
+      cfg.producer.limits.clientSpecificLimits
     )
   }
 
   def rateLimitFlow(
       clientId: WsClientId,
       defaultMessagesPerSecond: Int,
-      clientLimits: Seq[ClientSpecificRateLimitCfg]
+      clientLimits: Seq[ClientSpecificLimitCfg]
   ): Flow[Message, Message, NotUsed] = {
     val mps = clientLimits
-      .find(_.clientId.equals(clientId.value))
-      .map(_.messagesPerSecond)
+      .find(_.id.equals(clientId.value))
+      .flatMap(_.messagesPerSecond)
       .getOrElse(defaultMessagesPerSecond)
 
     if (mps == 0) {

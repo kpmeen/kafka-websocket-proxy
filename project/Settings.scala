@@ -76,7 +76,7 @@ object Settings {
     run / fork := true,
     Test / fork := true,
     Test / logBuffered := true,
-    Test / testOptions ++= Seq(Tests.Argument(ScalaTest, "-oD")),
+    Test / testOptions ++= Seq(Tests.Argument(ScalaTest, "-oDF")),
     updateOptions := updateOptions.value.withCachedResolution(true),
     // Disable ScalaDoc generation
     Compile / packageDoc / publishArtifact := false,

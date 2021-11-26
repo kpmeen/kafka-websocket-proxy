@@ -4,12 +4,10 @@ import akka.actor.typed.ActorSystem
 import akka.actor.typed.scaladsl.adapter._
 import akka.kafka.scaladsl.Consumer
 import akka.kafka.{ConsumerSettings, Subscriptions}
-import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy._
-import net.scalytica.kafka.wsproxy.codecs.Implicits._
 import net.scalytica.kafka.wsproxy.codecs.{BasicSerdes, SessionSerde}
+import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
-import net.scalytica.kafka.wsproxy.models.WsGroupId
 import org.apache.kafka.clients.consumer.ConsumerConfig.{
   AUTO_OFFSET_RESET_CONFIG,
   ENABLE_AUTO_COMMIT_CONFIG
@@ -82,8 +80,10 @@ private[session] class SessionDataConsumer(
       .log("Session event", cr => cr.key)
       .map { cr =>
         Option(cr.value)
-          .map(v => SessionHandlerProtocol.UpdateSession(WsGroupId(cr.key), v))
-          .getOrElse(SessionHandlerProtocol.RemoveSession(WsGroupId(cr.key)))
+          .map(v => SessionHandlerProtocol.UpdateSession(SessionId(cr.key), v))
+          .getOrElse(
+            SessionHandlerProtocol.RemoveSession(SessionId(cr.key))
+          )
       }
   }
 

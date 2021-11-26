@@ -15,6 +15,12 @@ case class ImpossibleError(
 ) extends ProxyError(msg, cause)
     with NoStackTrace
 
+case class InvalidSessionStateFormat(
+    msg: String,
+    cause: Option[Throwable] = None
+) extends ProxyError(msg, cause)
+    with NoStackTrace
+
 case class TrivialError(
     msg: String,
     cause: Option[Throwable] = None
