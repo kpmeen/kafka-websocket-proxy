@@ -1,36 +1,51 @@
 package net.scalytica.kafka.wsproxy.codecs
 
 import io.circe._
+import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.semiauto._
 import io.circe.syntax._
 import net.scalytica.kafka.wsproxy.models.Formats.FormatType
 import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails
 import net.scalytica.kafka.wsproxy.models._
-import net.scalytica.kafka.wsproxy.session.{ConsumerInstance, Session}
+import net.scalytica.kafka.wsproxy.session._
+
+import scala.annotation.nowarn
 
 trait Encoders {
 
   implicit val brokerInfoEncoder: Encoder[BrokerInfo] = deriveConfiguredEncoder
 
-  implicit val sessionEncoder: Encoder[Session] = deriveConfiguredEncoder
-
-  implicit val consumerInstEncoder: Encoder[ConsumerInstance] =
-    deriveConfiguredEncoder
-
-  implicit val msgIdEncoder: Encoder[WsMessageId] = { msgId =>
-    Json.fromString(msgId.value)
-  }
-
-  implicit val clientIdEncoder: Encoder[WsClientId] = { cid =>
+  implicit val wsClientIdEncoder: Encoder[WsClientId] = { cid =>
     Json.fromString(cid.value)
   }
 
-  implicit val groupIdEncoder: Encoder[WsGroupId] = { gid =>
+  implicit val wsGroupIdEncoder: Encoder[WsGroupId] = { gid =>
     Json.fromString(gid.value)
   }
 
-  implicit val serverIdEncoder: Encoder[WsServerId] = { sid =>
+  implicit val wsServerIdEncoder: Encoder[WsServerId] = { sid =>
     Json.fromString(sid.value)
+  }
+
+  implicit val sessionIdEncoder: Encoder[SessionId] = { sid =>
+    Json.fromString(sid.value)
+  }
+
+  implicit val sessionClientInstanceEncoder: Encoder[ClientInstance] = {
+    @nowarn("msg=is never used")
+    implicit val cfg =
+      Configuration.default.withDiscriminator("client_instance_type")
+    deriveConfiguredEncoder
+  }
+
+  implicit val sessionEncoder: Encoder[Session] = {
+    @nowarn("msg=is never used")
+    implicit val cfg = Configuration.default.withDiscriminator("session_type")
+    deriveConfiguredEncoder
+  }
+
+  implicit val msgIdEncoder: Encoder[WsMessageId] = { msgId =>
+    Json.fromString(msgId.value)
   }
 
   implicit val topicNameEncoder: Encoder[TopicName] = { tn =>

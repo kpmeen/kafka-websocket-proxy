@@ -6,17 +6,16 @@ import io.github.embeddedkafka.schemaregistry.{
   EmbeddedKafka,
   EmbeddedKafkaConfig
 }
-import net.scalytica.kafka.wsproxy.codecs.Implicits._
 import net.scalytica.kafka.wsproxy.codecs.{
   BasicSerdes,
-  SessionSerde,
-  WsGroupIdSerde
+  SessionIdSerde,
+  SessionSerde
 }
 import net.scalytica.kafka.wsproxy.models.WsGroupId
 import net.scalytica.kafka.wsproxy.session.SessionHandlerProtocol.{
-  ClientSessionProtocol,
-  InternalProtocol,
+  InternalSessionProtocol,
   RemoveSession,
+  SessionProtocol,
   UpdateSession
 }
 import net.scalytica.test.WsProxyKafkaSpec
@@ -50,10 +49,10 @@ class SessionDataConsumerSpec
 
   implicit val sys = atk.system
 
-  implicit val groupIdSerde = new WsGroupIdSerde()
-  implicit val sessionSerde = new SessionSerde()
-  implicit val keyDes       = BasicSerdes.StringDeserializer
-  implicit val keySer       = BasicSerdes.StringSerializer
+  implicit val sessionIdSerde = new SessionIdSerde()
+  implicit val sessionSerde   = new SessionSerde()
+  implicit val keyDes         = BasicSerdes.StringDeserializer
+  implicit val keySer         = BasicSerdes.StringSerializer
 
   override def afterAll(): Unit = {
     materializer.shutdown()
@@ -64,30 +63,32 @@ class SessionDataConsumerSpec
   private[this] def publish(
       s: Session
   )(implicit config: EmbeddedKafkaConfig): Unit = {
-    publishToKafka[WsGroupId, Session](
+    publishToKafka[SessionId, Session](
       topic = sessionTopic.value,
-      key = s.consumerGroupId,
+      key = s.sessionId,
       message = s
     )
   }
 
   private[this] def publishTombstone(
-      gid: WsGroupId
+      sid: SessionId
   )(implicit config: EmbeddedKafkaConfig): Unit = {
-    publishToKafka[WsGroupId, Session](
+    publishToKafka[SessionId, Session](
       topic = sessionTopic.value,
-      key = gid,
+      key = sid,
       message = null // scalastyle:ignore
     )
   }
 
-  private[this] def testSession(i: Int): Session =
-    Session(WsGroupId(s"c$i"), consumerLimit = i)
+  private[this] def testConsumerSession(i: Int): Session = {
+    val grpStr = s"c$i"
+    ConsumerSession(SessionId(grpStr), WsGroupId(grpStr), maxConnections = i)
+  }
 
-  val session1 = testSession(1)
-  val session2 = testSession(2)
-  val session3 = testSession(3)
-  val session4 = testSession(4)
+  val session1 = testConsumerSession(1)
+  val session2 = testConsumerSession(2)
+  val session3 = testConsumerSession(3)
+  val session4 = testConsumerSession(4)
 
   "The SessionConsumer" should {
 
@@ -103,23 +104,23 @@ class SessionDataConsumerSpec
         // Prepare the topic with some messages
         expected.foreach(publish)
         // Publish tombstone for session2
-        publishTombstone(session2.consumerGroupId)
+        publishTombstone(session2.sessionId)
 
         val sdc  = new SessionDataConsumer()
         val recs = sdc.sessionStateSource.take(5).runWith(Sink.seq).futureValue
 
         forAll(recs) {
-          case csp: ClientSessionProtocol =>
+          case csp: SessionProtocol =>
             fail(s"Got an unexpected message type ${csp.getClass}")
 
-          case ip: InternalProtocol =>
+          case ip: InternalSessionProtocol =>
             ip match {
-              case UpdateSession(gid, s) =>
-                expected.map(_.consumerGroupId) must contain(gid)
+              case UpdateSession(sid, s) =>
+                expected.map(_.sessionId) must contain(sid)
                 expected must contain(s)
 
-              case RemoveSession(gid) =>
-                gid mustBe session2.consumerGroupId
+              case RemoveSession(sid) =>
+                sid mustBe session2.sessionId
             }
         }
       }

@@ -1,21 +1,16 @@
 package net.scalytica.kafka.wsproxy.jmx
 
 import java.util.UUID
-
 import akka.NotUsed
 import akka.actor.Cancellable
 import akka.actor.typed.scaladsl.adapter._
 import akka.actor.typed.{ActorRef, ActorSystem}
+import akka.http.scaladsl.model.ws.Message
 import akka.stream.scaladsl.{Flow, Sink}
 import akka.stream.typed.scaladsl.ActorSink
 import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
-import net.scalytica.kafka.wsproxy.models.{
-  WsCommit,
-  WsConsumerRecord,
-  WsProducerRecord,
-  WsProducerResult
-}
+import net.scalytica.kafka.wsproxy.models.{WsCommit, WsConsumerRecord}
 
 import scala.concurrent.ExecutionContext
 // scalastyle:off
@@ -73,35 +68,47 @@ trait JmxProxyStatusOps { self: BaseJmxManager with WithProxyLogger =>
   }
 }
 
-trait JmxConnectionStatsOps { self: BaseJmxManager =>
+trait JmxConnectionStatsOps { self: BaseJmxManager with WithProxyLogger =>
 
   final protected val connectionStatsActor = sys.systemActorOf(
     behavior = ConnectionsStatsMXBeanActor(),
     name = "wsproxy-connections"
   )
 
-  def addConsumerConnection(): Unit = {
+  def addConsumerConnection(): Unit = try {
     connectionStatsActor.tell(
       ConnectionsStatsProtocol.AddConsumer(sys.ignoreRef)
     )
+  } catch {
+    case t: Throwable =>
+      logger.trace("An exception was thrown adding consumer from JMX bean", t)
   }
 
-  def removeConsumerConnection(): Unit = {
+  def removeConsumerConnection(): Unit = try {
     connectionStatsActor.tell(
       ConnectionsStatsProtocol.RemoveConsumer(sys.ignoreRef)
     )
+  } catch {
+    case t: Throwable =>
+      logger.trace("An exception was thrown removing consumer from JMX bean", t)
   }
 
-  def addProducerConnection(): Unit = {
+  def addProducerConnection(): Unit = try {
     connectionStatsActor.tell(
       ConnectionsStatsProtocol.AddProducer(sys.ignoreRef)
     )
+  } catch {
+    case t: Throwable =>
+      logger.trace("An exception was thrown adding producer from JMX bean", t)
   }
 
-  def removeProducerConnection(): Unit = {
+  def removeProducerConnection(): Unit = try {
     connectionStatsActor.tell(
       ConnectionsStatsProtocol.RemoveProducer(sys.ignoreRef)
     )
+  } catch {
+    case t: Throwable =>
+      logger.trace("An exception was thrown removing producer from JMX bean", t)
   }
 }
 
@@ -197,26 +204,19 @@ trait JmxProducerStatsOps { self: BaseJmxManager =>
       onFailureMessage = _ => ProducerClientStatsProtocol.Stop
     )
 
-  type ProducerInWireTapFlow[K, V] =
-    Flow[WsProducerRecord[K, V], WsProducerRecord[K, V], NotUsed]
-
-  type ProducerOutWireTapFlow =
-    Flow[WsProducerResult, WsProducerResult, NotUsed]
-
-  def producerStatsWireTaps[K, V](
+  def producerStatsWireTaps(
       pcsRef: ActorRef[ProducerClientStatsCommand]
-  ): (ProducerInWireTapFlow[K, V], ProducerOutWireTapFlow) = {
-    val sink = setupProducerStatsSink(pcsRef)
-    val in   = producerStatsInboundWireTap[K, V](sink)
-    val out  = producerStatsOutboundWireTap(sink)
-
+  ): (Flow[Message, Message, NotUsed], Flow[Message, Message, NotUsed]) = {
+    val in  = producerStatsInboundWireTap(pcsRef)
+    val out = producerStatsOutboundWireTap(pcsRef)
     (in, out)
   }
 
-  def producerStatsInboundWireTap[K, V](
-      sink: Sink[ProducerClientStatsCommand, NotUsed]
-  ): ProducerInWireTapFlow[K, V] = Flow[WsProducerRecord[K, V]].wireTap {
-    Flow[WsProducerRecord[K, V]]
+  def producerStatsInboundWireTap(
+      pcsRef: ActorRef[ProducerClientStatsCommand]
+  ): Flow[Message, Message, NotUsed] = Flow[Message].wireTap {
+    val sink = setupProducerStatsSink(pcsRef)
+    Flow[Message]
       .map { _ =>
         ProducerClientStatsProtocol.IncrementRecordsReceived(sys.ignoreRef)
       }
@@ -225,9 +225,10 @@ trait JmxProducerStatsOps { self: BaseJmxManager =>
   }
 
   def producerStatsOutboundWireTap(
-      sink: Sink[ProducerClientStatsCommand, NotUsed]
-  ): ProducerOutWireTapFlow = Flow[WsProducerResult].wireTap {
-    Flow[WsProducerResult]
+      pcsRef: ActorRef[ProducerClientStatsCommand]
+  ): Flow[Message, Message, NotUsed] = Flow[Message].wireTap {
+    val sink = setupProducerStatsSink(pcsRef)
+    Flow[Message]
       .map { _ =>
         ProducerClientStatsProtocol.IncrementAcksSent(sys.ignoreRef)
       }

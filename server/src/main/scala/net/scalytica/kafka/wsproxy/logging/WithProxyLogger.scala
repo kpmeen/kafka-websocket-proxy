@@ -1,8 +1,9 @@
 package net.scalytica.kafka.wsproxy.logging
 
 import net.scalytica.kafka.wsproxy.NiceClassNameExtensions
-
 import com.typesafe.scalalogging.Logger
+
+import scala.reflect.ClassTag
 
 /** Convenience trait for providing loggers to different objects and classes. */
 trait WithProxyLogger { self =>
@@ -12,6 +13,20 @@ trait WithProxyLogger { self =>
   final protected lazy val _log = Logger(loggerName)
 
   final protected lazy val logger = _log
+
+}
+
+object WithProxyLogger {
+
+  private[this] case class ClassProxyLogger(n: String) extends WithProxyLogger {
+    override protected lazy val loggerName = n
+  }
+
+  def namedLoggerFor[T](implicit ct: ClassTag[T]): Logger = {
+    val cpl = ClassProxyLogger(ct.runtimeClass.niceClassName)
+    cpl.logger
+  }
+
 }
 
 object DefaultProxyLogger extends WithProxyLogger {

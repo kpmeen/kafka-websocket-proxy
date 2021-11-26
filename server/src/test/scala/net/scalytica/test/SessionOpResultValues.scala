@@ -1,14 +1,14 @@
 package net.scalytica.test
 
-import net.scalytica.kafka.wsproxy.session.Session
+import net.scalytica.kafka.wsproxy.session._
 
 trait SessionOpResultValues {
 
   implicit def convertSessionOpResultToValuable[T](
-      res: Session.SessionOpResult
+      res: SessionOpResult
   ): Valuable = new Valuable(res)
 
-  class Valuable(res: Session.SessionOpResult) {
+  class Valuable(res: SessionOpResult) {
 
     def value: Session = {
       res.session

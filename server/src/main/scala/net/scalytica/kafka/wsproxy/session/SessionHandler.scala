@@ -10,13 +10,8 @@ import akka.stream.scaladsl.{RunnableGraph, Sink}
 import akka.util.Timeout
 import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
-import net.scalytica.kafka.wsproxy.jmx.WsProxyJmxRegistrar
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models.{WsClientId, WsGroupId, WsServerId}
-import net.scalytica.kafka.wsproxy.session.Session.{
-  IncompleteOperation,
-  SessionOpResult
-}
 import net.scalytica.kafka.wsproxy.session.SessionHandlerProtocol._
 
 import java.util.concurrent.TimeoutException
@@ -33,46 +28,116 @@ object SessionHandlerProtocol {
   /** Main protocol to be used by the proxy service */
   sealed trait Protocol
 
-  sealed trait ClientSessionProtocol extends Protocol
+  /**
+   * Protocol to use for session related behaviour from outside the session
+   * handler.
+   */
+  sealed trait SessionProtocol extends Protocol
+  /** Consumer session specific protocol */
+  sealed trait ConsumerSessionProtocol extends SessionProtocol
+  /** Producer session specific protocol */
+  sealed trait ProducerSessionProtocol extends SessionProtocol
 
-  case class InitSession(
-      groupId: WsGroupId,
-      consumerLimit: Int,
-      replyTo: ActorRef[Session.SessionOpResult]
-  ) extends ClientSessionProtocol
+  sealed trait SessionInitCmd {
+    val sessionId: SessionId
+    val maxConnections: Int
+    val replyTo: ActorRef[SessionOpResult]
+  }
 
-  case class AddConsumer(
+  sealed trait AddClientCmd {
+    val sessionId: SessionId
+    val clientId: WsClientId
+    val serverId: WsServerId
+    val replyTo: ActorRef[SessionOpResult]
+  }
+
+  sealed trait RemoveClientCmd {
+    val sessionId: SessionId
+    val clientId: WsClientId
+    val replyTo: ActorRef[SessionOpResult]
+  }
+
+  /**
+   * Command message to terminate a given Session
+   *
+   * @param replyTo
+   *   the [[ActorRef]] that sent the command
+   */
+  final case class StopSessionHandler(
+      replyTo: ActorRef[SessionOpResult]
+  ) extends SessionProtocol
+
+  // Consumer session specific commands
+  final case class InitConsumerSession(
+      sessionId: SessionId,
       groupId: WsGroupId,
-      consumerId: WsClientId,
+      maxConnections: Int,
+      replyTo: ActorRef[SessionOpResult]
+  ) extends ConsumerSessionProtocol
+      with SessionInitCmd
+
+  final case class AddConsumer(
+      sessionId: SessionId,
+      groupId: WsGroupId,
+      clientId: WsClientId,
       serverId: WsServerId,
-      replyTo: ActorRef[Session.SessionOpResult]
-  ) extends ClientSessionProtocol
+      replyTo: ActorRef[SessionOpResult]
+  ) extends ConsumerSessionProtocol
+      with AddClientCmd
 
-  case class RemoveConsumer(
+  final case class RemoveConsumer(
+      sessionId: SessionId,
       groupId: WsGroupId,
-      consumerId: WsClientId,
-      replyTo: ActorRef[Session.SessionOpResult]
-  ) extends ClientSessionProtocol
+      clientId: WsClientId,
+      replyTo: ActorRef[SessionOpResult]
+  ) extends ConsumerSessionProtocol
+      with RemoveClientCmd
 
-  case class GetSession(
-      groupId: WsGroupId,
-      replyTo: ActorRef[Option[Session]]
-  ) extends ClientSessionProtocol
+  final case class GetConsumerSession(
+      sessionId: SessionId,
+      replyTo: ActorRef[Option[ConsumerSession]]
+  ) extends ConsumerSessionProtocol
 
-  case class Stop(replyTo: ActorRef[Session.SessionOpResult])
-      extends ClientSessionProtocol
+  // Producer session specific commands
+
+  final case class InitProducerSession(
+      sessionId: SessionId,
+      maxConnections: Int,
+      replyTo: ActorRef[SessionOpResult]
+  ) extends ProducerSessionProtocol
+      with SessionInitCmd
+
+  final case class AddProducer(
+      sessionId: SessionId,
+      clientId: WsClientId,
+      serverId: WsServerId,
+      replyTo: ActorRef[SessionOpResult]
+  ) extends ProducerSessionProtocol
+      with AddClientCmd
+
+  final case class RemoveProducer(
+      sessionId: SessionId,
+      clientId: WsClientId,
+      replyTo: ActorRef[SessionOpResult]
+  ) extends ProducerSessionProtocol
+      with RemoveClientCmd
+
+  final case class GetProducerSession(
+      sessionId: SessionId,
+      replyTo: ActorRef[Option[ProducerSession]]
+  ) extends ProducerSessionProtocol
 
   /** Sub-protocol only to be used by the Kafka consumer */
-  sealed private[session] trait InternalProtocol extends Protocol
+  sealed private[session] trait InternalSessionProtocol extends Protocol
 
-  private[session] case class UpdateSession(
-      groupId: WsGroupId,
+  final private[session] case class UpdateSession(
+      sessionId: SessionId,
       s: Session
-  ) extends InternalProtocol
+  ) extends InternalSessionProtocol
 
-  private[session] case class RemoveSession(
-      groupId: WsGroupId
-  ) extends InternalProtocol
+  final private[session] case class RemoveSession(
+      sessionId: SessionId
+  ) extends InternalSessionProtocol
 }
 
 object SessionHandler extends SessionHandler {
@@ -86,65 +151,78 @@ object SessionHandler extends SessionHandler {
       sh: ActorRef[SessionHandlerProtocol.Protocol]
   ) {
 
-    private[this] def handleError[T](
-        groupId: WsGroupId,
-        clientId: Option[WsClientId] = None,
-        serverId: Option[WsServerId] = None
+    private[this] def handleClientError[T](
+        sessionId: SessionId,
+        groupId: Option[WsGroupId],
+        clientId: Option[WsClientId],
+        serverId: Option[WsServerId]
     )(timeoutResponse: String => T)(throwable: Throwable): Future[T] = {
       val op = throwable.getStackTrace
         .dropWhile(ste => !ste.getClassName.equals(getClass.getName))
         .headOption
         .map(_.getMethodName)
         .getOrElse("unknown")
-      val cid = clientId.map(c => s"on $c").getOrElse("")
+      val cid = clientId.map(c => s"for $c").getOrElse("")
       val sid = serverId.map(s => s"on $s").getOrElse("")
+      val gid = groupId.map(g => s"in $g").getOrElse("")
 
       throwable match {
         case t: TimeoutException =>
-          logger.debug(s"Timeout calling $op $cid in $groupId $sid", t)
+          logger.debug(s"Timeout calling $op $cid $gid in $sessionId $sid", t)
           Future.successful(timeoutResponse(t.getMessage))
 
         case t: Throwable =>
           logger.warn(
-            s"An unknown error occurred calling $op $cid in $groupId $sid",
+            s"Unhandled error calling $op $cid $gid in $sessionId $sid",
             t
           )
           throw t
       }
     }
 
-    private[this] def handleSessionOpError(
-        groupId: WsGroupId,
-        clientId: WsClientId,
-        serverId: WsServerId
-    )(throwable: Throwable): Future[SessionOpResult] = {
-      handleSessionOpError(groupId, Some(clientId), Some(serverId))(throwable)
-    }
-
-    private[this] def handleSessionOpError(
-        groupId: WsGroupId,
+    private[this] def handleClientSessionOpError(
+        sessionId: SessionId,
+        groupId: Option[WsGroupId] = None,
         clientId: Option[WsClientId] = None,
         serverId: Option[WsServerId] = None
     )(throwable: Throwable): Future[SessionOpResult] = {
-      handleError[SessionOpResult](
+      handleClientError[SessionOpResult](
+        sessionId = sessionId,
         groupId = groupId,
         clientId = clientId,
         serverId = serverId
       )(reason => IncompleteOperation(reason))(throwable)
     }
 
-    def initSession(groupId: WsGroupId, consumerLimit: Int)(
+    def initConsumerSession(groupId: WsGroupId, consumerLimit: Int)(
+        implicit ec: ExecutionContext,
+        timeout: Timeout,
+        scheduler: Scheduler
+    ): Future[SessionOpResult] = {
+      val sid = SessionId(groupId)
+
+      sh.ask[SessionOpResult] { ref =>
+        SessionHandlerProtocol.InitConsumerSession(
+          sessionId = sid,
+          groupId = groupId,
+          maxConnections = consumerLimit,
+          replyTo = ref
+        )
+      }.recoverWith(handleClientSessionOpError(sid)(_))
+    }
+
+    def initProducerSession(sessionId: SessionId, maxClients: Int)(
         implicit ec: ExecutionContext,
         timeout: Timeout,
         scheduler: Scheduler
     ): Future[SessionOpResult] = {
       sh.ask[SessionOpResult] { ref =>
-        SessionHandlerProtocol.InitSession(
-          groupId = groupId,
-          consumerLimit = consumerLimit,
+        SessionHandlerProtocol.InitProducerSession(
+          sessionId = sessionId,
+          maxConnections = maxClients,
           replyTo = ref
         )
-      }.recoverWith(handleSessionOpError(groupId)(_))
+      }.recoverWith(handleClientSessionOpError(sessionId)(_))
     }
 
     def addConsumer(
@@ -156,34 +234,48 @@ object SessionHandler extends SessionHandler {
         timeout: Timeout,
         scheduler: Scheduler
     ): Future[SessionOpResult] = {
-      def add() = sh
-        .ask[SessionOpResult] { ref =>
-          SessionHandlerProtocol.AddConsumer(
-            groupId = groupId,
-            consumerId = clientId,
-            serverId = serverId,
-            replyTo = ref
-          )
-        }
-        .recoverWith(handleSessionOpError(groupId, clientId, serverId)(_))
+      val sid = SessionId(groupId)
+      sh.ask[SessionOpResult] { ref =>
+        SessionHandlerProtocol.AddConsumer(
+          sessionId = sid,
+          groupId = groupId,
+          clientId = clientId,
+          serverId = serverId,
+          replyTo = ref
+        )
+      }.recoverWith(
+        handleClientSessionOpError(
+          sessionId = sid,
+          groupId = Option(groupId),
+          clientId = Option(clientId),
+          serverId = Option(serverId)
+        )(_)
+      )
+    }
 
-      WsProxyJmxRegistrar.findConsumerClientMBean(clientId, groupId) match {
-        case Some(_) =>
-          // Let the add logic pan out as normal, and fail if the consumer
-          // is already registered.
-          add()
-
-        case None =>
-          // There is no MBean registered, meaning there should be no consumer
-          // registered in the session. Just in case, we trigger a removal to
-          // avoid not being able to connect the consumer after an unexpected
-          // disconnect.
-          for {
-            _      <- removeConsumer(groupId, clientId, serverId)
-            addRes <- add()
-          } yield addRes
-
-      }
+    def addProducer(
+        sessionId: SessionId,
+        clientId: WsClientId,
+        serverId: WsServerId
+    )(
+        implicit ec: ExecutionContext,
+        timeout: Timeout,
+        scheduler: Scheduler
+    ): Future[SessionOpResult] = {
+      sh.ask[SessionOpResult] { ref =>
+        SessionHandlerProtocol.AddProducer(
+          sessionId = sessionId,
+          clientId = clientId,
+          serverId = serverId,
+          replyTo = ref
+        )
+      }.recoverWith(
+        handleClientSessionOpError(
+          sessionId = sessionId,
+          clientId = Option(clientId),
+          serverId = Option(serverId)
+        )(_)
+      )
     }
 
     def removeConsumer(
@@ -195,18 +287,58 @@ object SessionHandler extends SessionHandler {
         timeout: Timeout,
         scheduler: Scheduler
     ): Future[SessionOpResult] = {
+      val sid = SessionId(groupId)
+
       sh.ask[SessionOpResult] { ref =>
-        SessionHandlerProtocol.RemoveConsumer(groupId, clientId, ref)
-      }.recoverWith(handleSessionOpError(groupId, clientId, serverId)(_))
+        SessionHandlerProtocol.RemoveConsumer(sid, groupId, clientId, ref)
+      }.recoverWith(
+        handleClientSessionOpError(
+          sessionId = sid,
+          groupId = Option(groupId),
+          clientId = Option(clientId),
+          serverId = Option(serverId)
+        )(_)
+      )
     }
 
-    def sessionShutdown()(
+    def removeProducer(
+        clientId: WsClientId,
+        serverId: WsServerId
+    )(
+        implicit ec: ExecutionContext,
+        timeout: Timeout,
+        scheduler: Scheduler
+    ): Future[SessionOpResult] = {
+      removeProducer(SessionId(clientId), clientId, serverId)
+    }
+
+    def removeProducer(
+        sessionId: SessionId,
+        clientId: WsClientId,
+        serverId: WsServerId
+    )(
         implicit ec: ExecutionContext,
         timeout: Timeout,
         scheduler: Scheduler
     ): Future[SessionOpResult] = {
       sh.ask[SessionOpResult] { ref =>
-        SessionHandlerProtocol.Stop(ref)
+        SessionHandlerProtocol.RemoveProducer(sessionId, clientId, ref)
+      }.recoverWith(
+        handleClientSessionOpError(
+          sessionId = sessionId,
+          clientId = Option(clientId),
+          serverId = Option(serverId)
+        )(_)
+      )
+    }
+
+    def sessionHandlerShutdown()(
+        implicit ec: ExecutionContext,
+        timeout: Timeout,
+        scheduler: Scheduler
+    ): Future[SessionOpResult] = {
+      sh.ask[SessionOpResult] { ref =>
+        SessionHandlerProtocol.StopSessionHandler(ref)
       }.recoverWith {
         case t: TimeoutException =>
           logger.debug("Timeout calling sessionShutdown()", t)
@@ -218,14 +350,44 @@ object SessionHandler extends SessionHandler {
       }
     }
 
-    def getSession(groupId: WsGroupId)(
+    def getConsumerSession(groupId: WsGroupId)(
         implicit ec: ExecutionContext,
         timeout: Timeout,
         scheduler: Scheduler
-    ): Future[Option[Session]] = {
-      sh.ask[Option[Session]] { ref =>
-        SessionHandlerProtocol.GetSession(groupId, ref)
-      }.recoverWith(handleError[Option[Session]](groupId)(_ => None)(_))
+    ): Future[Option[ConsumerSession]] = {
+      val sid = SessionId(groupId)
+
+      sh.ask[Option[ConsumerSession]] { ref =>
+        SessionHandlerProtocol.GetConsumerSession(sid, ref)
+      }.recoverWith(
+        handleClientError[Option[ConsumerSession]](
+          sessionId = sid,
+          groupId = Option(groupId),
+          clientId = None,
+          serverId = None
+        ) { _ =>
+          None
+        }(_)
+      )
+    }
+
+    def getProducerSession(sessionId: SessionId)(
+        implicit ec: ExecutionContext,
+        timeout: Timeout,
+        scheduler: Scheduler
+    ): Future[Option[ProducerSession]] = {
+      sh.ask[Option[ProducerSession]] { ref =>
+        SessionHandlerProtocol.GetProducerSession(sessionId, ref)
+      }.recoverWith(
+        handleClientError[Option[ProducerSession]](
+          sessionId = sessionId,
+          groupId = None,
+          clientId = None,
+          serverId = None
+        ) { _ =>
+          None
+        }(_)
+      )
     }
 
   }
@@ -235,15 +397,14 @@ object SessionHandler extends SessionHandler {
 /**
  * Logic for building a clustered session handler using Kafka.
  *
- * The idea is to use a compacted Kafka topic as the source of truth for
- * consumer group session state. Each instance of the kafka-websocket-proxy will
- * have a single actor that can read and write from/to that topic. The topic
- * data should always be the up-to-date version of the state for all proxy
- * instances, and we can therefore implement some nice features on top of that
- * capability.
+ * The idea is to use a compacted Kafka topic as the source of truth for client
+ * session state. Each instance of the kafka-websocket-proxy will have a single
+ * actor that can read and write from/to that topic. The topic data should
+ * always be the up-to-date version of the state for all proxy instances, and we
+ * can therefore implement some nice features on top of that capability.
  *
- *   - Keeping track of number of sockets per consumer group
- *   - Keeping track of which consumers are part of the consumer group
+ *   - Keeping track of number of sockets per session
+ *   - Keeping track of which clients are part of the session
  *   - Possibility to share meta-data across nodes
  *   - etc...
  */
@@ -315,8 +476,8 @@ trait SessionHandler extends WithProxyLogger {
     val consumerStream: RunnableGraph[Consumer.Control] =
       consumer.sessionStateSource.to {
         Sink.foreach {
-          case ip: InternalProtocol =>
-            logger.debug(s"Consumed message: $ip")
+          case ip: InternalSessionProtocol =>
+            logger.debug(s"Consumed internal session protocol message: $ip")
             ref ! ip
 
           case _ =>
@@ -348,19 +509,19 @@ trait SessionHandler extends WithProxyLogger {
       producer: SessionDataProducer
   ): Behavior[Protocol] = {
     Behaviors.receiveMessage {
-      case c: ClientSessionProtocol =>
-        logger.trace(s"Received a ClientSessionProtocol message [$c]")
-        clientSessionProtocolHandler(active, c)
+      case c: SessionProtocol =>
+        logger.trace(s"Received a SessionProtocol message [$c]")
+        sessionProtocolHandler(active, c)
 
-      case i: InternalProtocol =>
+      case i: InternalSessionProtocol =>
         logger.trace(s"Received an InternalProtocol message [$i]")
         internalProtocolHandler(active, i)
     }
   }
 
-  private[this] def clientSessionProtocolHandler(
+  private[this] def sessionProtocolHandler(
       active: ActiveSessions,
-      csp: ClientSessionProtocol
+      sp: SessionProtocol
   )(
       implicit ec: ExecutionContext,
       cfg: AppCfg,
@@ -368,29 +529,29 @@ trait SessionHandler extends WithProxyLogger {
   ): Behavior[Protocol] = {
     val serverId = cfg.server.serverId
 
-    logger.trace(s"CLIENT_SESSION: got client session protocol message $csp")
+    sp match {
+      case csp: ConsumerSessionProtocol =>
+        consumerSessionProtocolHandler(active, csp)
 
-    csp match {
-      case is: InitSession    => initSessionHandler(active, is)
-      case ac: AddConsumer    => addConsumerHandler(active, ac)
-      case rc: RemoveConsumer => removeConsumerHandler(active, rc)
-      case gs: GetSession     => getSessionHandler(active, gs)
-      case Stop(replyTo) =>
+      case psp: ProducerSessionProtocol =>
+        producerSessionProtocolHandler(active, psp)
+
+      case StopSessionHandler(replyTo) =>
         Future
           .sequence {
-            active.removeConsumersFromServerId(serverId).sessions.map {
-              case (gid, s) =>
+            active.removeInstancesFromServerId(serverId).sessions.map {
+              case (sid, s) =>
                 producer.publish(s).map { _ =>
                   logger.debug(
-                    "REMOVE_CONSUMER: consumers connected to server " +
-                      s"${serverId.value} removed from session ${gid.value}"
+                    "REMOVE_CLIENT_INSTANCES: clients connected to server " +
+                      s"${serverId.value} removed from session ${sid.value}"
                   )
                   Done
                 }
             }
           }
           .map { _ =>
-            replyTo ! Session.ConsumersForServerRemoved
+            replyTo ! InstancesForServerRemoved()
           }
         logger.debug(
           s"STOP: stopping session handler for server ${serverId.value}"
@@ -399,153 +560,240 @@ trait SessionHandler extends WithProxyLogger {
     }
   }
 
-  private[this] def initSessionHandler(
+  private[this] def consumerSessionProtocolHandler(
       active: ActiveSessions,
-      is: InitSession
+      csp: ConsumerSessionProtocol
   )(
       implicit ec: ExecutionContext,
       cfg: AppCfg,
       producer: SessionDataProducer
   ): Behavior[Protocol] = {
-    logger.debug(
-      s"INIT_SESSION: initialise session ${is.groupId.value} " +
-        s"with limit ${is.consumerLimit}"
-    )
-    active.find(is.groupId) match {
+    logger.trace(s"CLIENT_SESSION: got consumer session protocol message $csp")
+
+    csp match {
+      case is: InitConsumerSession =>
+        initSessionHandler(active, is) { () =>
+          ConsumerSession(is.sessionId, is.groupId, is.maxConnections)
+        }
+
+      case ac: AddConsumer        => addClientHandler(active, ac)
+      case rc: RemoveConsumer     => removeClientHandler(active, rc)
+      case gs: GetConsumerSession => getConsumerSessionHandler(active, gs)
+    }
+  }
+
+  private[this] def producerSessionProtocolHandler(
+      active: ActiveSessions,
+      psp: ProducerSessionProtocol
+  )(
+      implicit ec: ExecutionContext,
+      cfg: AppCfg,
+      producer: SessionDataProducer
+  ): Behavior[Protocol] = {
+    logger.trace(s"CLIENT_SESSION: got producer session protocol message $psp")
+
+    psp match {
+      case is: InitProducerSession =>
+        initSessionHandler(active, is) { () =>
+          ProducerSession(is.sessionId, is.maxConnections)
+        }
+
+      case ap: AddProducer        => addClientHandler(active, ap)
+      case rp: RemoveProducer     => removeClientHandler(active, rp)
+      case gs: GetProducerSession => getProducerSessionHandler(active, gs)
+    }
+  }
+
+  private[this] def initSessionHandler[Init <: SessionInitCmd](
+      active: ActiveSessions,
+      cmd: Init
+  )(
+      session: () => Session
+  )(
+      implicit ec: ExecutionContext,
+      cfg: AppCfg,
+      producer: SessionDataProducer
+  ): Behavior[Protocol] = {
+    active.find(cmd.sessionId) match {
       case Some(s) =>
         logger.debug(
-          s"INIT_SESSION: session ${is.groupId.value} already initialised."
+          s"INIT_SESSION: session ${cmd.sessionId.value} already registered."
         )
-        is.replyTo ! Session.SessionInitialised(s)
+        cmd.replyTo ! SessionInitialised(s)
         Behaviors.same
 
       case None =>
         logger.debug(
-          s"INIT_SESSION: no active sessions for ${is.groupId.value}. " +
-            "Creating a new one..."
+          s"INIT_SESSION: ${cmd.sessionId.value} is not an active session."
         )
-        val s = Session(is.groupId, is.consumerLimit)
+        val s = session()
         producer.publish(s).map { _ =>
           logger.debug(
-            s"INIT_SESSION: session ${is.groupId.value} initialised."
+            s"INIT_SESSION: session ${cmd.sessionId.value} was registered."
           )
-          is.replyTo ! Session.SessionInitialised(s)
+          cmd.replyTo ! SessionInitialised(s)
         }
         active.add(s).map(as => behavior(as)).getOrElse(Behaviors.same)
     }
   }
 
-  private[this] def addConsumerHandler(
+  private[this] def createClientInstance[Add <: AddClientCmd](
+      cmd: Add,
+      session: Session
+  ): Either[SessionOpResult, ClientInstance] = {
+    (session, cmd) match {
+      case (cs: ConsumerSession, ca: AddConsumer) =>
+        Right(ConsumerInstance(ca.clientId, cs.groupId, ca.serverId))
+
+      case (_: ProducerSession, pa: AddProducer) =>
+        Right(ProducerInstance(pa.clientId, pa.serverId))
+
+      case (s, a) =>
+        logger.warn(s"ADD_CLIENT: cmd $a is not compatible with session $s.")
+        Left(InstanceTypeForSessionIncorrect(s))
+    }
+  }
+
+  def notAdded[Add <: AddClientCmd](
+      cmd: Add,
+      op: SessionOpResult
+  ): Behavior[Protocol] = {
+    logger.debug(
+      s"ADD_CLIENT: session op result for session ${cmd.sessionId.value}" +
+        s" trying to add client ${cmd.clientId.value} on server" +
+        s" ${cmd.serverId.value}: ${op.asString}"
+    )
+    cmd.replyTo ! op
+    Behaviors.same
+  }
+
+  private[this] def addClientHandler[Add <: AddClientCmd](
       active: ActiveSessions,
-      ac: AddConsumer
+      cmd: Add
   )(
       implicit ec: ExecutionContext,
       producer: SessionDataProducer
   ): Behavior[Protocol] = {
     logger.debug(
-      s"ADD_CONSUMER: adding consumer ${ac.consumerId.value} connected to " +
-        s"server ${ac.serverId.value} to session ${ac.groupId.value}..."
+      s"ADD_CLIENT: adding client instance ${cmd.clientId.value} connected " +
+        s"to server ${cmd.serverId.value} to session ${cmd.sessionId.value}..."
     )
-    active.find(ac.groupId) match {
+
+    active.find(cmd.sessionId) match {
       case None =>
         logger.warn(
-          s"ADD_CONSUMER: session ${ac.groupId.value} was not found. " +
-            s"Consumer ID ${ac.consumerId} will not be added."
+          s"ADD_CLIENT: session ${cmd.sessionId.value} was not found. " +
+            s"client ID ${cmd.clientId} will not be added."
         )
-        ac.replyTo ! Session.SessionNotFound(ac.groupId)
+        cmd.replyTo ! SessionNotFound(cmd.sessionId)
         Behaviors.same
 
       case Some(session) =>
-        session.addConsumer(ac.consumerId, ac.serverId) match {
-          case added @ Session.ConsumerAdded(s) =>
-            producer.publish(s).map { _ =>
-              logger.debug(
-                s"ADD_CONSUMER: consumer ${ac.consumerId.value} added to " +
-                  s"session ${ac.groupId.value} from instance " +
-                  s"${ac.serverId.value}"
-              )
-              ac.replyTo ! added
-            }
-            Behaviors.same
+        logger.trace("ADD_CLIENT: creating internal client session...")
+        createClientInstance(cmd, session) match {
+          case Right(instance) =>
+            session.addInstance(instance) match {
+              case added @ InstanceAdded(s) =>
+                logger.trace("ADD_CLIENT: publishing updated session...")
+                producer.publish(s).map { _ =>
+                  logger.debug(
+                    s"ADD_CLIENT: client instance ${cmd.clientId.value} added" +
+                      s"to session ${cmd.sessionId.value} from server " +
+                      s"${cmd.serverId.value}"
+                  )
+                  cmd.replyTo ! added
+                }
+                Behaviors.same
 
-          case notAdded =>
-            logger.debug(
-              s"ADD_CONSUMER: session op result for session " +
-                s"${ac.groupId.value} trying to add consumer " +
-                s"${ac.consumerId.value} on instance ${ac.serverId.value}: " +
-                s"${notAdded.asString}"
-            )
-            ac.replyTo ! notAdded
-            Behaviors.same
+              case op =>
+                notAdded(cmd, op)
+            }
+
+          case Left(invalidType) =>
+            notAdded(cmd, invalidType)
         }
     }
   }
 
-  private[this] def removeConsumerHandler(
+  private[this] def removeClientHandler[Remove <: RemoveClientCmd](
       active: ActiveSessions,
-      rc: RemoveConsumer
+      cmd: Remove
   )(
       implicit ec: ExecutionContext,
       producer: SessionDataProducer
   ): Behavior[Protocol] = {
     logger.debug(
-      s"REMOVE_CONSUMER: remove consumer ${rc.consumerId.value} from " +
-        s"session ${rc.groupId.value} on server..."
+      s"REMOVE_CLIENT: remove client instance ${cmd.clientId.value} from " +
+        s"session ${cmd.sessionId.value} on server..."
     )
-    active.find(rc.groupId) match {
+    active.find(cmd.sessionId) match {
       case None =>
         logger.debug(
-          s"REMOVE_CONSUMER: session ${rc.groupId.value} was not found"
+          s"REMOVE_CLIENT: session ${cmd.sessionId.value} was not found"
         )
-        rc.replyTo ! Session.SessionNotFound(rc.groupId)
+        cmd.replyTo ! SessionNotFound(cmd.sessionId)
         Behaviors.same
 
       case Some(session) =>
-        session.removeConsumer(rc.consumerId) match {
-          case removed @ Session.ConsumerRemoved(s) =>
+        session.removeInstance(cmd.clientId) match {
+          case removed @ InstanceRemoved(s) =>
             producer.publish(s).foreach { _ =>
               logger.debug(
-                s"REMOVE_CONSUMER: consumer ${rc.consumerId.value} removed " +
-                  s"from session ${rc.groupId.value}"
+                s"REMOVE_CLIENT: client ${cmd.clientId.value} removed " +
+                  s"from session ${cmd.sessionId.value}"
               )
-              rc.replyTo ! removed
+              cmd.replyTo ! removed
             }
             Behaviors.same
 
           case notRemoved =>
             logger.debug(
-              "REMOVE_CONSUMER: session op result " +
-                s"for ${rc.groupId.value}: ${notRemoved.asString}"
+              "REMOVE_CLIENT: session op result " +
+                s"for ${cmd.sessionId.value}: ${notRemoved.asString}"
             )
-            rc.replyTo ! notRemoved
+            cmd.replyTo ! notRemoved
             Behaviors.same
         }
     }
   }
 
-  private[this] def getSessionHandler(
+  private[this] def getConsumerSessionHandler(
       active: ActiveSessions,
-      gs: GetSession
+      gs: GetConsumerSession
   ): Behavior[Protocol] = {
-    gs.replyTo ! active.find(gs.groupId)
+    gs.replyTo ! active.find(gs.sessionId).flatMap {
+      case cs: ConsumerSession => Option(cs)
+      case _                   => None
+    }
+    Behaviors.same
+  }
+
+  private[this] def getProducerSessionHandler(
+      active: ActiveSessions,
+      gs: GetProducerSession
+  ): Behavior[Protocol] = {
+    gs.replyTo ! active.find(gs.sessionId).flatMap {
+      case ps: ProducerSession => Option(ps)
+      case _                   => None
+    }
     Behaviors.same
   }
 
   private[this] def internalProtocolHandler(
       active: ActiveSessions,
-      ip: InternalProtocol
+      ip: InternalSessionProtocol
   )(
       implicit ec: ExecutionContext,
       cfg: AppCfg,
       producer: SessionDataProducer
   ): Behavior[Protocol] = ip match {
-    case UpdateSession(gid, s) =>
-      logger.debug(s"INTERNAL: Updating session ${gid.value}...")
-      nextOrSame(active.updateSession(gid, s))(behavior)
+    case UpdateSession(sessionId, s) =>
+      logger.debug(s"INTERNAL: Updating session ${sessionId.value}...")
+      nextOrSame(active.updateSession(sessionId, s))(behavior)
 
-    case RemoveSession(gid) =>
-      logger.debug(s"INTERNAL: Removing session ${gid.value}..")
-      nextOrSame(active.removeSession(gid))(behavior)
+    case RemoveSession(sessionId) =>
+      logger.debug(s"INTERNAL: Removing session ${sessionId.value}..")
+      nextOrSame(active.removeSession(sessionId))(behavior)
   }
 
 }

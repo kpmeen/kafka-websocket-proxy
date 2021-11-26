@@ -132,7 +132,10 @@ object Server extends App with ServerRoutes with ServerBindings {
       implicit val timeout: Timeout = 10 seconds
       implicit val typedScheduler   = classicSys.scheduler.toTyped
       info("Cleaning up session state...")
-      sessionHandlerRef.shRef.sessionShutdown().map(_ => Done)
+      sessionHandlerRef.shRef.sessionHandlerShutdown().map { _ =>
+        logger.info("Session handler has been stopped.")
+        Done
+      }
     }
 
     cs.addTask(PhaseBeforeActorSystemTerminate, "session-consumer-shutdown") {

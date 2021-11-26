@@ -32,7 +32,13 @@ import net.scalytica.kafka.wsproxy.jmx.mbeans.ConsumerClientStatsProtocol._
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models._
 import net.scalytica.kafka.wsproxy.session.SessionHandler._
-import net.scalytica.kafka.wsproxy.session.{Session, SessionHandlerProtocol}
+import net.scalytica.kafka.wsproxy.session.{
+  InstanceAdded,
+  InstanceExists,
+  InstanceLimitReached,
+  SessionHandlerProtocol,
+  SessionNotFound
+}
 import net.scalytica.kafka.wsproxy.streams.ProxyFlowExtras
 import net.scalytica.kafka.wsproxy.web.SocketProtocol.{AvroPayload, JsonPayload}
 
@@ -54,15 +60,15 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
       serverId: WsServerId,
       groupId: WsGroupId,
       clientId: WsClientId,
-      numPartitions: Int,
+      maxConnections: Int,
       sh: ActorRef[SessionHandlerProtocol.Protocol]
   )(
       implicit ec: ExecutionContext,
       scheduler: Scheduler
   ) = {
     for {
-      ir     <- sh.initSession(groupId, numPartitions)
-      _      <- logger.debugf(s"Session ${ir.session.consumerGroupId} ready.")
+      ir     <- sh.initConsumerSession(groupId, maxConnections)
+      _      <- logger.debugf(s"Session ${ir.session.sessionId} ready.")
       addRes <- sh.addConsumer(groupId, clientId, serverId)
     } yield addRes
   }
@@ -119,7 +125,10 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
       sessionHandler: ActorRef[SessionHandlerProtocol.Protocol],
       jmxManager: Option[JmxManager]
   ): Route = {
-    logger.debug("Initialising outbound websocket")
+    logger.debug(
+      s"Initialising outbound WebSocket for topic ${args.topic.value} " +
+        s"with payload ${args.socketPayload}"
+    )
 
     implicit val scheduler = as.scheduler.toTyped
 
@@ -134,12 +143,12 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
       serverId = serverId,
       groupId = groupId,
       clientId = clientId,
-      numPartitions = topicPartitions,
+      maxConnections = topicPartitions,
       sh = sessionHandler
     )
 
     onSuccess(consumerAddResult) {
-      case Session.ConsumerAdded(_) =>
+      case InstanceAdded(_) =>
         prepareOutboundWebSocket(args) { () =>
           // Decrease the number of active consumer connections.
           jmxManager.foreach(_.removeConsumerConnection())
@@ -153,7 +162,7 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
             }
         }
 
-      case Session.ConsumerExists(_) =>
+      case InstanceExists(_) =>
         reject(
           ValidationRejection(
             s"WebSocket for consumer ${clientId.value} in session " +
@@ -162,15 +171,15 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
           )
         )
 
-      case Session.ConsumerLimitReached(s) =>
+      case InstanceLimitReached(s) =>
         reject(
           ValidationRejection(
-            s"The maximum number of WebSockets for session ${groupId.value} " +
-              s"has been reached. Limit is ${s.consumerLimit}"
+            s"The max number of WebSockets for session ${groupId.value} " +
+              s"has been reached. Limit is ${s.maxConnections}"
           )
         )
 
-      case Session.SessionNotFound(_) =>
+      case SessionNotFound(_) =>
         reject(
           ValidationRejection(
             s"Could not find an active session for ${groupId.value}."
@@ -232,7 +241,7 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
 
     implicit val statsActorRef = prepareJmx(args.groupId, args.clientId)
 
-    // Init monitoring flows
+    // Init inbound monitoring flow
     val jmxInFlow = jmxManager
       .map(_.consumerStatsInboundWireTap(statsActorRef))
       .getOrElse(Flow[WsCommit])
@@ -281,7 +290,8 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
 
   /**
    * Prepares the appropriate Sink to use for incoming messages on the outbound
-   * socket. The Sink is set up based on the desire to auto-commit or not.
+   * socket. The Sink is set up using the provided {{{messageParser}}} Flow,
+   * which is based on the desire to auto-commit or not.
    *
    *   - If the client requests auto-commit, all incoming messages are ignored.
    *   - If the client disables auto-commit, the Sink accepts JSON

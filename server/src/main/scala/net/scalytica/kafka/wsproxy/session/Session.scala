@@ -1,108 +1,146 @@
 package net.scalytica.kafka.wsproxy.session
 
+import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models.{WsClientId, WsGroupId, WsServerId}
-import net.scalytica.kafka.wsproxy.session.Session._
 
-case class Session(
-    consumerGroupId: WsGroupId,
-    consumers: Set[ConsumerInstance],
-    consumerLimit: Int
-) {
+/**
+ * Defines the common attributes and functions for session data used to keep
+ * track of active Kafka clients.
+ */
+sealed trait Session { self =>
 
-  def canOpenSocket: Boolean = consumers.size < consumerLimit
+  protected val logger = WithProxyLogger.namedLoggerFor[self.type]
 
-  def hasConsumer(consumerId: WsClientId): Boolean =
-    consumers.exists(_.id == consumerId)
+  def sessionId: SessionId
+  def maxConnections: Int
+  // val rateLimit: Int
 
-  def addConsumer(
-      consumerId: WsClientId,
-      serverId: WsServerId
-  ): SessionOpResult =
-    addConsumer(ConsumerInstance(consumerId, serverId))
+  def instances: Set[ClientInstance]
 
-  def addConsumer(consumerInstance: ConsumerInstance): SessionOpResult =
-    if (hasConsumer(consumerInstance.id)) ConsumerExists(this)
-    else {
-      if (canOpenSocket) {
-        ConsumerAdded(copy(consumers = consumers + consumerInstance))
-      } else {
-        ConsumerLimitReached(this)
-      }
-    }
-
-  def removeConsumer(consumerId: WsClientId): SessionOpResult = {
-    if (hasConsumer(consumerId)) {
-      ConsumerRemoved(copy(consumers = consumers.filterNot(_.id == consumerId)))
-    } else {
-      ConsumerDoesNotExists(this)
-    }
-  }
-}
-
-case object Session {
-
-  def apply(consumerGroupId: WsGroupId, consumerLimit: Int = 2): Session = {
-    Session(
-      consumerGroupId = consumerGroupId,
-      consumers = Set.empty,
-      consumerLimit = consumerLimit
+  def canOpenSocket: Boolean = {
+    logger.trace(
+      "Validating if session can open connection:" +
+        s" instances=${instances.size + 1} maxConnections=$maxConnections"
     )
+    maxConnections == 0 || (instances.size + 1) <= maxConnections
   }
 
-  sealed trait SessionOpResult { self =>
-    def session: Session
+  def hasInstance(consumerId: WsClientId): Boolean = {
+    instances.exists(_.clientId == consumerId)
+  }
 
-    def asString: String = {
-      val tn = self.getClass.getTypeName
-      tn.substring(tn.lastIndexOf("$"))
-        .stripPrefix("$")
-        .foldLeft("") { (str, in) =>
-          if (in.isUpper) str + " " + in.toLower
-          else str + in
-        }
-        .trim
+  def updateInstances(updated: Set[ClientInstance]): Session
+
+  def addInstance(clientId: WsClientId, serverId: WsServerId): SessionOpResult
+
+  def addInstance(instance: ClientInstance): SessionOpResult
+
+  def removeInstance(clientId: WsClientId): SessionOpResult = {
+    if (hasInstance(clientId)) {
+      InstanceRemoved(
+        updateInstances(instances.filterNot(_.clientId == clientId))
+      )
+    } else {
+      InstanceDoesNotExists(self)
     }
   }
 
-  case class SessionInitialised(session: Session)    extends SessionOpResult
-  case class ConsumerAdded(session: Session)         extends SessionOpResult
-  case class ConsumerRemoved(session: Session)       extends SessionOpResult
-  case class ConsumerExists(session: Session)        extends SessionOpResult
-  case class ConsumerLimitReached(session: Session)  extends SessionOpResult
-  case class ConsumerDoesNotExists(session: Session) extends SessionOpResult
-
-  case object ConsumersForServerRemoved extends SessionOpResult {
-
-    override def session =
-      throw new NoSuchElementException(
-        "Cannot access session value when it's not found"
-      )
+  def removeInstancesFromServerId(serverId: WsServerId): Session = {
+    updateInstances(instances.filterNot(_.serverId == serverId))
   }
-
-  case class SessionNotFound(groupId: WsGroupId) extends SessionOpResult {
-
-    override def session =
-      throw new NoSuchElementException(
-        "Cannot access session value when it's not found"
-      )
-  }
-
-  case class IncompleteOperation(reason: String) extends SessionOpResult {
-
-    override def session =
-      throw new NoSuchElementException(
-        "Cannot access session value when it's not found"
-      )
-  }
-
 }
 
 /**
- * Wraps information about each instantiated consumer within a [[Session]].
+ * Defines the shape of a Kafka consumer session with 1 or more clients.
  *
- * @param id
- *   The client (or consumer) ID given.
- * @param serverId
- *   The server ID where the consumer instance is running.
+ * @param sessionId
+ *   The session ID for this session
+ * @param groupId
+ *   The group ID this session applies to
+ * @param maxConnections
+ *   The maximum number of allowed connections. 0 means unlimited
+ * @param instances
+ *   The active client instances
  */
-case class ConsumerInstance(id: WsClientId, serverId: WsServerId)
+case class ConsumerSession private (
+    sessionId: SessionId,
+    groupId: WsGroupId,
+    maxConnections: Int = 2,
+    instances: Set[ClientInstance] = Set.empty
+) extends Session {
+
+  require(instances.forall(_.isInstanceOf[ConsumerInstance]))
+
+  override def updateInstances(updated: Set[ClientInstance]): Session = {
+    copy(instances = updated)
+  }
+
+  override def addInstance(
+      clientId: WsClientId,
+      serverId: WsServerId
+  ) = addInstance(ConsumerInstance(clientId, groupId, serverId))
+
+  override def addInstance(instance: ClientInstance) = {
+    instance match {
+      case ci: ConsumerInstance =>
+        if (hasInstance(ci.clientId)) InstanceExists(this)
+        else {
+          if (canOpenSocket) {
+            InstanceAdded(updateInstances(instances + ci))
+          } else {
+            InstanceLimitReached(this)
+          }
+        }
+
+      case _ =>
+        InstanceTypeForSessionIncorrect(this)
+    }
+  }
+}
+
+/**
+ * Defines the shape of a Kafka producer session with 1 or more clients.
+ *
+ * @param sessionId
+ *   The session ID for this session
+ * @param maxConnections
+ *   The maximum number of allowed connections. 0 means unlimited
+ * @param instances
+ *   The active client instances
+ */
+case class ProducerSession(
+    sessionId: SessionId,
+    maxConnections: Int = 1,
+    instances: Set[ClientInstance] = Set.empty
+) extends Session {
+
+  require(instances.forall(_.isInstanceOf[ProducerInstance]))
+
+  override def updateInstances(updated: Set[ClientInstance]): Session = {
+    copy(instances = updated)
+  }
+
+  override def addInstance(
+      producerId: WsClientId,
+      serverId: WsServerId
+  ) = addInstance(ProducerInstance(producerId, serverId))
+
+  override def addInstance(instance: ClientInstance) = {
+    logger.trace(s"Attempting to add producer client: $instance")
+    instance match {
+      case pi: ProducerInstance =>
+        if (hasInstance(pi.clientId)) InstanceExists(this)
+        else {
+          if (canOpenSocket) {
+            InstanceAdded(updateInstances(instances + pi))
+          } else {
+            logger.warn(s"Client limit was reached for producer $instance")
+            InstanceLimitReached(this)
+          }
+        }
+
+      case _ =>
+        InstanceTypeForSessionIncorrect(this)
+    }
+  }
+}

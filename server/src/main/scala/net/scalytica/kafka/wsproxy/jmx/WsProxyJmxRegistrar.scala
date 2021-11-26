@@ -1,10 +1,13 @@
 package net.scalytica.kafka.wsproxy.jmx
 
 import java.lang.management.ManagementFactory
-
 import akka.actor.typed.Behavior
+
 import javax.management._
-import net.scalytica.kafka.wsproxy.jmx.mbeans.ConsumerClientStatsMXBean
+import net.scalytica.kafka.wsproxy.jmx.mbeans.{
+  ConsumerClientStatsMXBean,
+  ProducerClientStatsMXBean
+}
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models.{WsClientId, WsGroupId}
 
@@ -41,6 +44,14 @@ trait WsProxyJmxQueries extends WithProxyLogger {
   ): Option[MBeanInfo] = {
     findMBeanByType[ConsumerClientStatsMXBean](
       consumerStatsName(clientId, groupId)
+    )
+  }
+
+  def findProducerClientMBean(
+      clientId: WsClientId
+  ): Option[MBeanInfo] = {
+    findMBeanByType[ProducerClientStatsMXBean](
+      producerStatsName(clientId)
     )
   }
 

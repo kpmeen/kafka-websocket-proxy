@@ -3,7 +3,12 @@ package net.scalytica.kafka.wsproxy.config
 import com.typesafe.config.{Config, ConfigFactory}
 import net.scalytica.kafka.wsproxy.errors.ConfigurationError
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
-import net.scalytica.kafka.wsproxy.models.{TopicName, WsServerId}
+import net.scalytica.kafka.wsproxy.models.{
+  TopicName,
+  WsClientId,
+  WsGroupId,
+  WsServerId
+}
 import org.apache.kafka.clients.CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG
 import pureconfig.error.ConfigReaderFailures
 import pureconfig.generic.auto._
@@ -28,12 +33,18 @@ object Configuration extends WithProxyLogger {
 
   implicit lazy val stringAsKafkaUrls: ConfigReader[KafkaBootstrapHosts] =
     ConfigReader.fromNonEmptyString { str =>
-      val urls = str.split(",").map(_.trim).toList
+      val urls = str.split(',').map(_.trim).toList
       Right(KafkaBootstrapHosts(urls))
     }
 
   implicit lazy val stringAsServerId: ConfigReader[WsServerId] =
     ConfigReader.fromString(str => Right(WsServerId(str)))
+
+  implicit lazy val stringAsClientId: ConfigReader[WsClientId] =
+    ConfigReader.fromString(str => Right(WsClientId(str)))
+
+  implicit lazy val stringAsGroupId: ConfigReader[WsGroupId] =
+    ConfigReader.fromString(str => Right(WsGroupId(str)))
 
   implicit lazy val stringAsTopicName: ConfigReader[TopicName] =
     ConfigReader.fromString(str => Right(TopicName(str)))
@@ -102,6 +113,38 @@ object Configuration extends WithProxyLogger {
     }
   }
 
+  private[this] val consLimCfgReader: ConfigReader[ConsumerSpecificLimitCfg] = {
+    ConfigReader.forProduct4(
+      keyA0 = "group-id",
+      keyA1 = "messages-per-second",
+      keyA2 = "max-connections",
+      keyA3 = "batch-size"
+    )(ConsumerSpecificLimitCfg.apply)
+  }
+
+  private[this] val prodLimCfgReader: ConfigReader[ProducerSpecificLimitCfg] = {
+    ConfigReader.forProduct3(
+      keyA0 = "client-id",
+      keyA1 = "messages-per-second",
+      keyA2 = "max-connections"
+    )(ProducerSpecificLimitCfg.apply)
+  }
+
+  implicit lazy val specLimCfgReader: ConfigReader[ClientSpecificLimitCfg] = {
+    ConfigReader.fromCursor { cursor =>
+      cursor.fluent
+        .at("group-id")
+        .asString
+        .toOption
+        .map { _ =>
+          consLimCfgReader.from(cursor)
+        }
+        .getOrElse {
+          prodLimCfgReader.from(cursor)
+        }
+    }
+  }
+
   final case class KafkaBootstrapHosts(hosts: List[String]) {
     def mkString(): String = hosts.mkString(",")
 
@@ -153,24 +196,63 @@ object Configuration extends WithProxyLogger {
       kafkaClientProperties: Map[String, AnyRef]
   )
 
-  final case class ClientSpecificRateLimitCfg(
-      clientId: String,
-      messagesPerSecond: Int
-  )
+  sealed trait ClientSpecificLimitCfg {
+    val id: String
+    val messagesPerSecond: Option[Int]
+    val maxConnections: Option[Int]
+    val batchSize: Option[Int]
+  }
 
-  final case class RateLimitingCfg(
+  final case class ConsumerSpecificLimitCfg(
+      groupId: WsGroupId,
+      messagesPerSecond: Option[Int],
+      maxConnections: Option[Int],
+      batchSize: Option[Int]
+  ) extends ClientSpecificLimitCfg {
+    override val id = groupId.value
+  }
+
+  final case class ProducerSpecificLimitCfg(
+      clientId: WsClientId,
+      messagesPerSecond: Option[Int],
+      maxConnections: Option[Int]
+  ) extends ClientSpecificLimitCfg {
+
+    override val id        = clientId.value
+    override val batchSize = None
+
+  }
+
+  final case class ClientLimitsCfg(
       defaultMessagesPerSecond: Int = 0,
-      clientLimits: Seq[ClientSpecificRateLimitCfg] = Seq.empty
-  )
+      defaultMaxConnectionsPerClient: Int = 0,
+      defaultBatchSize: Int = 0,
+      clientSpecificLimits: Seq[ClientSpecificLimitCfg] = Seq.empty
+  ) {
+
+    def forProducer(clientId: WsClientId): Option[ClientSpecificLimitCfg] = {
+      clientSpecificLimits.find {
+        case p: ProducerSpecificLimitCfg => p.clientId == clientId
+        case _                           => false
+      }
+    }
+
+    def forConsumer(groupId: WsGroupId): Option[ClientSpecificLimitCfg] = {
+      clientSpecificLimits.find {
+        case c: ConsumerSpecificLimitCfg => c.groupId == groupId
+        case _                           => false
+      }
+    }
+
+  }
 
   final case class ConsumerCfg(
-      defaultRateLimitMessagesPerSecond: Long,
-      defaultBatchSize: Int,
+      limits: ClientLimitsCfg,
       kafkaClientProperties: Map[String, AnyRef]
   )
 
   final case class ProducerCfg(
-      rateLimit: RateLimitingCfg,
+      limits: ClientLimitsCfg,
       kafkaClientProperties: Map[String, AnyRef]
   )
 
@@ -302,8 +384,8 @@ object Configuration extends WithProxyLogger {
   ) {
 
     lazy val isRateLimitEnabled: Boolean =
-      consumer.defaultRateLimitMessagesPerSecond > 0
-    lazy val isBatchingEnabled: Boolean = consumer.defaultBatchSize > 0
+      consumer.limits.defaultMessagesPerSecond > 0
+    lazy val isBatchingEnabled: Boolean = consumer.limits.defaultBatchSize > 0
 
     lazy val isRateLimitAndBatchEnabled: Boolean =
       isRateLimitEnabled && isBatchingEnabled

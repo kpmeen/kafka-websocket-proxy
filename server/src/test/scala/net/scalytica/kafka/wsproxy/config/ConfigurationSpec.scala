@@ -3,13 +3,17 @@ package net.scalytica.kafka.wsproxy.config
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import net.scalytica.kafka.wsproxy.config.Configuration.{
   AppCfg,
+  ClientLimitsCfg,
+  ConsumerSpecificLimitCfg,
   KafkaBootstrapHosts
 }
 import net.scalytica.kafka.wsproxy.errors.ConfigurationError
+import net.scalytica.kafka.wsproxy.models.WsGroupId
 import net.scalytica.test.FileLoader.testConfigPath
 import org.scalatest.OptionValues
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
+import pureconfig.ConfigSource
 import pureconfig.error.ConfigReaderException
 
 import scala.concurrent.duration._
@@ -56,14 +60,19 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
       |  }
       |
       |  consumer {
-      |    default-rate-limit-messages-per-second = 0
-      |    default-batch-size = 0
+      |    limits {
+      |      default-messages-per-second = 0
+      |      default-max-connections-per-client = 0
+      |      default-batch-size = 0
+      |      client-specific-limits: []
+      |    }
       |    kafka-client-properties = $${kafka.ws.proxy.kafka-client.properties}
       |  }
       |
       |  producer {
-      |    rate-limit {
+      |    limits {
       |      default-messages-per-second = 0
+      |      default-max-connections-per-client = 0
       |      client-limits: []
       |    }
       |    kafka-client-properties = $${kafka.ws.proxy.kafka-client.properties}
@@ -123,14 +132,19 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
       |  }
       |
       |  consumer {
-      |    default-rate-limit-messages-per-second = 0
-      |    default-batch-size = 0
+      |    limits {
+      |      default-messages-per-second = 0
+      |      default-max-connections-per-client = 0
+      |      default-batch-size = 0
+      |      client-specific-limits: []
+      |    }
       |    kafka-client-properties = $${kafka.ws.proxy.kafka-client.properties}
       |  }
       |
       |  producer {
-      |    rate-limit {
+      |    limits {
       |      default-messages-per-second = 0
+      |      default-max-connections-per-client = 0
       |      client-limits: []
       |    }
       |    kafka-client-properties = $${kafka.ws.proxy.kafka-client.properties} {
@@ -156,6 +170,42 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
 
   "The Configuration" should {
 
+    "successfully parse a ClientLimitsCfg with consumer specific limit cfg" in {
+      import pureconfig.generic.auto._
+      val cfg = ConfigSource.string(
+        """
+          |{
+          |  default-messages-per-second = 0
+          |  default-max-connections-per-client = 0
+          |  default-batch-size = 0
+          |  client-specific-limits: [
+          |    {
+          |      group-id = "group1",
+          |      messages-per-second = 0
+          |      max-connections = 2
+          |      batch-size = 10
+          |    }
+          |  ]
+          |}""".stripMargin
+      )
+
+      val res = cfg.loadOrThrow[ClientLimitsCfg]
+      res.defaultMessagesPerSecond mustBe 0
+      res.defaultMaxConnectionsPerClient mustBe 0
+      res.defaultBatchSize mustBe 0
+      res.clientSpecificLimits.size mustBe 1
+      res.clientSpecificLimits.headOption.value match {
+        case csl: ConsumerSpecificLimitCfg =>
+          csl.groupId mustBe WsGroupId("group1")
+          csl.messagesPerSecond.value mustBe 0
+          csl.maxConnections.value mustBe 2
+          csl.batchSize.value mustBe 10
+
+        case _ =>
+          fail("Unexpected client specific limits config type")
+      }
+    }
+
     "successfully load the application-test.conf configuration" in {
       val cfg = Configuration.loadFile(testConfigPath)
 
@@ -164,24 +214,34 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
       cfg.server.port mustBe 8078
       cfg.server.secureHealthCheckEndpoint mustBe true
 
-      // format: off
-      cfg.kafkaClient.bootstrapHosts mustBe KafkaBootstrapHosts(List("localhost:29092")) // scalastyle:ignore
-      cfg.kafkaClient.schemaRegistry.value.url mustBe "http://localhost:28081"
-      cfg.kafkaClient.schemaRegistry.value.autoRegisterSchemas mustBe true
-      cfg.kafkaClient.monitoringEnabled mustBe false
-      // format: on
+      val kcCfg = cfg.kafkaClient
+      kcCfg.bootstrapHosts mustBe KafkaBootstrapHosts(List("localhost:29092"))
+      kcCfg.schemaRegistry.value.url mustBe "http://localhost:28081"
+      kcCfg.schemaRegistry.value.autoRegisterSchemas mustBe true
+      kcCfg.monitoringEnabled mustBe false
 
-      cfg.consumer.defaultBatchSize mustBe 0
-      cfg.consumer.defaultRateLimitMessagesPerSecond mustBe 0
+      cfg.consumer.limits.defaultBatchSize mustBe 0
+      cfg.consumer.limits.defaultMessagesPerSecond mustBe 0
 
-      cfg.sessionHandler.sessionStateTopicName.value mustBe "_wsproxy.session.state" // scalastyle:ignore
-      cfg.sessionHandler.sessionStateReplicationFactor mustBe 3
-      cfg.sessionHandler.sessionStateRetention mustBe 30.days
+      cfg.producer.limits.defaultMessagesPerSecond mustBe 0
+      cfg.producer.limits.defaultMaxConnectionsPerClient mustBe 0
+      cfg.producer.limits.clientSpecificLimits must have size 1
+      val limitedClientCfg =
+        cfg.producer.limits.clientSpecificLimits.headOption.value
+      limitedClientCfg.id mustBe "dummy"
+      limitedClientCfg.messagesPerSecond.value mustBe 10
+      limitedClientCfg.maxConnections.value mustBe 1
 
-      cfg.commitHandler.maxStackSize mustBe 20
-      cfg.commitHandler.autoCommitEnabled mustBe false
-      cfg.commitHandler.autoCommitInterval mustBe 1.second
-      cfg.commitHandler.autoCommitMaxAge mustBe 20.seconds
+      val shCfg = cfg.sessionHandler
+      shCfg.sessionStateTopicName.value mustBe "_wsproxy.session.state"
+      shCfg.sessionStateReplicationFactor mustBe 3
+      shCfg.sessionStateRetention mustBe 30.days
+
+      val chCfg = cfg.commitHandler
+      chCfg.maxStackSize mustBe 20
+      chCfg.autoCommitEnabled mustBe false
+      chCfg.autoCommitInterval mustBe 1.second
+      chCfg.autoCommitMaxAge mustBe 20.seconds
     }
 
     "successfully load the default configuration without the " +
@@ -198,23 +258,28 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
         cfg.server.port mustBe 8078
         cfg.server.secureHealthCheckEndpoint mustBe true
 
-        // format: off
-        cfg.kafkaClient.bootstrapHosts mustBe KafkaBootstrapHosts(List("localhost:29092")) // scalastyle:ignore
-        cfg.kafkaClient.schemaRegistry mustBe empty
-        cfg.kafkaClient.monitoringEnabled mustBe false
-        // format: on
+        val kcCfg = cfg.kafkaClient
+        kcCfg.bootstrapHosts mustBe KafkaBootstrapHosts(List("localhost:29092"))
+        kcCfg.schemaRegistry mustBe empty
+        kcCfg.monitoringEnabled mustBe false
 
-        cfg.consumer.defaultBatchSize mustBe 0
-        cfg.consumer.defaultRateLimitMessagesPerSecond mustBe 0
+        cfg.consumer.limits.defaultBatchSize mustBe 0
+        cfg.consumer.limits.defaultMessagesPerSecond mustBe 0
 
-        cfg.sessionHandler.sessionStateTopicName.value mustBe "_wsproxy.session.state" // scalastyle:ignore
-        cfg.sessionHandler.sessionStateReplicationFactor mustBe 3
-        cfg.sessionHandler.sessionStateRetention mustBe 30.days
+        cfg.producer.limits.defaultMessagesPerSecond mustBe 0
+        cfg.producer.limits.defaultMaxConnectionsPerClient mustBe 0
+        cfg.producer.limits.clientSpecificLimits mustBe empty
 
-        cfg.commitHandler.maxStackSize mustBe 100
-        cfg.commitHandler.autoCommitEnabled mustBe false
-        cfg.commitHandler.autoCommitInterval mustBe 1.second
-        cfg.commitHandler.autoCommitMaxAge mustBe 20.seconds
+        val shCfg = cfg.sessionHandler
+        shCfg.sessionStateTopicName.value mustBe "_wsproxy.session.state"
+        shCfg.sessionStateReplicationFactor mustBe 3
+        shCfg.sessionStateRetention mustBe 30.days
+
+        val chCfg = cfg.commitHandler
+        chCfg.maxStackSize mustBe 100
+        chCfg.autoCommitEnabled mustBe false
+        chCfg.autoCommitInterval mustBe 1.second
+        chCfg.autoCommitMaxAge mustBe 20.seconds
       }
 
     "successfully load the application.conf configuration" in {
@@ -235,24 +300,29 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
       cfg.server.port mustBe 8078
       cfg.server.secureHealthCheckEndpoint mustBe true
 
-      // format: off
-      cfg.kafkaClient.bootstrapHosts mustBe KafkaBootstrapHosts(List("localhost:29092")) // scalastyle:ignore
-      cfg.kafkaClient.schemaRegistry.value.url mustBe "http://localhost:28081"
-      cfg.kafkaClient.schemaRegistry.value.autoRegisterSchemas mustBe true
-      cfg.kafkaClient.monitoringEnabled mustBe false
-      // format: on
+      val kcCfg = cfg.kafkaClient
+      kcCfg.bootstrapHosts mustBe KafkaBootstrapHosts(List("localhost:29092"))
+      kcCfg.schemaRegistry.value.url mustBe "http://localhost:28081"
+      kcCfg.schemaRegistry.value.autoRegisterSchemas mustBe true
+      kcCfg.monitoringEnabled mustBe false
 
-      cfg.consumer.defaultBatchSize mustBe 0
-      cfg.consumer.defaultRateLimitMessagesPerSecond mustBe 0
+      cfg.consumer.limits.defaultBatchSize mustBe 0
+      cfg.consumer.limits.defaultMessagesPerSecond mustBe 0
 
-      cfg.sessionHandler.sessionStateTopicName.value mustBe "_wsproxy.session.state" // scalastyle:ignore
-      cfg.sessionHandler.sessionStateReplicationFactor mustBe 3
-      cfg.sessionHandler.sessionStateRetention mustBe 30.days
+      cfg.producer.limits.defaultMessagesPerSecond mustBe 0
+      cfg.producer.limits.defaultMaxConnectionsPerClient mustBe 0
+      cfg.producer.limits.clientSpecificLimits mustBe empty
 
-      cfg.commitHandler.maxStackSize mustBe 100
-      cfg.commitHandler.autoCommitEnabled mustBe false
-      cfg.commitHandler.autoCommitInterval mustBe 1.second
-      cfg.commitHandler.autoCommitMaxAge mustBe 20.seconds
+      val shCfg = cfg.sessionHandler
+      shCfg.sessionStateTopicName.value mustBe "_wsproxy.session.state"
+      shCfg.sessionStateReplicationFactor mustBe 3
+      shCfg.sessionStateRetention mustBe 30.days
+
+      val chCfg = cfg.commitHandler
+      chCfg.maxStackSize mustBe 100
+      chCfg.autoCommitEnabled mustBe false
+      chCfg.autoCommitInterval mustBe 1.second
+      chCfg.autoCommitMaxAge mustBe 20.seconds
     }
 
     "successfully load the default configuration with the custom JWT Kafka " +

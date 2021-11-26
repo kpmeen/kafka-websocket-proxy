@@ -33,6 +33,7 @@ import net.scalytica.kafka.wsproxy.session.SessionHandler.{
   SessionHandlerOpExtensions,
   SessionHandlerRef
 }
+import net.scalytica.kafka.wsproxy.session.{SessionId, SessionOpResult}
 import net.scalytica.kafka.wsproxy.web.Headers.XKafkaAuthHeader
 import net.scalytica.kafka.wsproxy.web.websockets.{
   InboundWebSocket,
@@ -178,31 +179,58 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
     )
   }
 
+  private[this] def removeClientComplete(
+      sid: SessionId,
+      gid: Option[WsGroupId],
+      cid: WsClientId,
+      isConsumer: Boolean = true
+  )(tryRes: Try[SessionOpResult]): Unit = {
+    val grpStr     = gid.map(g => s" from group ${g.value}").getOrElse("")
+    val clientType = if (isConsumer) "consumer" else "producer"
+
+    tryRes match {
+      case Success(res) =>
+        logger.debug(
+          s"Removing $clientType ${cid.value}$grpStr" +
+            s" in session ${sid.value} on server ${serverId.value}" +
+            s" returned: ${res.asString}"
+        )
+
+      case Failure(err) =>
+        logger.warn(
+          s"An error occurred when trying to remove $clientType" +
+            s" ${cid.value}$grpStr in session ${sid.value}" +
+            s"on server ${serverId.value}",
+          err
+        )
+    }
+  }
+
   private[this] def rejectRequest(
       request: HttpRequest
   )(c: => ToResponseMarshallable) = {
-    paramsOnError { args =>
+    paramsOnError(request) { args =>
       extractActorSystem { implicit sys =>
         extractMaterializer { implicit mat =>
           implicit val s = sys.scheduler.toTyped
           implicit val e = sys.dispatcher
 
-          args.foreach { case (cid, gid) =>
-            sessionHandler.shRef.removeConsumer(gid, cid, serverId).onComplete {
-              case Success(res) =>
-                logger.debug(
-                  s"Removing consumer ${cid.value} from group" +
-                    s" ${gid.value} on server ${serverId.value}" +
-                    s" returned: ${res.asString}"
-                )
-              case Failure(err) =>
-                logger.warn(
-                  "An error occurred when trying to remove consumer" +
-                    s" ${cid.value} from group ${gid.value} " +
-                    s"on server ${serverId.value}",
-                  err
-                )
-            }
+          args match {
+            case ConsumerParamError(sid, cid, gid) =>
+              sessionHandler.shRef
+                .removeConsumer(gid, cid, serverId)
+                .onComplete(removeClientComplete(sid, Option(gid), cid))
+
+            case ProducerParamError(sid, cid) =>
+              sessionHandler.shRef
+                .removeProducer(cid, serverId)
+                .onComplete(removeClientComplete(sid, None, cid))
+
+            case wrong =>
+              logger.trace(
+                "Insufficient information in request to remove internal " +
+                  s"client references due to ${wrong.niceClassSimpleName}"
+              )
           }
 
           request.discardEntityBytes()

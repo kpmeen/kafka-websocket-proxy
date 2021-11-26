@@ -15,7 +15,6 @@ import net.scalytica.kafka.wsproxy.errors.{
   AuthenticationError,
   AuthorisationError
 }
-import net.scalytica.kafka.wsproxy.jmx.JmxManager
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models._
 import net.scalytica.kafka.wsproxy.{
@@ -211,8 +210,6 @@ object WsProducer extends ProducerFlowExtras with WithProxyLogger {
    *   the JSON decoder to use for the message key
    * @param vd
    *   the JSON decoder to use for the message value
-   * @param jmxManager
-   *   the JmxManager to use for setting up monitoring
    * @tparam K
    *   the message key type
    * @tparam V
@@ -229,8 +226,7 @@ object WsProducer extends ProducerFlowExtras with WithProxyLogger {
       ks: Serializer[K],
       vs: Serializer[V],
       kd: Decoder[K],
-      vd: Decoder[V],
-      jmxManager: Option[JmxManager]
+      vd: Decoder[V]
   ): Flow[Message, WsProducerResult, NotUsed] = {
     implicit val ec: ExecutionContext = as.dispatcher
 
@@ -238,19 +234,7 @@ object WsProducer extends ProducerFlowExtras with WithProxyLogger {
 
     checkClient(args.topic, settings)
 
-    val (jmxIn, jmxOut) = jmxManager
-      .map { jmx =>
-        // Init producer client stats actor
-        val ref = jmx.initProducerClientStatsActorForConnection(args.clientId)
-        // Setup wiretaps
-        jmx.producerStatsWireTaps[K, V](ref)
-      }
-      .getOrElse {
-        (Flow[WsProducerRecord[K, V]], Flow[WsProducerResult])
-      }
-
     rateLimitedJsonToWsProducerRecordFlow[K, V](args)
-      .via(jmxIn)
       .map { wpr =>
         val record = asKafkaProducerRecord(args.topic, wpr)
         ProducerMessage.Message(record, wpr)
@@ -258,15 +242,13 @@ object WsProducer extends ProducerFlowExtras with WithProxyLogger {
       .via(Producer.flexiFlow(settings))
       .map(r => WsProducerResult.fromProducerResult(r))
       .flatMapConcat(seqToSource)
-      .via(jmxOut)
   }
 
   def produceAvro[K, V](args: InSocketArgs)(
       implicit cfg: AppCfg,
       as: ActorSystem,
       mat: Materializer,
-      serde: WsProxyAvroSerde[AvroProducerRecord],
-      jmxManager: Option[JmxManager]
+      serde: WsProxyAvroSerde[AvroProducerRecord]
   ): Flow[Message, WsProducerResult, NotUsed] = {
     implicit val ec: ExecutionContext = as.dispatcher
 
@@ -281,33 +263,16 @@ object WsProducer extends ProducerFlowExtras with WithProxyLogger {
 
     checkClient(args.topic, settings)
 
-    val (jmxIn, jmxOut) = jmxManager
-      .map { jmx =>
-        // Init producer client stats actor
-        val ref = jmx.initProducerClientStatsActorForConnection(args.clientId)
-        // Setup wiretaps
-        jmx.producerStatsWireTaps[keyType.Aux, valType.Aux](ref)
-      }
-      .getOrElse {
-        (
-          Flow[WsProducerRecord[keyType.Aux, valType.Aux]],
-          Flow[WsProducerResult]
-        )
-      }
-
     rateLimitedAvroToWsProducerRecordFlow[keyType.Aux, valType.Aux](
       args = args,
       keyType = keyType,
       valType = valType
-    ).via(jmxIn)
-      .map { wpr =>
-        val record = asKafkaProducerRecord(args.topic, wpr)
-        ProducerMessage.Message(record, wpr)
-      }
-      .via(Producer.flexiFlow(settings))
+    ).map { wpr =>
+      val record = asKafkaProducerRecord(args.topic, wpr)
+      ProducerMessage.Message(record, wpr)
+    }.via(Producer.flexiFlow(settings))
       .map(r => WsProducerResult.fromProducerResult(r))
       .flatMapConcat(seqToSource)
-      .via(jmxOut)
   }
 
 }

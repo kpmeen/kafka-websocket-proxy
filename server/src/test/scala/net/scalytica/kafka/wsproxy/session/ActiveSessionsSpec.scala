@@ -12,14 +12,14 @@ class ActiveSessionsSpec
     with OptionValues
     with CustomEitherValues {
 
-  val s1 = Session(WsGroupId("c1"))
-  val s2 = Session(WsGroupId("c2"))
-  val s3 = Session(WsGroupId("c3"))
+  val s1 = ConsumerSession(SessionId("s1"), WsGroupId("c1"))
+  val s2 = ProducerSession(SessionId("s2"))
+  val s3 = ConsumerSession(SessionId("s3"), WsGroupId("c3"))
 
   val expected = Map(
-    s1.consumerGroupId -> s1,
-    s2.consumerGroupId -> s2,
-    s3.consumerGroupId -> s3
+    s1.sessionId -> s1,
+    s2.sessionId -> s2,
+    s3.sessionId -> s3
   )
 
   val as = ActiveSessions(expected)
@@ -38,44 +38,40 @@ class ActiveSessionsSpec
       ActiveSessions(s1, s2, s3).sessions must contain allElementsOf expected
     }
 
-    "find a session based on consumer group id" in {
-      as.find(WsGroupId("c2")).value mustBe s2
-    }
-
     "return none if a session is not found" in {
-      as.find(WsGroupId("c10")) mustBe empty
+      as.find(SessionId("s10")) mustBe empty
     }
 
     "add a new session" in {
-      val ns  = Session(WsGroupId("c4"), 4)
+      val ns  = ConsumerSession(SessionId("s4"), WsGroupId("c4"), 4)
       val as2 = as.add(ns)
 
       val res = as2.rightValue.sessions
-      res must contain allElementsOf (expected + (ns.consumerGroupId -> ns))
+      res must contain allElementsOf (expected + (ns.sessionId -> ns))
     }
 
     "update an existing session with a new session object" in {
-      val ns  = Session(WsGroupId("c2"), 4)
-      val as2 = as.updateSession(WsGroupId("c2"), ns)
+      val ns  = ConsumerSession(SessionId("s2"), WsGroupId("c2"), 4)
+      val as2 = as.updateSession(SessionId("s2"), ns)
 
       as2.rightValue must not be as
 
-      as2.rightValue.find(WsGroupId("c2")).value mustBe ns
+      as2.rightValue.find(SessionId("s2")).value mustBe ns
     }
 
     "add a new session if it didn't previously exist" in {
-      val ns  = Session(WsGroupId("c4"), 4)
-      val as2 = as.updateSession(WsGroupId("c4"), ns)
+      val ns  = ConsumerSession(SessionId("s4"), WsGroupId("c4"), 4)
+      val as2 = as.updateSession(SessionId("s4"), ns)
 
       val res = as2.rightValue.sessions
-      res must contain allElementsOf (expected + (ns.consumerGroupId -> ns))
+      res must contain allElementsOf (expected + (ns.sessionId -> ns))
     }
 
     "remove a session" in {
-      val as2 = as.removeSession(WsGroupId("c2"))
+      val as2 = as.removeSession(SessionId("s2"))
 
       as2.rightValue.sessions must contain allElementsOf (
-        expected - WsGroupId("c2")
+        expected - SessionId("s2")
       )
     }
   }
