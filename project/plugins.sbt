@@ -11,20 +11,20 @@ resolvers ++= Seq(
 )
 
 // sbt-git plugin to get access to git commands from the build scripts
-addSbtPlugin("com.typesafe.sbt" % "sbt-git" % "1.0.1")
+addSbtPlugin("com.typesafe.sbt" % "sbt-git" % "1.0.2")
 
 // Dependency handling
 addSbtPlugin("com.timushev.sbt" % "sbt-updates" % "0.6.0")
 
 // Formatting and style checking
-addSbtPlugin("org.scalameta"   % "sbt-scalafmt"          % "2.4.2")
+addSbtPlugin("org.scalameta"   % "sbt-scalafmt"          % "2.4.4")
 addSbtPlugin("org.scalastyle" %% "scalastyle-sbt-plugin" % "1.0.0")
 
 // Code coverage
-addSbtPlugin("org.scoverage" %% "sbt-scoverage" % "1.9.0")
+addSbtPlugin("org.scoverage" %% "sbt-scoverage" % "1.9.2")
 
 // Native packaging plugin
-addSbtPlugin("com.typesafe.sbt" %% "sbt-native-packager" % "1.8.1")
+addSbtPlugin("com.github.sbt" %% "sbt-native-packager" % "1.9.0")
 
 // Release plugin
 addSbtPlugin("com.github.sbt" % "sbt-release" % "1.1.0")
@@ -35,7 +35,7 @@ addSbtPlugin("com.github.sbt" % "sbt-release" % "1.1.0")
 //classpathTypes += "maven-plugin"
 
 // Scalafix for automated code re-writes when updating dependencies
-addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.9.31")
+addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.9.32")
 
 // documentation generator
-addSbtPlugin("org.scalameta" % "sbt-mdoc" % "2.2.23")
+addSbtPlugin("org.scalameta" % "sbt-mdoc" % "2.2.24")

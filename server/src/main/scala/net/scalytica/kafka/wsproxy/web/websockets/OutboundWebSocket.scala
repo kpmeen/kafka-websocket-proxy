@@ -89,6 +89,24 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
       tas.ignoreRef[ConsumerClientStatsCommand]
     }
 
+  private[this] def calculateMaxConnections(
+      numPartitions: Int,
+      groupId: WsGroupId
+  )(implicit appCfg: AppCfg): Int = {
+    def calc(confLimit: Int): Int = {
+      if (confLimit == 0) numPartitions
+      else if (numPartitions >= confLimit && confLimit != 0) confLimit
+      else numPartitions
+    }
+
+    calc(
+      appCfg.consumer.limits
+        .forConsumer(groupId)
+        .flatMap(_.maxConnections)
+        .getOrElse(appCfg.consumer.limits.defaultMaxConnectionsPerClient)
+    )
+  }
+
   // scalastyle:off method.length
   /**
    * Request handler for the outbound Kafka WebSocket connection.
@@ -135,22 +153,16 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
     val wsAdminClient   = new WsKafkaAdminClient(cfg)
     val topicPartitions = wsAdminClient.topicPartitions(args.topic)
 
-    val serverId = cfg.server.serverId
-    val clientId = args.clientId
-    val groupId  = args.groupId
-
-    val consLimitCfg = cfg.consumer.limits.forConsumer(groupId)
-    val maxCons = consLimitCfg.flatMap(_.maxConnections).getOrElse {
-      val defaultCons = cfg.consumer.limits.defaultMaxConnectionsPerClient
-      if (defaultCons > topicPartitions) topicPartitions
-      else defaultCons
-    }
+    val serverId    = cfg.server.serverId
+    val clientId    = args.clientId
+    val groupId     = args.groupId
+    val maxConLimit = calculateMaxConnections(topicPartitions, groupId)
 
     val consumerAddResult = initSessionForConsumer(
       serverId = serverId,
       groupId = groupId,
       clientId = clientId,
-      maxConnections = maxCons,
+      maxConnections = maxConLimit,
       sh = sessionHandler
     )
 

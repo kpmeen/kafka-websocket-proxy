@@ -194,8 +194,8 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
       res.defaultMaxConnectionsPerClient mustBe 0
       res.defaultBatchSize mustBe 0
       res.clientSpecificLimits.size mustBe 1
-      res.clientSpecificLimits.headOption.value match {
-        case csl: ConsumerSpecificLimitCfg =>
+      res.forConsumer(WsGroupId("group1")) match {
+        case Some(csl: ConsumerSpecificLimitCfg) =>
           csl.groupId mustBe WsGroupId("group1")
           csl.messagesPerSecond.value mustBe 0
           csl.maxConnections.value mustBe 2
