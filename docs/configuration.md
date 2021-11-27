@@ -138,20 +138,33 @@ the `kafka-websocket-proxy` whenever a WebSocket connection is established.
 
 | Config key                                                                            | Environment                               | Required | Default       | Description   |
 |:---                                                                                   |:----                                      |:--------:|:-------------:|:-----         |
-| kafka.ws.proxy.producer.kafka-client.properties.request.timeout.ms                    | WSPROXY_KAFKA_PRODUCER_REQUEST_TIMEOUT_MS |    n     | `30000`       | Defines the amount of time the client will wait for a response to a request. Note that this property affect consumer and producer clients differently. See official Kafka docs for more details. |
-| kafka.ws.proxy.producer.kafka-client.properties.retries                               | WSPROXY_KAFKA_PRODUCER_NUM_RETRIES        |    n     | `2147483647`  | Setting a value greater than zero will cause the client to resend any record whose send fails with a potentially transient error. Note that this retry is no different than if the client resent the record upon receiving the error. |
-| kafka.ws.proxy.producer.kafka-client.properties.retry.backoff.ms                      | WSPROXY_KAFKA_PRODUCER_RETRY_BACKOFF_MS   |    n     | `100`         | Defines the amount of time to wait before retrying a request. |
-| kafka.ws.proxy.producer.kafka-client-properties.delivery.timeout.ms                   | WSPROXY_KAFKA_PRODUCER_DELIVER_TIMEOUT_MS |    n     | `20000`       | Defines the amount of time to wait before abandoning the attempt to deliver a message to Kafka. |
+| kafka.ws.proxy.producer.kafka-client-properties.request.timeout.ms                    | WSPROXY_KAFKA_PRODUCER_REQUEST_TIMEOUT_MS |    n     | `30000`       | Defines the amount of time the client will wait for a response to a request. Note that this property affect consumer and producer clients differently. See official Kafka docs for more details. |
+| kafka.ws.proxy.producer.kafka-client-properties.retries                               | WSPROXY_KAFKA_PRODUCER_NUM_RETRIES        |    n     | `2147483647`  | Setting a value greater than zero will cause the client to resend any record whose send fails with a potentially transient error. Note that this retry is no different than if the client resent the record upon receiving the error. |
+| kafka.ws.proxy.producer.kafka-client-properties.retry.backoff.ms                      | WSPROXY_KAFKA_PRODUCER_RETRY_BACKOFF_MS   |    n     | `100`         | Defines the amount of time to wait before retrying a request. |
+| kafka.ws.proxy.producer.kafka-client-properties.delivery.timeout.ms                   | WSPROXY_KAFKA_PRODUCER_DELIVER_TIMEOUT_MS |    n     | `120000`      | Defines the amount of time to wait before abandoning the attempt to deliver a message to Kafka. |
 | kafka.ws.proxy.producer.kafka-client-properties.max.in.flight.requests.per.connection | WSPROXY_KAFKA_PRODUCER_MAX_IN_FLIGHT_REQ  |    n     | `5`           | The maximum number of unacknowledged requests the client will send on a single connection before blocking. Note that if this setting is set to be greater than 1 and there are failed sends, there is a risk of message re-ordering due to retries. |
+
+##### WebSocket client limitations
+
+| Config key                                                         | Environment                                         | Required | Default   | Description   |
+|:---                                                                |:----                                                |:--------:|:---------:|:-----         |
+| kafka.ws.proxy.producer.limits.default-messages-per-second         | WSPROXY_PRODUCER_RATELIMIT_DEFAULT_MESSAGES_PER_SEC |    n     | `0`       | Set the number of messages to allow through per second. Default value of `0` will disable default rate limiting. |
+| kafka.ws.proxy.producer.limits.default-max-connections-per-client  | WSPROXY_PRODUCER_DEFAULT_MAX_CLIENT_CONNECTIONS     |    n     | `0`       | Set the maximum number of connections a given producer client ID can have. Default value of `0` will disable default connection limit. |
+
 
 ### Consumer specific configuration
 
-| Config key                                                                            | Environment                               | Required | Default       | Description   |
-|:---                                                                                   |:----                                      |:--------:|:-------------:|:-----         |
-| kafka.ws.proxy.consumer.kafka-client.properties.request.timeout.ms                    | WSPROXY_KAFKA_CONSUMER_REQUEST_TIMEOUT_MS |    n     | `30000`       | Defines the amount of time the client will wait for a response to a request. Note that this property affect consumer and producer clients differently. See official Kafka docs for more details. |
-| kafka.ws.proxy.consumer.kafka-client.properties.retries                               | WSPROXY_KAFKA_CONSUMER_NUM_RETRIES        |    n     | `2147483647`  | Setting a value greater than zero will cause the client to resend any record whose send fails with a potentially transient error. Note that this retry is no different than if the client resent the record upon receiving the error. |
-| kafka.ws.proxy.consumer.kafka-client.properties.retry.backoff.ms                      | WSPROXY_KAFKA_CONSUMER_RETRY_BACKOFF_MS   |    n     | `100`         | Defines the amount of time to wait before retrying a request. |
+| Config key                                                         | Environment                               | Required | Default       | Description   |
+|:---                                                                |:----                                      |:--------:|:-------------:|:-----         |
+| kafka.ws.proxy.consumer.kafka-client-properties.request.timeout.ms | WSPROXY_KAFKA_CONSUMER_REQUEST_TIMEOUT_MS |    n     | `30000`       | Defines the amount of time the client will wait for a response to a request. Note that this property affect consumer and producer clients differently. See official Kafka docs for more details. |
+| kafka.ws.proxy.consumer.kafka-client-properties.retries            | WSPROXY_KAFKA_CONSUMER_NUM_RETRIES        |    n     | `2147483647`  | Setting a value greater than zero will cause the client to resend any record whose send fails with a potentially transient error. Note that this retry is no different than if the client resent the record upon receiving the error. |
+| kafka.ws.proxy.consumer.kafka-client-properties.retry.backoff.ms   | WSPROXY_KAFKA_CONSUMER_RETRY_BACKOFF_MS   |    n     | `100`         | Defines the amount of time to wait before retrying a request. |
 
+##### WebSocket client limitations
+
+| Config key                                                         | Environment                                         | Required | Default   | Description   |
+|:---                                                                |:----                                                |:--------:|:---------:|:-----         |
+| kafka.ws.proxy.consumer.limits.default-max-connections-per-client  | WSPROXY_CONSUMER_DEFAULT_MAX_CLIENT_CONNECTIONS     |    n     | `0`       | Set the maximum number of connections a given consumer client ID can have. Default value of `0` will disable default connection limit. A consumer will nevertheless not be allowed more connections than there are topic partitions. |
 
 ## Endpoint Security
 
