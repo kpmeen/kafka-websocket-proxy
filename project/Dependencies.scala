@@ -2,19 +2,18 @@ import sbt._
 
 object Versions {
 
-  val ScalaVersion = "2.13.6"
+  val ScalaVersion = "2.13.7"
 
   val LightbendConfigVersion = "1.4.1"
-  val PureConfigVersion      = "0.16.0"
+  val PureConfigVersion      = "0.17.1"
 
   val Avro4sVersion                 = "4.0.11"
-  val ConfluentPlatformVersion      = "6.2.0"
+  val ConfluentPlatformVersion      = "7.0.0"
   val KafkaVersion                  = s"$ConfluentPlatformVersion-ccs"
   val EmbeddedSchemaRegistryVersion = ConfluentPlatformVersion
 
-
-  val AkkaVersion            = "2.6.16"
-  val AkkaHttpVersion        = "10.2.6"
+  val AkkaVersion            = "2.6.17"
+  val AkkaHttpVersion        = "10.2.7"
   val AkkaStreamKafkaVersion = "2.1.1"
 
   val AlpakkaVersion = "1.0.2"
@@ -24,11 +23,11 @@ object Versions {
   val CirceGenericExtrasVersion = CirceVersion
   val CirceOpticsVersion        = CirceVersion
 
-  val JwtScalaVersion = "8.0.3"
+  val JwtScalaVersion = "9.0.2"
 
   val ScalaLoggingVersion = "3.9.4"
   val Slf4JVersion        = "1.7.32"
-  val LogbackVersion      = "1.2.6"
+  val LogbackVersion      = "1.2.7"
   val LogbackJsVersion    = "0.1.5"
   val JaninoVersion       = "3.1.6"
 
@@ -110,7 +109,6 @@ object Dependencies {
     val Clients =
       "org.apache.kafka" % "kafka-clients" % KafkaVersion excludeAll (Exclusions: _*)
 
-
     val Kafka =
       "org.apache.kafka" %% "kafka" % KafkaVersion excludeAll (Exclusions: _*)
 
@@ -138,8 +136,8 @@ object Dependencies {
   }
 
   object Config {
-    val TypeSafeConfig = "com.typesafe"           % "config"     % LightbendConfigVersion
-    val PureConfig     = "com.github.pureconfig" %% "pureconfig" % PureConfigVersion
+    val TypeSafeConfig = "com.typesafe" % "config" % LightbendConfigVersion
+    val PureConfig = "com.github.pureconfig" %% "pureconfig" % PureConfigVersion
 
     val All = Seq(TypeSafeConfig, PureConfig)
   }
@@ -211,12 +209,12 @@ object Dependencies {
     val LogbackJackson =
       s"$lbPkg.contrib" % "logback-jackson" % LogbackJsVersion
 
-    val Janino         = "org.codehaus.janino" % "janino"           % JaninoVersion
-    val Slf4j          = "org.slf4j"           % "slf4j-api"        % Slf4JVersion
-    val Log4jOverSlf4j = "org.slf4j"           % "log4j-over-slf4j" % Slf4JVersion
-    val Slf4jLog4j     = "org.slf4j"           % "slf4j-log4j12"    % Slf4JVersion
-    val JulToSlf4j     = "org.slf4j"           % "jul-to-slf4j"     % Slf4JVersion
-    val Slf4jNop       = "org.slf4j"           % "slf4j-nop"        % Slf4JVersion
+    val Janino = "org.codehaus.janino" % "janino"    % JaninoVersion
+    val Slf4j  = "org.slf4j"           % "slf4j-api" % Slf4JVersion
+    val Log4jOverSlf4j = "org.slf4j" % "log4j-over-slf4j" % Slf4JVersion
+    val Slf4jLog4j     = "org.slf4j" % "slf4j-log4j12"    % Slf4JVersion
+    val JulToSlf4j     = "org.slf4j" % "jul-to-slf4j"     % Slf4JVersion
+    val Slf4jNop       = "org.slf4j" % "slf4j-nop"        % Slf4JVersion
 
     val All =
       Seq(ScalaLogging, Slf4j, Logback, LogbackJson, LogbackJackson, Janino)

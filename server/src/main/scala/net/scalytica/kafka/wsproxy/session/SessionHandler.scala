@@ -698,7 +698,7 @@ trait SessionHandler extends WithProxyLogger {
                 producer.publish(s).map { _ =>
                   logger.debug(
                     s"ADD_CLIENT: client instance ${cmd.clientId.value} added" +
-                      s"to session ${cmd.sessionId.value} from server " +
+                      s" to session ${cmd.sessionId.value} from server " +
                       s"${cmd.serverId.value}"
                   )
                   cmd.replyTo ! added

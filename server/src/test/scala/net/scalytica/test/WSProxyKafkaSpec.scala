@@ -12,7 +12,6 @@ import com.typesafe.config.Config
 import io.confluent.kafka.schemaregistry.rest.SchemaRegistryConfig._
 import jdk.jshell.spi.ExecutionControl.NotImplementedException
 import kafka.server.KafkaConfig._
-import io.github.embeddedkafka.ConsumerExtensions.ConsumerRetryConfig
 import io.github.embeddedkafka.schemaregistry.{
   EmbeddedKafka,
   EmbeddedKafkaConfig
@@ -68,9 +67,6 @@ trait WsProxyKafkaSpec
   val creds: BasicHttpCredentials = BasicHttpCredentials(kafkaUser, kafkaPass)
 
   implicit val routeTestTimeout = RouteTestTimeout(20 seconds)
-
-  implicit val consumerRetryConfig: ConsumerRetryConfig =
-    ConsumerRetryConfig(30, 50 millis)
 
   val embeddedKafkaConfig: EmbeddedKafkaConfig = EmbeddedKafkaConfig(
     kafkaPort = 0,
@@ -671,7 +667,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       val ctx = setupConsumerContext
       body(ctx)
     }
-  //scalastyle:on
+  // scalastyle:on
 
   def secureServerAvroConsumerContext[T](
       topic: String,
