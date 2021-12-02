@@ -166,6 +166,7 @@ the `kafka-websocket-proxy` whenever a WebSocket connection is established.
 |:---                                                                |:----                                                |:--------:|:---------:|:-----         |
 | kafka.ws.proxy.consumer.limits.default-max-connections-per-client  | WSPROXY_CONSUMER_DEFAULT_MAX_CLIENT_CONNECTIONS     |    n     | `0`       | Set the maximum number of connections a given consumer client ID can have. Default value of `0` will disable default connection limit. A consumer will nevertheless not be allowed more connections than there are topic partitions. |
 
+
 ## Endpoint Security
 
 ### Server TLS/SSL Configuration
