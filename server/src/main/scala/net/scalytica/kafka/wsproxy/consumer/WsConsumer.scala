@@ -5,6 +5,7 @@ import akka.kafka.ConsumerMessage.CommittableOffset
 import akka.kafka.scaladsl.Consumer
 import akka.kafka.{ConsumerSettings, Subscriptions}
 import akka.stream.scaladsl.Source
+import net.scalytica.kafka.wsproxy.auth.KafkaLoginModules
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.errors.{
   AuthenticationError,
@@ -81,7 +82,10 @@ object WsConsumer extends WithProxyLogger {
       cs: ConsumerSettings[K, V]
   )(implicit cfg: AppCfg): KafkaConsumer[K, V] = {
     val props = {
-      val jaasProps = AclCredentials.buildSaslJaasProps(aclCredentials)
+      val saslMechanism = cfg.consumer.saslMechanism
+      val kafkaLoginModule =
+        KafkaLoginModules.fromSaslMechanism(saslMechanism, aclCredentials)
+      val jaasProps = KafkaLoginModules.buildJaasProperty(kafkaLoginModule)
       // Strip away the default sasl_jaas_config, since the client needs to
       // use their own credentials for auth.
       val kcp = cfg.consumer.kafkaClientProperties - SaslJaasConfig

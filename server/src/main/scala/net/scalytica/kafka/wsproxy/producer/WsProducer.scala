@@ -8,6 +8,7 @@ import akka.kafka.{ProducerMessage, ProducerSettings}
 import akka.stream.Materializer
 import akka.stream.scaladsl._
 import io.circe.Decoder
+import net.scalytica.kafka.wsproxy.auth.KafkaLoginModules
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroProducerRecord
 import net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
@@ -69,7 +70,10 @@ object WsProducer extends ProducerFlowExtras with WithProxyLogger {
       aclCredentials: Option[AclCredentials]
   )(ps: ProducerSettings[K, V])(implicit cfg: AppCfg): KafkaProducer[K, V] = {
     val props = {
-      val jaasProps = AclCredentials.buildSaslJaasProps(aclCredentials)
+      val saslMechanism = cfg.consumer.saslMechanism
+      val kafkaLoginModule =
+        KafkaLoginModules.fromSaslMechanism(saslMechanism, aclCredentials)
+      val jaasProps = KafkaLoginModules.buildJaasProperty(kafkaLoginModule)
 
       // Strip away the default sasl_jaas_config, since the client needs to
       // use their own credentials for auth.
