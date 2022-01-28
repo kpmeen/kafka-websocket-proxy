@@ -1,9 +1,5 @@
 package net.scalytica.kafka
 
-import java.nio.charset.StandardCharsets
-import java.util.concurrent.CompletableFuture
-import java.util.{Properties => JProps}
-
 import akka.util.ByteString
 import com.typesafe.scalalogging.Logger
 import io.confluent.monitoring.clients.interceptor.{
@@ -12,6 +8,9 @@ import io.confluent.monitoring.clients.interceptor.{
 }
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 
+import java.nio.charset.StandardCharsets
+import java.util.concurrent.CompletableFuture
+import java.util.{Properties => JProps}
 import scala.util.Try
 // scalastyle:off
 import org.apache.kafka.clients.consumer.ConsumerConfig.INTERCEPTOR_CLASSES_CONFIG
@@ -23,11 +22,6 @@ import scala.concurrent.Future
 package object wsproxy {
 
   val SaslJaasConfig: String = "sasl.jaas.config"
-
-  // scalastyle:off
-  val PlainLogin = (uname: String, pass: String) =>
-    s"""org.apache.kafka.common.security.plain.PlainLoginModule required username="$uname" password="$pass";"""
-  // scalastyle:on
 
   val ProducerInterceptorClass: String =
     classOf[MonitoringProducerInterceptor[_, _]].getName

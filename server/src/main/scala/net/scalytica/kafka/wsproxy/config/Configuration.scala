@@ -10,6 +10,7 @@ import net.scalytica.kafka.wsproxy.models.{
   WsServerId
 }
 import org.apache.kafka.clients.CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG
+import org.apache.kafka.common.config.SaslConfigs
 import pureconfig.error.ConfigReaderFailures
 import pureconfig.generic.auto._
 import pureconfig.{ConfigReader, ConfigSource}
@@ -249,12 +250,22 @@ object Configuration extends WithProxyLogger {
   final case class ConsumerCfg(
       limits: ClientLimitsCfg,
       kafkaClientProperties: Map[String, AnyRef]
-  )
+  ) {
+
+    def saslMechanism: Option[String] =
+      kafkaClientProperties.get(SaslConfigs.SASL_MECHANISM).map(_.toString)
+
+  }
 
   final case class ProducerCfg(
       limits: ClientLimitsCfg,
       kafkaClientProperties: Map[String, AnyRef]
-  )
+  ) {
+
+    def saslMechanism: Option[String] =
+      kafkaClientProperties.get(SaslConfigs.SASL_MECHANISM).map(_.toString)
+
+  }
 
   final case class SessionHandlerCfg(
       sessionStateTopicInitTimeout: FiniteDuration,
