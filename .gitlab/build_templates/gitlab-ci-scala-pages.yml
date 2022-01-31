@@ -29,7 +29,7 @@ pages:
   rules:
     - !reference [.shared_rules, rules]
   stage: deploy
-  image: node:15.12-alpine3.13
+  image: node:17-alpine
   dependencies:
     - pages:build
   script:
