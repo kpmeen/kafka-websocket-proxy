@@ -2,19 +2,19 @@ import sbt._
 
 object Versions {
 
-  val ScalaVersion = "2.13.7"
+  val ScalaVersion = "2.13.8"
 
   val LightbendConfigVersion = "1.4.1"
   val PureConfigVersion      = "0.17.1"
 
-  val Avro4sVersion                 = "4.0.11"
-  val ConfluentPlatformVersion      = "7.0.0"
+  val Avro4sVersion                 = "4.0.12"
+  val ConfluentPlatformVersion      = "7.0.1"
   val KafkaVersion                  = s"$ConfluentPlatformVersion-ccs"
   val EmbeddedSchemaRegistryVersion = ConfluentPlatformVersion
 
   val AkkaVersion            = "2.6.18"
   val AkkaHttpVersion        = "10.2.7"
-  val AkkaStreamKafkaVersion = "2.1.1"
+  val AkkaStreamKafkaVersion = "3.0.0"
 
   val AlpakkaVersion = "1.0.2"
 
@@ -23,15 +23,15 @@ object Versions {
   val CirceGenericExtrasVersion = CirceVersion
   val CirceOpticsVersion        = CirceVersion
 
-  val JwtScalaVersion = "9.0.2"
+  val JwtScalaVersion = "9.0.3"
 
   val ScalaLoggingVersion = "3.9.4"
-  val Slf4JVersion        = "1.7.32"
+  val Slf4JVersion        = "1.7.35"
   val LogbackVersion      = "1.2.10"
   val LogbackJsVersion    = "0.1.5"
   val JaninoVersion       = "3.1.6"
 
-  val ScalaTestVersion = "3.2.10"
+  val ScalaTestVersion = "3.2.11"
 
   val JolokiaAgentVersion    = "1.6.2"
   val PrometheusAgentVersion = "0.14.0"
