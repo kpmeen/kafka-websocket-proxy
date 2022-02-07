@@ -74,7 +74,8 @@ trait WsProxyKafkaSpec
     schemaRegistryPort = 0,
     customBrokerProperties = Map(AutoCreateTopicsEnableProp -> "false"),
     customSchemaRegistryProperties = Map(
-      KAFKASTORE_TOPIC_REPLICATION_FACTOR_CONFIG -> "1"
+      KAFKASTORE_TOPIC_REPLICATION_FACTOR_CONFIG -> "1",
+      ZkConnectionTimeoutMsProp                  -> "60000"
     )
   )
 
