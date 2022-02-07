@@ -19,6 +19,8 @@ variables:
   SAST_EXCLUDED_ANALYZERS: "eslint, nodejs-scan"
   # Dependency scan properties
   DS_DEFAULT_ANALYZERS: "gemnasium-maven"
+  # Flag to trigger manual publishing of pages
+  MANUAL_PUBLISH_PAGES: "false"
 
 cache:
   untracked: true
@@ -34,6 +36,12 @@ stages:
 
 include:
   - local: "/.gitlab/build_templates/gitlab-ci-scala-build.yml"
+    rules:
+      - if: '$MANUAL_PUBLISH_PAGES != "true"'
   - local: "/.gitlab/build_templates/gitlab-ci-scala-docker.yml"
+    rules:
+      - if: '$MANUAL_PUBLISH_PAGES != "true"'
   - local: "/.gitlab/build_templates/gitlab-ci-scala-pages.yml"
   - local: "/.gitlab/build_templates/gitlab-ci-project-scanning.yml"
+    rules:
+      - if: '$MANUAL_PUBLISH_PAGES != "true"'
