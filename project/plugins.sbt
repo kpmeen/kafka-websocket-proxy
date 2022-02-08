@@ -14,7 +14,7 @@ resolvers ++= Seq(
 addSbtPlugin("com.typesafe.sbt" % "sbt-git" % "1.0.2")
 
 // Dependency handling
-addSbtPlugin("com.timushev.sbt" % "sbt-updates" % "0.6.1")
+addSbtPlugin("com.timushev.sbt" % "sbt-updates" % "0.6.2")
 
 // Formatting and style checking
 addSbtPlugin("org.scalameta"   % "sbt-scalafmt"          % "2.4.6")
