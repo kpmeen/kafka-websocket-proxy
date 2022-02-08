@@ -1,5 +1,6 @@
 package net.scalytica.test
 
+import akka.actor.typed.scaladsl.adapter._
 import akka.http.scaladsl.model.headers.BasicHttpCredentials
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.{
@@ -7,15 +8,14 @@ import akka.http.scaladsl.testkit.{
   ScalatestRouteTest,
   WSProbe
 }
-import akka.actor.typed.scaladsl.adapter._
 import com.typesafe.config.Config
 import io.confluent.kafka.schemaregistry.rest.SchemaRegistryConfig._
-import jdk.jshell.spi.ExecutionControl.NotImplementedException
-import kafka.server.KafkaConfig._
 import io.github.embeddedkafka.schemaregistry.{
   EmbeddedKafka,
   EmbeddedKafkaConfig
 }
+import jdk.jshell.spi.ExecutionControl.NotImplementedException
+import kafka.server.KafkaConfig._
 import net.scalytica.kafka.wsproxy.auth.OpenIdClient
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroProducerRecord
 import net.scalytica.kafka.wsproxy.config.Configuration
@@ -72,10 +72,12 @@ trait WsProxyKafkaSpec
     kafkaPort = 0,
     zooKeeperPort = 0,
     schemaRegistryPort = 0,
-    customBrokerProperties = Map(AutoCreateTopicsEnableProp -> "false"),
+    customBrokerProperties = Map(
+      AutoCreateTopicsEnableProp -> "false",
+      ZkConnectionTimeoutMsProp  -> "60000"
+    ),
     customSchemaRegistryProperties = Map(
-      KAFKASTORE_TOPIC_REPLICATION_FACTOR_CONFIG -> "1",
-      ZkConnectionTimeoutMsProp                  -> "60000"
+      KAFKASTORE_TOPIC_REPLICATION_FACTOR_CONFIG -> "1"
     )
   )
 
