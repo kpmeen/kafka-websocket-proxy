@@ -48,7 +48,7 @@ object PrometheusConfigPlugin extends AutoPlugin {
 
   override def projectSettings = {
     Seq(
-      prometheusConfigFileName := "prometheus-config.yml",
+      prometheusConfigFileName      := "prometheus-config.yml",
       prometheusConfigFileTargetDir := target.value,
       prometheusConfigFile := {
         prometheusConfigFileTargetDir.value / prometheusConfigFileName.value

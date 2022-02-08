@@ -24,11 +24,11 @@ object DockerTasksPlugin extends AutoPlugin {
     }
 
     Seq(
-      cleanKafka := true,
-      startKafka := { initScript("start", cleanKafka.value) ! },
-      stopKafka := { initScript("stop", cleanKafka.value) ! },
+      cleanKafka   := true,
+      startKafka   := { initScript("start", cleanKafka.value) ! },
+      stopKafka    := { initScript("stop", cleanKafka.value) ! },
       restartKafka := { initScript("restart", cleanKafka.value) ! },
-      statusKafka := { initScript("status", cleanKafka.value) ! }
+      statusKafka  := { initScript("status", cleanKafka.value) ! }
     )
   }
 

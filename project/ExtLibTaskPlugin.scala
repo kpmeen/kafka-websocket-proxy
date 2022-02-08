@@ -120,14 +120,14 @@ object ExtLibTaskPlugin extends AutoPlugin {
   override def projectSettings = {
     Seq(
       externalLibsDirName := "ext",
-      externalLibsDir := target.value / externalLibsDirName.value,
+      externalLibsDir     := target.value / externalLibsDirName.value,
       createExternalLibsDir := {
         val log = streams.value.log
         val dir = externalLibsDir.value
         verifyExtLibsTargetDir(dir, log)
         dir
       },
-      externalJars := Seq.empty,
+      externalJars     := Seq.empty,
       externalJarNames := externalJars.value.map(moduleIdToDestFileName),
       externalJarFiles := externalJars.value.map { ej =>
         moduleIdToDestFile(ej, externalLibsDir.value)
