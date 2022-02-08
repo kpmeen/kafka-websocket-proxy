@@ -1,7 +1,7 @@
 ################################################################################
 # GitLab CI build script for Scala applications published as docker images     #
 ################################################################################
-image: registry.gitlab.com/kpmeen/docker-scala-sbt:scala_2.13_jdk11
+image: registry.gitlab.com/kpmeen/docker-scala-sbt:scala_2.13_jdk17
 
 variables:
   CI: "true"
