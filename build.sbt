@@ -23,7 +23,7 @@ releaseProcess := Seq[ReleaseStep](
   tagRelease,                // : ReleaseStep
   setNextVersion,            // : ReleaseStep
   commitNextVersion,         // : ReleaseStep
-  pushChanges                // : ReleaseStep, also checks that an upstream branch is properly configured
+  pushChanges // : ReleaseStep, also checks that an upstream branch is properly configured
 )
 
 Global / excludeLintKeys ++= Set(
@@ -112,7 +112,7 @@ lazy val docs = (project in file("kafka-websocket-proxy-docs"))
   .settings(
     organization := "net.scalytica",
     scalaVersion := Versions.ScalaVersion,
-    moduleName := "kafka-websocket-proxy-docs",
+    moduleName   := "kafka-websocket-proxy-docs",
     mdocVariables := Map(
       "VERSION" -> version.value
     )
