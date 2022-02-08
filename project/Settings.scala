@@ -68,7 +68,7 @@ object Settings {
     scalacOptions := BaseScalacOpts ++ ExperimentalScalacOpts,
     Test / scalacOptions ++= Seq("-Yrangepos"),
     // Require compilation against JDK 11.
-    javacOptions ++= Seq("-source", "11", "-target", "11"),
+    javacOptions ++= Seq("-source", "17", "-target", "17"),
     javaOptions ++= Seq(
       // Set timezone to UTC
       "-Duser.timezone=UTC"
@@ -137,7 +137,7 @@ object Settings {
         }
       },
       dockerUpdateLatest          := !isSnapshot.value,
-      dockerBaseImage             := "azul/zulu-openjdk-debian:11",
+      dockerBaseImage             := "azul/zulu-openjdk-debian:17",
       Docker / dockerExposedPorts := Seq(exposedPort),
       dockerCommands := {
         val (front, back) = dockerCommands.value.splitAt(12)

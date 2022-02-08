@@ -34,6 +34,14 @@ code_quality:
     paths:
       - gl-code-quality-report.json
 
+spotbugs-sast:
+  before_script:
+    - /bin/bash -c "source $HOME/.bashrc && asdf install java $ASDF_JAVA_VERSION && asdf global java $ASDF_JAVA_VERSION"
+  variables:
+    ASDF_JAVA_VERSION: adoptopenjdk-17.0.2+8 #https://github.com/halcyon/asdf-java/blob/master/data/jdk-linux-x86_64.tsv
+    JAVA_PATH: /opt/asdf/shims/java
+
+
 #dependency_scanning:
 #  variables:
 #    CI_DEBUG_TRACE: "true"
