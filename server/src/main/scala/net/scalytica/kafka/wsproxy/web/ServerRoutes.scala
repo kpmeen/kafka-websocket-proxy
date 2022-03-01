@@ -227,7 +227,7 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
                 .onComplete(removeClientComplete(sid, None, cid))
 
             case wrong =>
-              logger.trace(
+              logger.warn(
                 "Insufficient information in request to remove internal " +
                   s"client references due to ${wrong.niceClassSimpleName}"
               )

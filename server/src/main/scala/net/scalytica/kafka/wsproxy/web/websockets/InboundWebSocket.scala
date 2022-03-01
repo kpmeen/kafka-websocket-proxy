@@ -3,10 +3,10 @@ package net.scalytica.kafka.wsproxy.web.websockets
 import akka.Done
 import akka.actor.ActorSystem
 import akka.actor.typed.scaladsl.adapter._
-import akka.actor.typed.{ActorRef, Scheduler}
+import akka.actor.typed.ActorRef
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.{Route, ValidationRejection}
+import akka.http.scaladsl.server.Route
 import akka.stream.Materializer
 import akka.stream.scaladsl.Flow
 import akka.util.{ByteString, Timeout}
@@ -23,22 +23,10 @@ import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.jmx.JmxManager
 import net.scalytica.kafka.wsproxy.jmx.mbeans.ProducerClientStatsProtocol._
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
-import net.scalytica.kafka.wsproxy.models.{
-  Formats,
-  InSocketArgs,
-  WsClientId,
-  WsServerId
-}
+import net.scalytica.kafka.wsproxy.models.{Formats, InSocketArgs, WsClientId}
 import net.scalytica.kafka.wsproxy.session.SessionHandler._
-import net.scalytica.kafka.wsproxy.session.{
-  InstanceAdded,
-  InstanceExists,
-  InstanceLimitReached,
-  SessionHandlerProtocol,
-  SessionNotFound
-}
+import net.scalytica.kafka.wsproxy.session.{SessionHandlerProtocol, SessionId}
 import net.scalytica.kafka.wsproxy.producer.WsProducer
-import net.scalytica.kafka.wsproxy.session.SessionId
 import net.scalytica.kafka.wsproxy.web.SocketProtocol.{AvroPayload, JsonPayload}
 
 import scala.concurrent.duration._
@@ -47,23 +35,6 @@ import scala.concurrent.{ExecutionContext, Future}
 trait InboundWebSocket extends WithProxyLogger {
 
   implicit private[this] val timeout: Timeout = 10 seconds
-
-  private[this] def initSessionForProducer(
-      serverId: WsServerId,
-      sessionId: SessionId,
-      clientId: WsClientId,
-      maxConnections: Int,
-      sh: ActorRef[SessionHandlerProtocol.Protocol]
-  )(
-      implicit ec: ExecutionContext,
-      scheduler: Scheduler
-  ) = {
-    for {
-      ir     <- sh.initProducerSession(sessionId, maxConnections)
-      _      <- logger.debugf(s"Session ${ir.session.sessionId} ready")
-      addRes <- sh.addProducer(sessionId, clientId, serverId)
-    } yield addRes
-  }
 
   private[this] def prepareJmx(clientId: WsClientId)(
       implicit jmx: Option[JmxManager],
@@ -118,73 +89,22 @@ trait InboundWebSocket extends WithProxyLogger {
     )
     implicit val scheduler = as.scheduler.toTyped
 
-    val serverId     = cfg.server.serverId
-    val clientId     = args.clientId
-    val sessionId    = SessionId(clientId)
-    val prodLimitCfg = cfg.producer.limits.forProducer(clientId)
-    val maxCons = prodLimitCfg
-      .flatMap(_.maxConnections)
-      .getOrElse(cfg.producer.limits.defaultMaxConnectionsPerClient)
+    val serverId  = cfg.server.serverId
+    val clientId  = args.clientId
+    val sessionId = SessionId(clientId)
 
-    val producerAddResult = initSessionForProducer(
-      serverId = serverId,
-      sessionId = sessionId,
-      clientId = clientId,
-      maxConnections = maxCons,
-      sh = sessionHandler
-    )
-
-    onSuccess(producerAddResult) {
-      case InstanceAdded(_) =>
-        prepareInboundWebSocket(args) { () =>
-          jmxManager.foreach(_.removeProducerConnection())
-          // Remove the producer from the session handler
-          sessionHandler
-            .removeProducer(sessionId, clientId, serverId)
-            .map(_ => Done)
-            .recoverWith { case t: Throwable =>
-              logger.trace("Producer removal failed due to an error", t)
-              Future.successful(Done)
-            }
+    prepareInboundWebSocket(args) { () =>
+      jmxManager.foreach(_.removeProducerConnection())
+      // Remove the producer from the session handler
+      sessionHandler
+        .removeProducer(sessionId, clientId, serverId)
+        .map(_ => Done)
+        .recoverWith { case t: Throwable =>
+          logger.trace("Producer removal failed due to an error", t)
+          Future.successful(Done)
         }
-
-      case InstanceExists(_) =>
-        reject(
-          ValidationRejection(
-            s"WebSocket for producer ${clientId.value} in session " +
-              s"${sessionId.value} not established because a consumer with" +
-              " the same ID is already registered."
-          )
-        )
-
-      case InstanceLimitReached(s) =>
-        reject(
-          ValidationRejection(
-            s"The max number of WebSockets for session ${sessionId.value} " +
-              s"has been reached. Limit is ${s.maxConnections}"
-          )
-        )
-
-      case SessionNotFound(_) =>
-        reject(
-          ValidationRejection(
-            s"Could not find an active session for ${sessionId.value}."
-          )
-        )
-
-      case wrong =>
-        logger.error(
-          s"Adding producer failed with an unexpected state." +
-            s" Session:\n ${wrong.session}"
-        )
-        failWith(
-          new InternalError(
-            "An unexpected error occurred when trying to establish the " +
-              s"WebSocket producer ${clientId.value} in session" +
-              s" ${sessionId.value}."
-          )
-        )
     }
+
   }
   // scalastyle:on method.length
 
