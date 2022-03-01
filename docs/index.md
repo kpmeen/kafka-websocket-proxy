@@ -34,3 +34,16 @@ internally in the proxy.
 > When Kafka WebSocket Proxy has been used for consuming data it is best to
 > ensure that the session topic is empty / recreated on the Kafka cluster before
 > deploying version 1.x.x. 
+
+
+> ### Known bug for version 1.0.0 and 1.1.0
+> 
+> Version 1.0.0 of the Kafka WebSocket Proxy introduced a new feature intended
+> for limiting the number of connections a given producer client can set up.
+> The implementation adds support for producers to the internal session handler
+> mechanism.
+>
+> With version 1.1.1 this feature is temporarily removed due to a logic bug that
+> prevents more than 1 client from connecting. Regardless of configuration.
+> 
+> The producer session feature will be re-enabled again in a later version.
