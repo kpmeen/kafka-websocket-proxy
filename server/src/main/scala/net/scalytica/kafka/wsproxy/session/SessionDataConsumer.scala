@@ -37,8 +37,7 @@ private[session] class SessionDataConsumer(
 
   private[this] val kafkaUrl = cfg.kafkaClient.bootstrapHosts.mkString()
 
-  private[this] val cid =
-    s"ws-proxy-session-consumer-${cfg.server.serverId.value}"
+  private[this] lazy val cid = sessionConsumerGroupId
 
   private[this] val sessionStateTopic =
     cfg.sessionHandler.sessionStateTopicName.value
@@ -62,7 +61,7 @@ private[session] class SessionDataConsumer(
       cs.getProperties.asScala.toMap ++
       consumerMetricsProperties
 
-    logger.trace(s"Using consumer configuration:\n${props.mkString("\n")}")
+    log.trace(s"Using consumer configuration:\n${props.mkString("\n")}")
 
     new KafkaConsumer[String, Session](
       props,
@@ -80,10 +79,16 @@ private[session] class SessionDataConsumer(
       .log("Session event", cr => cr.key)
       .map { cr =>
         Option(cr.value)
-          .map(v => SessionHandlerProtocol.UpdateSession(SessionId(cr.key), v))
-          .getOrElse(
-            SessionHandlerProtocol.RemoveSession(SessionId(cr.key))
-          )
+          .map { v =>
+            SessionHandlerProtocol.UpdateSession(
+              sessionId = SessionId(cr.key),
+              s = v,
+              offset = cr.offset()
+            )
+          }
+          .getOrElse {
+            SessionHandlerProtocol.RemoveSession(SessionId(cr.key), cr.offset())
+          }
       }
   }
 

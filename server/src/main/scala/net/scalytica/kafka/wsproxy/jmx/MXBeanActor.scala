@@ -20,12 +20,12 @@ abstract class MXBeanActor[T](ctx: ActorContext[T])
 
   protected def register(): Unit = {
     registerToMBeanServer(this, objectName)
-    logger.trace(s"Registered MXBean ${objectName.getCanonicalName}")
+    log.trace(s"Registered MXBean ${objectName.getCanonicalName}")
   }
 
   protected def unregister(): Unit = {
     unregisterFromMBeanServer(objectName)
-    logger.trace(s"Unregistered MXBean ${objectName.getCanonicalName}")
+    log.trace(s"Unregistered MXBean ${objectName.getCanonicalName}")
   }
 
   override def onSignal: PartialFunction[Signal, Behavior[T]] = {
@@ -34,7 +34,7 @@ abstract class MXBeanActor[T](ctx: ActorContext[T])
       Behaviors.unhandled
 
     case PreRestart =>
-      logger.trace(s"Restarting MXBean ${objectName.getCanonicalName}...")
+      log.trace(s"Restarting MXBean ${objectName.getCanonicalName}...")
       unregister()
       register()
       Behaviors.unhandled

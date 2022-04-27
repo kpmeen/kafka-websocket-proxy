@@ -4,6 +4,22 @@ import scala.util.control.NoStackTrace
 
 case class ConfigurationError(message: String) extends RuntimeException(message)
 
+case class FatalProxyServerError(
+    message: String,
+    cause: Option[Throwable] = None
+) extends RuntimeException(message, cause.orNull)
+
+abstract class ProxyRequestError(
+    msg: String,
+    cause: Option[Throwable] = None
+) extends Exception(msg, cause.orNull)
+
+case class RequestValidationError(
+    msg: String,
+    cause: Option[Throwable] = None
+) extends ProxyRequestError(msg, cause)
+    with NoStackTrace
+
 abstract class ProxyError(
     msg: String,
     cause: Option[Throwable] = None
@@ -15,13 +31,25 @@ case class ImpossibleError(
 ) extends ProxyError(msg, cause)
     with NoStackTrace
 
-case class InvalidSessionStateFormat(
+case class UnexpectedError(
     msg: String,
     cause: Option[Throwable] = None
 ) extends ProxyError(msg, cause)
     with NoStackTrace
 
 case class TrivialError(
+    msg: String,
+    cause: Option[Throwable] = None
+) extends ProxyError(msg, cause)
+    with NoStackTrace
+
+case class RetryFailedError(
+    msg: String,
+    cause: Option[Throwable] = None
+) extends ProxyError(msg, cause)
+    with NoStackTrace
+
+case class InvalidSessionStateFormat(
     msg: String,
     cause: Option[Throwable] = None
 ) extends ProxyError(msg, cause)

@@ -1,108 +1,40 @@
 package net.scalytica.kafka.wsproxy.web
 
-import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.model.headers.Upgrade
-import akka.http.scaladsl.model.ws.{Message, WebSocketRequest}
 import akka.http.scaladsl.server._
-import akka.http.scaladsl.testkit.{RouteTestTimeout, WSProbe}
-import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
+import akka.http.scaladsl.testkit.WSProbe
 import io.github.embeddedkafka.Codecs.stringDeserializer
-import net.scalytica.kafka.wsproxy.models.Formats.{JsonType, NoType, StringType}
-import net.scalytica.kafka.wsproxy.models.TopicName
+import net.scalytica.kafka.wsproxy.models.Formats.{NoType, StringType}
+import net.scalytica.kafka.wsproxy.models.{
+  TopicName,
+  WsProducerId,
+  WsProducerInstanceId
+}
 import net.scalytica.kafka.wsproxy.web.SocketProtocol.JsonPayload
 import net.scalytica.test._
 import org.scalatest.Inspectors.forAll
-import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.tagobjects.Retryable
-import org.scalatest.time.{Minutes, Span}
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.{Assertion, OptionValues}
 
 import scala.concurrent.duration._
 
 // scalastyle:off magic.number
 class WebSocketRoutesJsonSpec
     extends AnyWordSpec
-    with OptionValues
-    with ScalaFutures
-    with WsProxyConsumerKafkaSpec
-    with MockOpenIdServer
-    with EmbeddedHttpServer
-    with TestDataGenerators
+    with BaseWebSocketRoutesSpec
     with FlakyTests {
-
-  implicit override val patienceConfig: PatienceConfig =
-    PatienceConfig(timeout = Span(2, Minutes))
-
-  implicit val timeout = RouteTestTimeout(2 minutes)
 
   override protected val testTopicPrefix: String = "json-test-topic"
 
-  private[this] def testRequiredQueryParamReject(
-      useClientId: Boolean = true,
-      useTopicName: Boolean = true,
-      useValType: Boolean = true
-  )(implicit ctx: ProducerContext): Assertion = {
-    implicit val wsClient = ctx.producerProbe
-
-    val cid = producerClientId("avro", topicCounter)
-
-    val messages = createJsonKeyValue(1)
-
-    val uri = buildProducerUri(
-      clientId = if (useClientId) Some(cid) else None,
-      topicName = if (useTopicName) Some(ctx.topicName) else None,
-      payloadType = Some(JsonPayload),
-      keyType = Some(JsonType),
-      valType = if (useValType) Some(JsonType) else None
+  private[this] def shortProducerUri(pid: String, iid: Option[String])(
+      implicit ctx: ProducerContext
+  ) = {
+    baseProducerUri(
+      producerId = WsProducerId(pid),
+      instanceId = iid.map(WsProducerInstanceId.apply),
+      topicName = ctx.topicName,
+      payloadType = JsonPayload
     )
-
-    produceAndCheckJson(
-      clientId = cid,
-      topic = ctx.topicName,
-      routes = Route.seal(ctx.route),
-      keyType = JsonType,
-      valType = JsonType,
-      messages = messages,
-      producerUri = Some(uri)
-    )
-  }
-
-  def checkWS(
-      host: String,
-      port: Int,
-      uri: String,
-      expectFailure: Boolean = false,
-      numExpMsgs: Int = 0
-  )(
-      initialDelay: FiniteDuration = 0 seconds,
-      openConnectionDuration: FiniteDuration = 5 seconds
-  ): Assertion = {
-    val ioIn   = Source.maybe[Message]
-    val ioOut  = Sink.seq[Message]
-    val ioFlow = Flow.fromSinkAndSourceMat(ioOut, ioIn)(Keep.both)
-
-    Thread.sleep(initialDelay.toMillis)
-
-    val (upgradeRes, (closed, promise)) = Http().singleWebSocketRequest(
-      request = WebSocketRequest(s"ws://$host:$port$uri"),
-      clientFlow = ioFlow
-    )
-    val connected = upgradeRes.futureValue
-
-    if (expectFailure) connected.response.status must not be SwitchingProtocols
-    else connected.response.status mustBe SwitchingProtocols
-
-    if (expectFailure) connected.response.header[Upgrade] mustBe empty
-    else connected.response.header[Upgrade].exists(_.hasWebSocket) mustBe true
-
-    Thread.sleep(openConnectionDuration.toMillis)
-
-    promise.success(None)
-
-    val result = closed.futureValue
-    result.size mustBe numExpMsgs
   }
 
   "Using JSON payloads with WebSockets" when {
@@ -111,12 +43,25 @@ class WebSocketRoutesJsonSpec
 
       "reject producer connection when the required clientId is not set" in
         plainProducerContext(nextTopic) { implicit ctx =>
-          testRequiredQueryParamReject(useClientId = false)
+          assertRejectMissingProducerId()
+        }
+
+      "reject producer connection when sessions are enabled and instanceId " +
+        "is not set" in
+        plainProducerContext(nextTopic, useProducerSessions = true) {
+          implicit ctx =>
+            assertRejectMissingInstanceId(useSession = true)
+        }
+
+      "allow producer connection when sessions are enabled and instanceId " +
+        "is not set" in
+        plainProducerContext(nextTopic) { implicit ctx =>
+          assertRejectMissingInstanceId(useSession = false)
         }
 
       "reject producer connection when the required topic is not set" in
         plainProducerContext(nextTopic) { implicit ctx =>
-          testRequiredQueryParamReject(useTopicName = false)
+          assertRejectMissingTopicName()
         }
 
       "produce messages with String key and value" in
@@ -125,8 +70,9 @@ class WebSocketRoutesJsonSpec
 
           val msgs = createJsonKeyValue(1)
 
-          produceAndCheckJson(
-            clientId = producerClientId("json", topicCounter),
+          produceAndAssertJson(
+            producerId = producerId("json", topicCounter),
+            instanceId = None,
             topic = ctx.topicName,
             keyType = StringType,
             valType = StringType,
@@ -141,8 +87,9 @@ class WebSocketRoutesJsonSpec
 
           val msgs = createJsonValue(1)
 
-          produceAndCheckJson(
-            clientId = producerClientId("json", topicCounter),
+          produceAndAssertJson(
+            producerId = producerId("json", topicCounter),
+            instanceId = None,
             topic = ctx.topicName,
             keyType = NoType,
             valType = StringType,
@@ -158,8 +105,9 @@ class WebSocketRoutesJsonSpec
 
           val msgs = createJsonKeyValue(1, withHeaders = true)
 
-          produceAndCheckJson(
-            clientId = producerClientId("json", topicCounter),
+          produceAndAssertJson(
+            producerId = producerId("json", topicCounter),
+            instanceId = None,
             topic = ctx.topicName,
             keyType = StringType,
             valType = StringType,
@@ -181,8 +129,9 @@ class WebSocketRoutesJsonSpec
 
           val msgs = createJsonValue(1, withHeaders = true)
 
-          produceAndCheckJson(
-            clientId = producerClientId("json", topicCounter),
+          produceAndAssertJson(
+            producerId = producerId("json", topicCounter),
+            instanceId = None,
             topic = ctx.topicName,
             keyType = NoType,
             valType = StringType,
@@ -202,8 +151,9 @@ class WebSocketRoutesJsonSpec
           val messages =
             createJsonKeyValue(1, withHeaders = true, withMessageId = true)
 
-          produceAndCheckJson(
-            clientId = producerClientId("json", topicCounter),
+          produceAndAssertJson(
+            producerId = producerId("json", topicCounter),
+            instanceId = None,
             topic = ctx.topicName,
             keyType = StringType,
             valType = StringType,
@@ -217,6 +167,116 @@ class WebSocketRoutesJsonSpec
             consumeFirstKeyedMessageFrom[String, String](ctx.topicName.value)
           k mustBe "foo-1"
           v mustBe "bar-1"
+        }
+
+      "allow a producer to reconnect when sessions are not enabled" in
+        plainProducerContext(nextTopic) { implicit ctx =>
+          val in = shortProducerUri(s"json-test-$topicCounter", None)
+
+          withEmbeddedServer(
+            routes = ctx.route,
+            completionWaitDuration = Some(10 seconds)
+          ) { (host, port) =>
+            // validate first request
+            forAll(1 to 4) { _ =>
+              assertWSRequest(host, port, in)(initialDelay = 2 seconds)
+            }
+          }
+        }
+
+      "allow producer to reconnect when sessions are enabled and limit is 1" in
+        plainProducerContext(nextTopic, useProducerSessions = true) {
+          implicit ctx =>
+            val in =
+              shortProducerUri("limit-test-producer-2", Some("instance-1"))
+
+            withEmbeddedServer(
+              routes = ctx.route,
+              completionWaitDuration = Some(10 seconds)
+            ) { (host, port) =>
+              // validate first request
+              forAll(1 to 4) { _ =>
+                assertWSRequest(host, port, in)(initialDelay = 2 seconds)
+              }
+            }
+        }
+
+      "allow producer to reconnect when sessions are enabled and limit is 2" in
+        plainProducerContext(nextTopic, useProducerSessions = true) {
+          implicit ctx =>
+            val wsClient = ctx.producerProbe
+
+            lazy val in = (instance: String) =>
+              shortProducerUri("limit-test-producer-2", Some(instance))
+
+            withEmbeddedServer(
+              routes = ctx.route,
+              completionWaitDuration = Some(10 seconds)
+            ) { (host, port) =>
+              WS(in("instance-1"), wsClient.flow) ~> ctx.route ~> check {
+                isWebSocketUpgrade mustBe true
+                // Make sure socket 1 is ready and registered in session
+                Thread.sleep((4 seconds).toMillis)
+                // validate first request
+                forAll(1 to 4) { _ =>
+                  assertWSRequest(host, port, in(s"instance-2"))(initialDelay =
+                    2 seconds
+                  )
+                }
+              }
+            }
+        }
+
+      "not enforce producer session limits when max-connections limit is 0" in
+        plainProducerContext(nextTopic, useProducerSessions = true) {
+          implicit ctx =>
+            val wsClient1 = ctx.producerProbe
+            val wsClient2 = WSProbe()
+            val wsClient3 = WSProbe()
+
+            lazy val in = (instance: String) =>
+              shortProducerUri("limit-test-producer-3", Some(instance))
+
+            WS(in("instance-1"), wsClient1.flow) ~> ctx.route ~> check {
+              isWebSocketUpgrade mustBe true
+
+              WS(in("instance-2"), wsClient2.flow) ~> ctx.route ~> check {
+                isWebSocketUpgrade mustBe true
+
+                // Make sure both sockets are ready and registered in session
+                Thread.sleep((4 seconds).toMillis)
+
+                WS(in("instance-3"), wsClient3.flow) ~> ctx.route ~> check {
+                  isWebSocketUpgrade mustBe true
+                }
+              }
+            }
+        }
+
+      "reject a new connection if the producer limit has been reached" in
+        plainProducerContext(nextTopic, useProducerSessions = true) {
+          implicit ctx =>
+            val wsClient1 = ctx.producerProbe
+            val wsClient2 = WSProbe()
+
+            val in = (instance: String) =>
+              // Producer ID is specifically defined in application-test.conf
+              shortProducerUri("limit-test-producer-1", Some(instance))
+
+            WS(in("instance-1"), wsClient1.flow) ~> ctx.route ~> check {
+              isWebSocketUpgrade mustBe true
+              // Make sure consumer socket 1 is ready and registered in session
+              Thread.sleep((4 seconds).toMillis)
+
+              WS(in("instance-2"), wsClient2.flow) ~> ctx.route ~> check {
+                status mustBe BadRequest
+                val res = responseAs[String]
+                res must include(
+                  "The max number of WebSockets for session " +
+                    "limit-test-producer-1 has been reached. Limit is 1"
+                )
+              }
+            }
         }
 
       "consume messages with String key and value" in
@@ -340,10 +400,9 @@ class WebSocketRoutesJsonSpec
           val topicName = TopicName("non-existing-topic")
 
           val uri = baseProducerUri(
-            clientId = producerClientId("json", topicCounter),
-            topicName = topicName,
-            keyType = StringType,
-            valType = StringType
+            producerId = producerId("json", topicCounter),
+            instanceId = None,
+            topicName = topicName
           )
 
           WS(uri, ctx.producerProbe.flow) ~> Route.seal(ctx.route) ~> check {
@@ -415,10 +474,8 @@ class WebSocketRoutesJsonSpec
             Thread.sleep((10 seconds).toMillis)
 
             WS(out, probe2.flow) ~> ctx.route ~> check {
-              rejection match {
-                case vr: ValidationRejection => vr.message mustBe rejectionMsg
-                case _                       => fail("Unexpected Rejection")
-              }
+              status mustBe BadRequest
+              responseAs[String] must include(rejectionMsg)
             }
           }
         }
@@ -443,12 +500,14 @@ class WebSocketRoutesJsonSpec
           ) { (host, port) =>
             // validate first request
             forAll(1 to 10) { _ =>
-              checkWS(host, port, out, numExpMsgs = 1)(initialDelay = 2 seconds)
+              assertWSRequest(host, port, out, numExpMsgs = 1)(initialDelay =
+                2 seconds
+              )
             }
           }
         }
 
-      "reject a new connection if the consumer limit has been reached" in
+      "reject new consumer connection if the client limit has been reached" in
         plainJsonConsumerContext(
           topic = nextTopic,
           keyType = None,
@@ -476,10 +535,8 @@ class WebSocketRoutesJsonSpec
             Thread.sleep((4 seconds).toMillis)
 
             WS(out("b"), ctx.consumerProbe.flow) ~> ctx.route ~> check {
-              rejection match {
-                case vr: ValidationRejection => vr.message mustBe rejectionMsg
-                case _                       => fail("Unexpected Rejection")
-              }
+              status mustBe BadRequest
+              responseAs[String] must include(rejectionMsg)
             }
           }
         }

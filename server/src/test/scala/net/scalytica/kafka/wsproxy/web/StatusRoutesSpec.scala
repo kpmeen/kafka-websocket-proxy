@@ -33,12 +33,12 @@ class StatusRoutesSpec
 
   implicit val timeout = RouteTestTimeout(20 seconds)
 
-  import TestServerRoutes.{serverErrorHandler, serverRejectionHandler}
+  import TestServerRoutes.serverRejectionHandler
 
   "The status routes" should {
 
     "return the kafka cluster info" in
-      plainServerContext { case (kcfg, _, route) =>
+      plainServerContext() { case (kcfg, _, route) =>
         Get("/kafka/cluster/info") ~> Route.seal(route) ~> check {
           status mustBe OK
           responseEntity.contentType mustBe `application/json`
@@ -59,14 +59,14 @@ class StatusRoutesSpec
       }
 
     "respond with OK to the healthcheck endpoint" in
-      plainServerContext { case (_, _, route) =>
+      plainServerContext() { case (_, _, route) =>
         Get("/healthcheck") ~> Route.seal(route) ~> check {
           status mustBe OK
         }
       }
 
     "ignore basic auth header when not enabled" in
-      plainServerContext { case (_, _, route) =>
+      plainServerContext() { case (_, _, route) =>
         Get("/kafka/cluster/info") ~> addCredentials(basicHttpCreds) ~> Route
           .seal(route) ~> check {
           status mustBe OK

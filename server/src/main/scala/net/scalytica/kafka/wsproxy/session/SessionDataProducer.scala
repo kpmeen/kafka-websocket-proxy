@@ -40,7 +40,7 @@ private[session] class SessionDataProducer(
         ps.getProperties.asScala.toMap ++
         producerMetricsProperties
 
-    logger.trace(s"Using producer configuration:\n${props.mkString("\n")}")
+    log.trace(s"Using producer configuration:\n${props.mkString("\n")}")
 
     new KafkaProducer[String, Session](
       props,
@@ -74,7 +74,7 @@ private[session] class SessionDataProducer(
 
     res.onComplete {
       case Success(rm) =>
-        logger.debug(
+        log.debug(
           "Successfully sent session record for session id" +
             s" ${session.sessionId.value} to Kafka. [" +
             s"topic: ${rm.topic()}," +
@@ -82,10 +82,10 @@ private[session] class SessionDataProducer(
             s"offset: ${rm.offset()}" +
             "]"
         )
-        logger.trace(s"Session data written was: $session")
+        log.trace(s"Session data written was: $session")
 
       case Failure(ex) =>
-        logger.error(
+        log.error(
           "Failed to send session record for session id" +
             s" ${session.sessionId.value} to Kafka",
           ex
@@ -105,13 +105,13 @@ private[session] class SessionDataProducer(
     )
     producer.send(record).toScalaFuture.onComplete {
       case Success(_) =>
-        logger.debug(
+        log.debug(
           s"Successfully sent tombstone for session id ${sessionId.value}" +
             " to Kafka"
         )
 
       case Failure(ex) =>
-        logger.error(
+        log.error(
           s"Failed to send tombstone for session id ${sessionId.value}" +
             " to Kafka",
           ex

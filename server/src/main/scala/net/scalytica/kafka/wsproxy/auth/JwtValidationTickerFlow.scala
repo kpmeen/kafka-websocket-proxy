@@ -9,7 +9,7 @@ import net.scalytica.kafka.wsproxy.auth.JwtValidationTickerFlow._
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.errors.OpenIdConnectError
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
-import net.scalytica.kafka.wsproxy.models.WsClientId
+import net.scalytica.kafka.wsproxy.models.WsIdentifier
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
@@ -37,7 +37,8 @@ import scala.concurrent.{ExecutionContext, Future}
  * service disruptions for connecting clients.
  *
  * @param clientId
- *   The [[WsClientId]] used by the websocket client to establish the connection
+ *   The [[WsIdentifier]] used by the websocket client to establish the
+ *   connection
  * @param bearerToken
  *   The JWT token
  * @param appCfg
@@ -51,7 +52,7 @@ import scala.concurrent.{ExecutionContext, Future}
  *   The type of inbound and outbound messages
  */
 private[auth] class JwtValidationTickerFlow[M](
-    clientId: WsClientId,
+    clientId: WsIdentifier,
     bearerToken: OAuth2BearerToken
 )(
     implicit appCfg: AppCfg,
@@ -94,14 +95,14 @@ private[auth] class JwtValidationTickerFlow[M](
       private[this] def updateErrorState(): ErrorState = {
         previousWasError = true
         errorCounter = errorCounter + 1
-        logger.trace(s"Num transient errors: $errorCounter")
-        logger.trace(s"Previous was transient error: $previousWasError")
+        log.trace(s"Num transient errors: $errorCounter")
+        log.trace(s"Previous was transient error: $previousWasError")
 
         if (!errorLimitReached || isLimitDisabled) {
-          logger.warn("Keeping socket open until JWT can be validated.")
+          log.warn("Keeping socket open until JWT can be validated.")
           Ok
         } else {
-          logger.warn("Error limit for JWT validation has been reached.")
+          log.warn("Error limit for JWT validation has been reached.")
           Ko
         }
       }
@@ -112,26 +113,26 @@ private[auth] class JwtValidationTickerFlow[M](
       }
 
       override def preStart(): Unit = {
-        logger.info(s"Starting JwtValidationTickerFlow for client $timerKey")
+        log.info(s"Starting JwtValidationTickerFlow for client $timerKey")
         if (appCfg.server.isOpenIdConnectEnabled) {
           scheduleAtFixedRate(timerKey, interval, interval)
         } else {
-          logger.info("OIDC isn't configured. Skipping JWT validation ticker.")
+          log.info("OIDC isn't configured. Skipping JWT validation ticker.")
         }
       }
 
       override def postStop(): Unit = {
-        logger.info(s"Stopped JwtValidationTickerFlow for client $timerKey")
+        log.info(s"Stopped JwtValidationTickerFlow for client $timerKey")
       }
 
       override def onTimer(timerKey: Any): Unit = {
         maybeOpenIdClient.foreach { client =>
           val callback = getAsyncCallback[Unit] { _ => () }
           callback.invoke {
-            logger.debug(s"Triggered token validation for client $timerKey.")
+            log.debug(s"Triggered token validation for client $timerKey.")
             validateJwtToken(client).foreach {
               case Valid =>
-                logger.trace(s"JWT for client $timerKey is valid.")
+                log.trace(s"JWT for client $timerKey is valid.")
                 resetErrorCounter()
 
               case TransientError(e) =>
@@ -143,7 +144,7 @@ private[auth] class JwtValidationTickerFlow[M](
                 }
 
               case Invalid(e) =>
-                logger.info(s"JWT for client $timerKey was invalidated")
+                log.info(s"JWT for client $timerKey was invalidated")
                 cancelTimer(timerKey)
                 failStage(e)
             }
@@ -177,7 +178,7 @@ object JwtValidationTickerFlow {
   private case object Ko extends ErrorState
 
   def flow[M](
-      clientId: WsClientId,
+      clientId: WsIdentifier,
       maybeBearerToken: Option[OAuth2BearerToken]
   )(
       implicit appCfg: AppCfg,

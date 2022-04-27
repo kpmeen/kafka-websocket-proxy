@@ -87,20 +87,20 @@ class OpenIdClient private (
           .map { jh =>
             jh.keyId.map(k => jwkProvider.get(k)).getOrElse {
               val errMsg = "Unable to retrieve kid from JWK"
-              logger.debug(errMsg)
+              log.debug(errMsg)
               Future.successful(Failure(AuthenticationError(errMsg)))
             }
           }
           .getOrElse {
             val errMsg = "Unable to retrieve header from JWK"
-            logger.debug(errMsg)
+            log.debug(errMsg)
             Future.successful(Failure(AuthenticationError(errMsg)))
           }
     }
   }
 
   private[this] def cleanToken(token: OAuth2BearerToken) = {
-    logger.trace("Stripping Bearer prefix from token...")
+    log.trace("Stripping Bearer prefix from token...")
     token.value.stripPrefix("Bearer ")
   }
 
@@ -116,13 +116,13 @@ class OpenIdClient private (
   private[this] def validateClaim(
       jwtClaim: JwtClaim
   )(implicit oidcConfig: OpenIdConnectConfig): Try[JwtClaim] = {
-    logger.trace("Validating jwt claim...")
+    log.trace("Validating jwt claim...")
     val allowDetailedLogging = oidcCfg.allowDetailedLogging
     if (jwtClaim.isValid(oidcConfig.issuer, audience)) {
-      jwtClaim.logValidity(logger, isValid = true, allowDetailedLogging)
+      jwtClaim.logValidity(log, isValid = true, allowDetailedLogging)
       Success(jwtClaim)
     } else {
-      jwtClaim.logValidity(logger, isValid = false, allowDetailedLogging)
+      jwtClaim.logValidity(log, isValid = false, allowDetailedLogging)
       Failure(AuthenticationError("The JWT is not valid"))
     }
   }
@@ -174,7 +174,7 @@ class OpenIdClient private (
         err match {
           case ae: ProxyAuthError => invalid(ae)
           case ex =>
-            logger.warn("Error connecting to OpenID Connect server", ex)
+            log.warn("Error connecting to OpenID Connect server", ex)
             errorHandler(ex)
         }
     }
@@ -182,41 +182,41 @@ class OpenIdClient private (
 
   // scalastyle:off
   private[auth] def wellKnownOidcConfig: Future[OpenIdConnectConfig] = {
-    logger.debug(s"Fetching openid-connect config from $oidcWellKnown...")
+    log.debug(s"Fetching openid-connect config from $oidcWellKnown...")
 
     Http()
       .singleRequest(HttpRequest(uri = oidcWellKnown))
       .recover { case ste: StreamTcpException =>
         // Handle any HTTP/TCP errors
-        logger.error(s"Error fetching config from $oidcWellKnown", ste)
+        log.error(s"Error fetching config from $oidcWellKnown", ste)
         throw OpenIdConnectError(
           message = "OpenID Connect server does not seem to be available.",
           cause = Option(ste.getCause)
         )
       }
       .flatMap { res =>
-        logger.info(s"OpenID well-known request status: ${res.status}")
+        log.info(s"OpenID well-known request status: ${res.status}")
         res match {
           case HttpResponse(StatusCodes.OK, _, body, _) =>
             foldBody(body.dataBytes).map {
               case Some(bodyStr) =>
                 val js = parse(bodyStr).toOption.getOrElse(Json.Null)
-                logger.trace(
+                log.trace(
                   s"OpenID well-known response body:\n${js.spaces2}"
                 )
                 js.as[OpenIdConnectConfig].toOption
 
               case None =>
-                logger.info(s"OpenID well-known request returned no body")
+                log.info(s"OpenID well-known request returned no body")
                 None
             }
 
           case HttpResponse(status, _, body, _) =>
             foldBody(body.dataBytes).map {
               case Some(bodyStr) =>
-                logger.whenTraceEnabled {
+                log.whenTraceEnabled {
                   val js = parse(bodyStr).toOption.getOrElse(Json.Null)
-                  logger.trace(
+                  log.trace(
                     s"OpenID well-known response returned with status" +
                       s" ${status.intValue()} and body:\n${js.spaces2}"
                   )
@@ -224,7 +224,7 @@ class OpenIdClient private (
                 None
 
               case None =>
-                logger.info(s"OpenID well-known request returned no body")
+                log.info(s"OpenID well-known request returned no body")
                 None
             }
         }
@@ -242,13 +242,13 @@ class OpenIdClient private (
       audience: String,
       grantType: String
   ): Future[Option[AccessToken]] = {
-    logger.debug(s"Generating token for $clientId...")
+    log.debug(s"Generating token for $clientId...")
     wellKnownOidcConfig.flatMap { oidcCfg =>
       val req = TokenRequest(clientId, clientSecret, audience, grantType)
 
       Http().singleRequest(req.request(oidcCfg.tokenEndpoint)).flatMap { res =>
-        logger.info(s"Token request status: ${res.status}")
-        logger.trace(
+        log.info(s"Token request status: ${res.status}")
+        log.trace(
           "Token response headers: [" +
             res.headers.mkString("\n  ", "\n  ", "\n") +
             s"]"
@@ -259,10 +259,10 @@ class OpenIdClient private (
             foldBody(body.dataBytes).map { ms =>
               ms.flatMap { bodyStr =>
                 val js = parse(bodyStr).toOption.getOrElse(Json.Null)
-                logger.trace(s"Token response body:\n${js.spaces2}")
+                log.trace(s"Token response body:\n${js.spaces2}")
                 js.as[AccessToken].toOption
               }.orElse {
-                logger.info(s"Token request returned no body")
+                log.info(s"Token request returned no body")
                 None
               }
             }
@@ -270,14 +270,14 @@ class OpenIdClient private (
           case HttpResponse(_, _, body, _) =>
             foldBody(body.dataBytes).map {
               case Some(bodyStr) =>
-                logger.whenTraceEnabled {
+                log.whenTraceEnabled {
                   val js = parse(bodyStr).toOption.getOrElse(Json.Null)
-                  logger.trace(s"Token response body:\n${js.spaces2}")
+                  log.trace(s"Token response body:\n${js.spaces2}")
                 }
                 None
 
               case None =>
-                logger.info(s"Token request returned no body")
+                log.info(s"Token request returned no body")
                 None
             }
         }

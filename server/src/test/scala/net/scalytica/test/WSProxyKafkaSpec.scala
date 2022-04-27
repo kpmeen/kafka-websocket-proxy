@@ -1,19 +1,19 @@
 package net.scalytica.test
 
+import akka.Done
 import akka.actor.typed.scaladsl.adapter._
 import akka.http.scaladsl.model.headers.BasicHttpCredentials
 import akka.http.scaladsl.server.Route
-import akka.http.scaladsl.testkit.{
-  RouteTestTimeout,
-  ScalatestRouteTest,
-  WSProbe
-}
+import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
 import com.typesafe.config.Config
-import io.confluent.kafka.schemaregistry.rest.SchemaRegistryConfig._
-import io.github.embeddedkafka.schemaregistry.{
-  EmbeddedKafka,
-  EmbeddedKafkaConfig
-}
+import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
+import net.scalytica.kafka.wsproxy.models.{WsProducerId, WsProducerInstanceId}
+import org.scalatest.BeforeAndAfterAll
+
+import scala.concurrent.Future
+import scala.util.{Failure, Success}
+//import io.confluent.kafka.schemaregistry.rest.SchemaRegistryConfig._
+import io.github.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import jdk.jshell.spi.ExecutionControl.NotImplementedException
 import kafka.server.KafkaConfig._
 import net.scalytica.kafka.wsproxy.auth.OpenIdClient
@@ -29,7 +29,7 @@ import net.scalytica.kafka.wsproxy.config.Configuration.{
 }
 import net.scalytica.kafka.wsproxy.mapToProperties
 import net.scalytica.kafka.wsproxy.models.Formats._
-import net.scalytica.kafka.wsproxy.models.{TopicName, WsClientId, WsServerId}
+import net.scalytica.kafka.wsproxy.models.{TopicName, WsServerId}
 import net.scalytica.kafka.wsproxy.session.{
   SessionHandler,
   SessionHandlerProtocol
@@ -57,8 +57,10 @@ import scala.util.Random
 trait WsProxyKafkaSpec
     extends FileLoader
     with ScalatestRouteTest
+    with BeforeAndAfterAll
     with Matchers
-    with EmbeddedKafka {
+    with EmbeddedKafka
+    with WithProxyLogger {
   self: Suite =>
 
   val testKeyPass: String         = "scalytica"
@@ -66,19 +68,29 @@ trait WsProxyKafkaSpec
   val kafkaPass: String           = kafkaUser
   val creds: BasicHttpCredentials = BasicHttpCredentials(kafkaUser, kafkaPass)
 
-  implicit val routeTestTimeout = RouteTestTimeout(20 seconds)
+//  implicit val routeTestTimeout = RouteTestTimeout(5 seconds)
+
+  override protected def afterAll(): Unit = {
+    super.afterAll()
+    system.terminate().onComplete {
+      case Success(_) =>
+        log.debug(s"Actor system terminated.")
+      case Failure(err) =>
+        log.debug(s"Failed to shutdown actor system: $err")
+    }
+  }
 
   val embeddedKafkaConfig: EmbeddedKafkaConfig = EmbeddedKafkaConfig(
     kafkaPort = 0,
     zooKeeperPort = 0,
-    schemaRegistryPort = 0,
+//    schemaRegistryPort = 0,
     customBrokerProperties = Map(
       AutoCreateTopicsEnableProp -> "false",
       ZkConnectionTimeoutMsProp  -> "60000"
-    ),
-    customSchemaRegistryProperties = Map(
-      KAFKASTORE_TOPIC_REPLICATION_FACTOR_CONFIG -> "1"
     )
+//    customSchemaRegistryProperties = Map(
+//      KAFKASTORE_TOPIC_REPLICATION_FACTOR_CONFIG -> "1"
+//    )
   )
 
   val saslSslPlainJaasConfig: String =
@@ -106,7 +118,7 @@ trait WsProxyKafkaSpec
     val brokerPortPlain  = availablePort
     val brokerPortSecure = availablePort
     val zkp              = availablePort
-    val srp              = availablePort
+//    val srp              = availablePort
 
     val brokerSasl =
       "org.apache.kafka.common.security.plain.PlainLoginModule required " +
@@ -123,7 +135,7 @@ trait WsProxyKafkaSpec
     EmbeddedKafkaConfig(
       kafkaPort = brokerPortSecure,
       zooKeeperPort = zkp,
-      schemaRegistryPort = srp,
+//      schemaRegistryPort = srp,
       customBrokerProperties = Map(
         ZkConnectProp                          -> s"localhost:$zkp",
         AutoCreateTopicsEnableProp             -> "false",
@@ -157,9 +169,11 @@ trait WsProxyKafkaSpec
   lazy val defaultTestAppCfg: AppCfg =
     Configuration.loadConfig(testConfig)
 
-  lazy val defaultTestAppCfgWithServerId: String => AppCfg = (sid: String) =>
+  def defaultTestAppCfgWithServerId(
+      serverId: String
+  ): AppCfg =
     defaultTestAppCfg.copy(
-      server = defaultTestAppCfg.server.copy(serverId = WsServerId(sid))
+      server = defaultTestAppCfg.server.copy(serverId = WsServerId(serverId))
     )
 
   val basicAuthUser         = "basicAuthUser"
@@ -210,21 +224,24 @@ trait WsProxyKafkaSpec
       kafkaPort: Int,
       schemaRegistryPort: Option[Int] = None,
       useServerBasicAuth: Boolean = false,
-      serverOpenIdCfg: Option[OpenIdConnectCfg] = None
+      serverOpenIdCfg: Option[OpenIdConnectCfg] = None,
+      useProducerSessions: Boolean = false
   ): Configuration.AppCfg = {
     if (useServerBasicAuth || serverOpenIdCfg.isDefined) {
       secureAppTestConfig(
         kafkaPort = kafkaPort,
         schemaRegistryPort = schemaRegistryPort,
         useServerBasicAuth = useServerBasicAuth,
-        serverOpenIdCfg = serverOpenIdCfg
+        serverOpenIdCfg = serverOpenIdCfg,
+        useProducerSessions = useProducerSessions
       )
     } else {
       plainAppTestConfig(
         kafkaPort = kafkaPort,
         schemaRegistryPort = schemaRegistryPort,
         useServerBasicAuth = useServerBasicAuth,
-        serverOpenIdCfg = serverOpenIdCfg
+        serverOpenIdCfg = serverOpenIdCfg,
+        useProducerSessions = useProducerSessions
       )
     }
   }
@@ -234,7 +251,8 @@ trait WsProxyKafkaSpec
       schemaRegistryPort: Option[Int] = None,
       useServerBasicAuth: Boolean = false,
       serverOpenIdCfg: Option[OpenIdConnectCfg] = None,
-      secureHealthCheckEndpoint: Boolean = true
+      secureHealthCheckEndpoint: Boolean = true,
+      useProducerSessions: Boolean = false
   ): Configuration.AppCfg = {
     val serverId = s"test-server-${Random.nextInt(50000)}"
     val srUrl =
@@ -256,6 +274,9 @@ trait WsProxyKafkaSpec
       kafkaClient = defaultTestAppCfg.kafkaClient.copy(
         bootstrapHosts = KafkaBootstrapHosts(List(serverHost(Some(kafkaPort)))),
         schemaRegistry = srCfg
+      ),
+      producer = defaultTestAppCfg.producer.copy(
+        sessionsEnabled = useProducerSessions
       )
     )
   }
@@ -264,7 +285,8 @@ trait WsProxyKafkaSpec
       kafkaPort: Int,
       schemaRegistryPort: Option[Int] = None,
       useServerBasicAuth: Boolean = false,
-      serverOpenIdCfg: Option[OpenIdConnectCfg] = None
+      serverOpenIdCfg: Option[OpenIdConnectCfg] = None,
+      useProducerSessions: Boolean = false
   ): Configuration.AppCfg = {
     val serverId = s"test-server-${Random.nextInt(50000)}"
     val srUrl =
@@ -291,6 +313,7 @@ trait WsProxyKafkaSpec
       consumer = defaultTestAppCfg.consumer
         .copy(kafkaClientProperties = secureClientProps),
       producer = defaultTestAppCfg.producer.copy(
+        sessionsEnabled = useProducerSessions,
         kafkaClientProperties = secureClientProps
       )
     )
@@ -359,11 +382,15 @@ trait WsProxyKafkaSpec
   }
 
   def plainServerContext[T](
+      useProducerSessions: Boolean = false
+  )(
       body: (EmbeddedKafkaConfig, AppCfg, Route) => T
   ): T =
     withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-      implicit val wsCfg =
-        plainAppTestConfig(kafkaPort = kcfg.kafkaPort)
+      implicit val wsCfg = plainAppTestConfig(
+        kafkaPort = kcfg.kafkaPort,
+        useProducerSessions = useProducerSessions
+      )
       implicit val oidClient: Option[OpenIdClient] = None
       implicit val sessionHandlerRef               = SessionHandler.init
 
@@ -376,7 +403,7 @@ trait WsProxyKafkaSpec
         SessionHandlerProtocol.StopSessionHandler(system.toTyped.ignoreRef)
       )
 
-      ctrl.shutdown()
+      ctrl.drainAndShutdown(Future.successful(Done))
 
       res
     }
@@ -384,17 +411,19 @@ trait WsProxyKafkaSpec
   def secureServerContext[T](
       useServerBasicAuth: Boolean = false,
       serverOpenIdCfg: Option[OpenIdConnectCfg] = None,
-      secureHealthCheckEndpoint: Boolean = true
+      secureHealthCheckEndpoint: Boolean = true,
+      useProducerSessions: Boolean = false
   )(
       body: (EmbeddedKafkaConfig, AppCfg, Route) => T
   ): T =
     withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
       implicit val wsCfg = plainAppTestConfig(
         kafkaPort = kcfg.kafkaPort,
-        schemaRegistryPort = Some(kcfg.schemaRegistryPort),
+//        schemaRegistryPort = Some(kcfg.schemaRegistryPort),
         useServerBasicAuth = useServerBasicAuth,
         serverOpenIdCfg = serverOpenIdCfg,
-        secureHealthCheckEndpoint = secureHealthCheckEndpoint
+        secureHealthCheckEndpoint = secureHealthCheckEndpoint,
+        useProducerSessions = useProducerSessions
       )
 
       implicit val oidClient = wsCfg.server.openidConnect
@@ -411,7 +440,7 @@ trait WsProxyKafkaSpec
         SessionHandlerProtocol.StopSessionHandler(system.toTyped.ignoreRef)
       )
 
-      ctrl.shutdown()
+      ctrl.drainAndShutdown(Future.successful(Done))
 
       res
     }
@@ -432,9 +461,10 @@ trait WsProxyProducerKafkaSpec
 
   def plainProducerContext[T](
       topic: String = "test-topic",
-      partitions: Int = 1
+      partitions: Int = 1,
+      useProducerSessions: Boolean = false
   )(body: ProducerContext => T): T =
-    plainServerContext { (kcfg, appCfg, routes) =>
+    plainServerContext(useProducerSessions) { (kcfg, appCfg, routes) =>
       initTopic(topic, partitions)(kcfg)
 
       val ctx = ProducerContext(
@@ -453,13 +483,15 @@ trait WsProxyProducerKafkaSpec
       topic: String,
       partitions: Int = 1,
       useServerBasicAuth: Boolean = false,
-      serverOpenIdCfg: Option[OpenIdConnectCfg] = None
+      serverOpenIdCfg: Option[OpenIdConnectCfg] = None,
+      useProducerSessions: Boolean = false
   )(body: ProducerContext => T): T = {
     secureKafkaClusterProducerContext(
-      topic,
-      partitions,
-      useServerBasicAuth,
-      serverOpenIdCfg
+      topic = topic,
+      partitions = partitions,
+      useServerBasicAuth = useServerBasicAuth,
+      serverOpenIdCfg = serverOpenIdCfg,
+      useProducerSessions = useProducerSessions
     )(body)
   }
 
@@ -467,15 +499,17 @@ trait WsProxyProducerKafkaSpec
       topic: String = "test-topic",
       partitions: Int = 1,
       useServerBasicAuth: Boolean = false,
-      serverOpenIdCfg: Option[OpenIdConnectCfg] = None
+      serverOpenIdCfg: Option[OpenIdConnectCfg] = None,
+      useProducerSessions: Boolean = false
   )(body: ProducerContext => T): T = {
     secureKafkaContext { implicit kcfg =>
       implicit val wsCfg =
         secureAppTestConfig(
           kafkaPort = kcfg.kafkaPort,
-          schemaRegistryPort = Some(kcfg.schemaRegistryPort),
+//          schemaRegistryPort = Some(kcfg.schemaRegistryPort),
           useServerBasicAuth = useServerBasicAuth,
-          serverOpenIdCfg = serverOpenIdCfg
+          serverOpenIdCfg = serverOpenIdCfg,
+          useProducerSessions = useProducerSessions
         )
 
       implicit val oidClient = wsCfg.server.openidConnect
@@ -502,7 +536,7 @@ trait WsProxyProducerKafkaSpec
         SessionHandlerProtocol.StopSessionHandler(system.toTyped.ignoreRef)
       )
 
-      ctrl.shutdown()
+      ctrl.drainAndShutdown(Future.successful(Done))
 
       res
     }
@@ -512,7 +546,8 @@ trait WsProxyProducerKafkaSpec
 
 trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
 
-  private[this] val defaultProducerClientId = WsClientId("test-producer-client")
+  private[this] val defaultProducerClientId =
+    WsProducerId("test-producer-client")
 
   case class ConsumerContext(
       topicName: TopicName,
@@ -576,7 +611,8 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
     plainProducerContext(topic, partitions) { implicit pctx =>
       if (prePopulate) {
         produceForMessageType(
-          clientId = defaultProducerClientId,
+          producerId = defaultProducerClientId,
+          instanceId = None,
           messageType = messageType,
           keyType = keyType,
           valType = valType,
@@ -657,7 +693,8 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
     ) { implicit pctx =>
       if (prePopulate) {
         produceForMessageType(
-          clientId = defaultProducerClientId,
+          producerId = defaultProducerClientId,
+          instanceId = None,
           messageType = messageType,
           keyType = keyType,
           valType = valType,
@@ -742,7 +779,8 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
     ) { implicit p =>
       if (prePopulate) {
         produceForMessageType(
-          clientId = defaultProducerClientId,
+          producerId = defaultProducerClientId,
+          instanceId = None,
           messageType = messageType,
           keyType = keyType,
           valType = valType,
@@ -815,7 +853,8 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
 
   // scalastyle:off
   private[this] def produceForMessageType(
-      clientId: WsClientId,
+      producerId: WsProducerId,
+      instanceId: Option[WsProducerInstanceId],
       messageType: FormatType,
       keyType: Option[FormatType],
       valType: FormatType,
@@ -833,8 +872,9 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
             numMessages,
             withHeaders
           )
-          val _ = produceAndCheckAvro(
-            clientId = clientId,
+          val _ = produceAndAssertAvro(
+            producerId = producerId,
+            instanceId = instanceId,
             topic = pctx.topicName,
             routes = pctx.route,
             keyType = keyType,
@@ -851,8 +891,9 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
             withHeaders = withHeaders,
             numMessages = numMessages
           )
-          val _ = produceAndCheckJson(
-            clientId = clientId,
+          val _ = produceAndAssertJson(
+            producerId = producerId,
+            instanceId = instanceId,
             topic = pctx.topicName,
             keyType = keyType.getOrElse(NoType),
             valType = valType,

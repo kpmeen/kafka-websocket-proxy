@@ -37,14 +37,14 @@ case class JwtAuthResult(
           user <- parseKey(userKey, js)
           pass <- parseKey(passwordKey, js)
         } yield {
-          logger.trace("Correctly parsed custom JWT attributes")
+          log.trace("Correctly parsed custom JWT attributes")
           valid(user, pass)
         }
       }
       .getOrElse {
         // This should _really_ not happen. Since the claim must have been
         // correctly parsed before this function is executed.
-        logger.warn("JWT Claim has an invalid format.")
+        log.warn("JWT Claim has an invalid format.")
         invalid
       }
   }
@@ -76,12 +76,12 @@ case class JwtAuthResult(
   ): Option[String] = {
     json.hcursor.downField(key).as[String] match {
       case Right(value) =>
-        logger.trace(s"Found JWT Kafka credentials key $key with value $value")
+        log.trace(s"Found JWT Kafka credentials key $key with value $value")
         Some(value)
       case Left(err) =>
         val msg = "Could not find expected Kafka credentials key " +
           s"'$key' in OAuth Bearer token."
-        logger.warn(msg, err)
+        log.warn(msg, err)
         None
     }
   }

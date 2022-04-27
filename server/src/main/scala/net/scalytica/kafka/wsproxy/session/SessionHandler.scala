@@ -8,137 +8,28 @@ import akka.actor.typed.{ActorRef, Behavior, Scheduler}
 import akka.kafka.scaladsl.Consumer
 import akka.stream.scaladsl.{RunnableGraph, Sink}
 import akka.util.Timeout
+import akka.util.Timeout.durationToTimeout
 import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.errors.{
+  FatalProxyServerError,
+  RetryFailedError
+}
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
-import net.scalytica.kafka.wsproxy.models.{WsClientId, WsGroupId, WsServerId}
+import net.scalytica.kafka.wsproxy.models.{
+  FullClientId,
+  FullConsumerId,
+  FullProducerId,
+  WsGroupId,
+  WsProducerId,
+  WsServerId
+}
 import net.scalytica.kafka.wsproxy.session.SessionHandlerProtocol._
+import net.scalytica.kafka.wsproxy.utils.BlockingRetry
 
 import java.util.concurrent.TimeoutException
+import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
-
-/**
- * Encapsulates the communication protocol to use with the [[SessionHandler]]
- * Actor. It's split into two distinct sub-protocols. Where one is intended to
- * be used by the main application flow, and the other is to manipulate and
- * update the active sessions state.
- */
-object SessionHandlerProtocol {
-
-  /** Main protocol to be used by the proxy service */
-  sealed trait Protocol
-
-  /**
-   * Protocol to use for session related behaviour from outside the session
-   * handler.
-   */
-  sealed trait SessionProtocol extends Protocol
-  /** Consumer session specific protocol */
-  sealed trait ConsumerSessionProtocol extends SessionProtocol
-  /** Producer session specific protocol */
-  sealed trait ProducerSessionProtocol extends SessionProtocol
-
-  sealed trait SessionInitCmd {
-    val sessionId: SessionId
-    val maxConnections: Int
-    val replyTo: ActorRef[SessionOpResult]
-  }
-
-  sealed trait AddClientCmd {
-    val sessionId: SessionId
-    val clientId: WsClientId
-    val serverId: WsServerId
-    val replyTo: ActorRef[SessionOpResult]
-  }
-
-  sealed trait RemoveClientCmd {
-    val sessionId: SessionId
-    val clientId: WsClientId
-    val replyTo: ActorRef[SessionOpResult]
-  }
-
-  /**
-   * Command message to terminate a given Session
-   *
-   * @param replyTo
-   *   the [[ActorRef]] that sent the command
-   */
-  final case class StopSessionHandler(
-      replyTo: ActorRef[SessionOpResult]
-  ) extends SessionProtocol
-
-  // Consumer session specific commands
-  final case class InitConsumerSession(
-      sessionId: SessionId,
-      groupId: WsGroupId,
-      maxConnections: Int,
-      replyTo: ActorRef[SessionOpResult]
-  ) extends ConsumerSessionProtocol
-      with SessionInitCmd
-
-  final case class AddConsumer(
-      sessionId: SessionId,
-      groupId: WsGroupId,
-      clientId: WsClientId,
-      serverId: WsServerId,
-      replyTo: ActorRef[SessionOpResult]
-  ) extends ConsumerSessionProtocol
-      with AddClientCmd
-
-  final case class RemoveConsumer(
-      sessionId: SessionId,
-      groupId: WsGroupId,
-      clientId: WsClientId,
-      replyTo: ActorRef[SessionOpResult]
-  ) extends ConsumerSessionProtocol
-      with RemoveClientCmd
-
-  final case class GetConsumerSession(
-      sessionId: SessionId,
-      replyTo: ActorRef[Option[ConsumerSession]]
-  ) extends ConsumerSessionProtocol
-
-  // Producer session specific commands
-
-  final case class InitProducerSession(
-      sessionId: SessionId,
-      maxConnections: Int,
-      replyTo: ActorRef[SessionOpResult]
-  ) extends ProducerSessionProtocol
-      with SessionInitCmd
-
-  final case class AddProducer(
-      sessionId: SessionId,
-      clientId: WsClientId,
-      serverId: WsServerId,
-      replyTo: ActorRef[SessionOpResult]
-  ) extends ProducerSessionProtocol
-      with AddClientCmd
-
-  final case class RemoveProducer(
-      sessionId: SessionId,
-      clientId: WsClientId,
-      replyTo: ActorRef[SessionOpResult]
-  ) extends ProducerSessionProtocol
-      with RemoveClientCmd
-
-  final case class GetProducerSession(
-      sessionId: SessionId,
-      replyTo: ActorRef[Option[ProducerSession]]
-  ) extends ProducerSessionProtocol
-
-  /** Sub-protocol only to be used by the Kafka consumer */
-  sealed private[session] trait InternalSessionProtocol extends Protocol
-
-  final private[session] case class UpdateSession(
-      sessionId: SessionId,
-      s: Session
-  ) extends InternalSessionProtocol
-
-  final private[session] case class RemoveSession(
-      sessionId: SessionId
-  ) extends InternalSessionProtocol
-}
 
 object SessionHandler extends SessionHandler {
 
@@ -150,29 +41,28 @@ object SessionHandler extends SessionHandler {
   implicit class SessionHandlerOpExtensions(
       sh: ActorRef[SessionHandlerProtocol.Protocol]
   ) {
-
     private[this] def handleClientError[T](
         sessionId: SessionId,
-        groupId: Option[WsGroupId],
-        clientId: Option[WsClientId],
-        serverId: Option[WsServerId]
+        appId: Option[String],
+        instanceId: Option[String],
+        serverId: Option[String]
     )(timeoutResponse: String => T)(throwable: Throwable): Future[T] = {
       val op = throwable.getStackTrace
         .dropWhile(ste => !ste.getClassName.equals(getClass.getName))
         .headOption
         .map(_.getMethodName)
         .getOrElse("unknown")
-      val cid = clientId.map(c => s"for $c").getOrElse("")
+      val cid = instanceId.map(c => s"for $c").getOrElse("")
       val sid = serverId.map(s => s"on $s").getOrElse("")
-      val gid = groupId.map(g => s"in $g").getOrElse("")
+      val gid = appId.map(g => s"in $g").getOrElse("")
 
       throwable match {
         case t: TimeoutException =>
-          logger.debug(s"Timeout calling $op $cid $gid in $sessionId $sid", t)
+          log.debug(s"Timeout calling $op $cid $gid in $sessionId $sid", t)
           Future.successful(timeoutResponse(t.getMessage))
 
         case t: Throwable =>
-          logger.warn(
+          log.warn(
             s"Unhandled error calling $op $cid $gid in $sessionId $sid",
             t
           )
@@ -182,14 +72,14 @@ object SessionHandler extends SessionHandler {
 
     private[this] def handleClientSessionOpError(
         sessionId: SessionId,
-        groupId: Option[WsGroupId] = None,
-        clientId: Option[WsClientId] = None,
-        serverId: Option[WsServerId] = None
+        appId: Option[String] = None,
+        instanceId: Option[String] = None,
+        serverId: Option[String] = None
     )(throwable: Throwable): Future[SessionOpResult] = {
       handleClientError[SessionOpResult](
         sessionId = sessionId,
-        groupId = groupId,
-        clientId = clientId,
+        appId = appId,
+        instanceId = instanceId,
         serverId = serverId
       )(reason => IncompleteOperation(reason))(throwable)
     }
@@ -200,7 +90,6 @@ object SessionHandler extends SessionHandler {
         scheduler: Scheduler
     ): Future[SessionOpResult] = {
       val sid = SessionId(groupId)
-
       sh.ask[SessionOpResult] { ref =>
         SessionHandlerProtocol.InitConsumerSession(
           sessionId = sid,
@@ -211,110 +100,118 @@ object SessionHandler extends SessionHandler {
       }.recoverWith(handleClientSessionOpError(sid)(_))
     }
 
-    def initProducerSession(sessionId: SessionId, maxClients: Int)(
+    def initProducerSession(producerId: WsProducerId, maxClients: Int)(
         implicit ec: ExecutionContext,
         timeout: Timeout,
         scheduler: Scheduler
     ): Future[SessionOpResult] = {
+      val sid = SessionId(producerId)
       sh.ask[SessionOpResult] { ref =>
         SessionHandlerProtocol.InitProducerSession(
-          sessionId = sessionId,
+          sessionId = sid,
+          producerId = producerId,
           maxConnections = maxClients,
           replyTo = ref
         )
-      }.recoverWith(handleClientSessionOpError(sessionId)(_))
+      }.recoverWith(handleClientSessionOpError(sid)(_))
     }
 
     def addConsumer(
-        groupId: WsGroupId,
-        clientId: WsClientId,
+        fullConsumerId: FullConsumerId,
         serverId: WsServerId
     )(
         implicit ec: ExecutionContext,
         timeout: Timeout,
         scheduler: Scheduler
     ): Future[SessionOpResult] = {
-      val sid = SessionId(groupId)
+      val sid = SessionId(fullConsumerId.groupId)
       sh.ask[SessionOpResult] { ref =>
         SessionHandlerProtocol.AddConsumer(
           sessionId = sid,
-          groupId = groupId,
-          clientId = clientId,
           serverId = serverId,
+          fullClientId = fullConsumerId,
           replyTo = ref
         )
       }.recoverWith(
         handleClientSessionOpError(
           sessionId = sid,
-          groupId = Option(groupId),
-          clientId = Option(clientId),
-          serverId = Option(serverId)
+          appId = Option(fullConsumerId.groupId.value),
+          instanceId = Option(fullConsumerId.clientId.value),
+          serverId = Option(serverId.value)
         )(_)
       )
     }
 
     def addProducer(
-        sessionId: SessionId,
-        clientId: WsClientId,
+        fullProducerId: FullProducerId,
         serverId: WsServerId
     )(
         implicit ec: ExecutionContext,
         timeout: Timeout,
         scheduler: Scheduler
     ): Future[SessionOpResult] = {
+      val sid = SessionId(fullProducerId.producerId)
       sh.ask[SessionOpResult] { ref =>
         SessionHandlerProtocol.AddProducer(
-          sessionId = sessionId,
-          clientId = clientId,
+          sessionId = sid,
           serverId = serverId,
+          fullClientId = fullProducerId,
           replyTo = ref
         )
       }.recoverWith(
         handleClientSessionOpError(
-          sessionId = sessionId,
-          clientId = Option(clientId),
-          serverId = Option(serverId)
+          sessionId = sid,
+          appId = Option(fullProducerId.producerId.value),
+          instanceId = fullProducerId.instanceId.map(_.value),
+          serverId = Option(serverId.value)
         )(_)
       )
     }
 
     def removeConsumer(
-        groupId: WsGroupId,
-        clientId: WsClientId,
+        fullConsumerId: FullConsumerId,
         serverId: WsServerId
     )(
         implicit ec: ExecutionContext,
         timeout: Timeout,
         scheduler: Scheduler
     ): Future[SessionOpResult] = {
-      val sid = SessionId(groupId)
+      val sid = SessionId(fullConsumerId.groupId)
 
       sh.ask[SessionOpResult] { ref =>
-        SessionHandlerProtocol.RemoveConsumer(sid, groupId, clientId, ref)
+        SessionHandlerProtocol.RemoveConsumer(
+          sessionId = sid,
+          fullClientId = fullConsumerId,
+          replyTo = ref
+        )
       }.recoverWith(
         handleClientSessionOpError(
           sessionId = sid,
-          groupId = Option(groupId),
-          clientId = Option(clientId),
-          serverId = Option(serverId)
+          appId = Option(fullConsumerId.groupId.value),
+          instanceId = Option(fullConsumerId.clientId.value),
+          serverId = Option(serverId.value)
         )(_)
       )
     }
 
     def removeProducer(
-        clientId: WsClientId,
+        fullProducerId: FullProducerId,
         serverId: WsServerId
     )(
         implicit ec: ExecutionContext,
         timeout: Timeout,
         scheduler: Scheduler
     ): Future[SessionOpResult] = {
-      removeProducer(SessionId(clientId), clientId, serverId)
+      removeProducer(
+        sessionId = SessionId(fullProducerId.producerId),
+        fullProducerId = fullProducerId,
+        serverId = serverId
+      )
     }
 
     def removeProducer(
         sessionId: SessionId,
-        clientId: WsClientId,
+        fullProducerId: FullProducerId,
         serverId: WsServerId
     )(
         implicit ec: ExecutionContext,
@@ -322,14 +219,55 @@ object SessionHandler extends SessionHandler {
         scheduler: Scheduler
     ): Future[SessionOpResult] = {
       sh.ask[SessionOpResult] { ref =>
-        SessionHandlerProtocol.RemoveProducer(sessionId, clientId, ref)
+        SessionHandlerProtocol.RemoveProducer(
+          sessionId = sessionId,
+          fullClientId = fullProducerId,
+          replyTo = ref
+        )
       }.recoverWith(
         handleClientSessionOpError(
           sessionId = sessionId,
-          clientId = Option(clientId),
-          serverId = Option(serverId)
+          appId = Option(fullProducerId.producerId.value),
+          instanceId = fullProducerId.instanceId.map(_.value),
+          serverId = Option(serverId.value)
         )(_)
       )
+    }
+
+    def awaitSessionRestoration()(
+        implicit ec: ExecutionContext,
+        scheduler: Scheduler
+    ): SessionStateRestored = {
+      val retries = 100
+      BlockingRetry.retryAwaitFuture(60 seconds, 500 millis, retries) {
+        attemptTimeout =>
+          implicit val at: Timeout = attemptTimeout
+
+          sh.ask[SessionOpResult] { ref =>
+            SessionHandlerProtocol.SessionHandlerReady(ref)
+          }.map {
+            case ssr: SessionStateRestored =>
+              log.trace("Session state is restored.")
+              ssr
+
+            case _: RestoringSessionState =>
+              log.trace("Session state is still being restored...")
+              throw RetryFailedError("Session state not ready.")
+
+            case _ =>
+              throw FatalProxyServerError(
+                "Unexpected error when checking for state of session topic " +
+                  "restoration. Expected one of:" +
+                  s"[${classOf[SessionStateRestored].niceClassSimpleName} |" +
+                  s" ${classOf[RestoringSessionState].niceClassSimpleName}]"
+              )
+          }
+      } { t =>
+        throw FatalProxyServerError(
+          message = "Unable to restore session state",
+          cause = Option(t)
+        )
+      }
     }
 
     def sessionHandlerShutdown()(
@@ -341,11 +279,11 @@ object SessionHandler extends SessionHandler {
         SessionHandlerProtocol.StopSessionHandler(ref)
       }.recoverWith {
         case t: TimeoutException =>
-          logger.debug("Timeout calling sessionShutdown()", t)
+          log.debug("Timeout calling sessionShutdown()", t)
           Future.successful(IncompleteOperation(t.getMessage))
 
         case t: Throwable =>
-          logger.warn("An unknown error occurred calling sessionShutdown()", t)
+          log.warn("An unknown error occurred calling sessionShutdown()", t)
           throw t
       }
     }
@@ -356,37 +294,33 @@ object SessionHandler extends SessionHandler {
         scheduler: Scheduler
     ): Future[Option[ConsumerSession]] = {
       val sid = SessionId(groupId)
-
       sh.ask[Option[ConsumerSession]] { ref =>
         SessionHandlerProtocol.GetConsumerSession(sid, ref)
       }.recoverWith(
         handleClientError[Option[ConsumerSession]](
           sessionId = sid,
-          groupId = Option(groupId),
-          clientId = None,
+          appId = Option(groupId.value),
+          instanceId = None,
           serverId = None
-        ) { _ =>
-          None
-        }(_)
+        )(_ => None)(_)
       )
     }
 
-    def getProducerSession(sessionId: SessionId)(
+    def getProducerSession(producerId: WsProducerId)(
         implicit ec: ExecutionContext,
         timeout: Timeout,
         scheduler: Scheduler
     ): Future[Option[ProducerSession]] = {
+      val sid = SessionId(producerId)
       sh.ask[Option[ProducerSession]] { ref =>
-        SessionHandlerProtocol.GetProducerSession(sessionId, ref)
+        SessionHandlerProtocol.GetProducerSession(sid, ref)
       }.recoverWith(
         handleClientError[Option[ProducerSession]](
-          sessionId = sessionId,
-          groupId = None,
-          clientId = None,
+          sessionId = sid,
+          appId = Option(producerId.value),
+          instanceId = None,
           serverId = None
-        ) { _ =>
-          None
-        }(_)
+        )(_ => None)(_)
       )
     }
 
@@ -410,6 +344,9 @@ object SessionHandler extends SessionHandler {
  */
 trait SessionHandler extends WithProxyLogger {
 
+  private[this] var latestOffset: Long     = 0L
+  private[this] var stateRestored: Boolean = false
+
   /**
    * Calculates the expected next behaviour based on the value of the {{either}}
    * argument.
@@ -421,7 +358,7 @@ trait SessionHandler extends WithProxyLogger {
    * @return
    *   the next behaviour to use.
    */
-  private[this] def nextOrSame(
+  private[this] def nextOrSameBehavior(
       either: Either[String, ActiveSessions]
   )(
       behavior: ActiveSessions => Behavior[Protocol]
@@ -429,6 +366,60 @@ trait SessionHandler extends WithProxyLogger {
     either match {
       case Left(_)   => Behaviors.same
       case Right(ns) => behavior(ns)
+    }
+  }
+
+  private[this] def prepareStateTopic(implicit cfg: AppCfg): Long = {
+    val admin = new WsKafkaAdminClient(cfg)
+    try {
+      val ready = admin.clusterReady
+      if (ready) admin.initSessionStateTopic()
+      else {
+        log.error("Could not reach Kafka cluster. Terminating application!")
+        System.exit(1)
+      }
+      val offset = admin.lastOffsetForSessionStateTopic
+      log.debug(s"Session state topic ready. Latest offset is $offset")
+      if (latestOffset == 0) stateRestored = true
+      offset
+    } finally {
+      admin.close()
+    }
+  }
+
+  private[this] def verifySessionStateRestore(
+      ip: InternalSessionProtocol
+  ): Unit = {
+    if (!stateRestored && latestOffset <= ip.offset) {
+      stateRestored = true
+      log.info(s"Session state restored to offset ${ip.offset}/$latestOffset")
+    }
+  }
+
+  /**
+   * Potentially clean the existing sessions for clients belonging to this
+   * serverId. Clients may get stuck in a session if the server has an unclean
+   * shutdown. If there are no more clients left in the session after cleanup,
+   * the [[UpdateSession]] command is converted into a [[RemoveSession]]
+   * command.
+   *
+   * @param upd
+   *   [[UpdateSession]] to verify and clean
+   * @param cfg
+   *   the implicitly provided [[AppCfg]]
+   * @return
+   *   The sanitized [[InternalSessionProtocol]]
+   */
+  private[this] def sanitizeSessionOnRestore(
+      upd: UpdateSession
+  )(implicit cfg: AppCfg): InternalSessionProtocol = {
+    // Clean up after a potentially unclean restart
+    if (upd.s.instances.exists(_.serverId == cfg.server.serverId)) {
+      val s2 = upd.s.removeInstancesFromServerId(cfg.server.serverId)
+      if (s2.instances.isEmpty) RemoveSession(upd.sessionId, upd.offset)
+      else upd.copy(s = s2)
+    } else {
+      upd
     }
   }
 
@@ -453,36 +444,32 @@ trait SessionHandler extends WithProxyLogger {
     implicit val typedSys = sys.toTyped
 
     val name = s"session-handler-actor-${cfg.server.serverId.value}"
-    logger.debug(s"Initialising session handler $name...")
-
-    val admin = new WsKafkaAdminClient(cfg)
-    try {
-      val ready = admin.clusterReady
-      if (ready) admin.initSessionStateTopic()
-      else {
-        logger.error("Could not reach Kafka cluster. Terminating application!")
-        System.exit(1)
-      }
-    } finally {
-      admin.close()
-    }
+    log.debug(s"Initialising session handler $name...")
+    latestOffset = prepareStateTopic
 
     val ref = sys.spawn(sessionHandler, name)
 
-    logger.debug(s"Starting session state consumer for server id $name...")
-
+    log.debug(s"Starting session state consumer for server id $name...")
     val consumer = new SessionDataConsumer()
 
     val consumerStream: RunnableGraph[Consumer.Control] =
       consumer.sessionStateSource.to {
         Sink.foreach {
-          case ip: InternalSessionProtocol =>
-            logger.debug(s"Consumed internal session protocol message: $ip")
-            ref ! ip
+          case upd: UpdateSession =>
+            log.trace(s"Consumed internal session protocol message: $upd")
+            verifySessionStateRestore(upd)
+            if (!stateRestored) ref ! sanitizeSessionOnRestore(upd)
+            else ref ! upd
 
-          case _ =>
-            logger.debug(s"No previous sessions found...")
-            ()
+          case rem: RemoveSession =>
+            log.trace(s"Consumed internal session protocol message: $rem")
+            verifySessionStateRestore(rem)
+            ref ! rem
+
+          case ip =>
+            log.warn(
+              s"Unknown internal session protocol message ${ip.niceClassName}"
+            )
         }
       }
 
@@ -493,10 +480,8 @@ trait SessionHandler extends WithProxyLogger {
     Behaviors.setup { implicit ctx =>
       implicit val sys = ctx.system
       implicit val ec  = sys.executionContext
-
-      logger.debug("Initialising session data producer...")
+      log.debug("Initialising session data producer...")
       implicit val producer = new SessionDataProducer()
-
       behavior()
     }
   }
@@ -510,11 +495,11 @@ trait SessionHandler extends WithProxyLogger {
   ): Behavior[Protocol] = {
     Behaviors.receiveMessage {
       case c: SessionProtocol =>
-        logger.trace(s"Received a SessionProtocol message [$c]")
+        log.trace(s"Received a SessionProtocol message [$c]")
         sessionProtocolHandler(active, c)
 
       case i: InternalSessionProtocol =>
-        logger.trace(s"Received an InternalProtocol message [$i]")
+        log.trace(s"Received an InternalProtocol message [$i]")
         internalProtocolHandler(active, i)
     }
   }
@@ -536,13 +521,21 @@ trait SessionHandler extends WithProxyLogger {
       case psp: ProducerSessionProtocol =>
         producerSessionProtocolHandler(active, psp)
 
+      case SessionHandlerReady(replyTo) =>
+        val currentState =
+          if (stateRestored) SessionStateRestored()
+          else RestoringSessionState()
+
+        replyTo ! currentState
+        Behaviors.same
+
       case StopSessionHandler(replyTo) =>
         Future
           .sequence {
             active.removeInstancesFromServerId(serverId).sessions.map {
               case (sid, s) =>
                 producer.publish(s).map { _ =>
-                  logger.debug(
+                  log.debug(
                     "REMOVE_CLIENT_INSTANCES: clients connected to server " +
                       s"${serverId.value} removed from session ${sid.value}"
                   )
@@ -550,10 +543,9 @@ trait SessionHandler extends WithProxyLogger {
                 }
             }
           }
-          .map { _ =>
-            replyTo ! InstancesForServerRemoved()
-          }
-        logger.debug(
+          .map(_ => replyTo ! InstancesForServerRemoved())
+
+        log.debug(
           s"STOP: stopping session handler for server ${serverId.value}"
         )
         Behaviors.stopped
@@ -568,7 +560,7 @@ trait SessionHandler extends WithProxyLogger {
       cfg: AppCfg,
       producer: SessionDataProducer
   ): Behavior[Protocol] = {
-    logger.trace(s"CLIENT_SESSION: got consumer session protocol message $csp")
+    log.trace(s"CLIENT_SESSION: got consumer session protocol message $csp")
 
     csp match {
       case is: InitConsumerSession =>
@@ -590,7 +582,7 @@ trait SessionHandler extends WithProxyLogger {
       cfg: AppCfg,
       producer: SessionDataProducer
   ): Behavior[Protocol] = {
-    logger.trace(s"CLIENT_SESSION: got producer session protocol message $psp")
+    log.trace(s"CLIENT_SESSION: got producer session protocol message $psp")
 
     psp match {
       case is: InitProducerSession =>
@@ -616,19 +608,19 @@ trait SessionHandler extends WithProxyLogger {
   ): Behavior[Protocol] = {
     active.find(cmd.sessionId) match {
       case Some(s) =>
-        logger.debug(
+        log.debug(
           s"INIT_SESSION: session ${cmd.sessionId.value} already registered."
         )
         cmd.replyTo ! SessionInitialised(s)
         Behaviors.same
 
       case None =>
-        logger.debug(
+        log.debug(
           s"INIT_SESSION: ${cmd.sessionId.value} is not an active session."
         )
         val s = session()
         producer.publish(s).map { _ =>
-          logger.debug(
+          log.debug(
             s"INIT_SESSION: session ${cmd.sessionId.value} was registered."
           )
           cmd.replyTo ! SessionInitialised(s)
@@ -637,109 +629,116 @@ trait SessionHandler extends WithProxyLogger {
     }
   }
 
-  private[this] def createClientInstance[Add <: AddClientCmd](
+  private[this] def createClientInstance[Add <: AddClientCmd[_]](
       cmd: Add,
       session: Session
   ): Either[SessionOpResult, ClientInstance] = {
     (session, cmd) match {
-      case (cs: ConsumerSession, ca: AddConsumer) =>
-        Right(ConsumerInstance(ca.clientId, cs.groupId, ca.serverId))
+      case (_: ConsumerSession, ca: AddConsumer) =>
+        Right(ConsumerInstance(ca.fullClientId, ca.serverId))
 
       case (_: ProducerSession, pa: AddProducer) =>
-        Right(ProducerInstance(pa.clientId, pa.serverId))
+        Right(ProducerInstance(pa.fullClientId, pa.serverId))
 
       case (s, a) =>
-        logger.warn(s"ADD_CLIENT: cmd $a is not compatible with session $s.")
+        log.warn(s"ADD_CLIENT: cmd $a is not compatible with session $s.")
         Left(InstanceTypeForSessionIncorrect(s))
     }
   }
 
-  def notAdded[Add <: AddClientCmd](
+  type AddCmd = AddClientCmd[_ <: FullClientId]
+  type RemCmd = RemoveClientCmd[_ <: FullClientId]
+
+  def notAdded[Add <: AddCmd](
       cmd: Add,
       op: SessionOpResult
   ): Behavior[Protocol] = {
-    logger.debug(
+    log.debug(
       s"ADD_CLIENT: session op result for session ${cmd.sessionId.value}" +
-        s" trying to add client ${cmd.clientId.value} on server" +
+        s" trying to add client ${cmd.fullClientId.value} on server" +
         s" ${cmd.serverId.value}: ${op.asString}"
     )
     cmd.replyTo ! op
     Behaviors.same
   }
 
-  private[this] def addClientHandler[Add <: AddClientCmd](
+  private[this] def addClientHandler[Cmd <: AddCmd](
       active: ActiveSessions,
-      cmd: Add
+      cmd: Cmd
   )(
       implicit ec: ExecutionContext,
       producer: SessionDataProducer
   ): Behavior[Protocol] = {
-    logger.debug(
-      s"ADD_CLIENT: adding client instance ${cmd.clientId.value} connected " +
-        s"to server ${cmd.serverId.value} to session ${cmd.sessionId.value}..."
+    log.debug(
+      s"ADD_CLIENT: adding client instance ${cmd.fullClientId.value} " +
+        s"connected to server ${cmd.serverId.value} to " +
+        s"session ${cmd.sessionId.value}..."
     )
 
     active.find(cmd.sessionId) match {
       case None =>
-        logger.warn(
+        log.warn(
           s"ADD_CLIENT: session ${cmd.sessionId.value} was not found. " +
-            s"client ID ${cmd.clientId} will not be added."
+            s"client ID ${cmd.fullClientId} will not be added."
         )
         cmd.replyTo ! SessionNotFound(cmd.sessionId)
         Behaviors.same
 
       case Some(session) =>
-        logger.trace("ADD_CLIENT: creating internal client session...")
+        log.trace("ADD_CLIENT: creating internal client session...")
         createClientInstance(cmd, session) match {
           case Right(instance) =>
-            session.addInstance(instance) match {
+            val addRes = instance match {
+              case prodInst: ProducerInstance => session.addInstance(prodInst)
+              case consInst: ConsumerInstance => session.addInstance(consInst)
+            }
+
+            addRes match {
               case added @ InstanceAdded(s) =>
-                logger.trace("ADD_CLIENT: publishing updated session...")
+                log.trace("ADD_CLIENT: publishing updated session...")
                 producer.publish(s).map { _ =>
-                  logger.debug(
-                    s"ADD_CLIENT: client instance ${cmd.clientId.value} added" +
-                      s" to session ${cmd.sessionId.value} from server " +
+                  log.debug(
+                    s"ADD_CLIENT: client instance ${cmd.fullClientId.value} " +
+                      s"added to session ${cmd.sessionId.value} from server " +
                       s"${cmd.serverId.value}"
                   )
                   cmd.replyTo ! added
                 }
                 Behaviors.same
 
-              case op =>
-                notAdded(cmd, op)
+              case op => notAdded(cmd, op)
             }
 
-          case Left(invalidType) =>
-            notAdded(cmd, invalidType)
+          case Left(invalidType) => notAdded(cmd, invalidType)
         }
     }
   }
 
-  private[this] def removeClientHandler[Remove <: RemoveClientCmd](
+  private[this] def removeClientHandler[Cmd <: RemCmd](
       active: ActiveSessions,
-      cmd: Remove
+      cmd: Cmd
   )(
       implicit ec: ExecutionContext,
       producer: SessionDataProducer
   ): Behavior[Protocol] = {
-    logger.debug(
-      s"REMOVE_CLIENT: remove client instance ${cmd.clientId.value} from " +
+    log.debug(
+      s"REMOVE_CLIENT: remove client instance ${cmd.fullClientId} from " +
         s"session ${cmd.sessionId.value} on server..."
     )
     active.find(cmd.sessionId) match {
       case None =>
-        logger.debug(
+        log.debug(
           s"REMOVE_CLIENT: session ${cmd.sessionId.value} was not found"
         )
         cmd.replyTo ! SessionNotFound(cmd.sessionId)
         Behaviors.same
 
       case Some(session) =>
-        session.removeInstance(cmd.clientId) match {
+        session.removeInstance(cmd.fullClientId) match {
           case removed @ InstanceRemoved(s) =>
             producer.publish(s).foreach { _ =>
-              logger.debug(
-                s"REMOVE_CLIENT: client ${cmd.clientId.value} removed " +
+              log.debug(
+                s"REMOVE_CLIENT: client ${cmd.fullClientId.value} removed " +
                   s"from session ${cmd.sessionId.value}"
               )
               cmd.replyTo ! removed
@@ -747,7 +746,7 @@ trait SessionHandler extends WithProxyLogger {
             Behaviors.same
 
           case notRemoved =>
-            logger.debug(
+            log.debug(
               "REMOVE_CLIENT: session op result " +
                 s"for ${cmd.sessionId.value}: ${notRemoved.asString}"
             )
@@ -787,13 +786,12 @@ trait SessionHandler extends WithProxyLogger {
       cfg: AppCfg,
       producer: SessionDataProducer
   ): Behavior[Protocol] = ip match {
-    case UpdateSession(sessionId, s) =>
-      logger.debug(s"INTERNAL: Updating session ${sessionId.value}...")
-      nextOrSame(active.updateSession(sessionId, s))(behavior)
+    case UpdateSession(sessionId, s, _) =>
+      log.debug(s"INTERNAL: Updating session ${sessionId.value}...")
+      nextOrSameBehavior(active.updateSession(sessionId, s))(behavior)
 
-    case RemoveSession(sessionId) =>
-      logger.debug(s"INTERNAL: Removing session ${sessionId.value}..")
-      nextOrSame(active.removeSession(sessionId))(behavior)
+    case RemoveSession(sessionId, _) =>
+      log.debug(s"INTERNAL: Removing session ${sessionId.value}..")
+      nextOrSameBehavior(active.removeSession(sessionId))(behavior)
   }
-
 }

@@ -1,7 +1,7 @@
 package net.scalytica.kafka.wsproxy.session
 
 import akka.actor.testkit.typed.scaladsl.ActorTestKit
-import io.github.embeddedkafka.schemaregistry._
+import io.github.embeddedkafka._
 import net.scalytica.kafka.wsproxy.codecs.{SessionIdSerde, SessionSerde}
 import net.scalytica.kafka.wsproxy.models.WsGroupId
 import net.scalytica.test.WsProxyKafkaSpec
@@ -55,8 +55,7 @@ class SessionDataProducerSpec
 
     "be able to publish a session record to the session state topic" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-        implicit val cfg =
-          plainAppTestConfig(kcfg.kafkaPort, Option(kcfg.schemaRegistryPort))
+        implicit val cfg = plainAppTestConfig(kcfg.kafkaPort)
 
         initTopic(cfg.sessionHandler.sessionStateTopicName.value)
 
@@ -79,8 +78,7 @@ class SessionDataProducerSpec
 
     "be able to publish multiple session records to the session state topic" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-        implicit val cfg =
-          plainAppTestConfig(kcfg.kafkaPort, Option(kcfg.schemaRegistryPort))
+        implicit val cfg = plainAppTestConfig(kcfg.kafkaPort)
 
         initTopic(cfg.sessionHandler.sessionStateTopicName.value)
 
@@ -105,8 +103,7 @@ class SessionDataProducerSpec
 
     "be able to publish removal of a session from the session state topic" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-        implicit val cfg =
-          plainAppTestConfig(kcfg.kafkaPort, Option(kcfg.schemaRegistryPort))
+        implicit val cfg = plainAppTestConfig(kcfg.kafkaPort)
 
         initTopic(cfg.sessionHandler.sessionStateTopicName.value)
 

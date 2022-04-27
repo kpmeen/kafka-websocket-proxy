@@ -1,7 +1,7 @@
 package net.scalytica.kafka.wsproxy
 
 import javax.management.ObjectName
-import net.scalytica.kafka.wsproxy.models.{WsClientId, WsGroupId}
+import net.scalytica.kafka.wsproxy.models.{FullConsumerId, FullProducerId}
 
 package object jmx {
 
@@ -29,9 +29,9 @@ package object jmx {
       .getOrElse(clazz.getSimpleName)
   }
 
-  def producerStatsName(clientId: WsClientId): String =
-    s"wsproxy-producer-stats-${clientId.value}"
+  def producerStatsName(fullProducerId: FullProducerId): String =
+    s"wsproxy-producer-stats-${fullProducerId.value}"
 
-  def consumerStatsName(clientId: WsClientId, groupId: WsGroupId): String =
-    s"wsproxy-consumer-stats-${groupId.value}-${clientId.value}"
+  def consumerStatsName(fullConsumerId: FullConsumerId): String =
+    s"wsproxy-consumer-stats-${fullConsumerId.value}"
 }

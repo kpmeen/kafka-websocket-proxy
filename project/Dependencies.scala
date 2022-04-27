@@ -10,6 +10,8 @@ object Versions {
   val Avro4sVersion                 = "4.0.12"
   val ConfluentPlatformVersion      = "7.0.1"
   val KafkaVersion                  = s"$ConfluentPlatformVersion-ccs"
+  val ApacheKafkaVersion            = "3.1.0"
+  val EmbeddedKafkaVersion          = ApacheKafkaVersion
   val EmbeddedSchemaRegistryVersion = ConfluentPlatformVersion
 
   val AkkaVersion            = "2.6.18"
@@ -164,6 +166,9 @@ object Dependencies {
     val Scalactic = "org.scalactic" %% "scalactic" % ScalaTestVersion
 
     val ScalaTestDeps = Seq(ScalaTest % Test, Scalactic)
+
+    val EmbeddedKafka =
+      "io.github.embeddedkafka" %% "embedded-kafka" % EmbeddedKafkaVersion excludeAll (LoggerExclusionsTest: _*)
 
     val EmbeddedSchemaRegistry =
       "io.github.embeddedkafka" %% "embedded-kafka-schema-registry" % EmbeddedSchemaRegistryVersion excludeAll (LoggerExclusionsTest: _*)

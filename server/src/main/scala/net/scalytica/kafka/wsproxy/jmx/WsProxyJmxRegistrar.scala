@@ -9,7 +9,7 @@ import net.scalytica.kafka.wsproxy.jmx.mbeans.{
   ProducerClientStatsMXBean
 }
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
-import net.scalytica.kafka.wsproxy.models.{WsClientId, WsGroupId}
+import net.scalytica.kafka.wsproxy.models.{FullConsumerId, FullProducerId}
 
 import scala.reflect.ClassTag
 import scala.util.Try
@@ -21,11 +21,11 @@ trait WsProxyJmxQueries extends WithProxyLogger {
     val tryRes = Try(mbs.getMBeanInfo(on))
     tryRes.recoverWith {
       case t: InstanceNotFoundException =>
-        logger.debug(s"MBean with ObjectName ${on.toString} could not be found")
+        log.debug(s"MBean with ObjectName ${on.toString} could not be found")
         throw t
 
       case t: Throwable =>
-        logger.info(s"Error querying MBean with ObjectName ${on.toString}", t)
+        log.info(s"Error querying MBean with ObjectName ${on.toString}", t)
         throw t
     }
     tryRes.toOption
@@ -39,19 +39,18 @@ trait WsProxyJmxQueries extends WithProxyLogger {
   }
 
   def findConsumerClientMBean(
-      clientId: WsClientId,
-      groupId: WsGroupId
+      fullConsumerId: FullConsumerId
   ): Option[MBeanInfo] = {
     findMBeanByType[ConsumerClientStatsMXBean](
-      consumerStatsName(clientId, groupId)
+      consumerStatsName(fullConsumerId)
     )
   }
 
   def findProducerClientMBean(
-      clientId: WsClientId
+      fullProducerId: FullProducerId
   ): Option[MBeanInfo] = {
     findMBeanByType[ProducerClientStatsMXBean](
-      producerStatsName(clientId)
+      producerStatsName(fullProducerId)
     )
   }
 
@@ -69,18 +68,18 @@ trait WsProxyJmxQueries extends WithProxyLogger {
     val tryRes = Try(mbs.getAttribute(on, attribute))
     tryRes.recoverWith {
       case t: InstanceNotFoundException =>
-        logger.debug(s"MBean with ObjectName ${on.toString} could not be found")
+        log.debug(s"MBean with ObjectName ${on.toString} could not be found")
         throw t
 
       case t: AttributeNotFoundException =>
-        logger.debug(
+        log.debug(
           s"Attribute $attribute was not found on " +
             s"MBean with ObjectName ${on.toString}"
         )
         throw t
 
       case t: Throwable =>
-        logger.trace(
+        log.trace(
           s"Error querying MBean with ObjectName ${on.toString} " +
             s"and attribute ${attribute.mkString(", ")}",
           t
@@ -103,7 +102,7 @@ object WsProxyJmxRegistrar extends WsProxyJmxQueries {
       actor: Behavior[T],
       objName: ObjectName
   ): ObjectInstance = {
-    logger.debug(s"Registering MBean ${objName.getCanonicalName}")
+    log.debug(s"Registering MBean ${objName.getCanonicalName}")
     mbs.registerMBean(actor, objName)
   }
 
@@ -113,7 +112,7 @@ object WsProxyJmxRegistrar extends WsProxyJmxQueries {
   @throws[InstanceNotFoundException]
   @throws[MBeanRegistrationException]
   def unregisterFromMBeanServer(objName: ObjectName): Unit = {
-    logger.debug(s"Unregistering MBean ${objName.getCanonicalName}")
+    log.debug(s"Unregistering MBean ${objName.getCanonicalName}")
     mbs.unregisterMBean(objName)
   }
 

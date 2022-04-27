@@ -1,13 +1,7 @@
 package net.scalytica.kafka.wsproxy.codecs
 
-import net.scalytica.kafka.wsproxy.models.{WsClientId, WsGroupId, WsServerId}
-import net.scalytica.kafka.wsproxy.session.{
-  ConsumerInstance,
-  ConsumerSession,
-  ProducerInstance,
-  ProducerSession,
-  SessionId
-}
+import net.scalytica.kafka.wsproxy.models._
+import net.scalytica.kafka.wsproxy.session._
 import org.scalatest.OptionValues
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
@@ -35,8 +29,7 @@ class SessionSerdeSpec extends AnyWordSpec with Matchers with OptionValues {
     maxConnections = 3,
     instances = Set(
       ConsumerInstance(
-        clientId = WsClientId("consumer-1"),
-        groupId = WsGroupId("group-1"),
+        id = FullConsumerId(WsGroupId("group-1"), WsClientId("consumer-1")),
         serverId = WsServerId("server-1")
       )
     )
@@ -51,7 +44,10 @@ class SessionSerdeSpec extends AnyWordSpec with Matchers with OptionValues {
     sessionId = SessionId("non-empty-producer-session"),
     instances = Set(
       ProducerInstance(
-        clientId = WsClientId("producer-1"),
+        id = FullProducerId(
+          WsProducerId("producer-1"),
+          Option(WsProducerInstanceId("instance-1"))
+        ),
         serverId = WsServerId("server-1")
       )
     )

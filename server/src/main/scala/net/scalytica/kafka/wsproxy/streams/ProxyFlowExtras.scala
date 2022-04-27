@@ -30,11 +30,11 @@ trait ProxyFlowExtras { self: WithProxyLogger =>
     .log("wsMessageToByteStringFlow", _ => "Concatenating incoming bytes...")
     .mapConcat {
       case tm: TextMessage =>
-        logger.trace("Received TextMessage through socket")
+        log.trace("Received TextMessage through socket")
         tm.textStream.runWith(Sink.ignore); Nil
 
       case bm: BinaryMessage =>
-        logger.trace("Received BinaryMessage through socket")
+        log.trace("Received BinaryMessage through socket")
         BinaryMessage(bm.dataStream) :: Nil
     }
     .log("wsMessageToByteStringFlow", m => s"Aggregated message: $m")

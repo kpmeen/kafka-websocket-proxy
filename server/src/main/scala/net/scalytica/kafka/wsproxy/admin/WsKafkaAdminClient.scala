@@ -11,7 +11,11 @@ import net.scalytica.kafka.wsproxy.models.{BrokerInfo, TopicName}
 import net.scalytica.kafka.wsproxy.utils.BlockingRetry
 import org.apache.kafka.clients.admin.AdminClientConfig._
 import org.apache.kafka.clients.admin._
-import org.apache.kafka.common.KafkaException
+import org.apache.kafka.common.{
+  KafkaException,
+  TopicPartition,
+  TopicPartitionInfo
+}
 import org.apache.kafka.common.config.TopicConfig._
 import org.apache.kafka.common.errors.UnknownTopicOrPartitionException
 
@@ -69,15 +73,15 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
     ).asJava
     val topic = new NewTopic(sessionStateTopicStr, 1, replFactor).configs(tconf)
 
-    logger.info("Creating session state topic...")
+    log.info("Creating session state topic...")
     Try {
       underlying.createTopics(Seq(topic).asJava).all().get()
     }.recover {
       KafkaFutureErrorHandler.handle {
-        logger.info("Topic already exists")
-      }(t => logger.error("Could not create the session state topic", t))
+        log.info("Topic already exists")
+      }(t => log.error("Could not create the session state topic", t))
     }.getOrElse(System.exit(1))
-    logger.info("Session state topic created.")
+    log.info("Session state topic created.")
   }
 
   /**
@@ -87,9 +91,9 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
    *   the [[TopicName]] to find
    */
   def findTopic(topic: TopicName): Option[String] = {
-    logger.debug(s"Trying to find topic ${topic.value}...")
+    log.debug(s"Trying to find topic ${topic.value}...")
     val t = underlying.listTopics().names().get().asScala.find(_ == topic.value)
-    logger.debug(
+    log.debug(
       s"Topic ${topic.value} was ${if (t.nonEmpty) "" else "not "}found"
     )
     t
@@ -118,15 +122,15 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
       ) { // scalastyle:ignore
         findSessionStateTopic match {
           case None    => createSessionStateTopic()
-          case Some(_) => logger.info("Session state topic verified.")
+          case Some(_) => log.info("Session state topic verified.")
         }
       } { _ =>
-        logger.warn("Session state topic not verified, terminating")
+        log.warn("Session state topic not verified, terminating")
         System.exit(1)
       }
     } catch {
       case ex: Throwable =>
-        logger.error("Session state topic verification failed.", ex)
+        log.error("Session state topic verification failed.", ex)
         throw ex
     }
   }
@@ -141,7 +145,7 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
    *   [[TopicNotFoundError]] is thrown.
    */
   @throws(classOf[TopicNotFoundError])
-  def topicPartitions(topicName: TopicName): Int = {
+  def numTopicPartitions(topicName: TopicName): Int = {
     try {
       val p = underlying
         .describeTopics(Seq(topicName.value).asJava)
@@ -152,7 +156,7 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
         .map(_._2.partitions().size())
         .getOrElse(0)
 
-      logger.debug(s"Topic ${topicName.value} has $p partitions")
+      log.debug(s"Topic ${topicName.value} has $p partitions")
       p
     } catch {
       case ee: java.util.concurrent.ExecutionException =>
@@ -160,13 +164,73 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
           case _: UnknownTopicOrPartitionException =>
             throw TopicNotFoundError(s"Topic ${topicName.value} was not found")
           case ke: KafkaException =>
-            logger.error("Unhandled Kafka Exception", ke)
+            log.error("Unhandled Kafka Exception", ke)
             throw ke
         }
       case NonFatal(e) =>
-        logger.error("Unhandled exception", e)
+        log.error("Unhandled exception", e)
         throw e
     }
+  }
+
+  /**
+   * Fetches the TopicPartitionInfo for the given Kafka topic partitions.
+   *
+   * @param topicName
+   *   the topic name to get partitions for
+   * @return
+   *   returns a list of TopicPartitionInfo for the topic. If it is not found, a
+   *   [[TopicNotFoundError]] is thrown.
+   */
+  @throws(classOf[TopicNotFoundError])
+  def topicPartitionInfoList(topicName: TopicName): List[TopicPartitionInfo] = {
+    try {
+      val p = underlying
+        .describeTopics(Seq(topicName.value).asJava)
+        .all()
+        .get()
+        .asScala
+        .headOption
+        .map(_._2.partitions().asScala.toList)
+        .getOrElse(List.empty)
+
+      log.debug(s"Topic ${topicName.value} has $p partitions")
+      p
+    } catch {
+      case ee: java.util.concurrent.ExecutionException =>
+        ee.getCause match {
+          case _: UnknownTopicOrPartitionException =>
+            throw TopicNotFoundError(s"Topic ${topicName.value} was not found")
+          case ke: KafkaException =>
+            log.error("Unhandled Kafka Exception", ke)
+            throw ke
+        }
+      case NonFatal(e) =>
+        log.error("Unhandled exception", e)
+        throw e
+    }
+  }
+
+  /**
+   * Fetch the latest offset for the session state topic.
+   * @return
+   *   a Long indicating the latest offset at the time of calling the function.
+   */
+  def lastOffsetForSessionStateTopic: Long = {
+    val topicName = cfg.sessionHandler.sessionStateTopicName
+    topicPartitionInfoList(topicName).headOption
+      .flatMap { tpi =>
+        val partition = new TopicPartition(topicName.value, tpi.partition())
+        val query     = Map(partition -> OffsetSpec.latest())
+        underlying
+          .listOffsets(query.asJava)
+          .all()
+          .get()
+          .asScala
+          .headOption
+          .map(_._2.offset())
+      }
+      .getOrElse(0L)
   }
 
   /**
@@ -176,7 +240,7 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
    *   a List of [[BrokerInfo]] data.
    */
   def clusterInfo: List[BrokerInfo] = {
-    logger.trace("Fetching Kafka cluster information...")
+    log.trace("Fetching Kafka cluster information...")
     underlying
       .describeCluster()
       .nodes()
@@ -198,7 +262,7 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
    */
   def replicationFactor: Short = {
     val numNodes = clusterInfo.size
-    logger.info(s"Calculating number of replicas for $sessionStateTopicStr...")
+    log.info(s"Calculating number of replicas for $sessionStateTopicStr...")
     val numReplicas = if (numNodes >= maxReplicas) maxReplicas else numNodes
 
     if (configuredReplicas > numReplicas) numReplicas.toShort
@@ -212,7 +276,7 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
    *   true if the cluster is ready, else false
    */
   def clusterReady: Boolean = {
-    logger.info("Verifying that cluster is ready...")
+    log.info("Verifying that cluster is ready...")
     val timeout  = 5 minutes
     val interval = 10 seconds
     val retries  = 30
@@ -226,6 +290,6 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
   /** Close the underlying admin client. */
   def close(): Unit = {
     underlying.close()
-    logger.debug("Underlying admin client closed.")
+    log.debug("Underlying admin client closed.")
   }
 }

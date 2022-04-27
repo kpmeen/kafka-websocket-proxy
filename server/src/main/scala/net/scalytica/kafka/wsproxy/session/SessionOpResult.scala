@@ -19,6 +19,27 @@ sealed trait SessionOpResult { self =>
   }
 }
 
+case class SessionStateRestored() extends SessionOpResult {
+  override def session =
+    throw new NoSuchElementException(
+      "No access to session instance when restoring global session state"
+    )
+}
+
+case class RestoringSessionState() extends SessionOpResult {
+  override def session =
+    throw new NoSuchElementException(
+      "No access to session instance when restoring global session state"
+    )
+}
+
+case object ProducerSessionsDisabled extends SessionOpResult {
+  override def session =
+    throw new NoSuchElementException(
+      "Producer sessions have been disabled in the configuration."
+    )
+}
+
 case class SessionInitialised(session: Session) extends SessionOpResult
 
 case class InstanceAdded(session: Session) extends SessionOpResult
@@ -33,6 +54,8 @@ case class InstanceTypeForSessionIncorrect(session: Session)
 case class InstanceLimitReached(session: Session) extends SessionOpResult
 
 case class InstanceDoesNotExists(session: Session) extends SessionOpResult
+
+case class ProducerInstanceMissingId(session: Session) extends SessionOpResult
 
 case class InstancesForServerRemoved() extends SessionOpResult {
 

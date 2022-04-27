@@ -33,7 +33,7 @@ class SchemaRoutesSpec
 
   implicit val oidClient: Option[OpenIdClient] = None
 
-  import TestServerRoutes.{serverErrorHandler, serverRejectionHandler}
+  import TestServerRoutes.serverRejectionHandler
 
   "The schema routes" should {
     "return HTTP 404 when requesting an invalid resource" in {

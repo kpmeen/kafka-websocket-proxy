@@ -28,7 +28,8 @@ trait WsClientSpec
     RouteTestTimeout((20 seconds).dilated)
 
   implicit val testRejectHandler = TestServerRoutes.serverRejectionHandler
-  implicit val testErrorHandler  = TestServerRoutes.serverErrorHandler
+  implicit override val testExceptionHandler =
+    TestServerRoutes.wsExceptionHandler
 
   /** Verify the server routes using an unsecured Kafka cluster */
   private[this] def defaultRouteCheck[T](
@@ -39,7 +40,7 @@ trait WsClientSpec
       body: => T
   )(
       implicit probe: WSProbe
-  ) = {
+  ): T = {
     creds match {
       case None => WS(uri, probe.flow) ~> routes ~> check(body)
       case Some(c) =>
@@ -58,7 +59,7 @@ trait WsClientSpec
       body: => T
   )(
       implicit wsClient: WSProbe
-  ) = {
+  ): T = {
     val headers = creds match {
       case Some(c) => addHeaders(Authorization(c), kafkaCreds)
       case None    => addHeader(kafkaCreds)
@@ -73,7 +74,7 @@ trait WsClientSpec
   }
 
   /** Check that the websocket behaves */
-  def checkWebSocket[T, M](
+  def inspectWebSocket[T, M](
       uri: String,
       routes: Route,
       kafkaCreds: Option[BasicHttpCredentials] = None,

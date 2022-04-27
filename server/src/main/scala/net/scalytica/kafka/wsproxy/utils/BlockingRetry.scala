@@ -3,7 +3,7 @@ package net.scalytica.kafka.wsproxy.utils
 import com.typesafe.scalalogging.Logger
 
 import scala.annotation.tailrec
-import scala.concurrent.blocking
+import scala.concurrent.{blocking, Await, Future}
 import scala.concurrent.duration._
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success, Try}
@@ -27,7 +27,13 @@ object BlockingRetry {
   private[this] def retryLoop[T](
       remainingRetries: Int,
       interval: FiniteDuration
-  )(op: => T)(err: Throwable => T)(implicit deadline: Deadline): T = {
+  )(
+      op: => T
+  )(
+      err: Throwable => T
+  )(
+      implicit deadline: Deadline
+  ): T = {
     Try(op) match {
       case Success(res) => res
       case Failure(t) =>
@@ -49,7 +55,34 @@ object BlockingRetry {
       timeout: FiniteDuration,
       interval: FiniteDuration,
       numRetries: Int
-  )(op: => T)(err: Throwable => T): T =
+  )(
+      op: => T
+  )(
+      err: Throwable => T
+  ): T = {
+    require(timeout > interval, "timeout must be greater than interval")
     retryLoop(numRetries, interval)(op)(err)(timeout.fromNow)
+  }
 
+  def retryAwaitFuture[T](
+      timeout: FiniteDuration,
+      interval: FiniteDuration,
+      numRetries: Int
+  )(
+      op: FiniteDuration => Future[T]
+  )(
+      err: Throwable => Future[T]
+  ): T = {
+    require(timeout > interval, "timeout must be greater than interval")
+    val attemptTimeout =
+      (timeout - (interval * numRetries.toLong)) / numRetries.toLong
+    retryLoop(
+      remainingRetries = numRetries,
+      interval = interval
+    )(
+      op = Await.result(op(attemptTimeout), attemptTimeout)
+    )(t => Await.result(err(t), 3 seconds))(
+      deadline = timeout.fromNow
+    )
+  }
 }

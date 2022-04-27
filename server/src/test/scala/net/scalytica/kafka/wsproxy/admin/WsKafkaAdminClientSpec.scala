@@ -1,6 +1,6 @@
 package net.scalytica.kafka.wsproxy.admin
 
-import io.github.embeddedkafka.schemaregistry.EmbeddedKafka
+import io.github.embeddedkafka.EmbeddedKafka
 import net.scalytica.test.WsProxyKafkaSpec
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Minutes, Span}

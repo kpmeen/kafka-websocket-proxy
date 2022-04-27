@@ -95,7 +95,7 @@ lazy val server = (project in file("server"))
       Logging.Log4jOverSlf4j         % Test,
       Logging.JulToSlf4j             % Test,
       Testing.ScalaTest              % Test,
-      Testing.EmbeddedSchemaRegistry % Test,
+      Testing.EmbeddedKafka          % Test,
       Testing.AkkaTestKit            % Test,
       Testing.AkkaTypedTestKit       % Test,
       Testing.AkkaHttpTestKit        % Test,

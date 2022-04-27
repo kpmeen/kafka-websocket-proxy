@@ -47,7 +47,8 @@ class WebSocketRoutesAvroBasicAuthSpec extends WebSocketRoutesAvroScaffolding {
         secureKafkaClusterProducerContext(topic = nextTopic) { implicit ctx =>
           implicit val wsClient = ctx.producerProbe
           val baseUri = baseProducerUri(
-            clientId = producerClientId("avro", topicCounter),
+            producerId = producerId("avro", topicCounter),
+            instanceId = None,
             topicName = ctx.topicName,
             payloadType = AvroPayload,
             keyType = NoType,
@@ -56,7 +57,7 @@ class WebSocketRoutesAvroBasicAuthSpec extends WebSocketRoutesAvroScaffolding {
 
           val wrongCreds = BasicHttpCredentials("bad", "user")
 
-          checkWebSocket(
+          inspectWebSocket(
             uri = baseUri,
             routes = Route.seal(ctx.route),
             kafkaCreds = Some(wrongCreds)
@@ -71,8 +72,9 @@ class WebSocketRoutesAvroBasicAuthSpec extends WebSocketRoutesAvroScaffolding {
 
           val messages = createAvroProducerRecordNoneAvro(1)
 
-          produceAndCheckAvro(
-            clientId = producerClientId("avro", topicCounter),
+          produceAndAssertAvro(
+            producerId = producerId("avro", topicCounter),
+            instanceId = None,
             topic = ctx.topicName,
             routes = Route.seal(ctx.route),
             keyType = None,

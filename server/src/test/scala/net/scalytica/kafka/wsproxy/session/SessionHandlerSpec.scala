@@ -5,10 +5,16 @@ import akka.actor.typed.scaladsl.adapter._
 import akka.actor.typed.Scheduler
 import akka.actor.typed.ActorRef
 import akka.util.Timeout
-import io.github.embeddedkafka.schemaregistry._
+import io.github.embeddedkafka._
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.codecs.{SessionIdSerde, SessionSerde}
-import net.scalytica.kafka.wsproxy.models.{WsClientId, WsGroupId, WsServerId}
+import net.scalytica.kafka.wsproxy.models.{
+  FullConsumerId,
+  WsClientId,
+  WsGroupId,
+  WsProducerId,
+  WsServerId
+}
 import net.scalytica.kafka.wsproxy.session.SessionHandler._
 import net.scalytica.test.{TestDataGenerators, WsProxyKafkaSpec}
 import org.apache.kafka.common.serialization.Deserializer
@@ -89,10 +95,10 @@ class SessionHandlerSpec
   }
 
   def validateConsumer(actual: ConsumerInstance)(
-      expectedConsumerId: WsClientId,
+      expectedClientId: WsClientId,
       expectedServerId: WsServerId
   ): Assertion = {
-    actual.clientId mustBe expectedConsumerId
+    actual.id.clientId mustBe expectedClientId
     actual.serverId mustBe expectedServerId
   }
 
@@ -171,8 +177,7 @@ class SessionHandlerSpec
 
           val r2 = ctx.sh
             .addConsumer(
-              grpId,
-              WsClientId("client1"),
+              FullConsumerId(grpId, WsClientId("client1")),
               WsServerId("n1")
             )
             .futureValue
@@ -187,40 +192,6 @@ class SessionHandlerSpec
           val ci =
             r2.session.instances.headOption.value.asInstanceOf[ConsumerInstance]
           validateConsumer(ci)(WsClientId("client1"), WsServerId("n1"))
-        }
-
-      "not allow adding a producer to a consumer session" in
-        sessionHandlerCtx { implicit ctx =>
-          implicit val kcfg = ctx.kcfg
-
-          val grpId   = WsGroupId("group1")
-          val sid     = SessionId(grpId)
-          val maxCons = 2
-
-          val s = ctx.sh.initConsumerSession(grpId, maxCons).futureValue.session
-          validateSession(s)(SessionId(grpId), maxCons)
-
-          validateSession(consumeSingleMessage().value._2)(
-            expectedSessionId = SessionId(grpId),
-            expectedMaxConnections = maxCons
-          )
-
-          val r2 = ctx.sh
-            .addProducer(
-              sid,
-              WsClientId("client1"),
-              WsServerId("n1")
-            )
-            .futureValue
-
-          r2 match {
-            case InstanceTypeForSessionIncorrect(s1) =>
-              validateSession(s1)(s.sessionId, s.maxConnections, 0)
-              r2.session.canOpenSocket mustBe true
-              r2.session.instances mustBe empty
-
-            case sop => fail(s"Unexpected result $sop")
-          }
         }
 
       "not allow adding a consumer if the session has reached its limit" in
@@ -238,8 +209,7 @@ class SessionHandlerSpec
 
           val r2 = ctx.sh
             .addConsumer(
-              grpId,
-              WsClientId("client1"),
+              FullConsumerId(grpId, WsClientId("client1")),
               WsServerId("n1")
             )
             .futureValue
@@ -257,8 +227,7 @@ class SessionHandlerSpec
 
           val r3 = ctx.sh
             .addConsumer(
-              grpId,
-              WsClientId("client2"),
+              FullConsumerId(grpId, WsClientId("client2")),
               WsServerId("n2")
             )
             .futureValue
@@ -275,8 +244,7 @@ class SessionHandlerSpec
 
           val r4 = ctx.sh
             .addConsumer(
-              grpId,
-              WsClientId("client3"),
+              FullConsumerId(grpId, WsClientId("client3")),
               WsServerId("n1")
             )
             .futureValue
@@ -291,10 +259,10 @@ class SessionHandlerSpec
       "register a new producer session" in sessionHandlerCtx { implicit ctx =>
         implicit val kcfg = ctx.kcfg
 
-        val cid = WsClientId("clientId1")
+        val cid = WsProducerId("clientId1")
         val sid = SessionId(cid)
 
-        val res = ctx.sh.initProducerSession(sid, 3).futureValue
+        val res = ctx.sh.initProducerSession(cid, 3).futureValue
         validateSession(res.session)(sid, 3)
 
         val (k, v) =

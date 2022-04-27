@@ -63,7 +63,7 @@ object WsProducer extends ProducerFlowExtras with WithProxyLogger {
       .withCloseProducerOnStop(true)
       .withBootstrapServers(kafkaUrl)
       .withProducerFactory(initialiseProducer(args.aclCredentials))
-      .withProperty(ProducerConfig.CLIENT_ID_CONFIG, args.clientId.value)
+      .withProperty(ProducerConfig.CLIENT_ID_CONFIG, args.producerId.value)
   }
 
   private[this] def initialiseProducer[K, V](
@@ -187,7 +187,7 @@ object WsProducer extends ProducerFlowExtras with WithProxyLogger {
 
       case t: Throwable =>
         client.close()
-        logger.error(
+        log.error(
           s"Unhandled error fetching topic partitions for topic ${topic.value}",
           t
         )
@@ -263,7 +263,7 @@ object WsProducer extends ProducerFlowExtras with WithProxyLogger {
 
     val settings = producerSettingsWithKey[keyType.Aux, valType.Aux](args)
 
-    logger.trace(s"Using serde $serde")
+    log.trace(s"Using serde $serde")
 
     checkClient(args.topic, settings)
 

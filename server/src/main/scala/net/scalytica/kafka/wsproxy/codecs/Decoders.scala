@@ -26,6 +26,14 @@ trait Decoders {
     json.as[String].map(WsGroupId.apply)
   }
 
+  implicit val wsProducerIdDecoder: Decoder[WsProducerId] = { json =>
+    json.as[String].map(WsProducerId.apply)
+  }
+
+  implicit val wsProducerInstanceIdDecoder: Decoder[WsProducerInstanceId] = {
+    json => json.as[String].map(WsProducerInstanceId.apply)
+  }
+
   implicit val wsServerIdDecoder: Decoder[WsServerId] = { json =>
     json.as[String].map(WsServerId.apply)
   }
@@ -34,12 +42,20 @@ trait Decoders {
     json.as[String].map(SessionId.apply)
   }
 
-  implicit val sessionClientInstanceDecoder: Decoder[ClientInstance] = {
+  implicit val fullConsumerIdDecoder: Decoder[FullConsumerId] =
+    deriveConfiguredDecoder
+
+  implicit val fullProducerIdDecoder: Decoder[FullProducerId] =
+    deriveConfiguredDecoder
+
+  // scalastyle:off
+  implicit def deriveClientInstanceDecoder: Decoder[ClientInstance] = {
     @nowarn("msg=is never used")
     implicit val cfg =
       Configuration.default.withDiscriminator("client_instance_type")
     deriveConfiguredDecoder
   }
+  // scalastyle:on
 
   implicit val sessionDecoder: Decoder[Session] = {
     @nowarn("msg=is never used")

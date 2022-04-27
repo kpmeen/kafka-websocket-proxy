@@ -4,11 +4,16 @@ import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.typed.scaladsl.adapter._
 import net.scalytica.kafka.wsproxy.jmx.mbeans.ProducerClientStatsProtocol._
 import net.scalytica.kafka.wsproxy.jmx.{producerStatsName, TestJmxQueries}
-import net.scalytica.kafka.wsproxy.models.WsClientId
+import net.scalytica.kafka.wsproxy.models.{
+  FullProducerId,
+  WsProducerId,
+  WsProducerInstanceId
+}
 import net.scalytica.test.WsProxyKafkaSpec
 import org.scalatest.{BeforeAndAfterAll, OptionValues}
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
+
 import scala.concurrent.duration._
 
 class ProducerClientStatsMXBeanSpec
@@ -18,38 +23,68 @@ class ProducerClientStatsMXBeanSpec
     with BeforeAndAfterAll
     with WsProxyKafkaSpec {
 
-  val testKit = ActorTestKit(system.toTyped)
-
-  override protected def afterAll(): Unit = {
-    super.afterAll()
-    testKit.shutdownTestKit()
-  }
-
+  val tk   = ActorTestKit(system.toTyped)
   val jmxq = new TestJmxQueries
 
-  val cid      = WsClientId("test")
-  val beanName = producerStatsName(cid)
+  val pid       = WsProducerId("test")
+  val iid       = WsProducerInstanceId("instance")
+  val fid       = FullProducerId(pid, Option(iid))
+  val fidNoInst = FullProducerId(pid, None)
 
-  val behavior = ProducerClientStatsMXBeanActor(
-    clientId = cid,
+  val beanName1 = producerStatsName(fid)
+  val beanName2 = producerStatsName(fidNoInst)
+
+  val behavior1 = ProducerClientStatsMXBeanActor(
+    fullProducerId = fid,
     useAutoAggregation = false
   )
 
-  val ref   = testKit.spawn(behavior, beanName)
-  val probe = testKit.createTestProbe[ProducerClientStatsResponse]("pcsr-probe")
-  val proxy = jmxq.getMxBean(beanName, classOf[ProducerClientStatsMXBean])
+  val behavior2 = ProducerClientStatsMXBeanActor(
+    fullProducerId = fidNoInst,
+    useAutoAggregation = false
+  )
 
-  "The ProducerClientStatsMXBean" should {
-    "increment the number records received" in {
-      ref ! IncrementRecordsReceived(probe.ref)
-      probe.expectMessage(1 second, RecordsReceivedIncremented)
-      proxy.getNumRecordsReceivedTotal mustBe 1
+  override protected def afterAll(): Unit = {
+    super.afterAll()
+    jmxq.removeMxBean(beanName1, classOf[ProducerClientStatsMXBean])
+    jmxq.removeMxBean(beanName2, classOf[ProducerClientStatsMXBean])
+    tk.shutdownTestKit()
+  }
+
+  "The ProducerClientStatsMxBean" when {
+
+    "provided with both producerId and instanceId" should {
+      "increment the bean counters" in {
+        val ref   = tk.spawn(behavior1, beanName1)
+        val probe = tk.createTestProbe[ProducerClientStatsResponse]("pcsr1")
+        val proxy =
+          jmxq.getMxBean(beanName1, classOf[ProducerClientStatsMXBean])
+
+        ref ! IncrementRecordsReceived(probe.ref)
+        probe.expectMessage(1 second, RecordsReceivedIncremented)
+        proxy.getNumRecordsReceivedTotal mustBe 1
+
+        ref ! IncrementAcksSent(probe.ref)
+        probe.expectMessage(1 second, AcksSentIncremented)
+        proxy.getNumAcksSentTotal mustBe 1
+      }
     }
 
-    "increment the number acks sent" in {
-      ref ! IncrementAcksSent(probe.ref)
-      probe.expectMessage(1 second, AcksSentIncremented)
-      proxy.getNumAcksSentTotal mustBe 1
+    "provided with only producerId" should {
+      "increment the bean counters" in {
+        val ref   = tk.spawn(behavior2, beanName2)
+        val probe = tk.createTestProbe[ProducerClientStatsResponse]("pcsr2")
+        val proxy =
+          jmxq.getMxBean(beanName2, classOf[ProducerClientStatsMXBean])
+
+        ref ! IncrementRecordsReceived(probe.ref)
+        probe.expectMessage(1 second, RecordsReceivedIncremented)
+        proxy.getNumRecordsReceivedTotal mustBe 1
+
+        ref ! IncrementAcksSent(probe.ref)
+        probe.expectMessage(1 second, AcksSentIncremented)
+        proxy.getNumAcksSentTotal mustBe 1
+      }
     }
   }
 }

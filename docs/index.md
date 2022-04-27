@@ -12,16 +12,17 @@ keywords:
 ---
 
 The Kafka WebSocket Proxy is mainly created as a more efficient alternative to
-the existing HTTP based REST proxy.
+using HTTP based REST proxies.
 
 With WebSockets, the overhead of the HTTP protocol is removed. Instead, a much
-"cheaper" TCP socket is setup between the client and proxy, through any
+"cheaper" TCP socket is set up between the client and proxy, through any
 intermediate networking components.
 
 Since WebSockets are bidirectional, they open up for client - server
 implementations that are much closer to the regular Kafka client. The WebSocket
 becomes more like an extension to the Kafka consumer/producer clients used
 internally in the proxy.
+
 
 > ### Important note on compatibility
 >
@@ -43,7 +44,5 @@ internally in the proxy.
 > The implementation adds support for producers to the internal session handler
 > mechanism.
 >
-> With version 1.1.1 this feature is temporarily removed due to a logic bug that
-> prevents more than 1 client from connecting. Regardless of configuration.
-> 
-> The producer session feature will be re-enabled again in a later version.
+> If this feature is required for your use-case, please ensure you are using
+> version >1.1.2, and have read the feature documentation.
