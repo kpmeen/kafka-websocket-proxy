@@ -35,7 +35,7 @@ import net.scalytica.kafka.wsproxy.jmx.JmxManager
 import net.scalytica.kafka.wsproxy.jmx.mbeans.ConsumerClientStatsProtocol._
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models._
-import net.scalytica.kafka.wsproxy.session.SessionHandler._
+import net.scalytica.kafka.wsproxy.session.SessionHandlerImplicits._
 import net.scalytica.kafka.wsproxy.session.{
   InstanceAdded,
   InstanceExists,

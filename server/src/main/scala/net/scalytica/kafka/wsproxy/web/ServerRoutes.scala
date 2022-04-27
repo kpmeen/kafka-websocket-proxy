@@ -29,10 +29,8 @@ import net.scalytica.kafka.wsproxy.errors._
 import net.scalytica.kafka.wsproxy.jmx.JmxManager
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models.{WsProxyAuthResult, _}
-import net.scalytica.kafka.wsproxy.session.SessionHandler.{
-  SessionHandlerOpExtensions,
-  SessionHandlerRef
-}
+import net.scalytica.kafka.wsproxy.session.SessionHandlerImplicits._
+import net.scalytica.kafka.wsproxy.session.SessionHandlerRef
 import net.scalytica.kafka.wsproxy.session.{SessionId, SessionOpResult}
 import net.scalytica.kafka.wsproxy.web.Headers.XKafkaAuthHeader
 import net.scalytica.kafka.wsproxy.web.websockets.{

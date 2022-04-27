@@ -15,7 +15,7 @@ import net.scalytica.kafka.wsproxy.models.{
   WsProducerId,
   WsServerId
 }
-import net.scalytica.kafka.wsproxy.session.SessionHandler._
+import net.scalytica.kafka.wsproxy.session.SessionHandlerImplicits._
 import net.scalytica.test.{TestDataGenerators, WsProxyKafkaSpec}
 import org.apache.kafka.common.serialization.Deserializer
 import org.scalatest.Inspectors.forAll

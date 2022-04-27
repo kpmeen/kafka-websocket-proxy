@@ -29,7 +29,7 @@ import net.scalytica.kafka.wsproxy.jmx.mbeans.ProducerClientStatsProtocol._
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models._
 import net.scalytica.kafka.wsproxy.producer.WsProducer
-import net.scalytica.kafka.wsproxy.session.SessionHandler._
+import net.scalytica.kafka.wsproxy.session.SessionHandlerImplicits._
 import net.scalytica.kafka.wsproxy.session._
 import net.scalytica.kafka.wsproxy.web.SocketProtocol.{AvroPayload, JsonPayload}
 

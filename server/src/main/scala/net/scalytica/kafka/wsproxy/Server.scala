@@ -17,7 +17,7 @@ import net.scalytica.kafka.wsproxy.jmx.JmxManager
 import net.scalytica.kafka.wsproxy.logging.DefaultProxyLogger._
 import net.scalytica.kafka.wsproxy.logging.WsProxyEnvLoggerConfigurator
 import net.scalytica.kafka.wsproxy.session.SessionHandler
-import net.scalytica.kafka.wsproxy.session.SessionHandler._
+import net.scalytica.kafka.wsproxy.session.SessionHandlerImplicits._
 import net.scalytica.kafka.wsproxy.utils.HostResolver.{
   resolveKafkaBootstrapHosts,
   HostResolutionError
