@@ -1,4 +1,4 @@
-import com.typesafe.sbt.SbtGit
+import com.github.sbt.git.SbtGit
 import com.typesafe.sbt.packager.Keys._
 import com.typesafe.sbt.packager.docker.DockerPlugin.autoImport.Docker
 import com.typesafe.sbt.packager.docker.{Cmd, DockerAlias}
