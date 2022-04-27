@@ -38,4 +38,4 @@ addSbtPlugin("com.github.sbt" % "sbt-release" % "1.1.0")
 addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.10.0")
 
 // documentation generator
-addSbtPlugin("org.scalameta" % "sbt-mdoc" % "2.3.0")
+addSbtPlugin("org.scalameta" % "sbt-mdoc" % "2.3.2")
