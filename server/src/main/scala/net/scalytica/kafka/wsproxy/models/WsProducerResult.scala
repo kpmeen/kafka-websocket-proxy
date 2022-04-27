@@ -46,7 +46,7 @@ object WsProducerResult extends WithProxyLogger {
   ): Seq[WsProducerResult] = {
     res match {
       case ProducerMessage.Result(md, ProducerMessage.Message(_, pt)) =>
-        logger.trace(
+        log.trace(
           "Mapping ProducerMessage.Result to a single WsProducerResult instance"
         )
         val pr = WsProducerResult(
@@ -63,11 +63,11 @@ object WsProducerResult extends WithProxyLogger {
         // ProducerMessage.MultiMessage type when publishing messages to Kafka.
         val msg =
           "The proxy does not currently support ProducerMessage.MultiResult."
-        logger.error(msg)
+        log.error(msg)
         throw ImpossibleError(msg)
 
       case ProducerMessage.PassThroughResult(_) =>
-        logger.trace(
+        log.trace(
           "Mapping ProducerMessage.PassThroughResult to WsProducerResult " +
             "will be ignored."
         )

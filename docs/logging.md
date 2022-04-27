@@ -32,11 +32,11 @@ default values are.
 | akka.actor                        | WS_PROXY_AKKA_ACTOR_LOG_LEVEL    |  WARN   |
 | akka.http                         | WS_PROXY_AKKA_HTTP_LOG_LEVEL     |  WARN   |
 | akka.kafka                        | WS_PROXY_AKKA_KAFKA_LOG_LEVEL    |  WARN   |
-| org.apache.kafka.clients          | WS_PROXY_KAFKA_CLIENTS_LOG_LEVEL |  ERROR  |
+| org.apache.kafka.clients          | WS_PROXY_KAFKA_CLIENTS_LOG_LEVEL |  WARN   |
 | net.scalytica.kafka.wsproxy       | WS_PROXY_APP_LOG_LEVEL           |  DEBUG  |
 | net.scalytica.kafka.wsproxy.auth  | WS_PROXY_AUTH_LOG_LEVEL          |  DEBUG  |
 | net.scalytica.kafka.wsproxy.admin | WS_PROXY_ADMIN_LOG_LEVEL         |  WARN   |
-| root                              | WS_PROXY_ROOT_LOG_LEVEL          |  ERROR  |
+| root                              | WS_PROXY_ROOT_LOG_LEVEL          |  WARN   |
 
 ## 3. Overriding full configuration through environment
 

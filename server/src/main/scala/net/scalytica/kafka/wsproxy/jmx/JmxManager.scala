@@ -1,6 +1,5 @@
 package net.scalytica.kafka.wsproxy.jmx
 
-import java.util.UUID
 import akka.NotUsed
 import akka.actor.Cancellable
 import akka.actor.typed.scaladsl.adapter._
@@ -10,7 +9,13 @@ import akka.stream.scaladsl.{Flow, Sink}
 import akka.stream.typed.scaladsl.ActorSink
 import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
-import net.scalytica.kafka.wsproxy.models.{WsCommit, WsConsumerRecord}
+import net.scalytica.kafka.wsproxy.models.{
+  FullConsumerId,
+  FullProducerId,
+  WsCommit,
+  WsConsumerRecord,
+  WsProducerId
+}
 
 import scala.concurrent.ExecutionContext
 // scalastyle:off
@@ -45,17 +50,17 @@ trait JmxProxyStatusOps { self: BaseJmxManager with WithProxyLogger =>
   final protected def updateKafkaClusterInfo(
       ref: ActorRef[ProxyStatusProtocol.ProxyStatusResponse]
   ): Unit = {
-    logger.trace("Trying to fetch Kafka cluster info...")
+    log.trace("Trying to fetch Kafka cluster info...")
     Try(adminClient.clusterInfo) match {
       case Success(brokers) =>
-        logger.trace("Sending broker info to ProxyStatusMXBeanActor")
+        log.trace("Sending broker info to ProxyStatusMXBeanActor")
         proxyStatusActor.tell(
           ProxyStatusProtocol.UpdateKafkaClusterInfo(brokers, ref)
         )
 
       case Failure(e) =>
-        logger.warn(s"Failure when attempting to fetch Kafka broker info.", e)
-        logger.trace("Sending empty broker info to ProxyStatusMXBeanActor")
+        log.warn(s"Failure when attempting to fetch Kafka broker info.", e)
+        log.trace("Sending empty broker info to ProxyStatusMXBeanActor")
         proxyStatusActor.tell(ProxyStatusProtocol.ClearBrokers(ref))
     }
   }
@@ -81,7 +86,7 @@ trait JmxConnectionStatsOps { self: BaseJmxManager with WithProxyLogger =>
     )
   } catch {
     case t: Throwable =>
-      logger.trace("An exception was thrown adding consumer from JMX bean", t)
+      log.trace("An exception was thrown adding consumer from JMX bean", t)
   }
 
   def removeConsumerConnection(): Unit = try {
@@ -90,7 +95,7 @@ trait JmxConnectionStatsOps { self: BaseJmxManager with WithProxyLogger =>
     )
   } catch {
     case t: Throwable =>
-      logger.trace("An exception was thrown removing consumer from JMX bean", t)
+      log.trace("An exception was thrown removing consumer from JMX bean", t)
   }
 
   def addProducerConnection(): Unit = try {
@@ -99,7 +104,7 @@ trait JmxConnectionStatsOps { self: BaseJmxManager with WithProxyLogger =>
     )
   } catch {
     case t: Throwable =>
-      logger.trace("An exception was thrown adding producer from JMX bean", t)
+      log.trace("An exception was thrown adding producer from JMX bean", t)
   }
 
   def removeProducerConnection(): Unit = try {
@@ -108,7 +113,7 @@ trait JmxConnectionStatsOps { self: BaseJmxManager with WithProxyLogger =>
     )
   } catch {
     case t: Throwable =>
-      logger.trace("An exception was thrown removing producer from JMX bean", t)
+      log.trace("An exception was thrown removing producer from JMX bean", t)
   }
 }
 
@@ -123,17 +128,18 @@ trait JmxConsumerStatsOps { self: BaseJmxManager =>
   )
 
   def initConsumerClientStatsActor(
-      clientId: WsClientId,
-      groupId: WsGroupId
+      fullConsumerId: FullConsumerId
   ): ActorRef[ConsumerClientStatsCommand] = {
     sys.systemActorOf(
-      behavior = ConsumerClientStatsMXBeanActor(clientId, groupId),
-      name = consumerStatsName(clientId, groupId)
+      behavior = ConsumerClientStatsMXBeanActor(fullConsumerId),
+      name = consumerStatsName(fullConsumerId)
     )
   }
 
   final protected val totalConsumerClientStatsActor =
-    initConsumerClientStatsActor(WsClientId("total"), WsGroupId("all"))
+    initConsumerClientStatsActor(
+      FullConsumerId(WsGroupId("all"), WsClientId("total"))
+    )
 
   def consumerStatsInboundWireTap(
       ccsRef: ActorRef[ConsumerClientStatsCommand]
@@ -176,23 +182,21 @@ trait JmxConsumerStatsOps { self: BaseJmxManager =>
 trait JmxProducerStatsOps { self: BaseJmxManager =>
 
   final protected val totalProducerClientStatsActor =
-    initProducerClientStatsActor(WsClientId("all"))
+    initProducerClientStatsActor(FullProducerId(WsProducerId("all"), None))
 
   def initProducerClientStatsActor(
-      clientId: WsClientId
+      fullProducerId: FullProducerId
   ): ActorRef[ProducerClientStatsCommand] = {
     sys.systemActorOf(
-      behavior = ProducerClientStatsMXBeanActor(clientId),
-      name = producerStatsName(clientId)
+      behavior = ProducerClientStatsMXBeanActor(fullProducerId),
+      name = producerStatsName(fullProducerId)
     )
   }
 
   def initProducerClientStatsActorForConnection(
-      clientId: WsClientId
+      fullProducerId: FullProducerId
   ): ActorRef[ProducerClientStatsCommand] = {
-    val suffix = UUID.randomUUID()
-    val cid    = WsClientId(s"${clientId.value}-${suffix.toString}")
-    initProducerClientStatsActor(cid)
+    initProducerClientStatsActor(fullProducerId)
   }
 
   final protected def setupProducerStatsSink(

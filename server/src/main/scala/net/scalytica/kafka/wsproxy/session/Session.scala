@@ -1,7 +1,7 @@
 package net.scalytica.kafka.wsproxy.session
 
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
-import net.scalytica.kafka.wsproxy.models.{WsClientId, WsGroupId, WsServerId}
+import net.scalytica.kafka.wsproxy.models.{FullClientId, WsGroupId, WsServerId}
 
 /**
  * Defines the common attributes and functions for session data used to keep
@@ -25,20 +25,18 @@ sealed trait Session { self =>
     maxConnections == 0 || (instances.size + 1) <= maxConnections
   }
 
-  def hasInstance(consumerId: WsClientId): Boolean = {
-    instances.exists(_.clientId == consumerId)
+  def hasInstance(clientId: FullClientId): Boolean = {
+    instances.exists(_.id == clientId)
   }
 
   def updateInstances(updated: Set[ClientInstance]): Session
 
-  def addInstance(clientId: WsClientId, serverId: WsServerId): SessionOpResult
-
   def addInstance(instance: ClientInstance): SessionOpResult
 
-  def removeInstance(clientId: WsClientId): SessionOpResult = {
+  def removeInstance(clientId: FullClientId): SessionOpResult = {
     if (hasInstance(clientId)) {
       InstanceRemoved(
-        updateInstances(instances.filterNot(_.clientId == clientId))
+        updateInstances(instances.filterNot(_.id == clientId))
       )
     } else {
       InstanceDoesNotExists(self)
@@ -75,15 +73,10 @@ case class ConsumerSession private (
     copy(instances = updated)
   }
 
-  override def addInstance(
-      clientId: WsClientId,
-      serverId: WsServerId
-  ) = addInstance(ConsumerInstance(clientId, groupId, serverId))
-
   override def addInstance(instance: ClientInstance) = {
     instance match {
       case ci: ConsumerInstance =>
-        if (hasInstance(ci.clientId)) InstanceExists(this)
+        if (hasInstance(ci.id)) InstanceExists(this)
         else {
           if (canOpenSocket) {
             InstanceAdded(updateInstances(instances + ci))
@@ -120,23 +113,15 @@ case class ProducerSession(
     copy(instances = updated)
   }
 
-  override def addInstance(
-      producerId: WsClientId,
-      serverId: WsServerId
-  ) = addInstance(ProducerInstance(producerId, serverId))
-
   override def addInstance(instance: ClientInstance) = {
     logger.trace(s"Attempting to add producer client: $instance")
     instance match {
       case pi: ProducerInstance =>
-        if (hasInstance(pi.clientId)) InstanceExists(this)
-        else {
-          if (canOpenSocket) {
-            InstanceAdded(updateInstances(instances + pi))
-          } else {
-            logger.warn(s"Client limit was reached for producer $instance")
-            InstanceLimitReached(this)
-          }
+        if (canOpenSocket) {
+          InstanceAdded(updateInstances(instances + pi))
+        } else {
+          logger.warn(s"Client limit was reached for producer $instance")
+          InstanceLimitReached(this)
         }
 
       case _ =>

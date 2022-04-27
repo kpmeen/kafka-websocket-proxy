@@ -2,11 +2,11 @@ package net.scalytica.kafka.wsproxy.web
 
 import akka.http.scaladsl.server.Route
 import net.scalytica.kafka.wsproxy.models.Formats.AvroType
+import net.scalytica.kafka.wsproxy.models.WsProducerInstanceId
 import net.scalytica.kafka.wsproxy.web.SocketProtocol.AvroPayload
 import net.scalytica.test.{
   MockOpenIdServer,
   TestDataGenerators,
-//  TestServerRoutes,
   WsProxyConsumerKafkaSpec
 }
 import org.scalatest.Inspectors.forAll
@@ -51,25 +51,30 @@ trait WebSocketRoutesAvroScaffolding
 
   protected def testRequiredQueryParamReject(
       useClientId: Boolean = true,
+      useInstanceId: Boolean = false,
       useTopicName: Boolean = true,
       useValType: Boolean = true
   )(implicit ctx: ProducerContext): Assertion = {
     implicit val wsClient = ctx.producerProbe
 
-    val cid = producerClientId("avro", topicCounter)
+    val pid = producerId("avro", topicCounter)
+    val iid =
+      if (useInstanceId) Some(WsProducerInstanceId("instance")) else None
 
     val messages = createAvroProducerRecordAvroAvro(1)
 
     val uri = buildProducerUri(
-      clientId = if (useClientId) Some(cid) else None,
+      producerId = if (useClientId) Some(pid) else None,
+      instanceId = iid,
       topicName = if (useTopicName) Some(ctx.topicName) else None,
       payloadType = Some(AvroPayload),
       keyType = Some(AvroType),
       valType = if (useValType) Some(AvroType) else None
     )
 
-    produceAndCheckAvro(
-      clientId = cid,
+    produceAndAssertAvro(
+      producerId = pid,
+      instanceId = iid,
       topic = ctx.topicName,
       routes = Route.seal(ctx.route),
       keyType = Some(AvroType),

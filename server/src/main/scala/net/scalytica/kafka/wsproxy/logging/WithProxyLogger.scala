@@ -12,7 +12,7 @@ trait WithProxyLogger { self =>
 
   final protected lazy val _log = Logger(loggerName)
 
-  final protected lazy val logger = _log
+  final protected lazy val log = _log
 
 }
 
@@ -24,7 +24,7 @@ object WithProxyLogger {
 
   def namedLoggerFor[T](implicit ct: ClassTag[T]): Logger = {
     val cpl = ClassProxyLogger(ct.runtimeClass.niceClassName)
-    cpl.logger
+    cpl.log
   }
 
 }
@@ -34,12 +34,12 @@ object DefaultProxyLogger extends WithProxyLogger {
   override protected lazy val loggerName =
     this.packageName.stripSuffix("logging") + "Server"
 
-  def trace(msg: String): Unit                   = logger.trace(msg)
-  def debug(msg: String): Unit                   = logger.debug(msg)
-  def info(msg: String): Unit                    = logger.info(msg)
-  def warn(msg: String): Unit                    = logger.warn(msg)
-  def warn(msg: String, cause: Throwable): Unit  = logger.warn(msg, cause)
-  def error(msg: String): Unit                   = logger.error(msg)
-  def error(msg: String, cause: Throwable): Unit = logger.error(msg, cause)
+  def trace(msg: String): Unit                   = log.trace(msg)
+  def debug(msg: String): Unit                   = log.debug(msg)
+  def info(msg: String): Unit                    = log.info(msg)
+  def warn(msg: String): Unit                    = log.warn(msg)
+  def warn(msg: String, cause: Throwable): Unit  = log.warn(msg, cause)
+  def error(msg: String): Unit                   = log.error(msg)
+  def error(msg: String, cause: Throwable): Unit = log.error(msg, cause)
 
 }

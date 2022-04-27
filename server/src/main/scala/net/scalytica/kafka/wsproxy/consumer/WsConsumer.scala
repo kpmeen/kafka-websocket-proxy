@@ -96,7 +96,7 @@ object WsConsumer extends WithProxyLogger {
         jaasProps
     }
 
-    logger.trace(
+    log.trace(
       s"Using consumer configuration: ${props.mkString("\n  ", "\n  ", "")}"
     )
 
@@ -154,7 +154,7 @@ object WsConsumer extends WithProxyLogger {
 
       case t: Throwable =>
         client.close()
-        logger.error(
+        log.error(
           s"Unhandled error fetching topic partitions for topic ${topic.value}",
           t
         )
@@ -196,7 +196,7 @@ object WsConsumer extends WithProxyLogger {
       kd: Deserializer[K],
       vd: Deserializer[V]
   ): Source[WsConsumerRecord[K, V], Consumer.Control] = {
-    logger.debug("Setting up consumer with auto-commit ENABLED")
+    log.debug("Setting up consumer with auto-commit ENABLED")
     val settings = consumerSettings[K, V](args, autoCommit = true)
 
     checkClient(args.topic, settings)
@@ -242,7 +242,7 @@ object WsConsumer extends WithProxyLogger {
       kd: Deserializer[K],
       vd: Deserializer[V]
   ): Source[WsConsumerRecord[K, V], Consumer.Control] = {
-    logger.debug("Setting up consumer with auto-commit DISABLED")
+    log.debug("Setting up consumer with auto-commit DISABLED")
     val settings = consumerSettings[K, V](args, autoCommit = false)
 
     checkClient(args.topic, settings)

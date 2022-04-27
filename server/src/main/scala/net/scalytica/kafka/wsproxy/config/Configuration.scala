@@ -5,8 +5,8 @@ import net.scalytica.kafka.wsproxy.errors.ConfigurationError
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models.{
   TopicName,
-  WsClientId,
   WsGroupId,
+  WsProducerId,
   WsServerId
 }
 import org.apache.kafka.clients.CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG
@@ -41,11 +41,11 @@ object Configuration extends WithProxyLogger {
   implicit lazy val stringAsServerId: ConfigReader[WsServerId] =
     ConfigReader.fromString(str => Right(WsServerId(str)))
 
-  implicit lazy val stringAsClientId: ConfigReader[WsClientId] =
-    ConfigReader.fromString(str => Right(WsClientId(str)))
-
   implicit lazy val stringAsGroupId: ConfigReader[WsGroupId] =
     ConfigReader.fromString(str => Right(WsGroupId(str)))
+
+  implicit lazy val stringAsWsProducerId: ConfigReader[WsProducerId] =
+    ConfigReader.fromString(str => Right(WsProducerId(str)))
 
   implicit lazy val stringAsTopicName: ConfigReader[TopicName] =
     ConfigReader.fromString(str => Right(TopicName(str)))
@@ -125,7 +125,7 @@ object Configuration extends WithProxyLogger {
 
   private[this] val prodLimCfgReader: ConfigReader[ProducerSpecificLimitCfg] = {
     ConfigReader.forProduct3(
-      keyA0 = "client-id",
+      keyA0 = "producer-id",
       keyA1 = "messages-per-second",
       keyA2 = "max-connections"
     )(ProducerSpecificLimitCfg.apply)
@@ -214,12 +214,12 @@ object Configuration extends WithProxyLogger {
   }
 
   final case class ProducerSpecificLimitCfg(
-      clientId: WsClientId,
+      producerId: WsProducerId,
       messagesPerSecond: Option[Int],
       maxConnections: Option[Int]
   ) extends ClientSpecificLimitCfg {
 
-    override val id        = clientId.value
+    override val id        = producerId.value
     override val batchSize = None
 
   }
@@ -231,9 +231,11 @@ object Configuration extends WithProxyLogger {
       clientSpecificLimits: Seq[ClientSpecificLimitCfg] = Seq.empty
   ) {
 
-    def forProducer(clientId: WsClientId): Option[ClientSpecificLimitCfg] = {
+    def forProducer(
+        producerId: WsProducerId
+    ): Option[ClientSpecificLimitCfg] = {
       clientSpecificLimits.find {
-        case p: ProducerSpecificLimitCfg => p.clientId == clientId
+        case p: ProducerSpecificLimitCfg => p.producerId == producerId
         case _                           => false
       }
     }
@@ -258,6 +260,7 @@ object Configuration extends WithProxyLogger {
   }
 
   final case class ProducerCfg(
+      sessionsEnabled: Boolean,
       limits: ClientLimitsCfg,
       kafkaClientProperties: Map[String, AnyRef]
   ) {
@@ -404,12 +407,12 @@ object Configuration extends WithProxyLogger {
   }
 
   def load(): AppCfg = {
-    logger.debug("Loading default config")
+    log.debug("Loading default config")
     ConfigSource.default.at(CfgRootKey).loadOrThrow[AppCfg]
   }
 
   def loadFrom(arg: (String, Any)*): AppCfg = {
-    logger.debug("Loading config from key/value pairs")
+    log.debug("Loading config from key/value pairs")
     loadString(arg.map(t => s"${t._1} = ${t._2}").mkString("\n"))
   }
 
@@ -419,7 +422,7 @@ object Configuration extends WithProxyLogger {
    *   The a resolved instance of Typesafe Config
    */
   def loadTypesafeConfig(): Config = {
-    logger.debug("Loading default typesafe configuration")
+    log.debug("Loading default typesafe configuration")
     ConfigSource.default.config() match {
       case Right(config) => config
       case Left(errors)  => throw ConfigurationError(errors.prettyPrint())
@@ -427,17 +430,17 @@ object Configuration extends WithProxyLogger {
   }
 
   def loadString(str: String): AppCfg = {
-    logger.debug(s"Loading configuration from string")
+    log.debug(s"Loading configuration from string")
     loadConfig(ConfigFactory.parseString(str))
   }
 
   def loadConfig(cfg: Config): AppCfg = {
-    logger.debug(s"Loading configuration from ${classOf[Config]} instance")
+    log.debug(s"Loading configuration from ${classOf[Config]} instance")
     ConfigSource.fromConfig(cfg).at(CfgRootKey).loadOrThrow[AppCfg]
   }
 
   def loadFile(file: Path): AppCfg = {
-    logger.debug(s"Loading configuration file at path $file")
+    log.debug(s"Loading configuration file at path $file")
     ConfigSource.file(file).at(CfgRootKey).loadOrThrow[AppCfg]
   }
 }

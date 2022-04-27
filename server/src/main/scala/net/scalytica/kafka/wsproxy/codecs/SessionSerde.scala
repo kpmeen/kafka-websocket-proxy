@@ -9,6 +9,7 @@ import net.scalytica.kafka.wsproxy.codecs.Implicits.{
 }
 import net.scalytica.kafka.wsproxy.errors.InvalidSessionStateFormat
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
+import net.scalytica.kafka.wsproxy.models.FullConsumerId
 import net.scalytica.kafka.wsproxy.session.{
   ConsumerInstance,
   ConsumerSession,
@@ -26,17 +27,17 @@ class SessionSerde extends StringBasedSerde[Session] with WithProxyLogger {
     Option(data).map { d =>
       val str = des.deserialize(topic, d)
 
-      logger.trace(s"Deserialized session message from topic $topic to:\n$str")
+      log.trace(s"Deserialized session message from topic $topic to:\n$str")
 
       parse(str).flatMap(_.as[Session]) match {
         case Left(err) =>
-          logger.warn(
+          log.warn(
             "Session data could not be deserialized to latest format," +
               "falling back to old format"
           )
           parse(str).flatMap(_.as[OldSession]) match {
             case Left(oldErr) =>
-              logger.error(
+              log.error(
                 s"Exception deserializing session from topic $topic:" +
                   s"\n$str" +
                   s"\nfirst error: ${err.getMessage}" +
@@ -52,7 +53,10 @@ class SessionSerde extends StringBasedSerde[Session] with WithProxyLogger {
                 groupId = old.consumerGroupId,
                 maxConnections = old.consumerLimit,
                 instances = old.consumers.map { o =>
-                  ConsumerInstance(o.id, old.consumerGroupId, o.serverId)
+                  ConsumerInstance(
+                    id = FullConsumerId(old.consumerGroupId, o.id),
+                    serverId = o.serverId
+                  )
                 }
               )
           }

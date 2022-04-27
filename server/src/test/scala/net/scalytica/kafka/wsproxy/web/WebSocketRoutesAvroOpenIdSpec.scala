@@ -25,8 +25,9 @@ class WebSocketRoutesAvroOpenIdSpec extends WebSocketRoutesAvroScaffolding {
 
               val messages = createAvroProducerRecordNoneAvro(1)
 
-              produceAndCheckAvro(
-                clientId = producerClientId("avro", topicCounter),
+              produceAndAssertAvro(
+                producerId = producerId("avro", topicCounter),
+                instanceId = None,
                 topic = ctx.topicName,
                 routes = Route.seal(ctx.route),
                 keyType = None,
@@ -50,8 +51,9 @@ class WebSocketRoutesAvroOpenIdSpec extends WebSocketRoutesAvroScaffolding {
 
               val messages = createAvroProducerRecordNoneAvro(1)
 
-              produceAndCheckAvro(
-                clientId = producerClientId("avro", topicCounter),
+              produceAndAssertAvro(
+                producerId = producerId("avro", topicCounter),
+                instanceId = None,
                 topic = ctx.topicName,
                 routes = Route.seal(ctx.route),
                 keyType = None,
@@ -74,14 +76,15 @@ class WebSocketRoutesAvroOpenIdSpec extends WebSocketRoutesAvroScaffolding {
               val token = AccessToken("Bearer", "foo.bar.baz", 3600L, None)
 
               val baseUri = baseProducerUri(
-                clientId = producerClientId("avro", topicCounter),
+                producerId = producerId("avro", topicCounter),
+                instanceId = None,
                 topicName = ctx.topicName,
                 payloadType = AvroPayload,
                 keyType = NoType,
                 valType = StringType
               )
 
-              checkWebSocket(
+              inspectWebSocket(
                 uri = baseUri,
                 routes = Route.seal(ctx.route),
                 creds = Some(token.bearerToken),
@@ -105,14 +108,15 @@ class WebSocketRoutesAvroOpenIdSpec extends WebSocketRoutesAvroScaffolding {
               val token = invalidAccessToken(oidcHost, oidcPort)
 
               val baseUri = baseProducerUri(
-                clientId = producerClientId("avro", topicCounter),
+                producerId = producerId("avro", topicCounter),
+                instanceId = None,
                 topicName = ctx.topicName,
                 payloadType = AvroPayload,
                 keyType = NoType,
                 valType = StringType
               )
 
-              checkWebSocket(
+              inspectWebSocket(
                 uri = baseUri,
                 routes = Route.seal(ctx.route),
                 creds = Some(token.bearerToken)
@@ -132,14 +136,15 @@ class WebSocketRoutesAvroOpenIdSpec extends WebSocketRoutesAvroScaffolding {
               implicit val wsClient = ctx.producerProbe
 
               val baseUri = baseProducerUri(
-                clientId = producerClientId("avro", topicCounter),
+                producerId = producerId("avro", topicCounter),
+                instanceId = None,
                 topicName = ctx.topicName,
                 payloadType = AvroPayload,
                 keyType = NoType,
                 valType = StringType
               )
 
-              checkWebSocket(
+              inspectWebSocket(
                 uri = baseUri,
                 routes = Route.seal(ctx.route),
                 creds = Some(token.bearerToken),
@@ -171,8 +176,9 @@ class WebSocketRoutesAvroOpenIdSpec extends WebSocketRoutesAvroScaffolding {
 
               val messages = createAvroProducerRecordNoneAvro(1)
 
-              produceAndCheckAvro(
-                clientId = producerClientId("avro", topicCounter),
+              produceAndAssertAvro(
+                producerId = producerId("avro", topicCounter),
+                instanceId = None,
                 topic = ctx.topicName,
                 routes = Route.seal(ctx.route),
                 keyType = None,

@@ -19,7 +19,7 @@ case class ActiveSessions(
   def find(sessionId: SessionId): Option[Session] = sessions.get(sessionId)
 
   def removeInstancesFromServerId(serverId: WsServerId): ActiveSessions = {
-    logger.trace(s"Removing all sessions for $serverId...")
+    log.trace(s"Removing all sessions for $serverId...")
     val s = sessions.map { case (sid, session) =>
       sid -> session.removeInstancesFromServerId(serverId)
     }
@@ -30,11 +30,11 @@ case class ActiveSessions(
     sessions.find(_._1 == session.sessionId) match {
       case Some(_) =>
         val msg = s"Session for ${session.sessionId} already exists"
-        logger.trace(msg)
+        log.trace(msg)
         Left(msg)
 
       case None =>
-        logger.trace(s"Adding session $session...")
+        log.trace(s"Adding session $session...")
         val ns = session.sessionId -> session
         Right(copy(sessions = sessions + ns))
     }
@@ -44,10 +44,10 @@ case class ActiveSessions(
       sessionId: SessionId,
       session: Session
   ): Either[String, ActiveSessions] = {
-    logger.trace(s"Updating session for $sessionId...")
+    log.trace(s"Updating session for $sessionId...")
     sessions.find(_._1 == sessionId) match {
       case None =>
-        logger.trace(s"Session for $sessionId was not found...")
+        log.trace(s"Session for $sessionId was not found...")
         add(session)
 
       case Some((gid, _)) =>
@@ -59,10 +59,10 @@ case class ActiveSessions(
     sessions.find(_._1 == sessionId) match {
       case None =>
         val msg = s"Session for $sessionId does not exist"
-        logger.trace(msg)
+        log.trace(msg)
         Left(msg)
       case Some(_) =>
-        logger.trace(s"Removing session for $sessionId")
+        log.trace(s"Removing session for $sessionId")
         Right(copy(sessions = sessions - sessionId))
     }
   }

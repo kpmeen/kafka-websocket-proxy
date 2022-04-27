@@ -7,7 +7,11 @@ import akka.http.scaladsl.testkit.WSProbe
 import akka.util.ByteString
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroProducerRecord
 import net.scalytica.kafka.wsproxy.models.Formats._
-import net.scalytica.kafka.wsproxy.models.{TopicName, WsClientId}
+import net.scalytica.kafka.wsproxy.models.{
+  TopicName,
+  WsProducerId,
+  WsProducerInstanceId
+}
 import net.scalytica.kafka.wsproxy.web.SocketProtocol.{
   AvroPayload,
   JsonPayload,
@@ -18,10 +22,10 @@ import org.scalatest.{Assertion, Suite}
 
 trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
 
-  val producerClientId = (prefix: String, topicNum: Int) =>
-    WsClientId(
-      s"$prefix-producer-client-$topicNum"
-    )
+  val producerId = (prefix: String, topicNum: Int) =>
+    WsProducerId(s"$prefix-producer-client-$topicNum")
+
+  val instanceId = (id: String) => WsProducerInstanceId(id)
 
   protected def testTopicPrefix: String
 
@@ -33,19 +37,21 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
   }
 
   def buildProducerUri(
-      clientId: Option[WsClientId],
+      producerId: Option[WsProducerId],
+      instanceId: Option[WsProducerInstanceId],
       topicName: Option[TopicName],
       payloadType: Option[SocketPayload] = None,
       keyType: Option[FormatType] = None,
       valType: Option[FormatType] = None
   ): String = {
-    val cidArg     = clientId.map(cid => s"clientId=${cid.value}")
+    val cidArg     = producerId.map(cid => s"clientId=${cid.value}")
+    val insArg     = instanceId.map(iid => s"instanceId=${iid.value}")
     val topicArg   = topicName.map(tn => s"topic=${tn.value}")
     val payloadArg = payloadType.map(pt => s"socketPayload=${pt.name}")
     val keyArg     = keyType.map(kt => s"keyType=${kt.name}")
     val valArg     = valType.map(vt => s"valType=${vt.name}")
 
-    val args = List(cidArg, topicArg, payloadArg, keyArg, valArg)
+    val args = List(cidArg, insArg, topicArg, payloadArg, keyArg, valArg)
       .filterNot(_.isEmpty)
       .collect { case Some(arg) => arg }
       .mkString("", "&", "")
@@ -53,12 +59,13 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
     s"/socket/in?$args"
   }
 
-  private[this] def validProducerUrl(uri: String): Boolean = {
+  private[this] def isProducerUrlValid(uri: String): Boolean = {
     uri.contains("clientId") && uri.contains("topic")
   }
 
   def baseProducerUri(
-      clientId: WsClientId,
+      producerId: WsProducerId,
+      instanceId: Option[WsProducerInstanceId],
       topicName: TopicName,
       payloadType: SocketPayload = JsonPayload,
       keyType: FormatType = StringType,
@@ -66,16 +73,34 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
   ): String = {
     val baseUri =
       "/socket/in?" +
-        s"clientId=${clientId.value}" +
+        s"clientId=${producerId.value}" +
+        instanceId.map(id => s"&instanceId=${id.value}").getOrElse("") +
         s"&topic=${topicName.value}" +
         s"&socketPayload=${payloadType.name}" +
         s"&valType=${valType.name}"
     if (keyType != NoType) baseUri + s"&keyType=${keyType.name}" else baseUri
   }
 
+  def assertProducerWS[T](
+      routes: Route,
+      uri: String,
+      kafkaCreds: Option[BasicHttpCredentials] = None,
+      creds: Option[HttpCredentials] = None
+  )(body: => T)(implicit wsClient: WSProbe): T = {
+    inspectWebSocket(
+      uri = uri,
+      routes = routes,
+      kafkaCreds = kafkaCreds,
+      creds = creds
+    ) {
+      body
+    }
+  }
+
   // scalastyle:off
-  def produceAndCheckJson(
-      clientId: WsClientId,
+  def produceAndAssertJson(
+      producerId: WsProducerId,
+      instanceId: Option[WsProducerInstanceId],
       topic: TopicName,
       keyType: FormatType,
       valType: FormatType,
@@ -88,38 +113,43 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
   )(implicit wsClient: WSProbe): Assertion = {
     val uri = producerUri.getOrElse {
       baseProducerUri(
-        clientId = clientId,
+        producerId = producerId,
+        instanceId = instanceId,
         topicName = topic,
         keyType = keyType,
         valType = valType
       )
     }
 
-    checkWebSocket(
+    inspectWebSocket(
       uri = uri,
       routes = routes,
       kafkaCreds = kafkaCreds,
       creds = creds
     ) {
-      if (validProducerUrl(uri)) {
+      if (isProducerUrlValid(uri)) {
         isWebSocketUpgrade mustBe true
 
-        forAll(messages) { msg =>
-          wsClient.sendMessage(msg)
-          wsClient.expectWsProducerResultJson(topic, validateMessageId)
+        if (messages.nonEmpty) {
+          forAll(messages) { msg =>
+            wsClient.sendMessage(msg)
+            wsClient.expectWsProducerResultJson(topic, validateMessageId)
+          }
+          wsClient.sendCompletion()
+          wsClient.expectCompletion()
         }
-        wsClient.sendCompletion()
-        wsClient.expectCompletion()
+
         wsClient.succeed
       } else {
         isWebSocketUpgrade mustBe false
-        status mustBe StatusCodes.NotFound
+        status mustBe StatusCodes.BadRequest
       }
     }
   }
 
-  def produceAndCheckAvro(
-      clientId: WsClientId,
+  def produceAndAssertAvro(
+      producerId: WsProducerId,
+      instanceId: Option[WsProducerInstanceId],
       topic: TopicName,
       routes: Route,
       keyType: Option[FormatType],
@@ -134,7 +164,8 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
   ): Assertion = {
     val uri = producerUri.getOrElse {
       baseProducerUri(
-        clientId = clientId,
+        producerId = producerId,
+        instanceId = instanceId,
         topicName = topic,
         payloadType = AvroPayload,
         keyType = keyType.getOrElse(NoType),
@@ -142,13 +173,13 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
       )
     }
 
-    checkWebSocket(
+    inspectWebSocket(
       uri = uri,
       routes = routes,
       kafkaCreds = kafkaCreds,
       creds = creds
     ) {
-      if (validProducerUrl(uri)) {
+      if (isProducerUrlValid(uri)) {
         isWebSocketUpgrade mustBe true
 
         forAll(messages) { msg =>
@@ -161,7 +192,7 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
         wsClient.succeed
       } else {
         isWebSocketUpgrade mustBe false
-        status mustBe StatusCodes.NotFound
+        status mustBe StatusCodes.BadRequest
       }
     }
   }

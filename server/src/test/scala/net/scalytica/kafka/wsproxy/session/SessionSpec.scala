@@ -1,6 +1,14 @@
 package net.scalytica.kafka.wsproxy.session
 
-import net.scalytica.kafka.wsproxy.models.{WsClientId, WsGroupId, WsServerId}
+import net.scalytica.kafka.wsproxy.models.{
+  FullConsumerId,
+  FullProducerId,
+  WsClientId,
+  WsGroupId,
+  WsProducerId,
+  WsProducerInstanceId,
+  WsServerId
+}
 import net.scalytica.test.SessionOpResultValues
 import org.scalatest.OptionValues
 import org.scalatest.matchers.must.Matchers
@@ -11,6 +19,42 @@ class SessionSpec
     with Matchers
     with SessionOpResultValues
     with OptionValues {
+
+  private[this] def producerInstance(
+      id: String,
+      instanceId: String,
+      serverId: String
+  ): ProducerInstance = {
+    ProducerInstance(
+      id = fullProducerId(id, Some(instanceId)),
+      serverId = WsServerId(serverId)
+    )
+  }
+
+  private[this] def consumerInstance(
+      id: String,
+      groupId: String,
+      serverId: String
+  ): ConsumerInstance = {
+    ConsumerInstance(
+      id = fullConsumerId(groupId, id),
+      serverId = WsServerId(serverId)
+    )
+  }
+
+  private[this] def fullConsumerId(
+      groupId: String,
+      clientId: String
+  ): FullConsumerId = FullConsumerId(WsGroupId(groupId), WsClientId(clientId))
+
+  private[this] def fullProducerId(
+      producerId: String,
+      instanceId: Option[String]
+  ): FullProducerId =
+    FullProducerId(
+      WsProducerId(producerId),
+      instanceId.map(WsProducerInstanceId.apply)
+    )
 
   "A session" when {
 
@@ -29,17 +73,18 @@ class SessionSpec
       "be initialised with consumer group, max connections and" +
         " consumer instances" in {
           assertCompiles(
-            """ConsumerSession(
+            """
+            |ConsumerSession(
             |  sessionId = SessionId("foo"),
             |  groupId = WsGroupId("foo"),
             |  maxConnections = 2,
             |  instances = Set(
             |    ConsumerInstance(
-            |      clientId = WsClientId("bar"),
-            |      groupId = WsGroupId("foo"),
+            |      id = FullConsumerId(WsGroupId("foo"), WsClientId("bar")),
             |      serverId = WsServerId("node-123")
             |    )
-            |  ))""".stripMargin
+            |  )
+            |)""".stripMargin
           )
         }
 
@@ -48,13 +93,7 @@ class SessionSpec
           sessionId = SessionId("foo"),
           groupId = WsGroupId("foo"),
           maxConnections = 1,
-          instances = Set(
-            ConsumerInstance(
-              clientId = WsClientId("bar"),
-              groupId = WsGroupId("foo"),
-              serverId = WsServerId("node-123")
-            )
-          )
+          instances = Set(consumerInstance("bar", "foo", "node-123"))
         )
         succeed
       }
@@ -65,20 +104,15 @@ class SessionSpec
             sessionId = SessionId("foo"),
             groupId = WsGroupId("foo"),
             maxConnections = 1,
-            instances = Set(
-              ProducerInstance(
-                clientId = WsClientId("bar"),
-                serverId = WsServerId("node-123")
-              )
-            )
+            instances = Set(producerInstance("bar", "pi1", "node-123"))
           )
         }
       }
 
       "allow adding a new consumer using base arguments" in {
         val s1 = ConsumerSession(SessionId("s1"), WsGroupId("s1"))
-        val s2 = s1.addInstance(WsClientId("c1"), WsServerId("n1")).value
-        val s3 = s2.addInstance(WsClientId("c2"), WsServerId("n2")).value
+        val s2 = s1.addInstance(consumerInstance("c1", "s1", "n1")).value
+        val s3 = s2.addInstance(consumerInstance("c2", "s1", "n2")).value
 
         s1.instances mustBe empty
         s2.instances must have size 1
@@ -86,28 +120,26 @@ class SessionSpec
       }
 
       "not allow adding a producer instance" in {
-        val gid = WsGroupId("s1")
-        val sid = WsServerId("n1")
-        val s1  = ConsumerSession(SessionId(gid), gid)
+        val gid = "s1"
+        val sid = "n1"
+        val s1  = ConsumerSession(SessionId(gid), WsGroupId(gid))
 
         s1.instances mustBe empty
 
-        val ci = ConsumerInstance(WsClientId("c1"), gid, sid)
-
+        val ci = ConsumerInstance(fullConsumerId(gid, "c1"), WsServerId(sid))
         val s2 = s1.addInstance(ci).value
 
         s2.instances must have size 1
 
-        val pi = ProducerInstance(WsClientId("c2"), sid)
+        val pi = producerInstance("c2", "pi1", sid)
         s2.addInstance(pi) mustBe an[InstanceTypeForSessionIncorrect]
       }
 
       "allow adding a new consumer instance" in {
         val s1 = ConsumerSession(SessionId("s1"), WsGroupId("s1"))
-          .addInstance(WsClientId("c1"), WsServerId("n1"))
+          .addInstance(consumerInstance("c1", "s1", "n1"))
           .value
-        val ci =
-          ConsumerInstance(WsClientId("c2"), WsGroupId("s1"), WsServerId("n2"))
+        val ci = consumerInstance("c2", "s1", "n2")
         val s2 = s1.addInstance(ci).value
 
         s1.instances must have size 1
@@ -119,52 +151,53 @@ class SessionSpec
       "return the same session if an existing consumer is added" in {
         val s1 =
           ConsumerSession(SessionId("s1"), WsGroupId("s1"))
-            .addInstance(WsClientId("c1"), WsServerId("n1"))
+            .addInstance(consumerInstance("c1", "s1", "n1"))
             .value
-            .addInstance(WsClientId("c2"), WsServerId("n2"))
+            .addInstance(consumerInstance("c2", "s1", "n2"))
             .value
-        val s2 = s1.addInstance(WsClientId("c2"), WsServerId("n2")).value
+        val s2 = s1.addInstance(consumerInstance("c2", "s1", "n2")).value
 
         s2 mustBe s1
       }
 
       "remove a consumer based on its client id" in {
+        val expected = fullConsumerId("s1", "c2")
         val s1 =
           ConsumerSession(SessionId("s1"), WsGroupId("s1"))
-            .addInstance(WsClientId("c1"), WsServerId("n1"))
+            .addInstance(consumerInstance("c1", "s1", "n1"))
             .value
-            .addInstance(WsClientId("c2"), WsServerId("n2"))
+            .addInstance(consumerInstance("c2", "s1", "n2"))
             .value
-        val s2 = s1.removeInstance(WsClientId("c1")).value
+        val s2 = s1.removeInstance(fullConsumerId("s1", "c1")).value
 
         s2.instances must have size 1
-        s2.instances.headOption.value.clientId mustBe WsClientId("c2")
+        s2.instances.headOption.value.id mustBe expected
       }
 
       "return the same session when removing a non-existing consumer id" in {
         val s1 =
           ConsumerSession(SessionId("s1"), WsGroupId("s1"))
-            .addInstance(WsClientId("c1"), WsServerId("n1"))
+            .addInstance(consumerInstance("c1", "s1", "n1"))
             .value
-            .addInstance(WsClientId("c2"), WsServerId("n2"))
+            .addInstance(consumerInstance("c2", "s1", "n2"))
             .value
-        val s2 = s1.removeInstance(WsClientId("c0")).value
+        val s2 = s1.removeInstance(fullConsumerId("s1", "c0")).value
 
         s2 mustBe s1
       }
 
       "return true when the session can have more consumers" in {
         ConsumerSession(SessionId("s1"), WsGroupId("s1"))
-          .addInstance(WsClientId("c1"), WsServerId("n1"))
+          .addInstance(consumerInstance("c1", "s1", "n1"))
           .value
           .canOpenSocket mustBe true
       }
 
       "return false when the session can not have more consumers" in {
         ConsumerSession(SessionId("s1"), WsGroupId("s1"))
-          .addInstance(WsClientId("c1"), WsServerId("n1"))
+          .addInstance(consumerInstance("c1", "s1", "n1"))
           .value
-          .addInstance(WsClientId("c2"), WsServerId("n2"))
+          .addInstance(consumerInstance("c2", "s1", "n2"))
           .value
           .canOpenSocket mustBe false
       }
@@ -173,13 +206,13 @@ class SessionSpec
         "limit is reached" in {
           val s1 =
             ConsumerSession(SessionId("s1"), WsGroupId("s1"))
-              .addInstance(WsClientId("c1"), WsServerId("n1"))
+              .addInstance(consumerInstance("c1", "s1", "n1"))
               .value
-              .addInstance(WsClientId("c2"), WsServerId("n2"))
+              .addInstance(consumerInstance("c2", "s1", "n2"))
               .value
+
           s1.addInstance(
-            WsClientId("c3"),
-            WsServerId("n3")
+            consumerInstance("c3", "s1", "n1")
           ) mustBe InstanceLimitReached(s1)
         }
 
@@ -203,7 +236,7 @@ class SessionSpec
             |  maxConnections = 2,
             |  instances = Set(
             |    ProducerInstance(
-            |      clientId = WsClientId("bar"),
+            |      id = FullProducerId(WsProducerId("foo"), Option(WsProducerInstanceId("bar"))),
             |      serverId = WsServerId("node-123")
             |    )
             |  ))""".stripMargin
@@ -214,12 +247,7 @@ class SessionSpec
         ProducerSession(
           sessionId = SessionId("foo"),
           maxConnections = 2,
-          instances = Set(
-            ProducerInstance(
-              clientId = WsClientId("bar"),
-              serverId = WsServerId("node-123")
-            )
-          )
+          instances = Set(producerInstance("bar", "pi1", "node-123"))
         )
         succeed
       }
@@ -229,13 +257,7 @@ class SessionSpec
           ProducerSession(
             sessionId = SessionId("foo"),
             maxConnections = 2,
-            instances = Set(
-              ConsumerInstance(
-                clientId = WsClientId("bar"),
-                groupId = WsGroupId("foo"),
-                serverId = WsServerId("node-123")
-              )
-            )
+            instances = Set(consumerInstance("bar", "foo", "node-123"))
           )
         }
       }
@@ -243,8 +265,8 @@ class SessionSpec
       "allow adding a new producer using base arguments" in {
         val s1 =
           ProducerSession(sessionId = SessionId("s1"), maxConnections = 2)
-        val s2 = s1.addInstance(WsClientId("c1"), WsServerId("n1")).value
-        val s3 = s2.addInstance(WsClientId("c2"), WsServerId("n2")).value
+        val s2 = s1.addInstance(producerInstance("c1", "pi1", "n1")).value
+        val s3 = s2.addInstance(producerInstance("c1", "pi2", "n2")).value
 
         s1.instances mustBe empty
         s2.instances must have size 1
@@ -252,18 +274,17 @@ class SessionSpec
       }
 
       "not allow adding a consumer instance" in {
-        val sid = WsServerId("n1")
+        val sid = "n1"
         val s1  = ProducerSession(SessionId("foo"))
 
         s1.instances mustBe empty
 
-        val ci = ProducerInstance(WsClientId("c1"), sid)
-
+        val ci = producerInstance("c1", "pi1", sid)
         val s2 = s1.addInstance(ci).value
 
         s2.instances must have size 1
 
-        val pi = ConsumerInstance(WsClientId("c2"), WsGroupId("s1"), sid)
+        val pi = consumerInstance("c1", "s1", sid)
         s2.addInstance(pi) mustBe an[InstanceTypeForSessionIncorrect]
       }
 
@@ -271,8 +292,9 @@ class SessionSpec
         val s1 = ProducerSession(
           sessionId = SessionId("s1"),
           maxConnections = 2
-        ).addInstance(WsClientId("c1"), WsServerId("n1")).value
-        val ci = ProducerInstance(WsClientId("c2"), WsServerId("n2"))
+        ).addInstance(producerInstance("c1", "pi1", "n1")).value
+
+        val ci = producerInstance("c1", "pi2", "n2")
         val s2 = s1.addInstance(ci).value
 
         s1.instances must have size 1
@@ -284,52 +306,52 @@ class SessionSpec
       "return the same session if an existing producer is added" in {
         val s1 =
           ProducerSession(sessionId = SessionId("s1"), maxConnections = 2)
-            .addInstance(WsClientId("c1"), WsServerId("n1"))
+            .addInstance(producerInstance("c1", "pi1", "n1"))
             .value
-            .addInstance(WsClientId("c2"), WsServerId("n2"))
+            .addInstance(producerInstance("c1", "pi2", "n2"))
             .value
-        val s2 = s1.addInstance(WsClientId("c2"), WsServerId("n2")).value
 
-        s2 mustBe s1
+        s1.addInstance(producerInstance("c1", "pi2", "n2")).value mustBe s1
       }
 
-      "remove a producer based on its client id" in {
+      "remove a producer based on its instance id" in {
+        val expected = fullProducerId("c1", Some("pi1"))
         val s1 =
           ProducerSession(sessionId = SessionId("s1"), maxConnections = 2)
-            .addInstance(WsClientId("c1"), WsServerId("n1"))
+            .addInstance(producerInstance("c1", "pi1", "n1"))
             .value
-            .addInstance(WsClientId("c2"), WsServerId("n2"))
+            .addInstance(producerInstance("c1", "pi2", "n2"))
             .value
-        val s2 = s1.removeInstance(WsClientId("c1")).value
+        val s2 = s1.removeInstance(fullProducerId("c1", Some("pi2"))).value
 
         s2.instances must have size 1
-        s2.instances.headOption.value.clientId mustBe WsClientId("c2")
+        s2.instances.headOption.value.id mustBe expected
       }
 
       "return the same session when removing a non-existing client id" in {
         val s1 =
           ProducerSession(sessionId = SessionId("s1"), maxConnections = 2)
-            .addInstance(WsClientId("c1"), WsServerId("n1"))
+            .addInstance(producerInstance("c1", "pi1", "n1"))
             .value
-            .addInstance(WsClientId("c2"), WsServerId("n2"))
+            .addInstance(producerInstance("c1", "pi2", "n2"))
             .value
-        val s2 = s1.removeInstance(WsClientId("c0")).value
+        val s2 = s1.removeInstance(fullProducerId("c1", Some("pi0"))).value
 
         s2 mustBe s1
       }
 
       "return true when the session can have more producers" in {
         ProducerSession(sessionId = SessionId("s1"), maxConnections = 2)
-          .addInstance(WsClientId("c1"), WsServerId("n1"))
+          .addInstance(producerInstance("c1", "pi1", "n1"))
           .value
           .canOpenSocket mustBe true
       }
 
       "return false when the session can not have more producers" in {
         ProducerSession(sessionId = SessionId("s1"), maxConnections = 2)
-          .addInstance(WsClientId("c1"), WsServerId("n1"))
+          .addInstance(producerInstance("c1", "pi1", "n1"))
           .value
-          .addInstance(WsClientId("c2"), WsServerId("n2"))
+          .addInstance(producerInstance("c1", "pi2", "n1"))
           .value
           .canOpenSocket mustBe false
       }
@@ -337,13 +359,13 @@ class SessionSpec
       "not allowing adding more producer instances when limit is reached" in {
         val s1 =
           ProducerSession(sessionId = SessionId("s1"), maxConnections = 2)
-            .addInstance(WsClientId("c1"), WsServerId("n1"))
+            .addInstance(producerInstance("c1", "pi1", "n1"))
             .value
-            .addInstance(WsClientId("c2"), WsServerId("n2"))
+            .addInstance(producerInstance("c1", "pi2", "n1"))
             .value
+
         s1.addInstance(
-          WsClientId("c3"),
-          WsServerId("n3")
+          producerInstance("c1", "pi3", "n2")
         ) mustBe InstanceLimitReached(s1)
       }
 

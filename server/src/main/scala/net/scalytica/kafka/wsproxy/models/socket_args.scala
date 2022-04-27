@@ -124,8 +124,11 @@ object OutSocketArgs {
 /**
  * Encodes configuration params for an inbound WebSocket stream.
  *
- * @param clientId
+ * @param producerId
  *   the clientId to use for the Kafka producer.
+ * @param instanceId
+ *   a unique identifier for the producer client instance. If sessions are
+ *   enabled this parameter is required.
  * @param topic
  *   the Kafka topic to subscribe to.
  * @param socketPayload
@@ -138,9 +141,10 @@ object OutSocketArgs {
  *   the type for the message values in the topic.
  */
 case class InSocketArgs(
-    clientId: WsClientId,
+    producerId: WsProducerId,
     topic: TopicName,
     socketPayload: SocketPayload,
+    instanceId: Option[WsProducerInstanceId] = None,
     aclCredentials: Option[AclCredentials] = None,
     keyType: Option[Formats.FormatType] = None,
     valType: Formats.FormatType = Formats.StringType,
@@ -157,7 +161,8 @@ case class InSocketArgs(
 object InSocketArgs {
 
   type TupledQueryParams = (
-      WsClientId,
+      WsProducerId,
+      Option[WsProducerInstanceId],
       TopicName,
       SocketPayload,
       Option[FormatType],
@@ -168,21 +173,24 @@ object InSocketArgs {
       t: TupledQueryParams
   ): InSocketArgs = fromQueryParams(
     clientId = t._1,
-    topicName = t._2,
-    socketPayload = t._3,
-    keyTpe = t._4,
-    valTpe = t._5
+    instanceId = t._2,
+    topicName = t._3,
+    socketPayload = t._4,
+    keyTpe = t._5,
+    valTpe = t._6
   )
 
   def fromQueryParams(
-      clientId: WsClientId,
+      clientId: WsProducerId,
+      instanceId: Option[WsProducerInstanceId],
       topicName: TopicName,
       socketPayload: SocketPayload,
       keyTpe: Option[FormatType],
       valTpe: FormatType
   ): InSocketArgs =
     InSocketArgs(
-      clientId = clientId,
+      producerId = clientId,
+      instanceId = instanceId,
       topic = topicName,
       socketPayload = socketPayload,
       keyType = keyTpe,

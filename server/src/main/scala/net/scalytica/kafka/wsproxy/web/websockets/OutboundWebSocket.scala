@@ -5,7 +5,7 @@ import akka.actor.typed.scaladsl.adapter._
 import akka.actor.typed.{ActorRef, Scheduler}
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.{Route, ValidationRejection}
+import akka.http.scaladsl.server.Route
 import akka.kafka.scaladsl.Consumer
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
@@ -27,6 +27,10 @@ import net.scalytica.kafka.wsproxy.codecs.ProtocolSerdes.{
 }
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.consumer.{CommitStackHandler, WsConsumer}
+import net.scalytica.kafka.wsproxy.errors.{
+  RequestValidationError,
+  UnexpectedError
+}
 import net.scalytica.kafka.wsproxy.jmx.JmxManager
 import net.scalytica.kafka.wsproxy.jmx.mbeans.ConsumerClientStatsProtocol._
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
@@ -51,15 +55,14 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
 
   /** Convenience function for logging and throwing an error in a Flow */
   def logAndThrow[T](message: String, t: Throwable): T = {
-    logger.error(message, t)
+    log.error(message, t)
     throw t
   }
 
   /** Prepare the session for a given client */
   private[this] def initSessionForConsumer(
       serverId: WsServerId,
-      groupId: WsGroupId,
-      clientId: WsClientId,
+      fullConsumerId: FullConsumerId,
       maxConnections: Int,
       sh: ActorRef[SessionHandlerProtocol.Protocol]
   )(
@@ -67,14 +70,14 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
       scheduler: Scheduler
   ) = {
     for {
-      ir     <- sh.initConsumerSession(groupId, maxConnections)
-      _      <- logger.debugf(s"Session ${ir.session.sessionId} ready.")
-      addRes <- sh.addConsumer(groupId, clientId, serverId)
+      ir     <- sh.initConsumerSession(fullConsumerId.groupId, maxConnections)
+      _      <- log.debugf(s"Session ${ir.session.sessionId} ready.")
+      addRes <- sh.addConsumer(fullConsumerId, serverId)
     } yield addRes
   }
 
   /** Setup the JMX flows for the websocket stream */
-  private[this] def prepareJmx(groupId: WsGroupId, clientId: WsClientId)(
+  private[this] def prepareJmx(fullConsumerId: FullConsumerId)(
       implicit jmx: Option[JmxManager],
       as: ActorSystem
   ): ActorRef[ConsumerClientStatsCommand] = jmx
@@ -82,7 +85,7 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
       // Update the number of active consumer connections
       j.addConsumerConnection()
       // Init consumer client stats actor
-      j.initConsumerClientStatsActor(clientId, groupId)
+      j.initConsumerClientStatsActor(fullConsumerId)
     }
     .getOrElse {
       implicit val tas = as.toTyped
@@ -95,7 +98,7 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
   )(implicit appCfg: AppCfg): Int = {
     def calc(confLimit: Int): Int = {
       if (confLimit == 0) numPartitions
-      else if (numPartitions >= confLimit && confLimit != 0) confLimit
+      else if (numPartitions >= confLimit && confLimit > 0) confLimit
       else numPartitions
     }
 
@@ -143,7 +146,7 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
       sessionHandler: ActorRef[SessionHandlerProtocol.Protocol],
       jmxManager: Option[JmxManager]
   ): Route = {
-    logger.debug(
+    log.debug(
       s"Initialising outbound WebSocket for topic ${args.topic.value} " +
         s"with payload ${args.socketPayload}"
     )
@@ -151,71 +154,63 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
     implicit val scheduler = as.scheduler.toTyped
 
     val wsAdminClient   = new WsKafkaAdminClient(cfg)
-    val topicPartitions = wsAdminClient.topicPartitions(args.topic)
+    val topicPartitions = wsAdminClient.numTopicPartitions(args.topic)
 
-    val serverId    = cfg.server.serverId
-    val clientId    = args.clientId
-    val groupId     = args.groupId
-    val maxConLimit = calculateMaxConnections(topicPartitions, groupId)
+    val serverId       = cfg.server.serverId
+    val clientId       = args.clientId
+    val groupId        = args.groupId
+    val fullConsumerId = FullConsumerId(groupId, clientId)
+    val maxConLimit    = calculateMaxConnections(topicPartitions, groupId)
 
     val consumerAddResult = initSessionForConsumer(
       serverId = serverId,
-      groupId = groupId,
-      clientId = clientId,
+      fullConsumerId = fullConsumerId,
       maxConnections = maxConLimit,
       sh = sessionHandler
     )
 
     onSuccess(consumerAddResult) {
       case InstanceAdded(_) =>
-        prepareOutboundWebSocket(args) { () =>
+        prepareOutboundWebSocket(fullConsumerId, args) { () =>
           // Decrease the number of active consumer connections.
           jmxManager.foreach(_.removeConsumerConnection())
           // Remove the consumer from the session handler
           sessionHandler
-            .removeConsumer(groupId, clientId, serverId)
+            .removeConsumer(fullConsumerId, serverId)
             .map(_ => Done)
             .recoverWith { case t: Throwable =>
-              logger.trace("Consumer removal failed due to an error", t)
+              log.trace("Consumer removal failed due to an error", t)
               Future.successful(Done)
             }
         }
 
       case InstanceExists(_) =>
-        reject(
-          ValidationRejection(
-            s"WebSocket for consumer ${clientId.value} in session " +
-              s"${groupId.value} not established because a consumer with the" +
-              " same ID is already registered."
-          )
+        throw RequestValidationError(
+          s"WebSocket for consumer ${clientId.value} in session " +
+            s"${groupId.value} not established because a consumer with the" +
+            " same ID is already registered."
         )
 
       case InstanceLimitReached(s) =>
-        reject(
-          ValidationRejection(
-            s"The max number of WebSockets for session ${groupId.value} " +
-              s"has been reached. Limit is ${s.maxConnections}"
-          )
+        throw RequestValidationError(
+          s"The max number of WebSockets for session ${groupId.value} " +
+            s"has been reached. Limit is ${s.maxConnections}"
         )
 
       case SessionNotFound(_) =>
-        reject(
-          ValidationRejection(
-            s"Could not find an active session for ${groupId.value}."
-          )
+        throw RequestValidationError(
+          s"Could not find an active session for ${groupId.value}."
         )
 
       case wrong =>
-        logger.error(
+        log.error(
           s"Adding consumer failed with an unexpected state." +
             s" Session:\n ${wrong.session}"
         )
-        failWith(
-          new InternalError(
-            "An unexpected error occurred when trying to establish the " +
-              s"WebSocket consumer ${clientId.value} in session" +
-              s" ${groupId.value}."
-          )
+        throw UnexpectedError(
+          "An unexpected error occurred when trying to establish the " +
+            s"WebSocket consumer ${clientId.value} in session" +
+            s" ${groupId.value}."
         )
     }
   }
@@ -245,6 +240,7 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
    *   the WebSocket [[Route]]
    */
   private[this] def prepareOutboundWebSocket(
+      fullConsumerId: FullConsumerId,
       args: OutSocketArgs
   )(terminateConsumer: () => Future[Done])(
       implicit cfg: AppCfg,
@@ -258,7 +254,7 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
       if (args.autoCommit) None
       else Some(as.spawn(CommitStackHandler.commitStack, args.clientId.value))
 
-    implicit val statsActorRef = prepareJmx(args.groupId, args.clientId)
+    implicit val statsActorRef = prepareJmx(fullConsumerId)
 
     // Init inbound monitoring flow
     val jmxInFlow = jmxManager
@@ -288,7 +284,7 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
         termination.onComplete {
           case scala.util.Success(_) =>
             m._2.drainAndShutdown(Future.successful(Done))
-            logger.info(
+            log.info(
               "Outbound WebSocket connect with clientId " +
                 s"${args.clientId.value} for topic ${args.topic.value} has " +
                 "been disconnected."
@@ -296,7 +292,7 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
 
           case scala.util.Failure(e) =>
             m._2.drainAndShutdown(Future.successful(Done))
-            logger.error(
+            log.error(
               "Outbound WebSocket connection with clientId " +
                 s"${args.clientId.value} for topic ${args.topic.value} has " +
                 "been disconnected due to an unexpected error",
@@ -342,7 +338,7 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
               ref = ar,
               onCompleteMessage = CommitStackHandler.Stop,
               onFailureMessage = { t: Throwable =>
-                logger.error(
+                log.error(
                   "Commit stack handler encountered an error while processing" +
                     s" commit message for client ${args.clientId.value} " +
                     s"in group ${args.groupId.value}",

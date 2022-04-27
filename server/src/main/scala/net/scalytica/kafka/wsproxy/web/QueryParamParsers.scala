@@ -4,6 +4,7 @@ import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.unmarshalling.Unmarshaller
+import net.scalytica.kafka.wsproxy.errors.RequestValidationError
 import net.scalytica.kafka.wsproxy.web.SocketProtocol._
 import net.scalytica.kafka.wsproxy.models.Formats._
 import net.scalytica.kafka.wsproxy.models._
@@ -17,6 +18,20 @@ trait QueryParamParsers {
   implicit val clientIdUnmarshaller: Unmarshaller[String, WsClientId] =
     Unmarshaller.strict[String, WsClientId] { str =>
       Option(str).map(WsClientId.apply).getOrElse {
+        throw Unmarshaller.NoContentException
+      }
+    }
+
+  implicit val producerIdUnmarshaller: Unmarshaller[String, WsProducerId] =
+    Unmarshaller.strict[String, WsProducerId] { str =>
+      Option(str).map(WsProducerId.apply).getOrElse {
+        throw Unmarshaller.NoContentException
+      }
+    }
+
+  implicit val pInstIdUnmarshaller: Unmarshaller[String, WsProducerInstanceId] =
+    Unmarshaller.strict[String, WsProducerInstanceId] { str =>
+      Option(str).map(WsProducerInstanceId.apply).getOrElse {
         throw Unmarshaller.NoContentException
       }
     }
@@ -73,7 +88,8 @@ trait QueryParamParsers {
 
   case class ProducerParamError(
       sessionId: SessionId,
-      wsClientId: WsClientId
+      wsProducerId: WsProducerId,
+      wsInstanceId: Option[WsProducerInstanceId]
   ) extends ParamError
 
   def paramsOnError(
@@ -81,11 +97,16 @@ trait QueryParamParsers {
   ): Directive[Tuple1[ParamError]] = {
     if (request.uri.path.endsWith("in", ignoreTrailingSlash = true)) {
       parameters(
-        Symbol("clientId").as[WsClientId] ?
+        Symbol("clientId").as[WsProducerId] ?,
+        Symbol("instanceId").as[WsProducerInstanceId] ?
       ).tmap { t =>
         t._1
           .map[ParamError] { cid =>
-            ProducerParamError(SessionId.forProducer(None)(cid), cid)
+            ProducerParamError(
+              SessionId.forProducer(None)(cid),
+              cid,
+              t._2
+            )
           }
           .getOrElse(MissingRequiredParam)
       }
@@ -136,11 +157,20 @@ trait QueryParamParsers {
    */
   def inParams: Directive[Tuple1[InSocketArgs]] =
     parameters(
-      Symbol("clientId").as[WsClientId],
+      Symbol("clientId").as[WsProducerId],
+      Symbol("instanceId").as[WsProducerInstanceId] ?,
       Symbol("topic").as[TopicName],
       Symbol("socketPayload").as[SocketPayload] ? (JsonPayload: SocketPayload),
       Symbol("keyType").as[FormatType] ?,
       Symbol("valType").as[FormatType] ? (StringType: FormatType)
-    ).tmap(InSocketArgs.fromTupledQueryParams)
+    ).tmap(InSocketArgs.fromTupledQueryParams).recover { rejections =>
+      rejections.headOption
+        .map { case MissingQueryParamRejection(paramName) =>
+          throw RequestValidationError(
+            s"Request param $paramName is missing or invalid."
+          )
+        }
+        .getOrElse(throw RequestValidationError("The request was invalid"))
+    }
 
 }

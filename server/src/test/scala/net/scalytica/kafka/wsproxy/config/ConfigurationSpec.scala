@@ -225,12 +225,17 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
 
       cfg.producer.limits.defaultMessagesPerSecond mustBe 0
       cfg.producer.limits.defaultMaxConnectionsPerClient mustBe 0
-      cfg.producer.limits.clientSpecificLimits must have size 1
-      val limitedClientCfg =
+      cfg.producer.limits.clientSpecificLimits must have size 2
+      val limitedClient1Cfg =
         cfg.producer.limits.clientSpecificLimits.headOption.value
-      limitedClientCfg.id mustBe "dummy"
-      limitedClientCfg.messagesPerSecond.value mustBe 10
-      limitedClientCfg.maxConnections.value mustBe 1
+      limitedClient1Cfg.id mustBe "limit-test-producer-1"
+      limitedClient1Cfg.messagesPerSecond.value mustBe 10
+      limitedClient1Cfg.maxConnections.value mustBe 1
+      val limitedClient2Cfg =
+        cfg.producer.limits.clientSpecificLimits.lastOption.value
+      limitedClient2Cfg.id mustBe "limit-test-producer-2"
+      limitedClient2Cfg.messagesPerSecond.value mustBe 10
+      limitedClient2Cfg.maxConnections.value mustBe 2
 
       val shCfg = cfg.sessionHandler
       shCfg.sessionStateTopicName.value mustBe "_wsproxy.session.state"

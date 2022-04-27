@@ -23,6 +23,14 @@ trait Encoders {
     Json.fromString(gid.value)
   }
 
+  implicit val wsProducerIdEncoder: Encoder[WsProducerId] = { pid =>
+    Json.fromString(pid.value)
+  }
+
+  implicit val wsProducerInstanceIdEncoder: Encoder[WsProducerInstanceId] = {
+    piid => Json.fromString(piid.value)
+  }
+
   implicit val wsServerIdEncoder: Encoder[WsServerId] = { sid =>
     Json.fromString(sid.value)
   }
@@ -31,12 +39,20 @@ trait Encoders {
     Json.fromString(sid.value)
   }
 
+  implicit val fullConsumerIdEncoder: Encoder[FullConsumerId] =
+    deriveConfiguredEncoder
+
+  implicit val fullProducerIdEncoder: Encoder[FullProducerId] =
+    deriveConfiguredEncoder
+
+  // scalastyle:off
   implicit val sessionClientInstanceEncoder: Encoder[ClientInstance] = {
     @nowarn("msg=is never used")
     implicit val cfg =
       Configuration.default.withDiscriminator("client_instance_type")
     deriveConfiguredEncoder
   }
+  // scalastyle:on
 
   implicit val sessionEncoder: Encoder[Session] = {
     @nowarn("msg=is never used")

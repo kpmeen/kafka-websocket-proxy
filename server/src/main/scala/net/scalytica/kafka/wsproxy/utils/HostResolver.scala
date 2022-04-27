@@ -38,7 +38,7 @@ object HostResolver extends WithProxyLogger {
   ): HostResolutionResult =
     Try(InetAddress.getByName(host))
       .map { addr =>
-        logger.info(s"Successfully resolved host $host")
+        log.info(s"Successfully resolved host $host")
         HostResolved(addr)
       }
       .getOrElse {
@@ -77,7 +77,7 @@ object HostResolver extends WithProxyLogger {
         ) {
           resolveHost(host, Some(resErrStr(host)))
         } { _ =>
-          logger.warn(s"Resolution of host $host failed, no more retries.")
+          log.warn(s"Resolution of host $host failed, no more retries.")
           HostResolutionError(
             s"$host could not be resolved within time limit of $timeout."
           )

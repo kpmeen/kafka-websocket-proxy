@@ -100,7 +100,7 @@ object KafkaLoginModules extends WithProxyLogger {
         case PlainSaslServer.PLAIN_MECHANISM => Some(Plain(ac))
         case m if Scram.validScram(m)        => Some(Scram(ac))
         case m =>
-          logger.warn(
+          log.warn(
             s"Using sasl.mechanism $m is not yet supported. " +
               "Please use PLAIN, SCRAM-SHA-256 or SCRAM-SHA-512."
           )

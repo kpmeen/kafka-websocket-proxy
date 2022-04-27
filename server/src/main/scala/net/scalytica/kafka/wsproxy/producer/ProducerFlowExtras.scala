@@ -17,7 +17,7 @@ import net.scalytica.kafka.wsproxy.models.Formats.FormatType
 import net.scalytica.kafka.wsproxy.models.{
   InSocketArgs,
   ProducerEmptyMessage,
-  WsClientId,
+  WsProducerId,
   WsProducerRecord
 }
 import net.scalytica.kafka.wsproxy.streams.ProxyFlowExtras
@@ -32,7 +32,7 @@ private[producer] trait ProducerFlowExtras
 
   /** Convenience function for logging and throwing an error in a Flow */
   def logAndEmpty[T](msg: String, t: Throwable)(empty: T): T = {
-    logger.error(msg, t)
+    log.error(msg, t)
     empty
   }
 
@@ -94,19 +94,19 @@ private[producer] trait ProducerFlowExtras
   ): Flow[Message, Message, NotUsed] = {
     val defaultMps = cfg.producer.limits.defaultMessagesPerSecond
     rateLimitFlow(
-      args.clientId,
+      args.producerId,
       defaultMps,
       cfg.producer.limits.clientSpecificLimits
     )
   }
 
   def rateLimitFlow(
-      clientId: WsClientId,
+      producerId: WsProducerId,
       defaultMessagesPerSecond: Int,
       clientLimits: Seq[ClientSpecificLimitCfg]
   ): Flow[Message, Message, NotUsed] = {
     val mps = clientLimits
-      .find(_.id.equals(clientId.value))
+      .find(_.id.equals(producerId.value))
       .flatMap(_.messagesPerSecond)
       .getOrElse(defaultMessagesPerSecond)
 

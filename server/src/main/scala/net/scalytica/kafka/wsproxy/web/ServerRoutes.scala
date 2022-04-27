@@ -68,11 +68,11 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
         creds match {
           case p @ Credentials.Provided(id) // constant time comparison
               if usr.equals(id) && p.verify(pwd) =>
-            logger.trace("Successfully authenticated bearer token.")
+            log.trace("Successfully authenticated bearer token.")
             Some(BasicAuthResult(id))
 
           case _ =>
-            logger.info("Could not authenticate basic auth credentials")
+            log.info("Could not authenticate basic auth credentials")
             None
         }
       }
@@ -86,7 +86,7 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
       maybeOpenIdClient: Option[OpenIdClient],
       mat: Materializer
   ): Future[Option[WsProxyAuthResult]] = {
-    logger.trace(s"Going to validate openid token $creds")
+    log.trace(s"Going to validate openid token $creds")
     implicit val ec = mat.executionContext
 
     maybeOpenIdClient match {
@@ -96,25 +96,25 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
             val bearerToken = OAuth2BearerToken(token)
             oidcClient.validate(bearerToken).flatMap {
               case Success(jwtClaim) =>
-                logger.trace("Successfully authenticated bearer token.")
+                log.trace("Successfully authenticated bearer token.")
                 val jar = JwtAuthResult(bearerToken, jwtClaim)
                 if (jar.isValid) Future.successful(Some(jar))
                 else Future.successful(None)
               case Failure(err) =>
                 err match {
                   case err: ProxyAuthError =>
-                    logger.info("Could not authenticate bearer token", err)
+                    log.info("Could not authenticate bearer token", err)
                     Future.successful(None)
                   case err =>
                     Future.failed(err)
                 }
             }
           case _ =>
-            logger.info("Could not authenticate bearer token")
+            log.info("Could not authenticate bearer token")
             Future.successful(None)
         }
       case None =>
-        logger.info("OpenID Connect is not enabled")
+        log.info("OpenID Connect is not enabled")
         Future.successful(None)
     }
   }
@@ -124,7 +124,7 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
       maybeOpenIdClient: Option[OpenIdClient],
       mat: Materializer
   ): Directive1[WsProxyAuthResult] = {
-    logger.debug("Attempting authentication using openid-connect...")
+    log.debug("Attempting authentication using openid-connect...")
     cfg.server.openidConnect
       .flatMap { oidcCfg =>
         val realm = oidcCfg.realm.getOrElse("")
@@ -132,7 +132,7 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
         else None
       }
       .getOrElse {
-        logger.info("OpenID Connect is not enabled.")
+        log.info("OpenID Connect is not enabled.")
         provide(AuthDisabled)
       }
   }
@@ -140,7 +140,7 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
   protected def maybeAuthenticateBasic[T](
       implicit cfg: AppCfg
   ): Directive1[WsProxyAuthResult] = {
-    logger.debug("Attempting authentication using basic authentication...")
+    log.debug("Attempting authentication using basic authentication...")
     cfg.server.basicAuth
       .flatMap { ba =>
         if (ba.enabled)
@@ -148,7 +148,7 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
         else None
       }
       .getOrElse {
-        logger.info("Basic authentication is not enabled.")
+        log.info("Basic authentication is not enabled.")
         provide(AuthDisabled)
       }
   }
@@ -181,28 +181,37 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
 
   private[this] def removeClientComplete(
       sid: SessionId,
-      gid: Option[WsGroupId],
-      cid: WsClientId,
-      isConsumer: Boolean = true
+      fid: FullClientId
   )(tryRes: Try[SessionOpResult]): Unit = {
-    val grpStr     = gid.map(g => s" from group ${g.value}").getOrElse("")
-    val clientType = if (isConsumer) "consumer" else "producer"
+    val (removingMsg, failMsg) = fid match {
+      case FullConsumerId(gid, cid) =>
+        val remStr = (msg: String) =>
+          s"Removing consumer ${cid.value} from group ${gid.value} " +
+            s"in session ${sid.value} on server ${serverId.value} " +
+            s"returned: $msg"
+
+        val errStr = "An error occurred when trying to remove consumer" +
+          s" ${cid.value} from group ${gid.value} in session ${sid.value} " +
+          s"on server ${serverId.value}."
+
+        (remStr, errStr)
+
+      case FullProducerId(pid, iid) =>
+        val instStr = iid.map(i => s" instance ${i.value} for").getOrElse("")
+        val remStr = (msg: String) =>
+          s"Removing$instStr producer ${pid.value} in session ${sid.value} " +
+            s"on server ${serverId.value} returned: $msg"
+
+        val errStr = s"An error occurred when trying to remove$instStr" +
+          s"producer ${pid.value} in session ${sid.value} " +
+          s"on server ${serverId.value}."
+
+        (remStr, errStr)
+    }
 
     tryRes match {
-      case Success(res) =>
-        logger.debug(
-          s"Removing $clientType ${cid.value}$grpStr" +
-            s" in session ${sid.value} on server ${serverId.value}" +
-            s" returned: ${res.asString}"
-        )
-
-      case Failure(err) =>
-        logger.warn(
-          s"An error occurred when trying to remove $clientType" +
-            s" ${cid.value}$grpStr in session ${sid.value}" +
-            s"on server ${serverId.value}",
-          err
-        )
+      case Success(res) => log.debug(removingMsg(res.asString))
+      case Failure(err) => log.warn(failMsg, err)
     }
   }
 
@@ -217,17 +226,19 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
 
           args match {
             case ConsumerParamError(sid, cid, gid) =>
+              val fid = FullConsumerId(gid, cid)
               sessionHandler.shRef
-                .removeConsumer(gid, cid, serverId)
-                .onComplete(removeClientComplete(sid, Option(gid), cid))
+                .removeConsumer(fid, serverId)
+                .onComplete(removeClientComplete(sid, fid))
 
-            case ProducerParamError(sid, cid) =>
+            case ProducerParamError(sid, pid, ins) =>
+              val fid = FullProducerId(pid, ins)
               sessionHandler.shRef
-                .removeProducer(cid, serverId)
-                .onComplete(removeClientComplete(sid, None, cid))
+                .removeProducer(fid, serverId)
+                .onComplete(removeClientComplete(sid, fid))
 
             case wrong =>
-              logger.warn(
+              log.warn(
                 "Insufficient information in request to remove internal " +
                   s"client references due to ${wrong.niceClassSimpleName}"
               )
@@ -244,7 +255,7 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
       m: => ToResponseMarshallable
   ) = {
     extractRequest { request =>
-      logger.warn(
+      log.warn(
         s"Request ${request.method.value} ${request.uri.toString} failed"
       )
       rejectRequest(request)(m)
@@ -255,55 +266,59 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
       proxyError: ProxyError,
       clientError: ClientError
   ) = extractUri { uri =>
-    logger.info(s"Request to $uri could not be authenticated.", proxyError)
+    log.info(s"Request to $uri could not be authenticated.", proxyError)
     rejectAndComplete(jsonResponseMsg(clientError, proxyError.getMessage))
   }
 
   private[this] def invalidTokenRejection(tokenError: InvalidTokenError) =
     extractUri { uri =>
-      logger.info(s"JWT token in request $uri is not valid.", tokenError)
+      log.info(s"JWT token in request $uri is not valid.", tokenError)
       rejectAndComplete(jsonResponseMsg(Unauthorized, tokenError.getMessage))
     }
 
-  implicit def serverErrorHandler: ExceptionHandler =
+  def wsExceptionHandler: ExceptionHandler =
     ExceptionHandler {
       case t: TopicNotFoundError =>
         extractUri { uri =>
-          logger.info(s"Topic in request $uri was not found.", t)
+          log.info(s"Topic in request $uri was not found.", t)
           rejectAndComplete(jsonResponseMsg(BadRequest, t.message))
         }
 
+      case r: RequestValidationError =>
+        log.info(s"Request failed with RequestValidationError", r)
+        rejectAndComplete(jsonResponseMsg(BadRequest, r.msg))
+
       case i: InvalidPublicKeyError =>
-        logger.warn(s"Request failed with an InvalidPublicKeyError.", i)
+        log.warn(s"Request failed with an InvalidPublicKeyError.", i)
         notAuthenticatedRejection(i, Unauthorized)
 
       case i: InvalidTokenError =>
-        logger.warn(s"Request failed with an InvalidTokenError.", i)
+        log.warn(s"Request failed with an InvalidTokenError.", i)
         invalidTokenRejection(i)
 
       case a: AuthenticationError =>
-        logger.warn(s"Request failed with an AuthenticationError.", a)
+        log.warn(s"Request failed with an AuthenticationError.", a)
         notAuthenticatedRejection(a, Unauthorized)
 
       case a: AuthorisationError =>
-        logger.warn(s"Request failed with an AuthorizationError.", a)
+        log.warn(s"Request failed with an AuthorizationError.", a)
         notAuthenticatedRejection(a, Forbidden)
 
       case o: OpenIdConnectError =>
         extractUri { uri =>
-          logger.warn(s"Request to $uri failed with an OpenIDConnectError.", o)
+          log.warn(s"Request to $uri failed with an OpenIDConnectError.", o)
           rejectAndComplete(jsonResponseMsg(ServiceUnavailable, o.getMessage))
         }
 
       case k: KafkaException =>
         extractUri { uri =>
-          logger.warn(s"Request to $uri failed with a KafkaException.", k)
+          log.warn(s"Request to $uri failed with a KafkaException.", k)
           rejectAndComplete(jsonResponseMsg(InternalServerError, k.getMessage))
         }
 
       case t =>
         extractUri { uri =>
-          logger.warn(s"Request to $uri could not be handled normally", t)
+          log.warn(s"Request to $uri could not be handled normally", t)
           rejectAndComplete(jsonResponseMsg(InternalServerError, t.getMessage))
         }
     }
@@ -311,19 +326,19 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
   implicit def serverRejectionHandler: RejectionHandler = {
     RejectionHandler
       .newBuilder()
+      .handle { case MissingQueryParamRejection(paramName) =>
+        rejectAndComplete(
+          jsonResponseMsg(
+            statusCode = BadRequest,
+            message = s"Request is missing required parameter '$paramName'"
+          )
+        )
+      }
       .handleNotFound {
         rejectAndComplete(
           jsonResponseMsg(
             statusCode = NotFound,
             message = "This is not the resource you are looking for."
-          )
-        )
-      }
-      .handle { case ValidationRejection(msg, _) =>
-        rejectAndComplete(
-          jsonResponseMsg(
-            statusCode = BadRequest,
-            message = msg
           )
         )
       }
@@ -380,6 +395,16 @@ trait ServerRoutes
     sessionHandler = sessionHandlerRef // TODO: This mutation hurts my pride
     implicit val sh = sessionHandler.shRef
 
+    // Wait for session state to be restored before continuing
+    try {
+      sh.awaitSessionRestoration()(ctx, sys.toTyped.scheduler)
+    } catch {
+      case t: Throwable =>
+        log
+          .error("Unable to restore session state. Terminating application.", t)
+        System.exit(1)
+    }
+
     (sessionHandler.stream, routesWith(inboundWebSocket, outboundWebSocket))
   }
 
@@ -397,9 +422,11 @@ trait ServerRoutes
       inbound: InSocketArgs => Route,
       outbound: OutSocketArgs => Route
   )(implicit cfg: AppCfg, maybeOpenIdClient: Option[OpenIdClient]): Route = {
-    schemaRoutes ~
-      websocketRoutes(inbound, outbound) ~
-      statusRoutes
+    handleExceptions(wsExceptionHandler) {
+      schemaRoutes ~
+        websocketRoutes(inbound, outbound) ~
+        statusRoutes
+    }
   }
 
 }
@@ -422,7 +449,7 @@ trait StatusRoutes { self: BaseRoutes =>
     complete {
       val admin = new WsKafkaAdminClient(cfg)
       try {
-        logger.debug("Fetching Kafka cluster info...")
+        log.debug("Fetching Kafka cluster info...")
         val ci = admin.clusterInfo
 
         HttpResponse(
@@ -523,13 +550,12 @@ trait WebSocketRoutes { self: BaseRoutes =>
       webSocketHandler: => Route
   )(implicit cfg: AppCfg): Route = {
     val topic = args.topic
-    logger.trace(s"Verifying if topic $topic exists...")
+    log.trace(s"Verifying if topic $topic exists...")
     val admin = new WsKafkaAdminClient(cfg)
     val topicExists = Try(admin.topicExists(topic)) match {
       case scala.util.Success(v) => v
       case scala.util.Failure(t) =>
-        logger
-          .warn(s"An error occurred while checking if topic $topic exists", t)
+        log.warn(s"An error occurred while checking if topic $topic exists", t)
         false
     }
     admin.close()
@@ -545,10 +571,10 @@ trait WebSocketRoutes { self: BaseRoutes =>
     cfg.server.openidConnect
       .map { oidcfg =>
         if (oidcfg.isKafkaTokenAuthOnlyEnabled) {
-          logger.trace("Only allowing Kafka auth through JWT token.")
+          log.trace("Only allowing Kafka auth through JWT token.")
           authRes.aclCredentials
         } else {
-          logger.trace(
+          log.trace(
             s"Allowing Kafka auth through JWT token or the" +
               s" ${Headers.KafkaAuthHeaderName} header."
           )
@@ -557,7 +583,7 @@ trait WebSocketRoutes { self: BaseRoutes =>
         }
       }
       .getOrElse {
-        logger.trace(
+        log.trace(
           "OpenID Connect is not configured. Using" +
             s" ${Headers.KafkaAuthHeaderName} header."
         )

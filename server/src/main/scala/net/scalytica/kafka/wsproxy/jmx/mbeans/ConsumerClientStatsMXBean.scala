@@ -4,7 +4,7 @@ import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.actor.typed.{ActorRef, Behavior}
 import net.scalytica.kafka.wsproxy.jmx.MXBeanActor
 import net.scalytica.kafka.wsproxy.jmx.mbeans.ConsumerClientStatsProtocol._
-import net.scalytica.kafka.wsproxy.models.{WsClientId, WsGroupId}
+import net.scalytica.kafka.wsproxy.models.FullConsumerId
 
 import scala.concurrent.duration._
 
@@ -12,6 +12,7 @@ trait ConsumerClientStatsMXBean extends WsProxyJmxBean {
 
   def getClientId: String
   def getGroupId: String
+  def getFullId: String
 
   def getNumRecordsSentTotal: Long
   def getNumRecordsSentLastHour: Long
@@ -26,8 +27,7 @@ trait ConsumerClientStatsMXBean extends WsProxyJmxBean {
 
 class ConsumerClientStatsMXBeanActor(
     ctx: ActorContext[ConsumerClientStatsCommand],
-    cid: WsClientId,
-    gid: WsGroupId,
+    fullConsumerId: FullConsumerId,
     useAutoAggregation: Boolean
 ) extends MXBeanActor[ConsumerClientStatsCommand](ctx)
     with ConsumerClientStatsMXBean {
@@ -46,8 +46,9 @@ class ConsumerClientStatsMXBeanActor(
 
   @volatile private[this] var uncommittedTotal: Long = 0
 
-  override def getClientId = cid.value
-  override def getGroupId  = gid.value
+  override def getClientId = fullConsumerId.clientId.value
+  override def getGroupId  = fullConsumerId.groupId.value
+  override def getFullId   = fullConsumerId.value
 
   override def getNumRecordsSentTotal      = numSentTotal
   override def getNumRecordsSentLastHour   = numSentHr
@@ -146,26 +147,22 @@ class ConsumerClientStatsMXBeanActor(
 object ConsumerClientStatsMXBeanActor {
 
   def apply(
-      clientId: WsClientId,
-      groupId: WsGroupId
+      fullConsumerId: FullConsumerId
   ): Behavior[ConsumerClientStatsCommand] = Behaviors.setup { ctx =>
     new ConsumerClientStatsMXBeanActor(
       ctx = ctx,
-      cid = clientId,
-      gid = groupId,
+      fullConsumerId = fullConsumerId,
       useAutoAggregation = true
     )
   }
 
   def apply(
-      clientId: WsClientId,
-      groupId: WsGroupId,
+      fullConsumerId: FullConsumerId,
       useAutoAggregation: Boolean
   ): Behavior[ConsumerClientStatsCommand] = Behaviors.setup { ctx =>
     new ConsumerClientStatsMXBeanActor(
       ctx = ctx,
-      cid = clientId,
-      gid = groupId,
+      fullConsumerId = fullConsumerId,
       useAutoAggregation = useAutoAggregation
     )
   }

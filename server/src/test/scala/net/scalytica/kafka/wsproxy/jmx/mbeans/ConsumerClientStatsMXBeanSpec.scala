@@ -4,11 +4,16 @@ import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.typed.scaladsl.adapter._
 import net.scalytica.kafka.wsproxy.jmx.mbeans.ConsumerClientStatsProtocol._
 import net.scalytica.kafka.wsproxy.jmx.{consumerStatsName, TestJmxQueries}
-import net.scalytica.kafka.wsproxy.models.{WsClientId, WsGroupId}
+import net.scalytica.kafka.wsproxy.models.{
+  FullConsumerId,
+  WsClientId,
+  WsGroupId
+}
 import net.scalytica.test.WsProxyKafkaSpec
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.{BeforeAndAfterAll, OptionValues}
+
 import scala.concurrent.duration._
 
 class ConsumerClientStatsMXBeanSpec
@@ -29,11 +34,11 @@ class ConsumerClientStatsMXBeanSpec
 
   val cid      = WsClientId("test")
   val gid      = WsGroupId("test")
-  val beanName = consumerStatsName(cid, gid)
+  val fid      = FullConsumerId(gid, cid)
+  val beanName = consumerStatsName(fid)
 
   val behavior = ConsumerClientStatsMXBeanActor(
-    clientId = cid,
-    groupId = gid,
+    fullConsumerId = fid,
     useAutoAggregation = false
   )
 

@@ -4,13 +4,15 @@ import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.actor.typed.{ActorRef, Behavior}
 import net.scalytica.kafka.wsproxy.jmx.MXBeanActor
 import net.scalytica.kafka.wsproxy.jmx.mbeans.ProducerClientStatsProtocol._
-import net.scalytica.kafka.wsproxy.models.WsClientId
+import net.scalytica.kafka.wsproxy.models.FullProducerId
 
 import scala.concurrent.duration._
 
 trait ProducerClientStatsMXBean extends WsProxyJmxBean {
 
-  def getClientId: String
+  def getProducerId: String
+  def getInstanceId: String
+  def getFullId: String
 
   def getNumRecordsReceivedTotal: Long
   def getNumRecordsReceivedLastHour: Long
@@ -24,10 +26,21 @@ trait ProducerClientStatsMXBean extends WsProxyJmxBean {
 
 class ProducerClientStatsMXBeanActor(
     ctx: ActorContext[ProducerClientStatsCommand],
-    cid: WsClientId,
+    fullProducerId: FullProducerId,
     useAutoAggregation: Boolean
 ) extends MXBeanActor[ProducerClientStatsCommand](ctx)
     with ProducerClientStatsMXBean {
+
+  override def getProducerId: String = {
+    fullProducerId.producerId.value
+  }
+
+  override def getInstanceId: String =
+    fullProducerId.instanceId
+      .map(_.value)
+      .getOrElse(fullProducerId.uuid.toString)
+
+  override def getFullId = fullProducerId.value
 
   @volatile private[this] var numSentTotal: Long   = 0
   @volatile private[this] var numSentHour: Long    = 0
@@ -73,8 +86,6 @@ class ProducerClientStatsMXBeanActor(
     currSentHour = currSentHour + 1
     currSentMinute = currSentMinute + 1
   }
-
-  override def getClientId = cid.value
 
   override def getNumRecordsReceivedTotal      = numRecTotal
   override def getNumRecordsReceivedLastHour   = numRecHour
@@ -129,23 +140,25 @@ class ProducerClientStatsMXBeanActor(
 
 object ProducerClientStatsMXBeanActor {
 
-  def apply(clientId: WsClientId): Behavior[ProducerClientStatsCommand] =
+  def apply(
+      fullProducerId: FullProducerId
+  ): Behavior[ProducerClientStatsCommand] =
     Behaviors.setup { ctx =>
       new ProducerClientStatsMXBeanActor(
         ctx = ctx,
-        cid = clientId,
+        fullProducerId = fullProducerId,
         useAutoAggregation = true
       )
     }
 
   def apply(
-      clientId: WsClientId,
+      fullProducerId: FullProducerId,
       useAutoAggregation: Boolean
   ): Behavior[ProducerClientStatsCommand] =
     Behaviors.setup { ctx =>
       new ProducerClientStatsMXBeanActor(
         ctx = ctx,
-        cid = clientId,
+        fullProducerId = fullProducerId,
         useAutoAggregation = useAutoAggregation
       )
     }

@@ -43,8 +43,9 @@ class WebSocketRoutesAvroUnsecuredSpec extends WebSocketRoutesAvroScaffolding {
 
           val messages = createAvroProducerRecordAvroAvro(1)
 
-          produceAndCheckAvro(
-            clientId = producerClientId("avro", topicCounter),
+          produceAndAssertAvro(
+            producerId = producerId("avro", topicCounter),
+            instanceId = None,
             topic = ctx.topicName,
             routes = Route.seal(ctx.route),
             keyType = Some(AvroType),
@@ -59,8 +60,9 @@ class WebSocketRoutesAvroUnsecuredSpec extends WebSocketRoutesAvroScaffolding {
 
           val messages = createAvroProducerRecordStringBytes(1)
 
-          produceAndCheckAvro(
-            clientId = producerClientId("avro", topicCounter),
+          produceAndAssertAvro(
+            producerId = producerId("avro", topicCounter),
+            instanceId = None,
             topic = ctx.topicName,
             routes = Route.seal(ctx.route),
             keyType = Some(StringType),
@@ -76,8 +78,9 @@ class WebSocketRoutesAvroUnsecuredSpec extends WebSocketRoutesAvroScaffolding {
           val messages =
             createAvroProducerRecordStringBytes(1, withHeaders = true)
 
-          produceAndCheckAvro(
-            clientId = producerClientId("avro", topicCounter),
+          produceAndAssertAvro(
+            producerId = producerId("avro", topicCounter),
+            instanceId = None,
             topic = ctx.topicName,
             routes = Route.seal(ctx.route),
             keyType = Some(StringType),
@@ -92,8 +95,9 @@ class WebSocketRoutesAvroUnsecuredSpec extends WebSocketRoutesAvroScaffolding {
 
           val messages = createAvroProducerRecordNoneAvro(1)
 
-          produceAndCheckAvro(
-            clientId = producerClientId("avro", topicCounter),
+          produceAndAssertAvro(
+            producerId = producerId("avro", topicCounter),
+            instanceId = None,
             topic = ctx.topicName,
             routes = Route.seal(ctx.route),
             keyType = None,
@@ -109,8 +113,9 @@ class WebSocketRoutesAvroUnsecuredSpec extends WebSocketRoutesAvroScaffolding {
           val messages =
             createAvroProducerRecordStringBytes(1, withMessageId = true)
 
-          produceAndCheckAvro(
-            clientId = producerClientId("avro", topicCounter),
+          produceAndAssertAvro(
+            producerId = producerId("avro", topicCounter),
+            instanceId = None,
             topic = ctx.topicName,
             routes = Route.seal(ctx.route),
             keyType = Some(StringType),
@@ -338,7 +343,8 @@ class WebSocketRoutesAvroUnsecuredSpec extends WebSocketRoutesAvroScaffolding {
           val nonExistingTopic = TopicName("non-existing-topic")
 
           val uri = baseProducerUri(
-            clientId = producerClientId("avro", topicCounter),
+            producerId = producerId("avro", topicCounter),
+            instanceId = None,
             topicName = nonExistingTopic,
             keyType = StringType,
             valType = StringType,

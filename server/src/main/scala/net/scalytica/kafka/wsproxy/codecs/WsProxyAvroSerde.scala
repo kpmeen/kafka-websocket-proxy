@@ -27,7 +27,7 @@ class WsProxyAvroSerde[T >: Null: SchemaFor: Encoder: Decoder: ClassTag]
 
   private val cls = classTag[T].runtimeClass.getName
 
-  logger.info(s"Init SerDes for $cls with schema:\n${schema.toString(true)}")
+  log.info(s"Init SerDes for $cls with schema:\n${schema.toString(true)}")
 
   override def configure(configs: JMap[String, _], isKey: Boolean): Unit = {
     // DO NOTHING
@@ -45,8 +45,8 @@ class WsProxyAvroSerde[T >: Null: SchemaFor: Encoder: Decoder: ClassTag]
   override def serialize(topic: String, data: T): Array[Byte] = {
     val tstr = topic.asOption.map(t => s"for topic $t").getOrElse("")
 
-    logger.trace(s"Serializing $cls $tstr")
-    logger.trace(s"Data to serialize: $data")
+    log.trace(s"Serializing $cls $tstr")
+    log.trace(s"Data to serialize: $data")
 
     Option(data).map(d => inner.serialize(topic, d)).orNull
   }
@@ -54,23 +54,23 @@ class WsProxyAvroSerde[T >: Null: SchemaFor: Encoder: Decoder: ClassTag]
   override def deserialize(topic: String, data: Array[Byte]): T = {
     val tstr = topic.asOption.map(t => s" from topic $t").getOrElse("")
 
-    logger.trace(s"Deserializing $cls $tstr")
-    logger.trace(s"Data to deserialize: $data")
+    log.trace(s"Deserializing $cls $tstr")
+    log.trace(s"Data to deserialize: $data")
 
     Option(data).flatMap {
       case d if d.nonEmpty =>
-        logger.debug(s"Data array has length ${d.length}")
+        log.debug(s"Data array has length ${d.length}")
         try {
           val record = inner.deserialize(topic, data)
-          logger.trace(s"Record is: $record")
+          log.trace(s"Record is: $record")
           Some(record)
         } catch {
           case NonFatal(ex) =>
-            logger.error(s"Could not deserialize $cls from $tstr", ex)
+            log.error(s"Could not deserialize $cls from $tstr", ex)
             throw ex
         }
       case _ =>
-        logger.debug("Data array is empty")
+        log.debug("Data array is empty")
         None
     }.orNull
   }
@@ -90,7 +90,7 @@ object WsProxyAvroSerde extends WithProxyLogger {
     val serde = new WsProxyAvroSerde[T]
     serde.configure(configs.asJava, isKey)
 
-    logger.trace(
+    log.trace(
       s"Initializing ${serde.getClass} for ${classTag[T].runtimeClass} with" +
         s" config: ${configs.mkString("\n", "\n", "")}"
     )

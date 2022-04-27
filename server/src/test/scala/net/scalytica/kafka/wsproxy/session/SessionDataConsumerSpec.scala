@@ -2,10 +2,7 @@ package net.scalytica.kafka.wsproxy.session
 
 import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.stream.scaladsl.Sink
-import io.github.embeddedkafka.schemaregistry.{
-  EmbeddedKafka,
-  EmbeddedKafkaConfig
-}
+import io.github.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import net.scalytica.kafka.wsproxy.codecs.{
   BasicSerdes,
   SessionIdSerde,
@@ -94,8 +91,7 @@ class SessionDataConsumerSpec
 
     "consume session data from the session state topic" in {
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-        implicit val cfg =
-          plainAppTestConfig(kcfg.kafkaPort, Option(kcfg.schemaRegistryPort))
+        implicit val cfg = plainAppTestConfig(kcfg.kafkaPort)
 
         initTopic(cfg.sessionHandler.sessionStateTopicName.value)
 
@@ -115,11 +111,11 @@ class SessionDataConsumerSpec
 
           case ip: InternalSessionProtocol =>
             ip match {
-              case UpdateSession(sid, s) =>
+              case UpdateSession(sid, s, _) =>
                 expected.map(_.sessionId) must contain(sid)
                 expected must contain(s)
 
-              case RemoveSession(sid) =>
+              case RemoveSession(sid, _) =>
                 sid mustBe session2.sessionId
             }
         }

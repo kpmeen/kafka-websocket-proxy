@@ -54,7 +54,7 @@ class UrlJwkProvider private[auth] (url: String, enforceHttps: Boolean = true)
       .withHeaders(Accept(MediaTypes.`application/json`))
 
     Http().singleRequest(request).flatMap { res =>
-      logger.info(s"JWK config request status: ${res.status}")
+      log.info(s"JWK config request status: ${res.status}")
       res match {
         case HttpResponse(StatusCodes.OK, _, body, _) =>
           foldBody(body.dataBytes).map {
@@ -70,16 +70,16 @@ class UrlJwkProvider private[auth] (url: String, enforceHttps: Boolean = true)
                 .map(js => js.as[Jwk])
                 .map {
                   case ok @ Right(jwk) =>
-                    logger.trace(s"Successfully parsed JWK object $jwk")
+                    log.trace(s"Successfully parsed JWK object $jwk")
                     ok
                   case ko @ Left(err) =>
-                    logger.error(s"Error parsing JWK object", err)
+                    log.error(s"Error parsing JWK object", err)
                     ko
                 }
                 .collect { case Right(jwk) => jwk }
           }
         case _ =>
-          logger.info("JWK config could not be found.")
+          log.info("JWK config could not be found.")
           Future.successful(List.empty)
       }
     }
@@ -99,7 +99,7 @@ class UrlJwkProvider private[auth] (url: String, enforceHttps: Boolean = true)
     implicit val ec = mat.executionContext
 
     load().map { keys =>
-      logger.trace(
+      log.trace(
         s"Trying to find keyId $keyId in keys:${keys.mkString("\n", "\n", "")}"
       )
       keys.find(_.kid.exists(_.equalsIgnoreCase(keyId))) match {

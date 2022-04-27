@@ -101,13 +101,13 @@ class ProxyStatusMXBeanActor(
   override def onMessage(msg: ProxyStatusCommand) =
     msg match {
       case UpdateKafkaClusterInfo(brokers, replyTo) =>
-        logger.trace(s"Adding ${brokers.size} brokers to cluster info")
+        log.trace(s"Adding ${brokers.size} brokers to cluster info")
         clusterInfo = brokers
         replyTo ! KafkaClusterInfoUpdated
         Behaviors.same
 
       case ClearBrokers(replyTo) =>
-        logger.trace("Clearing cluster info because no data was received")
+        log.trace("Clearing cluster info because no data was received")
         clusterInfo = List.empty
         replyTo ! BrokersCleared
         Behaviors.same

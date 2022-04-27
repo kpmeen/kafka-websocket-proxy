@@ -8,7 +8,10 @@
   </contextListener>
 
   <if condition='property("WS_PROXY_USE_JSON_LOG_FORMAT").contains("true")'>
-    <!-- If the WS_PROXY_USE_JSON_LOG_FORMAT env is true, the application will log using the JSON layout -->
+    <!--
+      If the WS_PROXY_USE_JSON_LOG_FORMAT env is true, the application will
+      write to the log using the JSON layout.
+    -->
     <then>
       <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
@@ -22,7 +25,7 @@
         </encoder>
       </appender>
     </then>
-    <!-- By default the application will use the regular pattern layout -->
+    <!-- By default, the application will use the regular pattern layout -->
     <else>
       <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
@@ -38,15 +41,19 @@
     <appender-ref ref="STDOUT"/>
   </appender>
 
+  <!--
+    Variable definitions allowing important loggers to be configured using
+    environment variables.
+  -->
   <variable name="WS_PROXY_AKKA_ACTOR_LOG_LEVEL" value="${WS_PROXY_AKKA_ACTOR_LOG_LEVEL:-WARN}"/>
   <variable name="WS_PROXY_AKKA_HTTP_LOG_LEVEL" value="${WS_PROXY_AKKA_HTTP_LOG_LEVEL:-WARN}"/>
   <variable name="WS_PROXY_AKKA_KAFKA_LOG_LEVEL" value="${WS_PROXY_AKKA_KAFKA_LOG_LEVEL:-WARN}"/>
-  <variable name="WS_PROXY_KAFKA_CLIENTS_LOG_LEVEL" value="${WS_PROXY_KAFKA_CLIENTS_LOG_LEVEL:-ERROR}"/>
+  <variable name="WS_PROXY_KAFKA_CLIENTS_LOG_LEVEL" value="${WS_PROXY_KAFKA_CLIENTS_LOG_LEVEL:-WARN}"/>
 
   <variable name="WS_PROXY_APP_LOG_LEVEL" value="${WS_PROXY_APP_LOG_LEVEL:-DEBUG}"/>
   <variable name="WS_PROXY_AUTH_LOG_LEVEL" value="${WS_PROXY_AUTH_LOG_LEVEL:-DEBUG}"/>
   <variable name="WS_PROXY_ADMIN_LOG_LEVEL" value="${WS_PROXY_ADMIN_LOG_LEVEL:-WARN}"/>
-  <variable name="WS_PROXY_ROOT_LOG_LEVEL" value="${WS_PROXY_ROOT_LOG_LEVEL:-ERROR}"/>
+  <variable name="WS_PROXY_ROOT_LOG_LEVEL" value="${WS_PROXY_ROOT_LOG_LEVEL:-WARN}"/>
 
   <logger name="akka.actor" level="${WS_PROXY_AKKA_ACTOR_LOG_LEVEL}"/>
   <logger name="akka.http" level="${WS_PROXY_AKKA_HTTP_LOG_LEVEL}"/>

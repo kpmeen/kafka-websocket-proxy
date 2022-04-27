@@ -38,8 +38,8 @@ trait InputJsonParser { self: WithProxyLogger =>
     else {
       parse(jsonStr) match {
         case Left(ParsingFailure(message, err)) =>
-          logger.error(s"Error parsing JSON string:\n$message")
-          logger.debug(s"JSON was: $jsonStr")
+          log.error(s"Error parsing JSON string:\n$message")
+          log.debug(s"JSON was: $jsonStr")
           throw err
 
         case Right(json) =>

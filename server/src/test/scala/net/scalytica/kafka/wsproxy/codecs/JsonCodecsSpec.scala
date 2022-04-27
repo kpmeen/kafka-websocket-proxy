@@ -2,16 +2,8 @@ package net.scalytica.kafka.wsproxy.codecs
 
 import net.scalytica.kafka.wsproxy.codecs.Encoders._
 import net.scalytica.kafka.wsproxy.codecs.Decoders._
-import net.scalytica.kafka.wsproxy.models.{WsClientId, WsGroupId, WsServerId}
-import net.scalytica.kafka.wsproxy.session.{
-  ClientInstance,
-  ConsumerInstance,
-  ConsumerSession,
-  ProducerInstance,
-  ProducerSession,
-  Session,
-  SessionId
-}
+import net.scalytica.kafka.wsproxy.models._
+import net.scalytica.kafka.wsproxy.session._
 import io.circe.syntax._
 import org.scalatest.OptionValues
 import org.scalatest.matchers.must.Matchers
@@ -19,45 +11,42 @@ import org.scalatest.wordspec.AnyWordSpec
 
 class JsonCodecsSpec extends AnyWordSpec with Matchers with OptionValues {
 
-  val sessionOne = SessionId("1")
-  val groupOne   = WsGroupId("group1")
-  val clientOne  = WsClientId("client1")
-  val serverOne  = WsServerId("server1")
+  val sessionOne  = SessionId("session1")
+  val groupOne    = WsGroupId("group1")
+  val consumerOne = WsClientId("consumer1")
+  val producerOne = WsProducerId("producer1")
+  val instanceOne = WsProducerInstanceId("instance1")
+  val serverOne   = WsServerId("server1")
 
   val consumerInstanceOne: ClientInstance = ConsumerInstance(
-    clientId = clientOne,
-    groupId = groupOne,
+    id = FullConsumerId(groupOne, consumerOne),
     serverId = serverOne
   )
 
   val producerInstanceOne: ClientInstance = ProducerInstance(
-    clientId = clientOne,
+    id = FullProducerId(producerOne, Option(instanceOne)),
     serverId = serverOne
   )
 
   val emptyConsumerSession: Session = ConsumerSession(
     sessionId = sessionOne,
     groupId = groupOne,
-    maxConnections = 2,
     instances = Set.empty
   )
 
   val consumerSession: Session = ConsumerSession(
     sessionId = sessionOne,
     groupId = groupOne,
-    maxConnections = 2,
     instances = Set(consumerInstanceOne)
   )
 
   val emptyProducerSession: Session = ProducerSession(
     sessionId = sessionOne,
-    maxConnections = 1,
     instances = Set.empty
   )
 
   val producerSession: Session = ProducerSession(
     sessionId = sessionOne,
-    maxConnections = 1,
     instances = Set(producerInstanceOne)
   )
 
