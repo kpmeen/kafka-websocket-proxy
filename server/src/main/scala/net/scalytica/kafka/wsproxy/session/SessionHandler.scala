@@ -112,8 +112,8 @@ trait SessionHandler extends WithProxyLogger {
   }
 
   /**
-   * Initialises a new SessionHandler actor. The [[ActorRef]] is named so there
-   * will only be 1 instance per proxy server instance.
+   * Initialises a new SessionHandler actor. The [[akka.actor.typed.ActorRef]]
+   * is named so there will only be 1 instance per proxy server instance.
    *
    * @param cfg
    *   implicit [[AppCfg]] to use
@@ -122,8 +122,8 @@ trait SessionHandler extends WithProxyLogger {
    * @return
    *   a [[SessionHandlerRef]] containing a reference to the [[RunnableGraph]]
    *   that executes the [[SessionDataConsumer]] stream. And a typed
-   *   [[ActorRef]] that understands messages from the defined protocol in
-   *   [[SessionHandlerProtocol.Protocol]].
+   *   [[akka.actor.typed.ActorRef]] that understands messages from the defined
+   *   protocol in [[SessionHandlerProtocol.Protocol]].
    */
   def init(
       implicit cfg: AppCfg,
