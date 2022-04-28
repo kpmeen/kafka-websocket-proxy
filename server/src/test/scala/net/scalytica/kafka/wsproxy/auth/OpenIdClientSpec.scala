@@ -33,7 +33,7 @@ class OpenIdClientSpec
   "The OAuth2 client" should {
 
     "fetch the .well-known openid-connect configuration" in
-      withOpenIdConnectServerAndClient(useJwtKafkaCreds = false) {
+      withOpenIdConnectServerAndClient(useJwtCreds = false) {
         case (host, port, client, _) =>
           client.wellKnownOidcConfig.futureValue mustBe openIdConnectConfig(
             host,
@@ -42,7 +42,7 @@ class OpenIdClientSpec
       }
 
     "fetch openid-connect config and then the jwks config" in
-      withOpenIdConnectServerAndClient(useJwtKafkaCreds = false) {
+      withOpenIdConnectServerAndClient(useJwtCreds = false) {
         case (_, _, client, _) =>
           val oidc     = client.wellKnownOidcConfig.futureValue
           val provider = new UrlJwkProvider(oidc.jwksUri, enforceHttps = false)
@@ -63,7 +63,7 @@ class OpenIdClientSpec
       }
 
     "get a bearer token" in
-      withOpenIdConnectServerAndClient(useJwtKafkaCreds = false) {
+      withOpenIdConnectServerAndClient(useJwtCreds = false) {
         case (_, _, client, _) =>
           val res = client
             .generateToken(
@@ -82,7 +82,7 @@ class OpenIdClientSpec
       }
 
     "validate a bearer token" in
-      withOpenIdConnectServerAndToken(useJwtKafkaCreds = false) {
+      withOpenIdConnectServerAndToken(useJwtCreds = false) {
         case (host, port, client, _, token) =>
           val bearerToken = token.bearerToken
 
@@ -96,7 +96,7 @@ class OpenIdClientSpec
       }
 
     "validate a bearer token containing Kafka credentials" in
-      withOpenIdConnectServerAndToken(useJwtKafkaCreds = true) {
+      withOpenIdConnectServerAndToken(useJwtCreds = true) {
         case (host, port, client, _, token) =>
           val bearerToken = token.bearerToken
 
@@ -115,7 +115,7 @@ class OpenIdClientSpec
     "fail to validate a bearer token containing with wrong audience" in
       withOpenIdConnectServerAndToken(
         tokenAudience = Some("not-for-me"),
-        useJwtKafkaCreds = true
+        useJwtCreds = true
       ) { case (_, _, client, _, token) =>
         val bearerToken = token.bearerToken
 
@@ -124,7 +124,7 @@ class OpenIdClientSpec
       }
 
     "gracefully handle that keycloak isn't available" in
-      withUnavailableOpenIdConnectServerAndToken(useJwtKafkaCreds = false) {
+      withUnavailableOpenIdConnectServerAndToken(useJwtCreds = false) {
         case (client, _, token) =>
           val expected = "OpenID Connect server does not seem to be available."
           val e = Await

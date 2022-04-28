@@ -80,7 +80,7 @@ class JwtValidationTickerFlowSpec
   "The JwtValidationTickerFlow" should {
     "successfully validate a JWT token at a given interval" in
       withOpenIdConnectServerAndClient(
-        useJwtKafkaCreds = true,
+        useJwtCreds = true,
         validationInterval = 500 millis
       ) { case (_, _, client, oidcCfg) =>
         implicit val maybeClient = Option(client)
@@ -107,7 +107,7 @@ class JwtValidationTickerFlowSpec
 
     "not invalidate a token if the OpenID server is unavailable" in
       withUnavailableOpenIdConnectServerAndToken(
-        useJwtKafkaCreds = true,
+        useJwtCreds = true,
         validationInterval = 500 millis
       ) { case (client, oidcCfg, accessToken) =>
         implicit val maybeClient = Option(client)
@@ -125,7 +125,7 @@ class JwtValidationTickerFlowSpec
 
     "fail when OpenID server has been unavailable the previous n attempts" in
       withUnavailableOpenIdConnectServerAndToken(
-        useJwtKafkaCreds = true,
+        useJwtCreds = true,
         validationInterval = 500 millis,
         errorLimit = 3
       ) { case (client, oidcCfg, accessToken) =>

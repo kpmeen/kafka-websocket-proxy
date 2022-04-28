@@ -141,7 +141,7 @@ class StatusRoutesSpec
       }
 
     "return the kafka cluster info when secured with OpenID Connect" in
-      withOpenIdConnectServerAndToken(useJwtKafkaCreds = false) {
+      withOpenIdConnectServerAndToken(useJwtCreds = false) {
         case (_, _, _, cfg, token) =>
           secureServerContext(serverOpenIdCfg = Option(cfg)) {
             case (kcfg, _, route) =>
@@ -168,7 +168,7 @@ class StatusRoutesSpec
       }
 
     "return 401 when accessing kafka cluster info with invalid bearer token" in
-      withOpenIdConnectServerAndClient(useJwtKafkaCreds = false) {
+      withOpenIdConnectServerAndClient(useJwtCreds = false) {
         case (_, _, _, cfg) =>
           secureServerContext(serverOpenIdCfg = Option(cfg)) {
             case (_, _, route) =>

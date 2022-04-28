@@ -1,8 +1,8 @@
 package net.scalytica.kafka.wsproxy.web
 
-import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server._
 import io.github.embeddedkafka.Codecs._
+import net.scalytica.kafka.wsproxy.config.Configuration.CustomJwtCfg
 import net.scalytica.kafka.wsproxy.models.Formats.{
   AvroType,
   LongType,
@@ -11,31 +11,42 @@ import net.scalytica.kafka.wsproxy.models.Formats.{
 }
 import net.scalytica.kafka.wsproxy.models.{
   ConsumerKeyValueRecord,
-  ConsumerValueRecord,
-  TopicName
+  ConsumerValueRecord
 }
 import net.scalytica.kafka.wsproxy.web.SocketProtocol.AvroPayload
 import net.scalytica.test._
+import org.scalatest.Assertion
 import org.scalatest.Inspectors.forAll
 
 import scala.concurrent.duration._
 
 // scalastyle:off magic.number
-class WebSocketRoutesAvroUnsecuredSpec extends WebSocketRoutesAvroScaffolding {
+class WebSocketRoutesAvroSpec extends BaseWebSocketRoutesSpec {
+
+  implicit val testKeyDeserializer = TestSerdes.keySerdes.deserializer()
+  implicit val albumDeserializer   = TestSerdes.valueSerdes.deserializer()
+  implicit val longDeserializer    = TestSerdes.longSerdes.deserializer()
+
+  override protected val testTopicPrefix: String = "avro-test-topic"
+
+  protected def verifyTestKeyAndAlbum(
+      testKey: TestKey,
+      album: Album,
+      expectedIndex: Int = 1
+  ): Assertion = {
+    testKey.username mustBe s"foo-$expectedIndex"
+    album.artist mustBe s"artist-$expectedIndex"
+    album.title mustBe s"title-$expectedIndex"
+    album.tracks must have size 3
+    forAll(album.tracks) { t =>
+      t.name must startWith("track-")
+      t.duration mustBe (120 seconds).toMillis
+    }
+  }
 
   "Using Avro payloads with WebSockets" when {
 
-    "kafka and the server is unsecured" should {
-
-      "reject producer connection when the required clientId is not set" in
-        plainProducerContext(nextTopic) { implicit ctx =>
-          testRequiredQueryParamReject(useClientId = false)
-        }
-
-      "reject producer connection when the required topic is not set" in
-        plainProducerContext(nextTopic) { implicit ctx =>
-          testRequiredQueryParamReject(useTopicName = false)
-        }
+    "both kafka and the proxy is unsecured" should {
 
       "produce messages with Avro key and value" in
         plainProducerContext(nextTopic) { ctx =>
@@ -336,48 +347,160 @@ class WebSocketRoutesAvroUnsecuredSpec extends WebSocketRoutesAvroScaffolding {
           }
         }
 
-      "return HTTP 400 when attempting to produce to a non-existing topic" in
-        plainProducerContext() { ctx =>
+    }
+
+    "kafka is secure and the server is unsecured" should {
+
+      "produce messages to a secured cluster" in
+        secureKafkaClusterProducerContext(topic = nextTopic) { ctx =>
           implicit val wsClient = ctx.producerProbe
 
-          val nonExistingTopic = TopicName("non-existing-topic")
+          val messages = createAvroProducerRecordNoneAvro(1)
 
-          val uri = baseProducerUri(
+          produceAndAssertAvro(
             producerId = producerId("avro", topicCounter),
             instanceId = None,
-            topicName = nonExistingTopic,
-            keyType = StringType,
-            valType = StringType,
-            payloadType = AvroPayload
+            topic = ctx.topicName,
+            routes = Route.seal(ctx.route),
+            keyType = None,
+            valType = AvroType,
+            messages = messages,
+            kafkaCreds = Some(creds)
           )
-
-          WS(uri, wsClient.flow) ~> Route.seal(ctx.route) ~> check {
-            status mustBe BadRequest
-          }
         }
 
-      "return HTTP 400 when attempting to consume from non-existing topic" in
-        plainAvroConsumerContext(
+      "consume messages with Avro key and value" in
+        secureKafkaAvroConsumerContext(
           topic = nextTopic,
           keyType = Some(AvroType),
           valType = AvroType,
-          numMessages = 0,
-          prePopulate = false
+          numMessages = 10
         ) { ctx =>
-          val topicName = "non-existing-topic"
-          val out = "/socket/out?" +
+          implicit val kcfg = ctx.embeddedKafkaConfig
+
+          val outPath = "/socket/out?" +
             s"clientId=avro-test-$topicCounter" +
             s"&groupId=avro-test-group-$topicCounter" +
-            s"&topic=$topicName" +
+            s"&topic=${ctx.topicName.value}" +
             s"&socketPayload=${AvroPayload.name}" +
-            s"&keyType=${AvroPayload.name}" +
-            s"&valType=${AvroPayload.name}" +
+            s"&keyType=${AvroType.name}" +
+            s"&valType=${AvroType.name}" +
             "&autoCommit=false"
 
-          WS(out, ctx.consumerProbe.flow) ~> Route.seal(ctx.route) ~> check {
-            status mustBe BadRequest
-          }
+          val (rk, rv) =
+            consumeFirstKeyedMessageFrom[TestKey, Album](ctx.topicName.value)
+
+          verifyTestKeyAndAlbum(rk, rv)
+
+          WS(outPath, ctx.consumerProbe.flow) ~>
+            addKafkaCreds(creds) ~>
+            ctx.route ~>
+            check {
+              isWebSocketUpgrade mustBe true
+
+              forAll(1 to 10) { i =>
+                val expectedTracks = (1 to 3).map { i =>
+                  TestTypes.Track(s"track-$i", (120 seconds).toMillis)
+                }
+                ctx.consumerProbe.expectWsConsumerKeyValueResultAvro(
+                  expectedTopic = ctx.topicName,
+                  expectedKey = Option(TestTypes.TestKey(s"foo-$i", 1234567L)),
+                  expectedValue =
+                    TestTypes.Album(s"artist-$i", s"title-$i", expectedTracks)
+                )
+              }
+
+            }
         }
+    }
+
+    "kafka is secure and the server is secured with OpenID Connect" should {
+
+      "allow producer connections providing a valid JWT token when OpenID" +
+        " is enabled" in withOpenIdConnectServerAndToken(useJwtCreds = false) {
+          case (_, _, _, cfg, token) =>
+            secureServerProducerContext(
+              topic = nextTopic,
+              serverOpenIdCfg = Option(cfg)
+            ) { ctx =>
+              implicit val wsClient = ctx.producerProbe
+
+              val messages = createAvroProducerRecordNoneAvro(1)
+
+              produceAndAssertAvro(
+                producerId = producerId("avro", topicCounter),
+                instanceId = None,
+                topic = ctx.topicName,
+                routes = Route.seal(ctx.route),
+                keyType = None,
+                valType = AvroType,
+                messages = messages,
+                creds = Some(token.bearerToken),
+                kafkaCreds = Some(creds)
+              )
+            }
+        }
+
+      "allow connections providing a valid JWT token containing the Kafka " +
+        "credentials when OpenID is enabled" in
+        withOpenIdConnectServerAndToken(useJwtCreds = true) {
+          case (_, _, _, cfg, token) =>
+            secureServerProducerContext(
+              topic = nextTopic,
+              serverOpenIdCfg = Option(cfg)
+            ) { ctx =>
+              implicit val wsClient = ctx.producerProbe
+
+              val messages = createAvroProducerRecordNoneAvro(1)
+
+              produceAndAssertAvro(
+                producerId = producerId("avro", topicCounter),
+                instanceId = None,
+                topic = ctx.topicName,
+                routes = Route.seal(ctx.route),
+                keyType = None,
+                valType = AvroType,
+                messages = messages,
+                creds = Some(token.bearerToken)
+              )
+            }
+        }
+
+      "allow connections providing a valid JWT token containing the Kafka " +
+        "credentials when OpenID is enabled using a custom JWT config" in
+        withOpenIdConnectServerAndToken(useJwtCreds = true) {
+          case (_, _, _, cfg, token) =>
+            val oidcCfg =
+              cfg.copy(customJwt =
+                Some(
+                  CustomJwtCfg(
+                    jwtKafkaUsernameKey = jwtKafkaCredsUsernameKey,
+                    jwtKafkaPasswordKey = jwtKafkaCredsPasswordKey
+                  )
+                )
+              )
+            secureServerProducerContext(
+              topic = nextTopic,
+              serverOpenIdCfg = Option(oidcCfg)
+            ) { ctx =>
+              implicit val wsClient = ctx.producerProbe
+
+              val messages = createAvroProducerRecordNoneAvro(1)
+
+              produceAndAssertAvro(
+                producerId = producerId("avro", topicCounter),
+                instanceId = None,
+                topic = ctx.topicName,
+                routes = Route.seal(ctx.route),
+                keyType = None,
+                valType = AvroType,
+                messages = messages,
+                creds = Some(token.bearerToken),
+                kafkaCreds = None
+              )
+            }
+        }
+
     }
   }
 }

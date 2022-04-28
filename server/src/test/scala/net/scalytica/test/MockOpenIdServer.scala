@@ -173,11 +173,11 @@ trait MockOpenIdServer
       issuerUrl: String,
       expiration: Long,
       issuedAt: Long,
-      useJwtKafkaCreds: Boolean,
+      useJwtCreds: Boolean,
       audience: Option[String]
   ): JwtClaim = {
     val claim = createBaseJwtClaim(issuerUrl, expiration, issuedAt, audience)
-    if (useJwtKafkaCreds) claim + jwtKafkaCredsJson
+    if (useJwtCreds) claim + jwtKafkaCredsJson
     else claim
   }
 
@@ -185,11 +185,11 @@ trait MockOpenIdServer
       issuerUrl: String,
       expiration: Long,
       issuedAt: Long,
-      useJwtKafkaCreds: Boolean,
+      useJwtCreds: Boolean,
       audience: Option[String]
   ): JwtClaim = {
     val claim = createBaseJwtClaim(issuerUrl, expiration, issuedAt, audience)
-    if (useJwtKafkaCreds) claim + invalidJwtKafkaCredsJson
+    if (useJwtCreds) claim + invalidJwtKafkaCredsJson
     else claim
   }
 
@@ -205,14 +205,14 @@ trait MockOpenIdServer
   def accessToken(
       host: String,
       port: Int,
-      useJwtKafkaCreds: Boolean,
+      useJwtCreds: Boolean,
       audience: Option[String] = Some(oidAudience)
   ): AccessToken = {
     val jd = jwtData(
       issuerUrl = s"http://$host:$port",
       expiration = expirationMillis,
       issuedAt = issuedAtMillis,
-      useJwtKafkaCreds = useJwtKafkaCreds,
+      useJwtCreds = useJwtCreds,
       audience = audience
     )
     val token = generateJwt(jd)
@@ -233,7 +233,7 @@ trait MockOpenIdServer
       issuerUrl = s"http://$host:$port",
       expiration = expirationMillis,
       issuedAt = issuedAtMillis,
-      useJwtKafkaCreds = true,
+      useJwtCreds = true,
       audience = audience
     )
     AccessToken(
@@ -247,10 +247,10 @@ trait MockOpenIdServer
   def tokenRoute(
       host: String,
       port: Int,
-      useJwtKafkaCreds: Boolean,
+      useJwtCreds: Boolean,
       audience: Option[String] = Some(oidAudience)
   ): Route = {
-    val b = accessToken(host, port, useJwtKafkaCreds, audience).asJson.spaces2
+    val b = accessToken(host, port, useJwtCreds, audience).asJson.spaces2
     path("token") {
       post {
         complete(
@@ -291,11 +291,11 @@ trait MockOpenIdServer
   def oauthRoutes(
       host: String,
       port: Int,
-      useJwtKafkaCreds: Boolean,
+      useJwtCreds: Boolean,
       tokenAudience: Option[String] = Some(oidAudience)
   ): Route =
     pathPrefix("oauth") {
-      tokenRoute(host, port, useJwtKafkaCreds, tokenAudience) ~ pathPrefix(
+      tokenRoute(host, port, useJwtCreds, tokenAudience) ~ pathPrefix(
         ".well-known"
       ) {
         wellKnownOpenIdUrl(host, port) ~ wellKnownJwkUrl
@@ -327,7 +327,7 @@ trait MockOpenIdServer
   def withOpenIdConnectServer[T](
       host: String = "localhost",
       port: Int = availablePort,
-      useJwtKafkaCreds: Boolean,
+      useJwtCreds: Boolean,
       validationInterval: FiniteDuration = 10 minutes,
       errorLimit: Int = -1,
       tokenAudience: Option[String] = Some(oidAudience)
@@ -336,7 +336,7 @@ trait MockOpenIdServer
       ec: ExecutionContext
   ): T = {
     withHttpServerForRoute(host, port)((h, p) =>
-      oauthRoutes(h, p, useJwtKafkaCreds, tokenAudience)
+      oauthRoutes(h, p, useJwtCreds, tokenAudience)
     ) { case (h, p) =>
       val cfg = OpenIdConnectCfg(
         wellKnownUrl = Option(wellKnownOpenIdUrlString(host, port)),
@@ -347,7 +347,7 @@ trait MockOpenIdServer
         revalidationInterval = validationInterval,
         revalidationErrorsLimit = errorLimit,
         customJwt =
-          if (useJwtKafkaCreds) Some(customJwtCfg)
+          if (useJwtCreds) Some(customJwtCfg)
           else None
       )
 
@@ -364,7 +364,7 @@ trait MockOpenIdServer
   def withOpenIdConnectServerAndClient[T](
       host: String = "localhost",
       port: Int = availablePort,
-      useJwtKafkaCreds: Boolean,
+      useJwtCreds: Boolean,
       validationInterval: FiniteDuration = 10 minutes,
       errorLimit: Int = -1,
       tokenAudience: Option[String] = Some(oidAudience)
@@ -376,7 +376,7 @@ trait MockOpenIdServer
     withOpenIdConnectServer(
       host,
       port,
-      useJwtKafkaCreds,
+      useJwtCreds,
       validationInterval,
       errorLimit,
       tokenAudience
@@ -393,7 +393,7 @@ trait MockOpenIdServer
       host: String = "localhost",
       port: Int = availablePort,
       audience: String = oidAudience,
-      useJwtKafkaCreds: Boolean,
+      useJwtCreds: Boolean,
       validationInterval: FiniteDuration = 10 minutes,
       errorLimit: Int = -1,
       tokenAudience: Option[String] = Some(oidAudience)
@@ -405,7 +405,7 @@ trait MockOpenIdServer
     withOpenIdConnectServerAndClient(
       host,
       port,
-      useJwtKafkaCreds,
+      useJwtCreds,
       validationInterval,
       errorLimit,
       tokenAudience
@@ -421,7 +421,7 @@ trait MockOpenIdServer
   def withUnavailableOpenIdConnectServerAndToken[T](
       host: String = "localhost",
       port: Int = availablePort,
-      useJwtKafkaCreds: Boolean,
+      useJwtCreds: Boolean,
       validationInterval: FiniteDuration = 10 minutes,
       errorLimit: Int = -1,
       tokenAudience: Option[String] = Some(oidAudience)
@@ -437,14 +437,14 @@ trait MockOpenIdServer
       revalidationInterval = validationInterval,
       revalidationErrorsLimit = errorLimit,
       customJwt =
-        if (useJwtKafkaCreds) Some(customJwtCfg)
+        if (useJwtCreds) Some(customJwtCfg)
         else None
     )
     lazy val client = OpenIdClient(
       oidcCfg = cfg,
       enforceHttps = false
     )
-    val token = accessToken(host, port, useJwtKafkaCreds, tokenAudience)
+    val token = accessToken(host, port, useJwtCreds, tokenAudience)
     block(client, cfg, token)
   }
 

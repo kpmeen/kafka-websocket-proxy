@@ -477,7 +477,6 @@ trait WsProxyProducerKafkaSpec
 
       body(ctx)
     }
-//  secureServerProducerContext(topic = topic, partitions = partitions)(body)
 
   def secureServerProducerContext[T](
       topic: String,

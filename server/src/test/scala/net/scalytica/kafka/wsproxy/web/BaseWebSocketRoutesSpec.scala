@@ -20,13 +20,12 @@ trait BaseWebSocketRoutesSpec
     with OptionValues
     with ScalaFutures
     with EmbeddedHttpServer
+    with MockOpenIdServer
     with BeforeAndAfterAll
     with TestDataGenerators { self: Suite =>
 
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(2, Minutes))
-
-//  implicit val timeout = RouteTestTimeout(2 minutes)
 
   final protected def assertWSRequest(
       host: String,
