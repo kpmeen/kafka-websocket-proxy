@@ -149,7 +149,7 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
     try {
       val p = underlying
         .describeTopics(Seq(topicName.value).asJava)
-        .all()
+        .allTopicNames()
         .get()
         .asScala
         .headOption
@@ -187,7 +187,7 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
     try {
       val p = underlying
         .describeTopics(Seq(topicName.value).asJava)
-        .all()
+        .allTopicNames()
         .get()
         .asScala
         .headOption
