@@ -41,8 +41,13 @@ internally in the proxy.
 > 
 > Version 1.0.0 of the Kafka WebSocket Proxy introduced a new feature intended
 > for limiting the number of connections a given producer client can set up.
-> The implementation adds support for producers to the internal session handler
-> mechanism.
+> Unfortunately the implementation was not bullet-proof, and contained a bug
+> that rendered the feature quite useless.
+> 
+> In releases after 1.0.0 and before 1.1.2 the feature was disabled entirely.
+> From version 1.1.2 the feature has been reintroduced. But it is turned off
+> by default. Please refer to the [Configuration](configuration.md) docs for
+> details on how to enable it.
 >
 > If this feature is required for your use-case, please ensure you are using
-> version >1.1.2, and have read the feature documentation.
+> version >=1.1.2, and have read the feature documentation.
