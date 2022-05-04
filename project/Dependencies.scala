@@ -28,17 +28,23 @@ object Versions {
   val JwtScalaVersion = "9.0.5"
 
   val ScalaLoggingVersion = "3.9.4"
-  val Slf4JVersion        = "1.7.36"
-  val LogbackVersion      = "1.2.11"
-  val LogbackJsVersion    = "0.1.5"
-  val JaninoVersion       = "3.1.7"
 
+  val Slf4JVersion     = "1.7.36"
+  val LogbackVersion   = "1.2.11"
+  val LogbackJsVersion = "0.1.5"
+  val JaninoVersion    = "3.1.7"
   val ScalaTestVersion = "3.2.12"
 
-  val JolokiaAgentVersion    = "1.6.2"
-  val PrometheusAgentVersion = "0.14.0"
+  val JolokiaAgentVersion = "1.6.2"
 
-  val GatlingVersion = "3.1.1"
+  val PrometheusAgentVersion = "0.14.0"
+  val GatlingVersion         = "3.1.1"
+
+  // Override versions
+  val AvroVersion            = "1.11.0"
+  val CommonsCompressVersion = "1.21"
+  val JacksonDatabindVersion = "2.13.2.2"
+  val JawnParserVersion      = "1.3.2"
 }
 
 object Dependencies {
@@ -239,9 +245,13 @@ object Dependencies {
   object Overrides {
 
     val Deps = Seq(
-      "org.apache.kafka"   % "kafka-clients"     % KafkaVersion,
-      "org.apache.kafka"   % "kafka-streams"     % KafkaVersion,
-      "org.apache.kafka"  %% "kafka"             % KafkaVersion,
+      "org.apache.avro"    % "avro"             % AvroVersion,
+      "org.apache.kafka"   % "kafka-clients"    % KafkaVersion,
+      "org.apache.kafka"   % "kafka-streams"    % KafkaVersion,
+      "org.apache.kafka"  %% "kafka"            % KafkaVersion,
+      "org.apache.commons" % "commons-compress" % CommonsCompressVersion,
+      "com.fasterxml.jackson.core" % "jackson-databind" % JacksonDatabindVersion,
+      "org.typelevel"     %% "jawn-parser"       % JawnParserVersion,
       "com.typesafe.akka" %% "akka-stream-kafka" % AkkaStreamKafkaVersion,
       "org.slf4j"          % "slf4j-api"         % Slf4JVersion,
       "org.slf4j"          % "log4j-over-slf4j"  % Slf4JVersion,
