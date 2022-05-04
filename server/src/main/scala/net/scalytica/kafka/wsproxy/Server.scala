@@ -111,6 +111,7 @@ object Server extends App with ServerRoutes with ServerBindings {
   /** Bind to network interface and port, starting the server */
   val bindingPlain  = initialisePlainBinding
   val bindingSecure = initialiseSslBinding
+  val bindingAdmin  = initialiseAdminBinding(adminRoutes)
 
   val shutdown: CoordinatedShutdown = {
     val cs = CoordinatedShutdown(classicSys)
@@ -120,6 +121,7 @@ object Server extends App with ServerRoutes with ServerBindings {
       for {
         _ <- bindingPlain.map(unbindConnection).getOrElse(evalDone)
         _ <- bindingSecure.map(unbindConnection).getOrElse(evalDone)
+        _ <- bindingAdmin.map(unbindConnection).getOrElse(evalDone)
       } yield Done
     }
 

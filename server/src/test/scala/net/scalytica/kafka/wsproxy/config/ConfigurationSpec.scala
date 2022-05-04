@@ -29,6 +29,12 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
       |    // port = 8078 // missing key
       |    secure-health-check-endpoint = true
       |
+      |    admin {
+      |      enabled = true
+      |      bind-interface = "0.0.0.0"
+      |      port = 9078
+      |    }
+      |
       |    jmx {
       |      manager {
       |        proxy.status.interval = 5 seconds
@@ -102,6 +108,12 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
       |    bind-interface = "localhost"
       |    port = 8078
       |    secure-health-check-endpoint = true
+      |
+      |    admin {
+      |      enabled = true
+      |      bind-interface = "0.0.0.0"
+      |      port = 9078
+      |    }
       |
       |    jmx {
       |      manager {
@@ -214,6 +226,10 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
       cfg.server.port mustBe 8078
       cfg.server.secureHealthCheckEndpoint mustBe true
 
+      cfg.server.admin.enabled mustBe true
+      cfg.server.admin.bindInterface mustBe "0.0.0.0"
+      cfg.server.admin.port mustBe 9078
+
       val kcCfg = cfg.kafkaClient
       kcCfg.bootstrapHosts mustBe KafkaBootstrapHosts(List("localhost:29092"))
       kcCfg.schemaRegistry.value.url mustBe "http://localhost:28081"
@@ -305,6 +321,10 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
       cfg.server.port mustBe 8078
       cfg.server.secureHealthCheckEndpoint mustBe true
 
+      cfg.server.admin.enabled mustBe false
+      cfg.server.admin.bindInterface mustBe "0.0.0.0"
+      cfg.server.admin.port mustBe 9078
+
       val kcCfg = cfg.kafkaClient
       kcCfg.bootstrapHosts mustBe KafkaBootstrapHosts(List("localhost:29092"))
       kcCfg.schemaRegistry.value.url mustBe "http://localhost:28081"
@@ -329,6 +349,33 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
       chCfg.autoCommitInterval mustBe 1.second
       chCfg.autoCommitMaxAge mustBe 20.seconds
     }
+
+    "successfully load the default configuration with admin enabled on " +
+      "different bind interface" in {
+        val tcfg = ConfigFactory.defaultApplication
+          .withValue(
+            "kafka.ws.proxy.kafka-client.bootstrap-hosts",
+            ConfigValueFactory.fromAnyRef("localhost:29092")
+          )
+          .withValue(
+            "kafka.ws.proxy.kafka-client.schema-registry.url",
+            ConfigValueFactory.fromAnyRef("http://localhost:28081")
+          )
+          .withValue(
+            "kafka.ws.proxy.server.admin.enabled",
+            ConfigValueFactory.fromAnyRef(true)
+          )
+          .withValue(
+            "kafka.ws.proxy.server.admin.bind-interface",
+            ConfigValueFactory.fromAnyRef("127.0.0.1")
+          )
+
+        val cfg = Configuration.loadConfig(tcfg)
+
+        cfg.server.admin.enabled mustBe true
+        cfg.server.admin.bindInterface mustBe "127.0.0.1"
+        cfg.server.admin.port mustBe 9078
+      }
 
     "successfully load the default configuration with the custom JWT Kafka " +
       "credential keys set" in {
