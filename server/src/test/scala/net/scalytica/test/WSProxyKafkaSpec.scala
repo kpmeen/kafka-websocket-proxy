@@ -252,7 +252,8 @@ trait WsProxyKafkaSpec
       useServerBasicAuth: Boolean = false,
       serverOpenIdCfg: Option[OpenIdConnectCfg] = None,
       secureHealthCheckEndpoint: Boolean = true,
-      useProducerSessions: Boolean = false
+      useProducerSessions: Boolean = false,
+      useAdminEndpoint: Boolean = false
   ): Configuration.AppCfg = {
     val serverId = s"test-server-${Random.nextInt(50000)}"
     val srUrl =
@@ -269,7 +270,8 @@ trait WsProxyKafkaSpec
         serverId = WsServerId(serverId),
         basicAuth = basicAuthCreds,
         openidConnect = serverOpenIdCfg,
-        secureHealthCheckEndpoint = secureHealthCheckEndpoint
+        secureHealthCheckEndpoint = secureHealthCheckEndpoint,
+        admin = defaultTestAppCfg.server.admin.copy(enabled = useAdminEndpoint)
       ),
       kafkaClient = defaultTestAppCfg.kafkaClient.copy(
         bootstrapHosts = KafkaBootstrapHosts(List(serverHost(Some(kafkaPort)))),
@@ -286,7 +288,8 @@ trait WsProxyKafkaSpec
       schemaRegistryPort: Option[Int] = None,
       useServerBasicAuth: Boolean = false,
       serverOpenIdCfg: Option[OpenIdConnectCfg] = None,
-      useProducerSessions: Boolean = false
+      useProducerSessions: Boolean = false,
+      useAdminEndpoint: Boolean = false
   ): Configuration.AppCfg = {
     val serverId = s"test-server-${Random.nextInt(50000)}"
     val srUrl =
@@ -302,7 +305,8 @@ trait WsProxyKafkaSpec
       server = defaultTestAppCfg.server.copy(
         serverId = WsServerId(serverId),
         basicAuth = basicAuthCreds,
-        openidConnect = serverOpenIdCfg
+        openidConnect = serverOpenIdCfg,
+        admin = defaultTestAppCfg.server.admin.copy(enabled = useAdminEndpoint)
       ),
       kafkaClient = defaultTestAppCfg.kafkaClient.copy(
         bootstrapHosts = KafkaBootstrapHosts(List(serverHost(Some(kafkaPort)))),
@@ -369,23 +373,39 @@ trait WsProxyKafkaSpec
       isSecure: Boolean = false
   )(
       implicit kcfg: EmbeddedKafkaConfig
-  ): Unit =
+  ): Unit = {
     initialiseTopic(
       topic = topicName,
       partitions = partitions,
       isSecure = isSecure
     )
+  }
 
   def secureKafkaContext[T](body: EmbeddedKafkaConfig => T): T = {
     implicit val cfg = embeddedKafkaConfigWithSasl
     withRunningKafka(body(cfg))
   }
 
+  def plainAdminServerContext[T](
+      body: (EmbeddedKafkaConfig, AppCfg, Route) => T
+  ): T = {
+    withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
+      implicit val wsCfg = plainAppTestConfig(
+        kafkaPort = kcfg.kafkaPort,
+        useAdminEndpoint = true
+      )
+      implicit val oidClient: Option[OpenIdClient] = None
+      val adminRoutes                              = TestAdminRoutes.adminRoutes
+
+      body(kcfg, wsCfg, adminRoutes)
+    }
+  }
+
   def plainServerContext[T](
       useProducerSessions: Boolean = false
   )(
       body: (EmbeddedKafkaConfig, AppCfg, Route) => T
-  ): T =
+  ): T = {
     withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
       implicit val wsCfg = plainAppTestConfig(
         kafkaPort = kcfg.kafkaPort,
@@ -407,6 +427,43 @@ trait WsProxyKafkaSpec
 
       res
     }
+  }
+
+  private[this] def secureAdminServerContext[T](
+      useServerBasicAuth: Boolean = false,
+      serverOpenIdCfg: Option[OpenIdConnectCfg] = None
+  )(
+      body: (EmbeddedKafkaConfig, AppCfg, Route) => T
+  ): T = {
+    withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
+      implicit val wsCfg = plainAppTestConfig(
+        kafkaPort = kcfg.kafkaPort,
+        useServerBasicAuth = useServerBasicAuth,
+        serverOpenIdCfg = serverOpenIdCfg,
+        useAdminEndpoint = true
+      )
+
+      implicit val oidClient = wsCfg.server.openidConnect
+        .filter(_.enabled)
+        .map(_ => OpenIdClient(wsCfg))
+
+      val adminRoutes = TestAdminRoutes.adminRoutes
+
+      body(kcfg, wsCfg, adminRoutes)
+    }
+  }
+
+  def openIdAdminServerContext[T](openIdCfg: OpenIdConnectCfg)(
+      body: (EmbeddedKafkaConfig, AppCfg, Route) => T
+  ): T = {
+    secureAdminServerContext(serverOpenIdCfg = Some(openIdCfg))(body)
+  }
+
+  def basicAuthAdminServerContext[T](
+      body: (EmbeddedKafkaConfig, AppCfg, Route) => T
+  ): T = {
+    secureAdminServerContext(useServerBasicAuth = true)(body)
+  }
 
   def secureServerContext[T](
       useServerBasicAuth: Boolean = false,
@@ -415,11 +472,11 @@ trait WsProxyKafkaSpec
       useProducerSessions: Boolean = false
   )(
       body: (EmbeddedKafkaConfig, AppCfg, Route) => T
-  ): T =
+  ): T = {
     withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
       implicit val wsCfg = plainAppTestConfig(
         kafkaPort = kcfg.kafkaPort,
-//        schemaRegistryPort = Some(kcfg.schemaRegistryPort),
+        //        schemaRegistryPort = Some(kcfg.schemaRegistryPort),
         useServerBasicAuth = useServerBasicAuth,
         serverOpenIdCfg = serverOpenIdCfg,
         secureHealthCheckEndpoint = secureHealthCheckEndpoint,
@@ -444,6 +501,7 @@ trait WsProxyKafkaSpec
 
       res
     }
+  }
 
 }
 

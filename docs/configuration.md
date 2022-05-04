@@ -29,16 +29,38 @@ file. Where the following parameters can be adjusted:
 Basic properties allowing configurations of things related to the basic server.
 Allows for changing things like network interface, port number, etc.
 
-| Config key                                             | Environment                              | Default                  | Description   |
-|:---                                                    |:----                                     |:------------------------:|:-----         |
-| kafka.ws.proxy.server.server-id                        | WSPROXY_SERVER_ID                        | `node-1`                 | A unique identifier for the specific kafka-websocket-proxy instance. |
-| kafka.ws.proxy.server.bind-interface                   | WSPROXY_BIND_INTERFACE                   | `0.0.0.0`                | Network interface to bind unsecured traffic to. |
-| kafka.ws.proxy.server.port                             | WSPROXY_PORT                             | `8078`                   | Port where the unsecured endpoints will be available. |
-| kafka.ws.proxy.server.broker-resolution-timeout        | WSPROXY_BROKER_RESOLUTION_TIMEOUT        | `30 seconds`             | Timeout duration to wait for successful host resolution of Kafka brokers. |
-| kafka.ws.proxy.server.broker-resolution-retries        | WSPROXY_BROKER_RESOLUTION_RETRIES        | `25`                     | Max number of retries for host resolution of Kafka brokers. |
-| kafka.ws.proxy.server.broker-resolution-retry-interval | WSPROXY_BROKER_RESOLUTION_RETRY_INTERVAL | `1 second`               | Interval duration between retries when resolving the Kafka broker hosts. |
+| Config key                                             | Environment                              | Default                  | Description                                                                                                                                   |
+|:---                                                    |:----                                     |:------------------------:|:----------------------------------------------------------------------------------------------------------------------------------------------|
+| kafka.ws.proxy.server.server-id                        | WSPROXY_SERVER_ID                        | `node-1`                 | A unique identifier for the specific kafka-websocket-proxy instance.                                                                          |
+| kafka.ws.proxy.server.bind-interface                   | WSPROXY_BIND_INTERFACE                   | `0.0.0.0`                | Default network interface to bind traffic to.                                                                                                 |
+| kafka.ws.proxy.server.port                             | WSPROXY_PORT                             | `8078`                   | Port where the unsecured endpoints will be available.                                                                                         |
+| kafka.ws.proxy.server.broker-resolution-timeout        | WSPROXY_BROKER_RESOLUTION_TIMEOUT        | `30 seconds`             | Timeout duration to wait for successful host resolution of Kafka brokers.                                                                     |
+| kafka.ws.proxy.server.broker-resolution-retries        | WSPROXY_BROKER_RESOLUTION_RETRIES        | `25`                     | Max number of retries for host resolution of Kafka brokers.                                                                                   |
+| kafka.ws.proxy.server.broker-resolution-retry-interval | WSPROXY_BROKER_RESOLUTION_RETRY_INTERVAL | `1 second`               | Interval duration between retries when resolving the Kafka broker hosts.                                                                      |
 | kafka.ws.proxy.server.secure-health-check-endpoint     | WSPROXY_SECURE_HEALTHCHECK_ENDPOINT      | `true`                   | When set to `true`, will enforce the same auth requirements as other endpoints. If `false` the `/healthcheck` endpoint will not require auth. |
-| kafka.ws.proxy.server.jmx.proxy.status.interval        | WSPROXY_JMX_PROXY_STATUS_INTERVAL        | `5 seconds`              | Sets the frequency the Kafka WebSocket Proxy will update the values in the `ProxyStatusMXBean` |
+| kafka.ws.proxy.server.jmx.proxy.status.interval        | WSPROXY_JMX_PROXY_STATUS_INTERVAL        | `5 seconds`              | Sets the frequency the Kafka WebSocket Proxy will update the values in the `ProxyStatusMXBean`                                                |
+
+### Admin Server Configuration
+
+The admin server provides a set of service endpoints that should not be exposed
+together with the standard endpoints. Typically, these services provide
+information or functionality that can be considered harmful for unauthorised
+use.
+
+These endpoints must be explicitly enabled before they can be used. And when
+they are enabled, will be exposed on a separate port number.
+
+> NOTE:
+> If the server is configured to use SSL/TLS, the admin server will
+> automatically use it as well. This also applies to configs where both SSL/TLS
+> and plain access to the proxy is allowed.
+
+| Config key                                 | Environment                              |                       Default                        | Description                                                       |
+|:-------------------------------------------|:----                                     |:----------------------------------------------------:|:------------------------------------------------------------------|
+| kafka.ws.proxy.server.admin.enabled        | WSPROXY_ADMIN_ENDPOINT_ENABLED           |                       `false`                        | To enable the admin server endpoints this must be set to  `true`. |
+| kafka.ws.proxy.server.admin.bind-interface | WSPROXY_ADMIN_BIND_INTERFACE             | same value as `kafka.ws.proxy.server.bind-interface` | Network interface to bind traffic to.                             |
+| kafka.ws.proxy.server.port                 | WSPROXY_PORT                             |                        `9078`                        | Port where the admin endpoints will be available.                 |
+
 
 ## Internal Session Handler
 

@@ -345,6 +345,12 @@ object Configuration extends WithProxyLogger {
 
   case class JmxManagerConfig(proxyStatusInterval: FiniteDuration)
 
+  case class AdminEndpointConfig(
+      enabled: Boolean,
+      bindInterface: String,
+      port: Int
+  )
+
   final case class ServerCfg(
       serverId: WsServerId,
       bindInterface: String,
@@ -356,8 +362,11 @@ object Configuration extends WithProxyLogger {
       secureHealthCheckEndpoint: Boolean,
       basicAuth: Option[BasicAuthCfg],
       openidConnect: Option[OpenIdConnectCfg],
-      jmx: JmxConfig
+      jmx: JmxConfig,
+      admin: AdminEndpointConfig
   ) {
+
+    def isAdminEnabled: Boolean = admin.enabled
 
     def isSslEnabled: Boolean = ssl.exists(_.enabled)
 

@@ -25,6 +25,58 @@ trait ServerBindings {
     httpsCtx.map(sb.enableHttps).getOrElse(sb).bindFlow(routes)
   }
 
+  private[this] def printUnsecuredWarning()(implicit cfg: AppCfg): Unit = {
+    val srv = cfg.server
+    val adm = srv.admin
+
+    def middle(name: String, iface: String, port: Int) = {
+      s"""${name.toUpperCase}
+         |----------------------------
+         |interface: $iface
+         |     port: $port
+         |""".stripMargin
+    }
+    // scalastyle:off
+    println(
+      s"""
+         |-------------------------------------------------------------------
+         |  WARNING:
+         |-------------------------------------------------------------------
+         |Server starting with authentication and non-TLS binding
+         |
+         |${middle("proxy", srv.bindInterface, srv.port)}
+         |${if (adm.enabled) middle("admin", adm.bindInterface, adm.port)}
+         |This will allow credentials to be transmitted in plain text over
+         |the network, and could compromise security!
+         |-------------------------------------------------------------------
+         |""".stripMargin
+    )
+    // scalastyle:on
+  }
+
+  def initialiseAdminBinding(routes: Route)(
+      implicit cfg: AppCfg,
+      sys: ActorSystem
+  ): Option[Future[Http.ServerBinding]] = {
+    val adminCfg = cfg.server.admin
+
+    if (adminCfg.enabled) {
+      if (cfg.server.isSslEnabled) {
+        val httpsCtx = createHttpsContext()
+        Option(
+          initialiseBinding(
+            interface = adminCfg.bindInterface,
+            port = adminCfg.port,
+            routes = routes,
+            httpsCtx = httpsCtx
+          )
+        )
+      } else {
+        Option(initialiseBinding(adminCfg.bindInterface, adminCfg.port, routes))
+      }
+    } else None
+  }
+
   def initialisePlainBinding(
       implicit cfg: AppCfg,
       routes: Route,
@@ -33,23 +85,7 @@ trait ServerBindings {
     if (cfg.server.ssl.exists(_.sslOnly)) None
     else {
       if (!cfg.server.isAuthSecurelyEnabled) {
-        // scalastyle:off
-        println(
-          s"""
-            |-------------------------------------------------------------------
-            |  WARNING:
-            |-------------------------------------------------------------------
-            |Server starting with authentication and non-TLS binding
-            |
-            |interface: ${cfg.server.bindInterface}
-            |     port: ${cfg.server.port}
-            |
-            |This will allow credentials to be transmitted in plain text over
-            |the network, and could compromise security!
-            |-------------------------------------------------------------------
-            |""".stripMargin
-        )
-        // scalastyle:on
+        printUnsecuredWarning()
       }
       Option(
         initialiseBinding(cfg.server.bindInterface, cfg.server.port, routes)
@@ -57,16 +93,13 @@ trait ServerBindings {
     }
   }
 
-  // scalastyle:off
-  def initialiseSslBinding(
-      implicit cfg: AppCfg,
-      routes: Route,
-      sys: ActorSystem
-  ): Option[Future[Http.ServerBinding]] = {
-    cfg.server.ssl.flatMap { sslCfg =>
-      val ks: KeyStore = KeyStore.getInstance("PKCS12")
+  private[this] lazy val keyStoreInstance = KeyStore.getInstance("PKCS12")
 
-      sslCfg.port.map { port =>
+  private[this] def createHttpsContext()(
+      implicit cfg: AppCfg
+  ): Option[HttpsConnectionContext] = {
+    if (cfg.server.isSslEnabled) {
+      cfg.server.ssl.map { sslCfg =>
         val keystore = sslCfg.keystoreLocation
           .map(s => Path.of(s))
           .map(path => Files.newInputStream(path))
@@ -76,16 +109,31 @@ trait ServerBindings {
           message = "SSL is configured but no keystore could be found"
         )
 
-        keystore.foreach(store => ks.load(store, sslCfg.liftKeystorePassword))
+        keystore.foreach { store =>
+          keyStoreInstance.load(store, sslCfg.liftKeystorePassword)
+        }
 
-        val sslCtx   = initSslContext(ks, sslCfg)
-        val httpsCtx = httpsContext(sslCtx)
+        val sslCtx = initSslContext(keyStoreInstance, sslCfg)
+        httpsContext(sslCtx)
+      }
+    } else None
+  }
+
+  // scalastyle:off
+  def initialiseSslBinding(
+      implicit cfg: AppCfg,
+      routes: Route,
+      sys: ActorSystem
+  ): Option[Future[Http.ServerBinding]] = {
+    cfg.server.ssl.flatMap { sslCfg =>
+      sslCfg.port.map { port =>
+        val httpsCtx = createHttpsContext()
 
         initialiseBinding(
           interface = sslCfg.bindInterface.getOrElse(cfg.server.bindInterface),
           port = port,
           routes = routes,
-          httpsCtx = Some(httpsCtx)
+          httpsCtx = httpsCtx
         )
       }
     }
