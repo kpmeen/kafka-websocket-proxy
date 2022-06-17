@@ -40,7 +40,7 @@ private[session] class SessionDataConsumer(
   private[this] lazy val cid = sessionConsumerGroupId
 
   private[this] val sessionStateTopic =
-    cfg.sessionHandler.sessionStateTopicName.value
+    cfg.sessionHandler.topicName.value
 
   private[this] lazy val consumerProps = {
     ConsumerSettings(sys.toClassic, kDes, vDes)
@@ -48,6 +48,7 @@ private[session] class SessionDataConsumer(
       .withGroupId(cid)
       .withClientId(cid)
       .withProperties(
+        // Always begin at the start of the topic
         AUTO_OFFSET_RESET_CONFIG  -> EARLIEST.name.toLowerCase,
         ENABLE_AUTO_COMMIT_CONFIG -> "false"
       )
@@ -56,7 +57,7 @@ private[session] class SessionDataConsumer(
 
   private[this] def initialiseConsumer(
       cs: ConsumerSettings[String, Session]
-  )(implicit cfg: AppCfg): KafkaConsumer[String, Session] = {
+  ): KafkaConsumer[String, Session] = {
     val props = cfg.consumer.kafkaClientProperties ++
       cs.getProperties.asScala.toMap ++
       consumerMetricsProperties
@@ -74,22 +75,21 @@ private[session] class SessionDataConsumer(
   lazy val sessionStateSource: SessionSource = {
     val subscription = Subscriptions.topics(Set(sessionStateTopic))
 
-    Consumer
-      .plainSource(consumerProps, subscription)
-      .log("Session event", cr => cr.key)
-      .map { cr =>
-        Option(cr.value)
-          .map { v =>
-            SessionHandlerProtocol.UpdateSession(
-              sessionId = SessionId(cr.key),
-              s = v,
-              offset = cr.offset()
-            )
-          }
-          .getOrElse {
-            SessionHandlerProtocol.RemoveSession(SessionId(cr.key), cr.offset())
-          }
-      }
+    Consumer.plainSource(consumerProps, subscription).map { cr =>
+      Option(cr.value)
+        .map { v =>
+          log.trace(s"Received UpdateSession event for key ${cr.key()}")
+          SessionHandlerProtocol.UpdateSession(
+            sessionId = SessionId(cr.key),
+            s = v,
+            offset = cr.offset()
+          )
+        }
+        .getOrElse {
+          log.trace(s"Received RemoveSession event for key ${cr.key()}")
+          SessionHandlerProtocol.RemoveSession(SessionId(cr.key), cr.offset())
+        }
+    }
   }
 
 }

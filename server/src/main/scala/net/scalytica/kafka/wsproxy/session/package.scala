@@ -8,7 +8,7 @@ package object session {
 
   type SessionSource = Source[SessionHandlerProtocol.Protocol, Consumer.Control]
 
-  def sessionConsumerGroupId(implicit cfg: AppCfg): String = {
+  private[session] def sessionConsumerGroupId(implicit cfg: AppCfg): String = {
     s"ws-proxy-session-consumer-${cfg.server.serverId.value}"
   }
 }

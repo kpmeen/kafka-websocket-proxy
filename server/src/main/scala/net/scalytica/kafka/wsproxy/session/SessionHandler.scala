@@ -137,7 +137,7 @@ trait SessionHandler extends WithProxyLogger {
 
     val ref = sys.spawn(sessionHandler, name)
 
-    log.debug(s"Starting session state consumer for server id $name...")
+    log.debug(s"Starting session state consumer with identifier $name...")
     val consumer = new SessionDataConsumer()
 
     val consumerStream: RunnableGraph[Consumer.Control] =
@@ -209,7 +209,7 @@ trait SessionHandler extends WithProxyLogger {
       case psp: ProducerSessionProtocol =>
         producerSessionProtocolHandler(active, psp)
 
-      case SessionHandlerReady(replyTo) =>
+      case CheckSessionHandlerReady(replyTo) =>
         val currentState =
           if (stateRestored) SessionStateRestored()
           else RestoringSessionState()
@@ -256,9 +256,10 @@ trait SessionHandler extends WithProxyLogger {
           ConsumerSession(is.sessionId, is.groupId, is.maxConnections)
         }
 
-      case ac: AddConsumer        => addClientHandler(active, ac)
-      case rc: RemoveConsumer     => removeClientHandler(active, rc)
-      case gs: GetConsumerSession => getConsumerSessionHandler(active, gs)
+      case ac: AddConsumer           => addClientHandler(active, ac)
+      case rc: RemoveConsumer        => removeClientHandler(active, rc)
+      case uc: UpdateConsumerSession => updateConsumerSessionHandler(active, uc)
+      case gs: GetConsumerSession    => getConsumerSessionHandler(active, gs)
     }
   }
 
@@ -278,9 +279,10 @@ trait SessionHandler extends WithProxyLogger {
           ProducerSession(is.sessionId, is.maxConnections)
         }
 
-      case ap: AddProducer        => addClientHandler(active, ap)
-      case rp: RemoveProducer     => removeClientHandler(active, rp)
-      case gs: GetProducerSession => getProducerSessionHandler(active, gs)
+      case ap: AddProducer           => addClientHandler(active, ap)
+      case rp: RemoveProducer        => removeClientHandler(active, rp)
+      case up: UpdateProducerSession => updateProducerSessionHandler(active, up)
+      case gs: GetProducerSession    => getProducerSessionHandler(active, gs)
     }
   }
 
@@ -442,6 +444,54 @@ trait SessionHandler extends WithProxyLogger {
             Behaviors.same
         }
     }
+  }
+
+  private[this] def updateConsumerSessionHandler(
+      active: ActiveSessions,
+      ucs: UpdateConsumerSession
+  )(
+      implicit ec: ExecutionContext,
+      cfg: AppCfg,
+      producer: SessionDataProducer
+  ): Behavior[Protocol] = {
+    active
+      .find(ucs.sessionId)
+      .flatMap { s =>
+        val upd = s.updateConfig(ucs.cfg)
+        active.updateSession(ucs.sessionId, upd).toOption.map(a => upd -> a)
+      }
+      .map { case (s, a) =>
+        ucs.replyTo ! SessionUpdated(s)
+        behavior(a)
+      }
+      .getOrElse {
+        ucs.replyTo ! SessionNotFound(ucs.sessionId)
+        Behaviors.same
+      }
+  }
+
+  private[this] def updateProducerSessionHandler(
+      active: ActiveSessions,
+      ups: UpdateProducerSession
+  )(
+      implicit ec: ExecutionContext,
+      cfg: AppCfg,
+      producer: SessionDataProducer
+  ): Behavior[Protocol] = {
+    active
+      .find(ups.sessionId)
+      .flatMap { s =>
+        val upd = s.updateConfig(ups.cfg)
+        active.updateSession(ups.sessionId, upd).toOption.map(a => upd -> a)
+      }
+      .map { case (s, a) =>
+        ups.replyTo ! SessionUpdated(s)
+        behavior(a)
+      }
+      .getOrElse {
+        ups.replyTo ! SessionNotFound(ups.sessionId)
+        Behaviors.same
+      }
   }
 
   private[this] def getConsumerSessionHandler(

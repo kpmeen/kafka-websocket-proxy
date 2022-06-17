@@ -8,11 +8,12 @@ import akka.http.scaladsl.Http
 import akka.stream.Materializer
 import akka.util.Timeout
 import net.scalytica.kafka.wsproxy.auth.OpenIdClient
-import net.scalytica.kafka.wsproxy.config.Configuration
 import net.scalytica.kafka.wsproxy.config.Configuration.{
   AppCfg,
   OpenIdConnectCfg
 }
+import net.scalytica.kafka.wsproxy.config.DynamicConfigHandlerImplicits._
+import net.scalytica.kafka.wsproxy.config.{Configuration, DynamicConfigHandler}
 import net.scalytica.kafka.wsproxy.jmx.JmxManager
 import net.scalytica.kafka.wsproxy.logging.DefaultProxyLogger._
 import net.scalytica.kafka.wsproxy.logging.WsProxyEnvLoggerConfigurator
@@ -61,7 +62,7 @@ object Server extends App with ServerRoutes with ServerBindings {
 
   private[this] val evalDone = Future.successful(Done)
 
-  val config = Configuration.loadTypesafeConfig()
+  val config = Configuration.loadLightbendConfig()
 
   implicit val cfg: AppCfg = Configuration.loadConfig(config)
 
@@ -94,13 +95,28 @@ object Server extends App with ServerRoutes with ServerBindings {
 
   implicit val jmxMngr = Option(JmxManager())
 
-  implicit val sessionHandlerRef = SessionHandler.init
+  implicit val sessionHandler = SessionHandler.init
+  val sessionHandlerStream    = sessionHandler.stream
+
+  implicit val optRunnableDynCfgHandler = {
+    if (cfg.dynamicConfigHandler.enabled) {
+      Option(DynamicConfigHandler.init)
+    } else None
+  }
+  implicit val optReadableDynCfgHandler =
+    optRunnableDynCfgHandler.map(_.asReadOnlyRef)
 
   private[this] val plainPort = cfg.server.port
 
-  implicit val (sessionHandlerStream, routes) = wsProxyRoutes
+  implicit val routes = wsProxyRoutes
 
-  val ctrl = sessionHandlerStream.run()
+  val dynCfgCtrl  = optRunnableDynCfgHandler.map(_.stream.run())
+  val sessionCtrl = sessionHandlerStream.run()
+
+  /** Bind to network interface and port, starting the server */
+  val bindingPlain  = initialisePlainBinding
+  val bindingSecure = initialiseSslBinding
+  val bindingAdmin  = initialiseAdminBinding(adminRoutes)
 
   private[this] def unbindConnection(
       binding: Future[Http.ServerBinding]
@@ -108,21 +124,20 @@ object Server extends App with ServerRoutes with ServerBindings {
     binding.flatMap(_.terminate(10 seconds)).map(_ => Done)
   }
 
-  /** Bind to network interface and port, starting the server */
-  val bindingPlain  = initialisePlainBinding
-  val bindingSecure = initialiseSslBinding
-  val bindingAdmin  = initialiseAdminBinding(adminRoutes)
+  private[this] def unbindAll(): Future[Done] = {
+    for {
+      _ <- bindingPlain.map(unbindConnection).getOrElse(evalDone)
+      _ <- bindingSecure.map(unbindConnection).getOrElse(evalDone)
+      _ <- bindingAdmin.map(unbindConnection).getOrElse(evalDone)
+    } yield Done
+  }
 
   val shutdown: CoordinatedShutdown = {
     val cs = CoordinatedShutdown(classicSys)
 
     cs.addTask(PhaseServiceUnbind, "http-unbind") { () =>
       info("Gracefully terminating HTTP network bindings...")
-      for {
-        _ <- bindingPlain.map(unbindConnection).getOrElse(evalDone)
-        _ <- bindingSecure.map(unbindConnection).getOrElse(evalDone)
-        _ <- bindingAdmin.map(unbindConnection).getOrElse(evalDone)
-      } yield Done
+      unbindAll()
     }
 
     cs.addTask(PhaseServiceStop, "http-shutdown-connection-pools") { () =>
@@ -130,20 +145,32 @@ object Server extends App with ServerRoutes with ServerBindings {
       Http().shutdownAllConnectionPools().map(_ => Done)
     }
 
-    cs.addTask(PhaseBeforeClusterShutdown, "session-cleanup-state") { () =>
-      implicit val timeout: Timeout = 10 seconds
-      implicit val typedScheduler   = classicSys.scheduler.toTyped
-      info("Cleaning up session state...")
-      sessionHandlerRef.shRef.sessionHandlerShutdown().map { _ =>
-        log.info("Session handler has been stopped.")
-        Done
-      }
+    cs.addTask(PhaseBeforeClusterShutdown, "session-consumer-shutdown") { () =>
+      info("Session data consumer shutting down...")
+      sessionCtrl.drainAndShutdown(evalDone)
+      info("Dynamic config consumer shutting down...")
+      dynCfgCtrl.map(_.drainAndShutdown(evalDone)).getOrElse(evalDone)
     }
 
-    cs.addTask(PhaseBeforeActorSystemTerminate, "session-consumer-shutdown") {
-      () =>
-        info("Session data consumer shutting down...")
-        ctrl.drainAndShutdown(evalDone)
+    cs.addTask(PhaseBeforeActorSystemTerminate, "cleanup-state") { () =>
+      implicit val timeout: Timeout = 10 seconds
+      implicit val typedScheduler   = classicSys.scheduler.toTyped
+
+      info("Shutting down dynamic config handler...")
+      optRunnableDynCfgHandler
+        .map { r =>
+          r.dynamicConfigHandlerStop().map { _ =>
+            info("Dynamic config handler has been stopped.")
+            Done
+          }
+        }
+        .getOrElse(evalDone)
+
+      info("Cleaning up internal session state...")
+      sessionHandler.shRef.sessionHandlerStop().map { _ =>
+        info("Session handler has been stopped.")
+        Done
+      }
     }
 
     cs

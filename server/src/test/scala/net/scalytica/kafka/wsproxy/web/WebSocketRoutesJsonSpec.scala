@@ -20,7 +20,7 @@ class WebSocketRoutesJsonSpec
     "the server routes" should {
 
       "produce messages with String key and value" in
-        plainProducerContext(nextTopic) { ctx =>
+        plainProducerContext(nextTopic) { implicit ctx =>
           implicit val wsClient = ctx.producerProbe
 
           val msgs = createJsonKeyValue(1)
@@ -31,13 +31,13 @@ class WebSocketRoutesJsonSpec
             topic = ctx.topicName,
             keyType = StringType,
             valType = StringType,
-            routes = Route.seal(ctx.route),
+            routes = Route.seal(wsRouteFromProducerContext),
             messages = msgs
           )
         }
 
       "produce messages with String value" in
-        plainProducerContext(nextTopic) { ctx =>
+        plainProducerContext(nextTopic) { implicit ctx =>
           implicit val wsClient = ctx.producerProbe
 
           val msgs = createJsonValue(1)
@@ -48,13 +48,13 @@ class WebSocketRoutesJsonSpec
             topic = ctx.topicName,
             keyType = NoType,
             valType = StringType,
-            routes = Route.seal(ctx.route),
+            routes = Route.seal(wsRouteFromProducerContext),
             messages = msgs
           )
         }
 
       "produce messages with headers and String key and value" in
-        plainProducerContext(nextTopic) { ctx =>
+        plainProducerContext(nextTopic) { implicit ctx =>
           implicit val wsClient = ctx.producerProbe
           implicit val kcfg     = ctx.embeddedKafkaConfig
 
@@ -66,7 +66,7 @@ class WebSocketRoutesJsonSpec
             topic = ctx.topicName,
             keyType = StringType,
             valType = StringType,
-            routes = Route.seal(ctx.route),
+            routes = Route.seal(wsRouteFromProducerContext),
             messages = msgs
           )
 
@@ -78,7 +78,7 @@ class WebSocketRoutesJsonSpec
         }
 
       "produce messages with headers and String values" in
-        plainProducerContext(nextTopic) { ctx =>
+        plainProducerContext(nextTopic) { implicit ctx =>
           implicit val wsClient = ctx.producerProbe
           implicit val kcfg     = ctx.embeddedKafkaConfig
 
@@ -90,7 +90,7 @@ class WebSocketRoutesJsonSpec
             topic = ctx.topicName,
             keyType = NoType,
             valType = StringType,
-            routes = Route.seal(ctx.route),
+            routes = Route.seal(wsRouteFromProducerContext),
             messages = msgs
           )
 
@@ -99,7 +99,7 @@ class WebSocketRoutesJsonSpec
         }
 
       "produce messages with headers, String key and value and message ID" in
-        plainProducerContext(nextTopic) { ctx =>
+        plainProducerContext(nextTopic) { implicit ctx =>
           implicit val wsClient = ctx.producerProbe
           implicit val kcfg     = ctx.embeddedKafkaConfig
 
@@ -112,7 +112,7 @@ class WebSocketRoutesJsonSpec
             topic = ctx.topicName,
             keyType = StringType,
             valType = StringType,
-            routes = Route.seal(ctx.route),
+            routes = Route.seal(wsRouteFromProducerContext),
             messages = messages,
             validateMessageId = true
           )
@@ -130,7 +130,7 @@ class WebSocketRoutesJsonSpec
           keyType = Some(StringType),
           valType = StringType,
           numMessages = 10
-        ) { ctx =>
+        ) { implicit ctx =>
           implicit val kcfg = ctx.embeddedKafkaConfig
 
           val out = "/socket/out?" +
@@ -152,18 +152,20 @@ class WebSocketRoutesJsonSpec
             k must startWith("foo-")
             v must startWith("bar-")
           }
-          WS(out, ctx.consumerProbe.flow) ~> ctx.route ~> check {
-            isWebSocketUpgrade mustBe true
+          WS(out, ctx.consumerProbe.flow) ~>
+            wsRouteFromConsumerContext ~>
+            check {
+              isWebSocketUpgrade mustBe true
 
-            forAll(1 to 10) { i =>
-              ctx.consumerProbe
-                .expectWsConsumerKeyValueResultJson[String, String](
-                  expectedTopic = ctx.topicName,
-                  expectedKey = s"foo-$i",
-                  expectedValue = s"bar-$i"
-                )
+              forAll(1 to 10) { i =>
+                ctx.consumerProbe
+                  .expectWsConsumerKeyValueResultJson[String, String](
+                    expectedTopic = ctx.topicName,
+                    expectedKey = s"foo-$i",
+                    expectedValue = s"bar-$i"
+                  )
+              }
             }
-          }
         }
 
       "consume messages with String key and value and headers" in
@@ -173,7 +175,7 @@ class WebSocketRoutesJsonSpec
           valType = StringType,
           numMessages = 10,
           withHeaders = true
-        ) { ctx =>
+        ) { implicit ctx =>
           implicit val kcfg = ctx.embeddedKafkaConfig
 
           val out = "/socket/out?" +
@@ -195,19 +197,21 @@ class WebSocketRoutesJsonSpec
             k must startWith("foo-")
             v must startWith("bar-")
           }
-          WS(out, ctx.consumerProbe.flow) ~> ctx.route ~> check {
-            isWebSocketUpgrade mustBe true
+          WS(out, ctx.consumerProbe.flow) ~>
+            wsRouteFromConsumerContext ~>
+            check {
+              isWebSocketUpgrade mustBe true
 
-            forAll(1 to 10) { i =>
-              ctx.consumerProbe
-                .expectWsConsumerKeyValueResultJson[String, String](
-                  expectedTopic = ctx.topicName,
-                  expectedKey = s"foo-$i",
-                  expectedValue = s"bar-$i",
-                  expectHeaders = true
-                )
+              forAll(1 to 10) { i =>
+                ctx.consumerProbe
+                  .expectWsConsumerKeyValueResultJson[String, String](
+                    expectedTopic = ctx.topicName,
+                    expectedKey = s"foo-$i",
+                    expectedValue = s"bar-$i",
+                    expectHeaders = true
+                  )
+              }
             }
-          }
         }
 
       "consume messages with String value" in
@@ -216,7 +220,7 @@ class WebSocketRoutesJsonSpec
           keyType = None,
           valType = StringType,
           numMessages = 10
-        ) { ctx =>
+        ) { implicit ctx =>
           implicit val kcfg = ctx.embeddedKafkaConfig
 
           val out = "/socket/out?" +
@@ -228,23 +232,25 @@ class WebSocketRoutesJsonSpec
 
           consumeFirstMessageFrom[String](ctx.topicName.value) mustBe "bar-1"
 
-          WS(out, ctx.consumerProbe.flow) ~> ctx.route ~> check {
-            isWebSocketUpgrade mustBe true
+          WS(out, ctx.consumerProbe.flow) ~>
+            wsRouteFromConsumerContext ~>
+            check {
+              isWebSocketUpgrade mustBe true
 
-            forAll(1 to 10) { i =>
-              ctx.consumerProbe.expectWsConsumerValueResultJson[String](
-                expectedTopic = ctx.topicName,
-                expectedValue = s"bar-$i"
-              )
+              forAll(1 to 10) { i =>
+                ctx.consumerProbe.expectWsConsumerValueResultJson[String](
+                  expectedTopic = ctx.topicName,
+                  expectedValue = s"bar-$i"
+                )
+              }
             }
-          }
         }
     }
 
     "kafka is secure and the server is unsecured" should {
 
       "be able to produce messages" in
-        secureKafkaClusterProducerContext(topic = nextTopic) { ctx =>
+        secureKafkaClusterProducerContext(topic = nextTopic) { implicit ctx =>
           implicit val wsClient = ctx.producerProbe
 
           val messages = createJsonKeyValue(1)
@@ -255,7 +261,7 @@ class WebSocketRoutesJsonSpec
             topic = ctx.topicName,
             keyType = StringType,
             valType = StringType,
-            routes = Route.seal(ctx.route),
+            routes = Route.seal(wsRouteFromProducerContext),
             messages = messages,
             kafkaCreds = Some(creds)
           )
@@ -267,7 +273,7 @@ class WebSocketRoutesJsonSpec
           keyType = None,
           valType = StringType,
           numMessages = 10
-        ) { ctx =>
+        ) { implicit ctx =>
           implicit val kcfg = ctx.embeddedKafkaConfig
 
           val out = "/socket/out?" +
@@ -281,7 +287,7 @@ class WebSocketRoutesJsonSpec
 
           WS(out, ctx.consumerProbe.flow) ~>
             addKafkaCreds(creds) ~>
-            ctx.route ~>
+            wsRouteFromConsumerContext ~>
             check {
               isWebSocketUpgrade mustBe true
 

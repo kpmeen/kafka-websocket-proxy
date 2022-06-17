@@ -39,7 +39,23 @@ class WsKafkaAdminClientSpec
         val wsCfg  = plainAppTestConfig(kcfg.kafkaPort)
         val client = new WsKafkaAdminClient(wsCfg)
 
-        client.replicationFactor mustBe 1
+        client.replicationFactor(
+          wsCfg.sessionHandler.topicName,
+          wsCfg.sessionHandler.topicReplicationFactor
+        ) mustBe 1
+
+        client.close()
+      }
+
+    "return number replicas to use for the dynamic config topic" in
+      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
+        val wsCfg  = plainAppTestConfig(kcfg.kafkaPort)
+        val client = new WsKafkaAdminClient(wsCfg)
+
+        client.replicationFactor(
+          wsCfg.dynamicConfigHandler.topicName,
+          wsCfg.dynamicConfigHandler.topicReplicationFactor
+        ) mustBe 1
 
         client.close()
       }
@@ -49,25 +65,25 @@ class WsKafkaAdminClientSpec
         val wsCfg  = plainAppTestConfig(kcfg.kafkaPort)
         val client = new WsKafkaAdminClient(wsCfg)
 
-        client.createSessionStateTopic()
+        client.initSessionStateTopic()
 
-        val res = client.findSessionStateTopic
+        val res = client.findTopic(wsCfg.sessionHandler.topicName)
         res must not be empty
-        res.value mustBe wsCfg.sessionHandler.sessionStateTopicName.value
+        res.value mustBe wsCfg.sessionHandler.topicName.value
 
         client.close()
       }
 
-    "initialise the session state topic" in
+    "create and find the dynamic config topic" in
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         val wsCfg  = plainAppTestConfig(kcfg.kafkaPort)
         val client = new WsKafkaAdminClient(wsCfg)
 
-        client.initSessionStateTopic()
+        client.initDynamicConfigTopic()
 
-        val res = client.findSessionStateTopic
+        val res = client.findTopic(wsCfg.dynamicConfigHandler.topicName)
         res must not be empty
-        res.value mustBe wsCfg.sessionHandler.sessionStateTopicName.value
+        res.value mustBe wsCfg.dynamicConfigHandler.topicName.value
 
         client.close()
       }

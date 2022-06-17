@@ -26,7 +26,9 @@ trait WebSocketRoutes { self: BaseRoutes =>
       args: SocketArgs
   )(
       webSocketHandler: => Route
-  )(implicit cfg: AppCfg): Route = {
+  )(
+      implicit cfg: AppCfg
+  ): Route = {
     val topic = args.topic
     log.trace(s"Verifying if topic $topic exists...")
     val admin = new WsKafkaAdminClient(cfg)
@@ -85,23 +87,25 @@ trait WebSocketRoutes { self: BaseRoutes =>
   def websocketRoutes(
       inbound: InSocketArgs => Route,
       outbound: OutSocketArgs => Route
-  )(implicit cfg: AppCfg, maybeOpenIdClient: Option[OpenIdClient]): Route = {
+  )(
+      implicit cfg: AppCfg,
+      maybeOpenIdClient: Option[OpenIdClient]
+  ): Route = {
     extractMaterializer { implicit mat =>
-      pathPrefix("socket") {
-        path("in") {
-          maybeAuthenticate(cfg, maybeOpenIdClient, mat) { authResult =>
+      maybeAuthenticate(cfg, maybeOpenIdClient, mat) { authResult =>
+        pathPrefix("socket") {
+          path("in") {
             optionalHeaderValueByType(XKafkaAuthHeader) { headerCreds =>
               val creds = extractKafkaCreds(authResult, headerCreds)
               inParams { inArgs =>
                 val args = inArgs
                   .withAclCredentials(creds)
                   .withBearerToken(authResult.maybeBearerToken)
+
                 validateAndHandleWebSocket(args)(inbound(args))
               }
             }
-          }
-        } ~ path("out") {
-          maybeAuthenticate(cfg, maybeOpenIdClient, mat) { authResult =>
+          } ~ path("out") {
             optionalHeaderValueByType(XKafkaAuthHeader) { headerCreds =>
               val creds = extractKafkaCreds(authResult, headerCreds)
               outParams { outArgs =>

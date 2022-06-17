@@ -1,18 +1,21 @@
 package net.scalytica.kafka.wsproxy.web
 
 import akka.actor.ActorSystem
+import akka.actor.typed.ActorRef
 import akka.actor.typed.scaladsl.adapter._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server._
-import akka.kafka.scaladsl.Consumer
 import akka.stream.Materializer
-import akka.stream.scaladsl.RunnableGraph
 import net.scalytica.kafka.wsproxy.auth.OpenIdClient
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.config.ReadableDynamicConfigHandlerRef
 import net.scalytica.kafka.wsproxy.jmx.JmxManager
 import net.scalytica.kafka.wsproxy.models._
 import net.scalytica.kafka.wsproxy.session.SessionHandlerImplicits._
-import net.scalytica.kafka.wsproxy.session.SessionHandlerRef
+import net.scalytica.kafka.wsproxy.session.{
+  SessionHandlerProtocol,
+  SessionHandlerRef
+}
 import net.scalytica.kafka.wsproxy.web.websockets.{
   InboundWebSocket,
   OutboundWebSocket
@@ -46,31 +49,30 @@ trait ServerRoutes
    * @param jmx
    *   Implicitly provided optional [[JmxManager]]
    * @return
-   *   a tuple containing a [[RunnableGraph]] and the [[Route]] definition
+   *   the [[Route]] definition
    */
   def wsProxyRoutes(
       implicit cfg: AppCfg,
       sessionHandlerRef: SessionHandlerRef,
+      maybeDynamicCfgHandlerRef: Option[ReadableDynamicConfigHandlerRef],
       maybeOpenIdClient: Option[OpenIdClient],
       sys: ActorSystem,
       mat: Materializer,
       ctx: ExecutionContext,
       jmx: Option[JmxManager] = None
-  ): (RunnableGraph[Consumer.Control], Route) = {
-    sessionHandler = sessionHandlerRef // TODO: This mutation hurts my pride
-    implicit val sh = sessionHandler.shRef
+  ): Route = {
+    implicit val sh = sessionHandlerRef.shRef
 
     // Wait for session state to be restored before continuing
     try {
       sh.awaitSessionRestoration()(ctx, sys.toTyped.scheduler)
     } catch {
       case t: Throwable =>
-        log
-          .error("Unable to restore session state. Terminating application.", t)
-        System.exit(1)
+        log.error("Unable to restore session state. Terminating server.", t)
+        scala.sys.exit(1)
     }
 
-    (sessionHandler.stream, routesWith(inboundWebSocket, outboundWebSocket))
+    routesWith(inboundWebSocket, outboundWebSocket)
   }
 
   /**
@@ -86,11 +88,17 @@ trait ServerRoutes
   def routesWith(
       inbound: InSocketArgs => Route,
       outbound: OutSocketArgs => Route
-  )(implicit cfg: AppCfg, maybeOpenIdClient: Option[OpenIdClient]): Route = {
-    handleExceptions(wsExceptionHandler) {
-      schemaRoutes ~
-        websocketRoutes(inbound, outbound) ~
-        statusRoutes
+  )(
+      implicit cfg: AppCfg,
+      sh: ActorRef[SessionHandlerProtocol.Protocol],
+      maybeOpenIdClient: Option[OpenIdClient]
+  ): Route = {
+    extractMaterializer { implicit mat =>
+      handleExceptions(wsExceptionHandler) {
+        schemaRoutes ~
+          websocketRoutes(inbound, outbound) ~
+          statusRoutes
+      }
     }
   }
 

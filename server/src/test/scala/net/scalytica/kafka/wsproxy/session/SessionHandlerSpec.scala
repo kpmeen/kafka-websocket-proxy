@@ -1,31 +1,25 @@
 package net.scalytica.kafka.wsproxy.session
 
 import akka.Done
+import akka.actor.typed.{ActorRef, Scheduler}
 import akka.actor.typed.scaladsl.adapter._
-import akka.actor.typed.Scheduler
-import akka.actor.typed.ActorRef
 import akka.util.Timeout
+import akka.testkit.TestDuration
 import io.github.embeddedkafka._
-import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.codecs.{SessionIdSerde, SessionSerde}
-import net.scalytica.kafka.wsproxy.models.{
-  FullConsumerId,
-  WsClientId,
-  WsGroupId,
-  WsProducerId,
-  WsServerId
-}
+import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.models._
 import net.scalytica.kafka.wsproxy.session.SessionHandlerImplicits._
 import net.scalytica.test.{TestDataGenerators, WsProxyKafkaSpec}
 import org.apache.kafka.common.serialization.Deserializer
 import org.scalatest.Inspectors.forAll
 import org.scalatest._
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
+import org.scalatest.matchers.must.Matchers
 import org.scalatest.time.{Minute, Span}
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.duration._
-import org.scalatest.matchers.must.Matchers
-import org.scalatest.wordspec.AnyWordSpec
 
 // scalastyle:off magic.number
 class SessionHandlerSpec
@@ -42,7 +36,7 @@ class SessionHandlerSpec
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(1, Minute))
 
-  implicit val timeout: Timeout     = 3 seconds
+  implicit val timeout: Timeout     = 3.seconds.dilated
   implicit val scheduler: Scheduler = system.scheduler.toTyped
 
   implicit val keyDes: Deserializer[SessionId] =
@@ -51,7 +45,7 @@ class SessionHandlerSpec
   implicit val valDes: Deserializer[Session] =
     new SessionSerde().deserializer()
 
-  val testTopic = defaultTestAppCfg.sessionHandler.sessionStateTopicName
+  val testTopic = defaultTestAppCfg.sessionHandler.topicName
 
   case class Ctx(
       sh: ActorRef[SessionHandlerProtocol.Protocol],
@@ -61,12 +55,11 @@ class SessionHandlerSpec
 
   def consumeSingleMessage()(
       implicit kcfg: EmbeddedKafkaConfig
-  ): Option[(SessionId, Session)] =
-    consumeNumberKeyedMessagesFrom[SessionId, Session](
+  ): (SessionId, Session) =
+    consumeFirstKeyedMessageFrom[SessionId, Session](
       topic = testTopic.value,
-      number = 1,
-      autoCommit = true
-    ).headOption
+      timeout = 5.seconds.dilated
+    )
 
   def sessionHandlerCtx[T](body: Ctx => T): Assertion =
     withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
@@ -125,10 +118,7 @@ class SessionHandlerSpec
         val res = ctx.sh.initConsumerSession(grpId, 3).futureValue
         validateSession(res.session)(sid, 3)
 
-        val (k, v) =
-          consumeFirstKeyedMessageFrom[SessionId, Session](
-            testTopic.value
-          )
+        val (k, v) = consumeSingleMessage()
 
         k mustBe sid
         v mustBe ConsumerSession(sid, grpId, maxConnections = 3)
@@ -173,7 +163,7 @@ class SessionHandlerSpec
 
           val s = ctx.sh.initConsumerSession(grpId, 2).futureValue.session
           validateSession(s)(SessionId(grpId), 2)
-          validateSession(consumeSingleMessage().value._2)(SessionId(grpId), 2)
+          validateSession(consumeSingleMessage()._2)(SessionId(grpId), 2)
 
           val r2 = ctx.sh
             .addConsumer(
@@ -181,7 +171,7 @@ class SessionHandlerSpec
               WsServerId("n1")
             )
             .futureValue
-          validateSession(consumeSingleMessage().value._2)(
+          validateSession(consumeSingleMessage()._2)(
             expectedSessionId = s.sessionId,
             expectedMaxConnections = s.maxConnections,
             expectedNumClients = 1
@@ -202,7 +192,7 @@ class SessionHandlerSpec
           val s =
             ctx.sh.initConsumerSession(grpId, 2).futureValue.session
           validateSession(s)(sid, 2)
-          validateSession(consumeSingleMessage().value._2)(
+          validateSession(consumeSingleMessage()._2)(
             expectedSessionId = SessionId("group1"),
             expectedMaxConnections = 2
           )
@@ -219,7 +209,7 @@ class SessionHandlerSpec
           val ci1 =
             r2.session.instances.headOption.value.asInstanceOf[ConsumerInstance]
           validateConsumer(ci1)(WsClientId("client1"), WsServerId("n1"))
-          validateSession(consumeSingleMessage().value._2)(
+          validateSession(consumeSingleMessage()._2)(
             expectedSessionId = s.sessionId,
             expectedMaxConnections = s.maxConnections,
             expectedNumClients = 1
@@ -236,7 +226,7 @@ class SessionHandlerSpec
           val ci2 =
             r3.session.instances.lastOption.value.asInstanceOf[ConsumerInstance]
           validateConsumer(ci2)(WsClientId("client2"), WsServerId("n2"))
-          validateSession(consumeSingleMessage().value._2)(
+          validateSession(consumeSingleMessage()._2)(
             expectedSessionId = s.sessionId,
             expectedMaxConnections = s.maxConnections,
             expectedNumClients = 2
@@ -265,10 +255,7 @@ class SessionHandlerSpec
         val res = ctx.sh.initProducerSession(cid, 3).futureValue
         validateSession(res.session)(sid, 3)
 
-        val (k, v) =
-          consumeFirstKeyedMessageFrom[SessionId, Session](
-            testTopic.value
-          )
+        val (k, v) = consumeSingleMessage()
 
         k mustBe sid
         v mustBe ProducerSession(sid, maxConnections = 3)

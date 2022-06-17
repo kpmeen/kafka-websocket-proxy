@@ -1,6 +1,9 @@
 package net.scalytica.kafka.wsproxy.admin
 
-import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.config.Configuration.{
+  AppCfg,
+  InternalStateTopic
+}
 import net.scalytica.kafka.wsproxy._
 import net.scalytica.kafka.wsproxy.errors.{
   KafkaFutureErrorHandler,
@@ -42,46 +45,32 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
   }
   // scalastyle:on line.size.limit
 
-  private[this] val sessionStateTopicStr =
-    cfg.sessionHandler.sessionStateTopicName.value
-
-  private[this] val configuredReplicas =
-    cfg.sessionHandler.sessionStateReplicationFactor
-  private[this] val maxReplicas = 3
-
-  private[this] val retentionDuration =
-    cfg.sessionHandler.sessionStateRetention.toMillis
+  private[this] val internalTopicMaxReplicas = 3
 
   private[this] lazy val underlying = AdminClient.create(admConfig)
 
-  /**
-   * Checks for the existence of the session state topic
-   *
-   * @return
-   *   an [[Option]] containing the name of the session state topic.
-   */
-  private[admin] def findSessionStateTopic: Option[String] = {
-    findTopic(cfg.sessionHandler.sessionStateTopicName)
-  }
-
-  /** Method for creating the session state topic. */
-  private[admin] def createSessionStateTopic(): Unit = {
-    val replFactor = replicationFactor
+  /** Method for creating an internal state topic. */
+  private[admin] def createInternalStateTopic(ist: InternalStateTopic): Unit = {
+    val replFactor = replicationFactor(
+      topicName = ist.topicName,
+      wantedReplicas = ist.topicReplicationFactor
+    )
     val tconf = Map[String, String](
       CLEANUP_POLICY_CONFIG -> CLEANUP_POLICY_COMPACT,
-      RETENTION_MS_CONFIG   -> s"$retentionDuration"
+      RETENTION_MS_CONFIG   -> s"${ist.topicRetention.toMillis}"
     ).asJava
-    val topic = new NewTopic(sessionStateTopicStr, 1, replFactor).configs(tconf)
 
-    log.info("Creating session state topic...")
+    val topic = new NewTopic(ist.topicName.value, 1, replFactor).configs(tconf)
+
+    log.info(s"Creating topic ${ist.topicName.value}...")
     Try {
       underlying.createTopics(Seq(topic).asJava).all().get()
     }.recover {
       KafkaFutureErrorHandler.handle {
         log.info("Topic already exists")
-      }(t => log.error("Could not create the session state topic", t))
+      }(t => log.error(s"Could not create the topic ${ist.topicName.value}", t))
     }.getOrElse(System.exit(1))
-    log.info("Session state topic created.")
+    log.info(s"Topic ${ist.topicName.value} created.")
   }
 
   /**
@@ -110,30 +99,46 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
   def topicExists(topic: TopicName): Boolean = findTopic(topic).nonEmpty
 
   /**
-   * Trigger the initialisation of the session state topic. This method will
-   * first check if the topic already exists before attempting to create it.
+   * Function for creating an [[InternalStateTopic]] in the Kafka cluster.
+   *
+   * @param cfg
+   *   The [[InternalStateTopic]] config to use when creating the topic.
    */
-  def initSessionStateTopic(): Unit = {
+  private[this] def initInternalTopic(cfg: InternalStateTopic): Unit = {
     try {
       BlockingRetry.retry(
-        timeout = cfg.sessionHandler.sessionStateTopicInitTimeout,
-        interval = cfg.sessionHandler.sessionStateTopicInitRetryInterval,
-        numRetries = cfg.sessionHandler.sessionStateTopicInitRetries
-      ) { // scalastyle:ignore
-        findSessionStateTopic match {
-          case None    => createSessionStateTopic()
-          case Some(_) => log.info("Session state topic verified.")
+        timeout = cfg.topicInitTimeout,
+        interval = cfg.topicInitRetryInterval,
+        numRetries = cfg.topicInitRetries
+      ) {
+        findTopic(cfg.topicName) match {
+          case None    => createInternalStateTopic(cfg)
+          case Some(_) => log.info(s"${cfg.topicName.value} topic verified.")
         }
       } { _ =>
-        log.warn("Session state topic not verified, terminating")
+        log.warn(s"${cfg.topicName.value} topic not verified, terminating")
         System.exit(1)
       }
     } catch {
       case ex: Throwable =>
-        log.error("Session state topic verification failed.", ex)
+        log.error(s"${cfg.topicName.value} topic verification failed.", ex)
         throw ex
     }
   }
+
+  /**
+   * Trigger the initialisation of the dynamic config topic. This method will
+   * first check if the topic already exists before attempting to create it.
+   */
+  def initDynamicConfigTopic(): Unit =
+    initInternalTopic(cfg.dynamicConfigHandler)
+
+  /**
+   * Trigger the initialisation of the session state topic. This method will
+   * first check if the topic already exists before attempting to create it.
+   */
+  def initSessionStateTopic(): Unit =
+    initInternalTopic(cfg.sessionHandler)
 
   /**
    * Fetches the configured number of partitions for the given Kafka topic.
@@ -212,12 +217,11 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
   }
 
   /**
-   * Fetch the latest offset for the session state topic.
+   * Fetch the latest offset for the given topic.
    * @return
    *   a Long indicating the latest offset at the time of calling the function.
    */
-  def lastOffsetForSessionStateTopic: Long = {
-    val topicName = cfg.sessionHandler.sessionStateTopicName
+  def lastOffsetFor(topicName: TopicName): Long = {
     topicPartitionInfoList(topicName).headOption
       .flatMap { tpi =>
         val partition = new TopicPartition(topicName.value, tpi.partition())
@@ -232,6 +236,22 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
       }
       .getOrElse(0L)
   }
+
+  /**
+   * Fetch the latest offset for the dynamic config topic.
+   * @return
+   *   a Long indicating the latest offset at the time of calling the function.
+   */
+  def lastOffsetForDynamicConfigTopic: Long =
+    lastOffsetFor(cfg.dynamicConfigHandler.topicName)
+
+  /**
+   * Fetch the latest offset for the session state topic.
+   * @return
+   *   a Long indicating the latest offset at the time of calling the function.
+   */
+  def lastOffsetForSessionStateTopic: Long =
+    lastOffsetFor(cfg.sessionHandler.topicName)
 
   /**
    * Fetch the cluster information for the configured Kafka cluster.
@@ -251,22 +271,24 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
   }
 
   /**
-   * Calculates the replication factor to use for the session state topic.
+   * Calculates the replication factor to use for the state topic.
    *
    * If the configured replication factor value is higher than the number of
    * brokers available, the replication factor will set to the number of
    * available brokers in the cluster.
    *
    * @return
-   *   the number of replicas to use for the sesion state topic.
+   *   the number of replicas to use for the state topic.
    */
-  def replicationFactor: Short = {
+  def replicationFactor(topicName: TopicName, wantedReplicas: Short): Short = {
     val numNodes = clusterInfo.size
-    log.info(s"Calculating number of replicas for $sessionStateTopicStr...")
-    val numReplicas = if (numNodes >= maxReplicas) maxReplicas else numNodes
+    log.info(s"Calculating number of replicas for ${topicName.value}...")
+    val numReplicas =
+      if (numNodes >= internalTopicMaxReplicas) internalTopicMaxReplicas
+      else numNodes
 
-    if (configuredReplicas > numReplicas) numReplicas.toShort
-    else configuredReplicas
+    if (wantedReplicas > numReplicas) numReplicas.toShort
+    else wantedReplicas
   }
 
   /**

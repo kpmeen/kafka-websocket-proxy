@@ -21,6 +21,7 @@ import scala.concurrent.duration._
 
 class SchemaRoutesSpec
     extends AnyWordSpec
+    with TestSchemaRoutes
     with EitherValues
     with OptionValues
     with ScalaFutures
@@ -33,8 +34,6 @@ class SchemaRoutesSpec
 
   implicit val oidClient: Option[OpenIdClient] = None
 
-  import TestServerRoutes.serverRejectionHandler
-
   "The schema routes" should {
     "return HTTP 404 when requesting an invalid resource" in {
       implicit val cfg = plainTestConfig()
@@ -46,9 +45,7 @@ class SchemaRoutesSpec
         )
         .spaces2
 
-      val routes = Route.seal(TestSchemaRoutes.schemaRoutes)
-
-      Get() ~> routes ~> check {
+      Get() ~> Route.seal(schemaRoutes) ~> check {
         status mustBe NotFound
         responseAs[String] mustBe expected
       }
@@ -57,45 +54,45 @@ class SchemaRoutesSpec
     "return the Avro schema for producer records" in {
       implicit val cfg = plainTestConfig()
 
-      val testRoutes = Route.seal(TestSchemaRoutes.schemaRoutes)
-
-      Get("/schemas/avro/producer/record") ~> testRoutes ~> check {
-        status mustBe OK
-        responseAs[String] mustBe AvroProducerRecord.schema.toString(true)
-      }
+      Get("/schemas/avro/producer/record") ~>
+        Route.seal(schemaRoutes) ~>
+        check {
+          status mustBe OK
+          responseAs[String] mustBe AvroProducerRecord.schema.toString(true)
+        }
     }
 
     "return the Avro schema for producer results" in {
       implicit val cfg = plainTestConfig()
 
-      val testRoutes = Route.seal(TestSchemaRoutes.schemaRoutes)
-
-      Get("/schemas/avro/producer/result") ~> testRoutes ~> check {
-        status mustBe OK
-        responseAs[String] mustBe AvroProducerResult.schema.toString(true)
-      }
+      Get("/schemas/avro/producer/result") ~>
+        Route.seal(schemaRoutes) ~>
+        check {
+          status mustBe OK
+          responseAs[String] mustBe AvroProducerResult.schema.toString(true)
+        }
     }
 
     "return the Avro schema for consumer record" in {
       implicit val cfg = plainTestConfig()
 
-      val testRoutes = Route.seal(TestSchemaRoutes.schemaRoutes)
-
-      Get("/schemas/avro/consumer/record") ~> testRoutes ~> check {
-        status mustBe OK
-        responseAs[String] mustBe AvroConsumerRecord.schema.toString(true)
-      }
+      Get("/schemas/avro/consumer/record") ~>
+        Route.seal(schemaRoutes) ~>
+        check {
+          status mustBe OK
+          responseAs[String] mustBe AvroConsumerRecord.schema.toString(true)
+        }
     }
 
     "return the Avro schema for consumer commit" in {
       implicit val cfg = plainTestConfig()
 
-      val testRoutes = Route.seal(TestSchemaRoutes.schemaRoutes)
-
-      Get("/schemas/avro/consumer/commit") ~> testRoutes ~> check {
-        status mustBe OK
-        responseAs[String] mustBe AvroCommit.schema.toString(true)
-      }
+      Get("/schemas/avro/consumer/commit") ~>
+        Route.seal(schemaRoutes) ~>
+        check {
+          status mustBe OK
+          responseAs[String] mustBe AvroCommit.schema.toString(true)
+        }
     }
   }
 }

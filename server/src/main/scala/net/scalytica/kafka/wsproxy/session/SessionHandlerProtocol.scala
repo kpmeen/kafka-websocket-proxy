@@ -1,6 +1,10 @@
 package net.scalytica.kafka.wsproxy.session
 
 import akka.actor.typed.ActorRef
+import net.scalytica.kafka.wsproxy.config.Configuration.{
+  ConsumerSpecificLimitCfg,
+  ProducerSpecificLimitCfg
+}
 import net.scalytica.kafka.wsproxy.models._
 
 /**
@@ -11,7 +15,7 @@ import net.scalytica.kafka.wsproxy.models._
  */
 object SessionHandlerProtocol {
 
-  /** Main protocol to be used by the proxy service */
+  /** Main protocol to be used by the session handler */
   sealed trait Protocol
 
   /**
@@ -57,7 +61,7 @@ object SessionHandlerProtocol {
       replyTo: ActorRef[SessionOpResult]
   ) extends SessionProtocol
 
-  final case class SessionHandlerReady(
+  final case class CheckSessionHandlerReady(
       replyTo: ActorRef[SessionOpResult]
   ) extends SessionProtocol
 
@@ -84,6 +88,12 @@ object SessionHandlerProtocol {
       replyTo: ActorRef[SessionOpResult]
   ) extends ConsumerSessionProtocol
       with RemoveClientCmd[FullConsumerId]
+
+  final case class UpdateConsumerSession(
+      sessionId: SessionId,
+      cfg: ConsumerSpecificLimitCfg,
+      replyTo: ActorRef[SessionOpResult]
+  ) extends ConsumerSessionProtocol
 
   final case class GetConsumerSession(
       sessionId: SessionId,
@@ -114,6 +124,12 @@ object SessionHandlerProtocol {
       replyTo: ActorRef[SessionOpResult]
   ) extends ProducerSessionProtocol
       with RemoveClientCmd[FullProducerId]
+
+  final case class UpdateProducerSession(
+      sessionId: SessionId,
+      cfg: ProducerSpecificLimitCfg,
+      replyTo: ActorRef[SessionOpResult]
+  ) extends ProducerSessionProtocol
 
   final case class GetProducerSession(
       sessionId: SessionId,

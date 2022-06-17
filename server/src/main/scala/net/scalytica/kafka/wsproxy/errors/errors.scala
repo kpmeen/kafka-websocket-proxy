@@ -55,6 +55,12 @@ case class InvalidSessionStateFormat(
 ) extends ProxyError(msg, cause)
     with NoStackTrace
 
+case class InvalidDynamicCfg(
+    msg: String,
+    cause: Option[Throwable] = None
+) extends ProxyError(msg, cause)
+    with NoStackTrace
+
 case class OpenIdConnectError(message: String, cause: Option[Throwable] = None)
     extends ProxyError(message, cause)
     with NoStackTrace

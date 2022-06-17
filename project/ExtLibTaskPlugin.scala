@@ -13,8 +13,6 @@ object ExtLibTaskPlugin extends AutoPlugin {
 
   override def requires = DockerPlugin
 
-//  override def trigger = AllRequirements
-
   object autoImport {
 
     lazy val externalLibsDirName = settingKey[String](

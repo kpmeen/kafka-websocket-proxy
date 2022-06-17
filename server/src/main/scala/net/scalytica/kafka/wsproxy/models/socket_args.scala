@@ -5,7 +5,7 @@ import net.scalytica.kafka.wsproxy.models.Formats.FormatType
 import net.scalytica.kafka.wsproxy.web.SocketProtocol.SocketPayload
 import org.apache.kafka.clients.consumer.OffsetResetStrategy
 
-trait SocketArgs {
+sealed trait SocketArgs {
   val topic: TopicName
   val socketPayload: SocketPayload
   val keyType: Option[Formats.FormatType]

@@ -6,8 +6,15 @@ import akka.http.scaladsl.model.headers.BasicHttpCredentials
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
 import com.typesafe.config.Config
+import net.scalytica.kafka.wsproxy.config.{
+  DynamicConfigHandler,
+  DynamicConfigHandlerProtocol,
+  ReadableDynamicConfigHandlerRef,
+  RunnableDynamicConfigHandlerRef
+}
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models.{WsProducerId, WsProducerInstanceId}
+import net.scalytica.kafka.wsproxy.session.SessionHandlerRef
 import org.scalatest.BeforeAndAfterAll
 
 import scala.concurrent.Future
@@ -225,7 +232,8 @@ trait WsProxyKafkaSpec
       schemaRegistryPort: Option[Int] = None,
       useServerBasicAuth: Boolean = false,
       serverOpenIdCfg: Option[OpenIdConnectCfg] = None,
-      useProducerSessions: Boolean = false
+      useProducerSessions: Boolean = false,
+      useDynamicConfigs: Boolean = false
   ): Configuration.AppCfg = {
     if (useServerBasicAuth || serverOpenIdCfg.isDefined) {
       secureAppTestConfig(
@@ -233,7 +241,8 @@ trait WsProxyKafkaSpec
         schemaRegistryPort = schemaRegistryPort,
         useServerBasicAuth = useServerBasicAuth,
         serverOpenIdCfg = serverOpenIdCfg,
-        useProducerSessions = useProducerSessions
+        useProducerSessions = useProducerSessions,
+        useDynamicConfigs = useDynamicConfigs
       )
     } else {
       plainAppTestConfig(
@@ -241,7 +250,8 @@ trait WsProxyKafkaSpec
         schemaRegistryPort = schemaRegistryPort,
         useServerBasicAuth = useServerBasicAuth,
         serverOpenIdCfg = serverOpenIdCfg,
-        useProducerSessions = useProducerSessions
+        useProducerSessions = useProducerSessions,
+        useDynamicConfigs = useDynamicConfigs
       )
     }
   }
@@ -253,7 +263,8 @@ trait WsProxyKafkaSpec
       serverOpenIdCfg: Option[OpenIdConnectCfg] = None,
       secureHealthCheckEndpoint: Boolean = true,
       useProducerSessions: Boolean = false,
-      useAdminEndpoint: Boolean = false
+      useAdminEndpoint: Boolean = false,
+      useDynamicConfigs: Boolean = false
   ): Configuration.AppCfg = {
     val serverId = s"test-server-${Random.nextInt(50000)}"
     val srUrl =
@@ -279,6 +290,9 @@ trait WsProxyKafkaSpec
       ),
       producer = defaultTestAppCfg.producer.copy(
         sessionsEnabled = useProducerSessions
+      ),
+      dynamicConfigHandler = defaultTestAppCfg.dynamicConfigHandler.copy(
+        enabled = useDynamicConfigs
       )
     )
   }
@@ -289,7 +303,8 @@ trait WsProxyKafkaSpec
       useServerBasicAuth: Boolean = false,
       serverOpenIdCfg: Option[OpenIdConnectCfg] = None,
       useProducerSessions: Boolean = false,
-      useAdminEndpoint: Boolean = false
+      useAdminEndpoint: Boolean = false,
+      useDynamicConfigs: Boolean = false
   ): Configuration.AppCfg = {
     val serverId = s"test-server-${Random.nextInt(50000)}"
     val srUrl =
@@ -319,6 +334,9 @@ trait WsProxyKafkaSpec
       producer = defaultTestAppCfg.producer.copy(
         sessionsEnabled = useProducerSessions,
         kafkaClientProperties = secureClientProps
+      ),
+      dynamicConfigHandler = defaultTestAppCfg.dynamicConfigHandler.copy(
+        enabled = useDynamicConfigs
       )
     )
   }
@@ -387,91 +405,240 @@ trait WsProxyKafkaSpec
   }
 
   def plainAdminServerContext[T](
-      body: (EmbeddedKafkaConfig, AppCfg, Route) => T
-  ): T = {
-    withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-      implicit val wsCfg = plainAppTestConfig(
-        kafkaPort = kcfg.kafkaPort,
-        useAdminEndpoint = true
-      )
-      implicit val oidClient: Option[OpenIdClient] = None
-      val adminRoutes                              = TestAdminRoutes.adminRoutes
-
-      body(kcfg, wsCfg, adminRoutes)
-    }
-  }
-
-  def plainServerContext[T](
-      useProducerSessions: Boolean = false
+      useDynamicConfigs: Boolean = true
   )(
-      body: (EmbeddedKafkaConfig, AppCfg, Route) => T
+      body: (
+          EmbeddedKafkaConfig,
+          AppCfg,
+          SessionHandlerRef,
+          Option[RunnableDynamicConfigHandlerRef],
+          Option[OpenIdClient]
+      ) => T
   ): T = {
     withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
       implicit val wsCfg = plainAppTestConfig(
         kafkaPort = kcfg.kafkaPort,
-        useProducerSessions = useProducerSessions
+        useAdminEndpoint = true,
+        useDynamicConfigs = useDynamicConfigs
       )
-      implicit val oidClient: Option[OpenIdClient] = None
-      implicit val sessionHandlerRef               = SessionHandler.init
+      implicit val maybeOidClient: Option[OpenIdClient] = None
+      implicit val sessionHandlerRef                    = SessionHandler.init
+      implicit val maybeDynCfgHandlerRef =
+        if (useDynamicConfigs) Option(DynamicConfigHandler.init) else None
 
-      val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
-      val ctrl                    = sdcStream.run()
+      val sessionCtrl = sessionHandlerRef.stream.run()
+      val maybeCtrl   = maybeDynCfgHandlerRef.map(_.stream.run())
 
-      val res = body(kcfg, wsCfg, testRoutes)
-
-      sessionHandlerRef.shRef.tell(
-        SessionHandlerProtocol.StopSessionHandler(system.toTyped.ignoreRef)
+      val res = body(
+        kcfg,
+        wsCfg,
+        sessionHandlerRef,
+        maybeDynCfgHandlerRef,
+        maybeOidClient
       )
 
-      ctrl.drainAndShutdown(Future.successful(Done))
+      maybeCtrl.foreach(_.stop())
+      sessionCtrl.stop()
 
       res
     }
   }
 
+  def plainContextNoWebSockets[T](
+      useProducerSessions: Boolean = false,
+      useDynamicConfigs: Boolean = false
+  )(
+      body: (EmbeddedKafkaConfig, AppCfg) => T
+  ): T = {
+    withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
+      val wsCfg = plainAppTestConfig(
+        kafkaPort = kcfg.kafkaPort,
+        useProducerSessions = useProducerSessions,
+        useDynamicConfigs = useDynamicConfigs
+      )
+      body(kcfg, wsCfg)
+    }
+  }
+
+  // scalastyle:off method.length
+  def plainServerContext[T](
+      useProducerSessions: Boolean = false,
+      useDynamicConfigs: Boolean = false
+  )(
+      body: (
+          EmbeddedKafkaConfig,
+          AppCfg,
+          SessionHandlerRef,
+          Option[ReadableDynamicConfigHandlerRef],
+          Option[OpenIdClient]
+      ) => T
+  ): T = {
+    withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
+      implicit val wsCfg = plainAppTestConfig(
+        kafkaPort = kcfg.kafkaPort,
+        useProducerSessions = useProducerSessions,
+        useDynamicConfigs = useDynamicConfigs
+      )
+      implicit val oidClient: Option[OpenIdClient] = None
+      implicit val sessionHandlerRef               = SessionHandler.init
+      implicit val optRunnableDynCfgHandler =
+        if (useDynamicConfigs) Option(DynamicConfigHandler.init) else None
+
+      implicit val optReadableDynCfgHandler =
+        optRunnableDynCfgHandler.map(_.asReadOnlyRef)
+
+      val sessionCtrl = sessionHandlerRef.stream.run()
+      val dynCfgCtrl  = optRunnableDynCfgHandler.map(_.stream.run())
+
+      val res = body(
+        kcfg,
+        wsCfg,
+        sessionHandlerRef,
+        optReadableDynCfgHandler,
+        oidClient
+      )
+
+      sessionHandlerRef.shRef.tell(
+        SessionHandlerProtocol.StopSessionHandler(system.toTyped.ignoreRef)
+      )
+
+      optRunnableDynCfgHandler.foreach(
+        _.dchRef.tell(
+          DynamicConfigHandlerProtocol.StopConfigHandler(
+            system.toTyped.ignoreRef
+          )
+        )
+      )
+
+      sessionCtrl.drainAndShutdown(Future.successful(Done))
+      dynCfgCtrl.map(_.drainAndShutdown(Future.successful(Done)))
+
+      res
+    }
+  }
+  // scalastyle:on method.length
+
   private[this] def secureAdminServerContext[T](
-      useServerBasicAuth: Boolean = false,
+      useServerBasicAuth: Boolean,
+      useDynamicConfigs: Boolean,
       serverOpenIdCfg: Option[OpenIdConnectCfg] = None
   )(
-      body: (EmbeddedKafkaConfig, AppCfg, Route) => T
+      body: (
+          EmbeddedKafkaConfig,
+          AppCfg,
+          SessionHandlerRef,
+          Option[RunnableDynamicConfigHandlerRef],
+          Option[OpenIdClient]
+      ) => T
   ): T = {
     withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
       implicit val wsCfg = plainAppTestConfig(
         kafkaPort = kcfg.kafkaPort,
         useServerBasicAuth = useServerBasicAuth,
         serverOpenIdCfg = serverOpenIdCfg,
-        useAdminEndpoint = true
+        useAdminEndpoint = true,
+        useDynamicConfigs = useDynamicConfigs
       )
-
       implicit val oidClient = wsCfg.server.openidConnect
         .filter(_.enabled)
         .map(_ => OpenIdClient(wsCfg))
+      implicit val sessionHandlerRef = SessionHandler.init
+      implicit val optRunnableDynCfgHandler =
+        if (useDynamicConfigs) Option(DynamicConfigHandler.init) else None
 
-      val adminRoutes = TestAdminRoutes.adminRoutes
+      val sessionCtrl = sessionHandlerRef.stream.run()
+      val maybeCtrl   = optRunnableDynCfgHandler.map(_.stream.run())
 
-      body(kcfg, wsCfg, adminRoutes)
+      val res = body(
+        kcfg,
+        wsCfg,
+        sessionHandlerRef,
+        optRunnableDynCfgHandler,
+        oidClient
+      )
+
+      maybeCtrl.foreach(_.stop())
+      sessionCtrl.stop()
+
+      res
     }
   }
 
-  def openIdAdminServerContext[T](openIdCfg: OpenIdConnectCfg)(
-      body: (EmbeddedKafkaConfig, AppCfg, Route) => T
+  def openIdAdminServerContext[T](
+      openIdCfg: OpenIdConnectCfg,
+      useDynamicConfigs: Boolean = true
+  )(
+      body: (
+          EmbeddedKafkaConfig,
+          AppCfg,
+          SessionHandlerRef,
+          Option[RunnableDynamicConfigHandlerRef],
+          Option[OpenIdClient]
+      ) => T
   ): T = {
-    secureAdminServerContext(serverOpenIdCfg = Some(openIdCfg))(body)
+    secureAdminServerContext(
+      useServerBasicAuth = false,
+      useDynamicConfigs = useDynamicConfigs,
+      serverOpenIdCfg = Some(openIdCfg)
+    )(body)
   }
 
   def basicAuthAdminServerContext[T](
-      body: (EmbeddedKafkaConfig, AppCfg, Route) => T
+      useDynamicConfigs: Boolean = true
+  )(
+      body: (
+          EmbeddedKafkaConfig,
+          AppCfg,
+          SessionHandlerRef,
+          Option[RunnableDynamicConfigHandlerRef],
+          Option[OpenIdClient]
+      ) => T
   ): T = {
-    secureAdminServerContext(useServerBasicAuth = true)(body)
+    secureAdminServerContext(
+      useServerBasicAuth = true,
+      useDynamicConfigs = useDynamicConfigs
+    )(body)
   }
 
+  def secureContextNoWebSockets[T](
+      useServerBasicAuth: Boolean = false,
+      serverOpenIdCfg: Option[OpenIdConnectCfg] = None,
+      secureHealthCheckEndpoint: Boolean = true,
+      useProducerSessions: Boolean = false,
+      useDynamicConfigs: Boolean = false
+  )(
+      body: (EmbeddedKafkaConfig, AppCfg) => T
+  ): T = {
+    withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
+      val wsCfg = plainAppTestConfig(
+        kafkaPort = kcfg.kafkaPort,
+        //        schemaRegistryPort = Some(kcfg.schemaRegistryPort),
+        useServerBasicAuth = useServerBasicAuth,
+        serverOpenIdCfg = serverOpenIdCfg,
+        secureHealthCheckEndpoint = secureHealthCheckEndpoint,
+        useProducerSessions = useProducerSessions,
+        useDynamicConfigs = useDynamicConfigs
+      )
+
+      body(kcfg, wsCfg)
+    }
+  }
+
+  // scalastyle:off method.length
   def secureServerContext[T](
       useServerBasicAuth: Boolean = false,
       serverOpenIdCfg: Option[OpenIdConnectCfg] = None,
       secureHealthCheckEndpoint: Boolean = true,
-      useProducerSessions: Boolean = false
+      useProducerSessions: Boolean = false,
+      useDynamicConfigs: Boolean = false
   )(
-      body: (EmbeddedKafkaConfig, AppCfg, Route) => T
+      body: (
+          EmbeddedKafkaConfig,
+          AppCfg,
+          SessionHandlerRef,
+          Option[ReadableDynamicConfigHandlerRef],
+          Option[OpenIdClient]
+      ) => T
   ): T = {
     withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
       implicit val wsCfg = plainAppTestConfig(
@@ -480,28 +647,49 @@ trait WsProxyKafkaSpec
         useServerBasicAuth = useServerBasicAuth,
         serverOpenIdCfg = serverOpenIdCfg,
         secureHealthCheckEndpoint = secureHealthCheckEndpoint,
-        useProducerSessions = useProducerSessions
+        useProducerSessions = useProducerSessions,
+        useDynamicConfigs = useDynamicConfigs
       )
 
       implicit val oidClient = wsCfg.server.openidConnect
         .filter(_.enabled)
         .map(_ => OpenIdClient(wsCfg))
       implicit val sessionHandlerRef = SessionHandler.init
+      implicit val optRunnableDynCfgHandler =
+        if (useDynamicConfigs) Option(DynamicConfigHandler.init) else None
+      implicit val optReadableDynCfgHandler =
+        optRunnableDynCfgHandler.map(_.asReadOnlyRef)
 
-      val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
-      val ctrl                    = sdcStream.run()
+      val sessionCtrl = sessionHandlerRef.stream.run()
+      val dynCfgCtrl  = optRunnableDynCfgHandler.map(_.stream.run())
 
-      val res = body(kcfg, wsCfg, testRoutes)
+      val res = body(
+        kcfg,
+        wsCfg,
+        sessionHandlerRef,
+        optReadableDynCfgHandler,
+        oidClient
+      )
 
       sessionHandlerRef.shRef.tell(
         SessionHandlerProtocol.StopSessionHandler(system.toTyped.ignoreRef)
       )
 
-      ctrl.drainAndShutdown(Future.successful(Done))
+      optRunnableDynCfgHandler.foreach(
+        _.dchRef.tell(
+          DynamicConfigHandlerProtocol.StopConfigHandler(
+            system.toTyped.ignoreRef
+          )
+        )
+      )
+
+      sessionCtrl.drainAndShutdown(Future.successful(Done))
+      dynCfgCtrl.map(_.drainAndShutdown(Future.successful(Done)))
 
       res
     }
   }
+  // scalastyle:on method.length
 
 }
 
@@ -513,27 +701,42 @@ trait WsProxyProducerKafkaSpec
       topicName: TopicName,
       embeddedKafkaConfig: EmbeddedKafkaConfig,
       appCfg: AppCfg,
-      route: Route,
+      sessionHandlerRef: SessionHandlerRef,
+      optReadDynCfgHandlerRef: Option[ReadableDynamicConfigHandlerRef],
+      optOidClient: Option[OpenIdClient],
       producerProbe: WSProbe
   )
+
+  def wsRouteFromProducerContext(implicit ctx: ProducerContext): Route = {
+    wsRouteFrom(
+      ctx.appCfg,
+      ctx.sessionHandlerRef,
+      ctx.optReadDynCfgHandlerRef,
+      ctx.optOidClient
+    )
+  }
 
   def plainProducerContext[T](
       topic: String = "test-topic",
       partitions: Int = 1,
-      useProducerSessions: Boolean = false
+      useProducerSessions: Boolean = false,
+      useDynamicConfigs: Boolean = false
   )(body: ProducerContext => T): T =
-    plainServerContext(useProducerSessions) { (kcfg, appCfg, routes) =>
-      initTopic(topic, partitions)(kcfg)
+    plainServerContext(useProducerSessions, useDynamicConfigs) {
+      (kcfg, appCfg, sessionHandler, optReadCfgHandler, optOidClient) =>
+        initTopic(topic, partitions)(kcfg)
 
-      val ctx = ProducerContext(
-        topicName = TopicName(topic),
-        embeddedKafkaConfig = kcfg,
-        appCfg = appCfg,
-        route = routes,
-        producerProbe = WSProbe()
-      )
+        val ctx = ProducerContext(
+          topicName = TopicName(topic),
+          embeddedKafkaConfig = kcfg,
+          appCfg = appCfg,
+          sessionHandlerRef = sessionHandler,
+          optReadDynCfgHandlerRef = optReadCfgHandler,
+          optOidClient = optOidClient,
+          producerProbe = WSProbe()
+        )
 
-      body(ctx)
+        body(ctx)
     }
 
   def secureServerProducerContext[T](
@@ -541,23 +744,27 @@ trait WsProxyProducerKafkaSpec
       partitions: Int = 1,
       useServerBasicAuth: Boolean = false,
       serverOpenIdCfg: Option[OpenIdConnectCfg] = None,
-      useProducerSessions: Boolean = false
+      useProducerSessions: Boolean = false,
+      useDynamicConfigs: Boolean = false
   )(body: ProducerContext => T): T = {
     secureKafkaClusterProducerContext(
       topic = topic,
       partitions = partitions,
       useServerBasicAuth = useServerBasicAuth,
       serverOpenIdCfg = serverOpenIdCfg,
-      useProducerSessions = useProducerSessions
+      useProducerSessions = useProducerSessions,
+      useDynamicConfigs = useDynamicConfigs
     )(body)
   }
 
+  // scalastyle:off method.length
   def secureKafkaClusterProducerContext[T](
       topic: String = "test-topic",
       partitions: Int = 1,
       useServerBasicAuth: Boolean = false,
       serverOpenIdCfg: Option[OpenIdConnectCfg] = None,
-      useProducerSessions: Boolean = false
+      useProducerSessions: Boolean = false,
+      useDynamicConfigs: Boolean = false
   )(body: ProducerContext => T): T = {
     secureKafkaContext { implicit kcfg =>
       implicit val wsCfg =
@@ -566,25 +773,33 @@ trait WsProxyProducerKafkaSpec
 //          schemaRegistryPort = Some(kcfg.schemaRegistryPort),
           useServerBasicAuth = useServerBasicAuth,
           serverOpenIdCfg = serverOpenIdCfg,
-          useProducerSessions = useProducerSessions
+          useProducerSessions = useProducerSessions,
+          useDynamicConfigs = useDynamicConfigs
         )
 
-      implicit val oidClient = wsCfg.server.openidConnect
+      implicit val optOidClient = wsCfg.server.openidConnect
         .filter(_.enabled)
         .map(_ => OpenIdClient(wsCfg))
       implicit val sessionHandlerRef = SessionHandler.init
+      implicit val optRunnableDynCfgHandler =
+        if (useDynamicConfigs) Option(DynamicConfigHandler.init) else None
+      implicit val optReadableDynCfgHandler =
+        optRunnableDynCfgHandler.map(_.asReadOnlyRef)
 
       initTopic(topic, partitions, isSecure = true)
 
-      val producerProbe           = WSProbe()
-      val (sdcStream, testRoutes) = TestServerRoutes.wsProxyRoutes
-      val ctrl                    = sdcStream.run()
+      val sessionCtrl = sessionHandlerRef.stream.run()
+      val dynCfgCtrl  = optRunnableDynCfgHandler.map(_.stream.run())
+
+      val producerProbe = WSProbe()
 
       val ctx = ProducerContext(
         topicName = TopicName(topic),
         embeddedKafkaConfig = kcfg,
         appCfg = wsCfg,
-        route = testRoutes,
+        sessionHandlerRef = sessionHandlerRef,
+        optReadDynCfgHandlerRef = optReadableDynCfgHandler,
+        optOidClient = optOidClient,
         producerProbe = producerProbe
       )
       val res = body(ctx)
@@ -593,11 +808,21 @@ trait WsProxyProducerKafkaSpec
         SessionHandlerProtocol.StopSessionHandler(system.toTyped.ignoreRef)
       )
 
-      ctrl.drainAndShutdown(Future.successful(Done))
+      optRunnableDynCfgHandler.foreach(
+        _.dchRef.tell(
+          DynamicConfigHandlerProtocol.StopConfigHandler(
+            system.toTyped.ignoreRef
+          )
+        )
+      )
+
+      sessionCtrl.drainAndShutdown(Future.successful(Done))
+      dynCfgCtrl.map(_.drainAndShutdown(Future.successful(Done)))
 
       res
     }
   }
+  // scalastyle:on method.length
 
 }
 
@@ -610,10 +835,21 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       topicName: TopicName,
       embeddedKafkaConfig: EmbeddedKafkaConfig,
       appCfg: AppCfg,
-      route: Route,
+      sessionHandlerRef: SessionHandlerRef,
+      optReadDynCfgHandlerRef: Option[ReadableDynamicConfigHandlerRef],
+      optOidClient: Option[OpenIdClient],
       producerProbe: WSProbe,
       consumerProbe: WSProbe
   )
+
+  def wsRouteFromConsumerContext(implicit ctx: ConsumerContext): Route = {
+    wsRouteFrom(
+      ctx.appCfg,
+      ctx.sessionHandlerRef,
+      ctx.optReadDynCfgHandlerRef,
+      ctx.optOidClient
+    )
+  }
 
   def plainJsonConsumerContext[T](
       topic: String,
@@ -693,6 +929,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       partitions: Int = 1,
       prePopulate: Boolean = true,
       useServerBasicAuth: Boolean = false,
+      useDynamicConfigs: Boolean = false,
       serverOpenIdCfg: Option[OpenIdConnectCfg] = None
   )(body: ConsumerContext => T): T =
     secureKafkaConsumerContext(
@@ -704,6 +941,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       partitions = partitions,
       prePopulate = prePopulate,
       useServerBasicAuth = useServerBasicAuth,
+      useDynamicConfigs = useDynamicConfigs,
       serverOpenIdCfg = serverOpenIdCfg
     )(body)
 
@@ -715,6 +953,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       partitions: Int = 1,
       prePopulate: Boolean = true,
       useServerBasicAuth: Boolean = false,
+      useDynamicConfigs: Boolean = false,
       serverOpenIdCfg: Option[OpenIdConnectCfg] = None
   )(body: ConsumerContext => T): T =
     secureKafkaConsumerContext(
@@ -726,6 +965,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       partitions = partitions,
       prePopulate = prePopulate,
       useServerBasicAuth = useServerBasicAuth,
+      useDynamicConfigs = useDynamicConfigs,
       serverOpenIdCfg = serverOpenIdCfg
     )(body)
 
@@ -740,12 +980,14 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       prePopulate: Boolean = true,
       withHeaders: Boolean = false,
       useServerBasicAuth: Boolean = false,
+      useDynamicConfigs: Boolean = false,
       serverOpenIdCfg: Option[OpenIdConnectCfg] = None
   )(body: ConsumerContext => T): T =
     secureKafkaClusterProducerContext(
       topic = topic,
       partitions = partitions,
       useServerBasicAuth = useServerBasicAuth,
+      useDynamicConfigs = useDynamicConfigs,
       serverOpenIdCfg = serverOpenIdCfg
     ) { implicit pctx =>
       if (prePopulate) {
@@ -766,6 +1008,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
     }
   // scalastyle:on
 
+  // scalastyle:off parameter.number
   def secureServerAvroConsumerContext[T](
       topic: String,
       keyType: Option[FormatType],
@@ -775,6 +1018,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       prePopulate: Boolean = true,
       withHeaders: Boolean = false,
       useServerBasicAuth: Boolean = false,
+      useDynamicConfigs: Boolean = false,
       serverOpenIdCfg: Option[OpenIdConnectCfg] = None
   )(body: ConsumerContext => T): T =
     secureServerConsumerContext(
@@ -785,6 +1029,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       numMessages = numMessages,
       partitions = partitions,
       useServerBasicAuth = useServerBasicAuth,
+      useDynamicConfigs = useDynamicConfigs,
       serverOpenIdCfg = serverOpenIdCfg,
       prePopulate = prePopulate,
       withHeaders = withHeaders
@@ -799,6 +1044,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       prePopulate: Boolean = true,
       withHeaders: Boolean = false,
       useServerBasicAuth: Boolean = false,
+      useDynamicConfigs: Boolean = false,
       serverOpenIdCfg: Option[OpenIdConnectCfg] = None
   )(body: ConsumerContext => T): T =
     secureServerConsumerContext(
@@ -809,12 +1055,12 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       numMessages = numMessages,
       partitions = partitions,
       useServerBasicAuth = useServerBasicAuth,
+      useDynamicConfigs = useDynamicConfigs,
       serverOpenIdCfg = serverOpenIdCfg,
       prePopulate = prePopulate,
       withHeaders = withHeaders
     )(body)
 
-  // scalastyle:off
   def secureServerConsumerContext[T, M <: FormatType](
       topic: String,
       messageType: M,
@@ -825,6 +1071,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       prePopulate: Boolean = true,
       withHeaders: Boolean = false,
       useServerBasicAuth: Boolean = false,
+      useDynamicConfigs: Boolean = false,
       serverOpenIdCfg: Option[OpenIdConnectCfg] = None
   )(body: ConsumerContext => T): T = {
     // scalastyle:on
@@ -832,6 +1079,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       topic = topic,
       partitions = partitions,
       useServerBasicAuth = useServerBasicAuth,
+      useDynamicConfigs = useDynamicConfigs,
       serverOpenIdCfg = serverOpenIdCfg
     ) { implicit p =>
       if (prePopulate) {
@@ -851,6 +1099,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       body(ctx)
     }
   }
+  // scalastyle:on parameter.number
 
   private[this] def createAvroMessagesForTypes(
       keyType: Option[FormatType],
@@ -902,13 +1151,15 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       topicName = pctx.topicName,
       embeddedKafkaConfig = pctx.embeddedKafkaConfig,
       appCfg = pctx.appCfg,
-      route = pctx.route,
+      sessionHandlerRef = pctx.sessionHandlerRef,
+      optReadDynCfgHandlerRef = pctx.optReadDynCfgHandlerRef,
+      optOidClient = pctx.optOidClient,
       producerProbe = pctx.producerProbe,
       consumerProbe = consProbe
     )
   }
 
-  // scalastyle:off
+  // scalastyle:off method.length
   private[this] def produceForMessageType(
       producerId: WsProducerId,
       instanceId: Option[WsProducerInstanceId],
@@ -933,7 +1184,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
             producerId = producerId,
             instanceId = instanceId,
             topic = pctx.topicName,
-            routes = pctx.route,
+            routes = wsRouteFromProducerContext,
             keyType = keyType,
             valType = valType,
             messages = msgs,
@@ -954,7 +1205,7 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
             topic = pctx.topicName,
             keyType = keyType.getOrElse(NoType),
             valType = valType,
-            routes = pctx.route,
+            routes = wsRouteFromProducerContext,
             messages = messages,
             kafkaCreds =
               if (secureKafka) Some(BasicHttpCredentials(kafkaUser, kafkaPass))
@@ -965,5 +1216,5 @@ trait WsProxyConsumerKafkaSpec extends WsProxyProducerKafkaSpec { self: Suite =>
       }
     }
   }
-  // scalastyle:on
+  // scalastyle:on method.length
 }

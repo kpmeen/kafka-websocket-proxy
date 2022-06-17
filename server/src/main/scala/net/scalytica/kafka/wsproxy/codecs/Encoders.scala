@@ -4,6 +4,8 @@ import io.circe._
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.semiauto._
 import io.circe.syntax._
+import io.circe.parser._
+import net.scalytica.kafka.wsproxy.config.Configuration.DynamicCfg
 import net.scalytica.kafka.wsproxy.models.Formats.FormatType
 import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails
 import net.scalytica.kafka.wsproxy.models._
@@ -78,6 +80,13 @@ trait Encoders {
 
   implicit val timestampEncoder: Encoder[Timestamp] = { ts =>
     Json.fromLong(ts.value)
+  }
+
+  implicit val dynamicCfgEncoder: Encoder[DynamicCfg] = { dcfg =>
+    parse(dcfg.asHoconString(useJson = true)) match {
+      case Right(value) => value
+      case Left(err)    => Json.obj("error" -> Json.fromString(err.message))
+    }
   }
 
   implicit val byteArrEncoder: Encoder[Array[Byte]] = { arr =>

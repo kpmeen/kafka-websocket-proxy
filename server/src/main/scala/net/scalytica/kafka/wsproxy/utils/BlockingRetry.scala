@@ -2,6 +2,7 @@ package net.scalytica.kafka.wsproxy.utils
 
 import com.typesafe.scalalogging.Logger
 
+import java.util.concurrent.TimeUnit
 import scala.annotation.tailrec
 import scala.concurrent.{blocking, Await, Future}
 import scala.concurrent.duration._
@@ -74,8 +75,13 @@ object BlockingRetry {
       err: Throwable => Future[T]
   ): T = {
     require(timeout > interval, "timeout must be greater than interval")
-    val attemptTimeout =
-      (timeout - (interval * numRetries.toLong)) / numRetries.toLong
+    val attemptTimeoutMillis =
+      ((timeout - (interval * numRetries.toLong)) / numRetries.toLong).toMillis
+
+    val attemptTimeout = FiniteDuration(
+      length = scala.math.abs(attemptTimeoutMillis),
+      unit = TimeUnit.MILLISECONDS
+    )
     retryLoop(
       remainingRetries = numRetries,
       interval = interval

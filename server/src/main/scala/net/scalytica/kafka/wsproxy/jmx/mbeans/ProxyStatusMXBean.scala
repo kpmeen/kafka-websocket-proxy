@@ -52,6 +52,7 @@ trait ProxyStatusMXBean extends WsProxyJmxBean {
   def getHttpPort: Int
   def getHttpsPort: Int
   def getSessionStateTopicName: String
+  def getDynamicConfigTopicName: String
   def getUpSince: String
   def getUptimeMillis: Long
   def getBrokerInfoListMXView: BrokerInfoListMXView
@@ -86,7 +87,10 @@ class ProxyStatusMXBeanActor(
     appCfg.server.ssl.flatMap(_.port).getOrElse(0)
 
   override def getSessionStateTopicName: String =
-    appCfg.sessionHandler.sessionStateTopicName.value
+    appCfg.sessionHandler.topicName.value
+
+  override def getDynamicConfigTopicName: String =
+    appCfg.dynamicConfigHandler.topicName.value
 
   override def getUpSince: String =
     started.format(java.time.format.DateTimeFormatter.ISO_DATE_TIME)

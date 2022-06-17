@@ -6,10 +6,10 @@ import net.scalytica.kafka.wsproxy.codecs.{SessionIdSerde, SessionSerde}
 import net.scalytica.kafka.wsproxy.models.WsGroupId
 import net.scalytica.test.WsProxyKafkaSpec
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
-import org.scalatest.time.{Minute, Span}
-import org.scalatest.{BeforeAndAfterAll, OptionValues}
 import org.scalatest.matchers.must.Matchers
+import org.scalatest.time.{Minute, Span}
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.{BeforeAndAfterAll, OptionValues}
 
 // scalastyle:off magic.number
 class SessionDataProducerSpec
@@ -28,7 +28,7 @@ class SessionDataProducerSpec
   val config  = defaultTypesafeConfig
   val testCfg = defaultTestAppCfg
 
-  val sessionTopic = testCfg.sessionHandler.sessionStateTopicName
+  val testTopic = testCfg.sessionHandler.topicName
 
   val atk          = ActorTestKit("session-data-producer-test", config)
   implicit val sys = atk.system
@@ -37,6 +37,7 @@ class SessionDataProducerSpec
   implicit val valDes = new SessionSerde().deserializer()
 
   override def afterAll(): Unit = {
+    materializer.shutdown()
     atk.shutdownTestKit()
     super.afterAll()
   }
@@ -57,7 +58,7 @@ class SessionDataProducerSpec
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val cfg = plainAppTestConfig(kcfg.kafkaPort)
 
-        initTopic(cfg.sessionHandler.sessionStateTopicName.value)
+        initTopic(testTopic.value)
 
         val sdp = new SessionDataProducer()
         // Write the session data to Kafka
@@ -65,7 +66,7 @@ class SessionDataProducerSpec
         // Verify the data can be consumed
         val (key, value) =
           consumeFirstKeyedMessageFrom[SessionId, Session](
-            sessionTopic.value
+            testTopic.value
           )
 
         key mustBe session1.sessionId
@@ -80,18 +81,18 @@ class SessionDataProducerSpec
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val cfg = plainAppTestConfig(kcfg.kafkaPort)
 
-        initTopic(cfg.sessionHandler.sessionStateTopicName.value)
+        initTopic(testTopic.value)
 
         val sdp = new SessionDataProducer()
 
         val expected = List(session1, session2, session3, session4)
         // Write the session data to Kafka
-        expected.foreach(s => sdp.publish(s))
+        expected.foreach(sdp.publish)
 
         val recs =
           consumeNumberKeyedMessagesFrom[SessionId, Session](
-            topic = sessionTopic.value,
-            number = 4
+            topic = testTopic.value,
+            number = expected.size
           )
 
         val keys   = recs.map(_._1)
@@ -105,21 +106,21 @@ class SessionDataProducerSpec
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val cfg = plainAppTestConfig(kcfg.kafkaPort)
 
-        initTopic(cfg.sessionHandler.sessionStateTopicName.value)
+        initTopic(testTopic.value)
 
         val sdp = new SessionDataProducer()
 
         val in = List(session1, session2, session3, session4)
 
         // Write the session data to Kafka
-        in.foreach(s => sdp.publish(s))
+        in.foreach(sdp.publish)
         // Remove session2
         sdp.publishRemoval(session2.sessionId)
         // Verify the presence of all expected messages
         val r1 =
           consumeNumberKeyedMessagesFrom[SessionId, Session](
-            topic = sessionTopic.value,
-            number = 5
+            topic = testTopic.value,
+            number = in.size + 1
           )
 
         r1.map(_._2) must contain allElementsOf in

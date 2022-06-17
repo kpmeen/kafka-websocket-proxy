@@ -18,10 +18,10 @@ import net.scalytica.kafka.wsproxy.session.SessionHandlerProtocol.{
 import net.scalytica.test.WsProxyKafkaSpec
 import org.scalatest.Inspectors.forAll
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
-import org.scalatest.time.{Minute, Span}
-import org.scalatest.{BeforeAndAfterAll, OptionValues}
 import org.scalatest.matchers.must.Matchers
+import org.scalatest.time.{Minute, Span}
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.{BeforeAndAfterAll, OptionValues}
 
 // scalastyle:off magic.number
 class SessionDataConsumerSpec
@@ -40,7 +40,7 @@ class SessionDataConsumerSpec
   val config  = defaultTypesafeConfig
   val testCfg = defaultTestAppCfg
 
-  val sessionTopic = testCfg.sessionHandler.sessionStateTopicName
+  val sessionTopic = testCfg.sessionHandler.topicName
 
   val atk = ActorTestKit("session-data-consumer-test", config)
 
@@ -93,7 +93,7 @@ class SessionDataConsumerSpec
       withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
         implicit val cfg = plainAppTestConfig(kcfg.kafkaPort)
 
-        initTopic(cfg.sessionHandler.sessionStateTopicName.value)
+        initTopic(cfg.sessionHandler.topicName.value)
 
         val expected = List(session1, session2, session3, session4)
 

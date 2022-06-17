@@ -158,4 +158,16 @@ package object wsproxy {
       }
 
   }
+
+  implicit class ThrowableExtensions(t: Throwable) {
+
+    def operationName: String = {
+      t.getStackTrace
+        .dropWhile(ste => !ste.getClassName.equals(getClass.getName))
+        .headOption
+        .map(_.getMethodName)
+        .getOrElse("unknown")
+    }
+
+  }
 }

@@ -1,6 +1,6 @@
 package net.scalytica.kafka.wsproxy.config
 
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.{Config, ConfigRenderOptions}
 import net.scalytica.kafka.wsproxy.errors.ConfigurationError
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models.{
@@ -13,24 +13,25 @@ import org.apache.kafka.clients.CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG
 import org.apache.kafka.common.config.SaslConfigs
 import pureconfig.error.ConfigReaderFailures
 import pureconfig.generic.auto._
-import pureconfig.{ConfigReader, ConfigSource}
+import pureconfig.{ConfigReader, ConfigSource, ConfigWriter}
 
 import java.nio.file.Path
 import scala.concurrent.duration.FiniteDuration
 import scala.jdk.CollectionConverters._
 
-object Configuration extends WithProxyLogger {
+// scalastyle:off number.of.methods
+trait Configuration extends WithProxyLogger {
 
-  private[this] val CfgRootKey = "kafka.ws.proxy"
+  protected val CfgRootKey = "kafka.ws.proxy"
 
-  private[this] def typesafeConfigToMap(cfg: Config): Map[String, AnyRef] = {
+  private[this] def lightbendConfigToMap(cfg: Config): Map[String, AnyRef] = {
     cfg.entrySet().asScala.map(e => e.getKey -> e.getValue.unwrapped).toMap
   }
 
   implicit lazy val configAsMap: ConfigReader[Map[String, AnyRef]] =
     ConfigReader
       .fromCursor(_.asObjectCursor.map(_.objValue.toConfig))
-      .map(typesafeConfigToMap)
+      .map(lightbendConfigToMap)
 
   implicit lazy val stringAsKafkaUrls: ConfigReader[KafkaBootstrapHosts] =
     ConfigReader.fromNonEmptyString { str =>
@@ -66,7 +67,7 @@ object Configuration extends WithProxyLogger {
             val props = cursor.fluent
               .at("properties")
               .asObjectCursor
-              .map(coc => typesafeConfigToMap(coc.objValue.toConfig))
+              .map(coc => lightbendConfigToMap(coc.objValue.toConfig))
               .getOrElse(Map.empty)
 
             Right[ConfigReaderFailures, Option[SchemaRegistryCfg]](
@@ -132,33 +133,33 @@ object Configuration extends WithProxyLogger {
   }
 
   implicit lazy val specLimCfgReader: ConfigReader[ClientSpecificLimitCfg] = {
-    ConfigReader.fromCursor { cursor =>
-      cursor.fluent
-        .at("group-id")
-        .asString
-        .toOption
-        .map { _ =>
-          consLimCfgReader.from(cursor)
-        }
-        .getOrElse {
-          prodLimCfgReader.from(cursor)
-        }
-    }
+    consLimCfgReader.orElse(prodLimCfgReader)
   }
 
-  final case class KafkaBootstrapHosts(hosts: List[String]) {
+  implicit lazy val dynamicCfgReader: ConfigReader[DynamicCfg] = {
+    // Currently only ClientSpecificLimitCfg types are dynamic
+    specLimCfgReader.map(dcfg => dcfg: DynamicCfg)
+  }
+
+  implicit lazy val groupIdAsString: ConfigWriter[WsGroupId] =
+    ConfigWriter.toString[WsGroupId](_.value)
+
+  implicit lazy val producerIdAsString: ConfigWriter[WsProducerId] =
+    ConfigWriter.toString[WsProducerId](_.value)
+
+  case class KafkaBootstrapHosts(hosts: List[String]) {
     def mkString(): String = hosts.mkString(",")
 
     def hostStrings: List[String] = hosts.map(_.takeWhile(_ != ':'))
   }
 
-  final case class SchemaRegistryCfg(
+  case class SchemaRegistryCfg(
       url: String,
       autoRegisterSchemas: Boolean,
       properties: Map[String, AnyRef] = Map.empty
   )
 
-  final case class ConfluentMonitoringCfg(
+  case class ConfluentMonitoringCfg(
       bootstrapHosts: KafkaBootstrapHosts,
       properties: Map[String, AnyRef]
   ) {
@@ -184,7 +185,7 @@ object Configuration extends WithProxyLogger {
     }
   }
 
-  final case class KafkaClientCfg(
+  case class KafkaClientCfg(
       brokerResolutionTimeout: FiniteDuration,
       bootstrapHosts: KafkaBootstrapHosts,
       schemaRegistry: Option[SchemaRegistryCfg],
@@ -193,27 +194,38 @@ object Configuration extends WithProxyLogger {
       confluentMonitoring: Option[ConfluentMonitoringCfg]
   )
 
-  final case class AdminClientCfg(
+  case class AdminClientCfg(
       kafkaClientProperties: Map[String, AnyRef]
   )
 
-  sealed trait ClientSpecificLimitCfg {
+  sealed trait DynamicCfg {
     val id: String
+
+    def asHoconString(useJson: Boolean = false): String
+  }
+
+  sealed trait ClientSpecificLimitCfg extends DynamicCfg {
     val messagesPerSecond: Option[Int]
     val maxConnections: Option[Int]
     val batchSize: Option[Int]
   }
 
-  final case class ConsumerSpecificLimitCfg(
+  case class ConsumerSpecificLimitCfg(
       groupId: WsGroupId,
       messagesPerSecond: Option[Int],
       maxConnections: Option[Int],
       batchSize: Option[Int]
   ) extends ClientSpecificLimitCfg {
     override val id = groupId.value
+
+    override def asHoconString(useJson: Boolean = false) = {
+      ConfigWriter[ConsumerSpecificLimitCfg]
+        .to(this)
+        .render(ConfigRenderOptions.concise().setJson(useJson))
+    }
   }
 
-  final case class ProducerSpecificLimitCfg(
+  case class ProducerSpecificLimitCfg(
       producerId: WsProducerId,
       messagesPerSecond: Option[Int],
       maxConnections: Option[Int]
@@ -222,14 +234,35 @@ object Configuration extends WithProxyLogger {
     override val id        = producerId.value
     override val batchSize = None
 
+    override def asHoconString(useJson: Boolean = false) = {
+      ConfigWriter[ProducerSpecificLimitCfg]
+        .to(this)
+        .render(ConfigRenderOptions.concise().setJson(useJson))
+    }
+
   }
 
-  final case class ClientLimitsCfg(
+  case class ClientLimitsCfg(
       defaultMessagesPerSecond: Int = 0,
       defaultMaxConnectionsPerClient: Int = 0,
       defaultBatchSize: Int = 0,
       clientSpecificLimits: Seq[ClientSpecificLimitCfg] = Seq.empty
   ) {
+
+    lazy val defaultsForProducer: ProducerSpecificLimitCfg =
+      ProducerSpecificLimitCfg(
+        producerId = WsProducerId("__DEFAULT__"),
+        messagesPerSecond = Option(defaultMessagesPerSecond),
+        maxConnections = Option(defaultMaxConnectionsPerClient)
+      )
+
+    lazy val defaultsForConsumer: ConsumerSpecificLimitCfg =
+      ConsumerSpecificLimitCfg(
+        groupId = WsGroupId("__DEFAULT__"),
+        messagesPerSecond = Option(defaultMessagesPerSecond),
+        maxConnections = Option(defaultMaxConnectionsPerClient),
+        batchSize = Option(defaultBatchSize)
+      )
 
     def forProducer(
         producerId: WsProducerId
@@ -247,9 +280,21 @@ object Configuration extends WithProxyLogger {
       }
     }
 
+    def addConsumerSpecificLimitCfg(
+        cfg: ConsumerSpecificLimitCfg
+    ): ClientLimitsCfg = {
+      this.copy(clientSpecificLimits = clientSpecificLimits :+ cfg)
+    }
+
+    def addProducerSpecificLimitCfg(
+        cfg: ProducerSpecificLimitCfg
+    ): ClientLimitsCfg = {
+      this.copy(clientSpecificLimits = clientSpecificLimits :+ cfg)
+    }
+
   }
 
-  final case class ConsumerCfg(
+  case class ConsumerCfg(
       limits: ClientLimitsCfg,
       kafkaClientProperties: Map[String, AnyRef]
   ) {
@@ -257,9 +302,13 @@ object Configuration extends WithProxyLogger {
     def saslMechanism: Option[String] =
       kafkaClientProperties.get(SaslConfigs.SASL_MECHANISM).map(_.toString)
 
+    def addConsumerLimitCfg(cfg: ConsumerSpecificLimitCfg): ConsumerCfg = {
+      this.copy(limits = limits.addConsumerSpecificLimitCfg(cfg))
+    }
+
   }
 
-  final case class ProducerCfg(
+  case class ProducerCfg(
       sessionsEnabled: Boolean,
       limits: ClientLimitsCfg,
       kafkaClientProperties: Map[String, AnyRef]
@@ -268,25 +317,48 @@ object Configuration extends WithProxyLogger {
     def saslMechanism: Option[String] =
       kafkaClientProperties.get(SaslConfigs.SASL_MECHANISM).map(_.toString)
 
+    def addProducerLimitCfg(cfg: ProducerSpecificLimitCfg): ProducerCfg = {
+      this.copy(limits = limits.addProducerSpecificLimitCfg(cfg))
+    }
+
   }
 
-  final case class SessionHandlerCfg(
-      sessionStateTopicInitTimeout: FiniteDuration,
-      sessionStateTopicInitRetries: Int,
-      sessionStateTopicInitRetryInterval: FiniteDuration,
-      sessionStateTopicName: TopicName,
-      sessionStateReplicationFactor: Short,
-      sessionStateRetention: FiniteDuration
-  )
+  sealed trait InternalStateTopic {
+    val topicInitTimeout: FiniteDuration
+    val topicInitRetries: Int
+    val topicInitRetryInterval: FiniteDuration
+    val topicName: TopicName
+    val topicReplicationFactor: Short
+    val topicRetention: FiniteDuration
+  }
 
-  final case class CommitHandlerCfg(
+  case class DynamicConfigHandlerCfg(
+      enabled: Boolean,
+      topicInitTimeout: FiniteDuration,
+      topicInitRetries: Int,
+      topicInitRetryInterval: FiniteDuration,
+      topicName: TopicName,
+      topicReplicationFactor: Short,
+      topicRetention: FiniteDuration
+  ) extends InternalStateTopic
+
+  case class SessionHandlerCfg(
+      topicInitTimeout: FiniteDuration,
+      topicInitRetries: Int,
+      topicInitRetryInterval: FiniteDuration,
+      topicName: TopicName,
+      topicReplicationFactor: Short,
+      topicRetention: FiniteDuration
+  ) extends InternalStateTopic
+
+  case class CommitHandlerCfg(
       maxStackSize: Int,
       autoCommitEnabled: Boolean,
       autoCommitInterval: FiniteDuration,
       autoCommitMaxAge: FiniteDuration
   )
 
-  final case class ServerSslCfg(
+  case class ServerSslCfg(
       enabled: Boolean,
       sslOnly: Boolean,
       bindInterface: Option[String],
@@ -300,7 +372,7 @@ object Configuration extends WithProxyLogger {
 
   }
 
-  final case class BasicAuthCfg(
+  case class BasicAuthCfg(
       username: Option[String],
       password: Option[String],
       realm: Option[String],
@@ -313,13 +385,13 @@ object Configuration extends WithProxyLogger {
       )
   }
 
-  final case class CustomJwtCfg(
+  case class CustomJwtCfg(
       jwtKafkaUsernameKey: String,
       jwtKafkaPasswordKey: String,
       kafkaTokenAuthOnly: Boolean = false
   )
 
-  final case class OpenIdConnectCfg(
+  case class OpenIdConnectCfg(
       wellKnownUrl: Option[String],
       audience: Option[String],
       realm: Option[String],
@@ -341,7 +413,7 @@ object Configuration extends WithProxyLogger {
       customJwt.exists(_.kafkaTokenAuthOnly)
   }
 
-  final case class JmxConfig(manager: JmxManagerConfig)
+  case class JmxConfig(manager: JmxManagerConfig)
 
   case class JmxManagerConfig(proxyStatusInterval: FiniteDuration)
 
@@ -351,7 +423,7 @@ object Configuration extends WithProxyLogger {
       port: Int
   )
 
-  final case class ServerCfg(
+  case class ServerCfg(
       serverId: WsServerId,
       bindInterface: String,
       port: Int,
@@ -396,12 +468,33 @@ object Configuration extends WithProxyLogger {
 
   }
 
-  final case class AppCfg(
+  case class AllClientSpecifcLimits(
+      consumerLimits: Seq[ConsumerSpecificLimitCfg],
+      producerLimits: Seq[ProducerSpecificLimitCfg]
+  ) {
+
+    def findConsumerSpecificLimitCfg(
+        id: String
+    ): Option[ConsumerSpecificLimitCfg] = consumerLimits.find(_.id == id)
+
+    def findProducerSpecificLimitCfg(
+        id: String
+    ): Option[ProducerSpecificLimitCfg] = producerLimits.find(_.id == id)
+
+    def findClientSpecificLimitCfg(
+        id: String
+    ): Option[ClientSpecificLimitCfg] =
+      consumerLimits.find(_.id == id).orElse(producerLimits.find(_.id == id))
+
+  }
+
+  case class AppCfg(
       server: ServerCfg,
       kafkaClient: KafkaClientCfg,
       adminClient: AdminClientCfg,
       consumer: ConsumerCfg,
       producer: ProducerCfg,
+      dynamicConfigHandler: DynamicConfigHandlerCfg,
       sessionHandler: SessionHandlerCfg,
       commitHandler: CommitHandlerCfg
   ) {
@@ -413,43 +506,103 @@ object Configuration extends WithProxyLogger {
     lazy val isRateLimitAndBatchEnabled: Boolean =
       isRateLimitEnabled && isBatchingEnabled
 
+    def addProducerCfg(cfg: ProducerSpecificLimitCfg): AppCfg = {
+      this.copy(producer = producer.addProducerLimitCfg(cfg))
+    }
+
+    def addConsumerCfg(cfg: ConsumerSpecificLimitCfg): AppCfg = {
+      this.copy(consumer = consumer.addConsumerLimitCfg(cfg))
+    }
+
+    /** Fast access to the consumer specific limit configs */
+    def consumerLimitsCfg: ClientLimitsCfg = consumer.limits
+
+    /** Fast access to the producer specific limit configs */
+    def producerLimitsCfg: ClientLimitsCfg = producer.limits
+
+    /**
+     * Fetch all limit configs for consumer and producer clients. Including the
+     * default configs as a separate config entry, with the correct type, for
+     * each client type.
+     *
+     * @return
+     *   An instance of [[AllClientSpecifcLimits]] containing both consumer and
+     *   producer limit configs.
+     */
+    lazy val allClientLimits: AllClientSpecifcLimits = {
+      val cl = consumer.limits
+      val pl = producer.limits
+
+      val allCons = cl.defaultsForConsumer +: cl.clientSpecificLimits.collect {
+        case csl: ConsumerSpecificLimitCfg => csl
+      }
+      val allProd = pl.defaultsForProducer +: pl.clientSpecificLimits.collect {
+        case psl: ProducerSpecificLimitCfg => psl
+      }
+
+      AllClientSpecifcLimits(allCons, allProd)
+    }
+
   }
 
+}
+
+object Configuration extends Configuration with WithProxyLogger {
+
+  /**
+   * Loads the default application.conf file.
+   *
+   * @return
+   *   an instance of [[AppCfg]]
+   */
   def load(): AppCfg = {
     log.debug("Loading default config")
     ConfigSource.default.at(CfgRootKey).loadOrThrow[AppCfg]
   }
 
-  def loadFrom(arg: (String, Any)*): AppCfg = {
-    log.debug("Loading config from key/value pairs")
-    loadString(arg.map(t => s"${t._1} = ${t._2}").mkString("\n"))
-  }
-
   /**
    * Loads and resolves the default application.conf
+   *
    * @return
-   *   The a resolved instance of Typesafe Config
+   *   an instance of Lightbend [[Config]].
    */
-  def loadTypesafeConfig(): Config = {
-    log.debug("Loading default typesafe configuration")
+  def loadLightbendConfig(): Config = {
+    log.debug("Loading default Lightbend configuration")
     ConfigSource.default.config() match {
       case Right(config) => config
       case Left(errors)  => throw ConfigurationError(errors.prettyPrint())
     }
   }
 
-  def loadString(str: String): AppCfg = {
-    log.debug(s"Loading configuration from string")
-    loadConfig(ConfigFactory.parseString(str))
-  }
-
+  /**
+   * Loads an [[AppCfg]] instance from a Lightbend [[Config]] instance.
+   *
+   * @return
+   *   an instance of [[AppCfg]]
+   */
   def loadConfig(cfg: Config): AppCfg = {
     log.debug(s"Loading configuration from ${classOf[Config]} instance")
     ConfigSource.fromConfig(cfg).at(CfgRootKey).loadOrThrow[AppCfg]
   }
 
+  /**
+   * Loads the configuration from a specific file path.
+   *
+   * @return
+   *   an instance of [[AppCfg]]
+   */
   def loadFile(file: Path): AppCfg = {
     log.debug(s"Loading configuration file at path $file")
     ConfigSource.file(file).at(CfgRootKey).loadOrThrow[AppCfg]
+  }
+
+  /**
+   * Loads a [[DynamicCfg]] instance from a HOCON String.
+   *
+   * @return
+   *   an instance of [[DynamicCfg]]
+   */
+  def loadDynamicCfgString(str: String): DynamicCfg = {
+    ConfigSource.string(str).loadOrThrow[DynamicCfg]
   }
 }

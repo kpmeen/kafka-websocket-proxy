@@ -42,6 +42,8 @@ case object ProducerSessionsDisabled extends SessionOpResult {
 
 case class SessionInitialised(session: Session) extends SessionOpResult
 
+case class SessionUpdated(session: Session) extends SessionOpResult
+
 case class InstanceAdded(session: Session) extends SessionOpResult
 
 case class InstanceRemoved(session: Session) extends SessionOpResult

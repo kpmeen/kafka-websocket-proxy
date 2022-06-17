@@ -25,7 +25,7 @@ private[session] class SessionDataProducer(
   private[this] val kafkaUrl = cfg.kafkaClient.bootstrapHosts.mkString()
 
   private[this] val sessionStateTopic =
-    cfg.sessionHandler.sessionStateTopicName.value
+    cfg.sessionHandler.topicName.value
 
   private[this] lazy val producerProps =
     ProducerSettings(sys.toClassic, Some(kSer), Some(vSer))
@@ -34,7 +34,7 @@ private[session] class SessionDataProducer(
 
   private[this] def initialiseProducer(
       ps: ProducerSettings[String, Session]
-  )(implicit cfg: AppCfg): KafkaProducer[String, Session] = {
+  ): KafkaProducer[String, Session] = {
     val props =
       cfg.producer.kafkaClientProperties ++
         ps.getProperties.asScala.toMap ++

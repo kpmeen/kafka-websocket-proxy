@@ -27,16 +27,22 @@ It is possible to set the log levels for some of the important loggers through
 environment variables. The below table shows which are available, and what their
 default values are.
 
-| Logger                            | Environment                      | Default |
-|:---                               |:----                             |:-------:|
-| akka.actor                        | WS_PROXY_AKKA_ACTOR_LOG_LEVEL    |  WARN   |
-| akka.http                         | WS_PROXY_AKKA_HTTP_LOG_LEVEL     |  WARN   |
-| akka.kafka                        | WS_PROXY_AKKA_KAFKA_LOG_LEVEL    |  WARN   |
-| org.apache.kafka.clients          | WS_PROXY_KAFKA_CLIENTS_LOG_LEVEL |  WARN   |
-| net.scalytica.kafka.wsproxy       | WS_PROXY_APP_LOG_LEVEL           |  DEBUG  |
-| net.scalytica.kafka.wsproxy.auth  | WS_PROXY_AUTH_LOG_LEVEL          |  DEBUG  |
-| net.scalytica.kafka.wsproxy.admin | WS_PROXY_ADMIN_LOG_LEVEL         |  WARN   |
-| root                              | WS_PROXY_ROOT_LOG_LEVEL          |  WARN   |
+| Logger                               | Environment                      | Default |
+|:-------------------------------------|:---------------------------------|:-------:|
+| akka.actor                           | WS_PROXY_AKKA_ACTOR_LOG_LEVEL    |  WARN   |
+| akka.http                            | WS_PROXY_AKKA_HTTP_LOG_LEVEL     |  WARN   |
+| akka.kafka                           | WS_PROXY_AKKA_KAFKA_LOG_LEVEL    |  WARN   |
+| org.apache.kafka.clients             | WS_PROXY_KAFKA_CLIENTS_LOG_LEVEL |  WARN   |
+| net.scalytica.kafka.wsproxy.auth     | WS_PROXY_AUTH_LOG_LEVEL          |  DEBUG  |
+| net.scalytica.kafka.wsproxy.admin    | WS_PROXY_ADMIN_LOG_LEVEL         |  WARN   |
+| net.scalytica.kafka.wsproxy.config   | WS_PROXY_CONFIG_LOG_LEVEL        |  WARN   |
+| net.scalytica.kafka.wsproxy.codecs   | WS_PROXY_CODECS_LOG_LEVEL        |  WARN   |
+| net.scalytica.kafka.wsproxy.consumer | WS_PROXY_CONSUMER_LOG_LEVEL      |  WARN   |
+| net.scalytica.kafka.wsproxy.producer | WS_PROXY_PRODUCER_LOG_LEVEL      |  WARN   |
+| net.scalytica.kafka.wsproxy.session  | WS_PROXY_SESSION_LOG_LEVEL       |  WARN   |
+| net.scalytica.kafka.wsproxy.utils    | WS_PROXY_UTILS_LOG_LEVEL         |  WARN   |
+| net.scalytica.kafka.wsproxy          | WS_PROXY_APP_LOG_LEVEL           |  DEBUG  |
+| root                                 | WS_PROXY_ROOT_LOG_LEVEL          |  WARN   |
 
 ## 3. Overriding full configuration through environment
 

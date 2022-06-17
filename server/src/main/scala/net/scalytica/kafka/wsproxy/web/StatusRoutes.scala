@@ -28,12 +28,14 @@ trait StatusRoutes { self: BaseRoutes =>
   ): Route = {
     extractMaterializer { implicit mat =>
       path("healthcheck") {
-        if (cfg.server.secureHealthCheckEndpoint) {
-          maybeAuthenticate(cfg, maybeOidcClient, mat) { _ =>
+        get {
+          if (cfg.server.secureHealthCheckEndpoint) {
+            maybeAuthenticate(cfg, maybeOidcClient, mat) { _ =>
+              serveHealthCheck
+            }
+          } else {
             serveHealthCheck
           }
-        } else {
-          serveHealthCheck
         }
       }
     }
