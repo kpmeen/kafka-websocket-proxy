@@ -5,11 +5,21 @@ import net.scalytica.kafka.wsproxy.codecs.Decoders._
 import net.scalytica.kafka.wsproxy.models._
 import net.scalytica.kafka.wsproxy.session._
 import io.circe.syntax._
-import org.scalatest.OptionValues
+import io.circe.parser._
+import net.scalytica.kafka.wsproxy.config.Configuration.{
+  ConsumerSpecificLimitCfg,
+  DynamicCfg
+}
+import org.scalatest.{CustomEitherValues, OptionValues}
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
-class JsonCodecsSpec extends AnyWordSpec with Matchers with OptionValues {
+// scalastyle:off magic.number
+class JsonCodecsSpec
+    extends AnyWordSpec
+    with Matchers
+    with OptionValues
+    with CustomEitherValues {
 
   val sessionOne  = SessionId("session1")
   val groupOne    = WsGroupId("group1")
@@ -132,7 +142,57 @@ class JsonCodecsSpec extends AnyWordSpec with Matchers with OptionValues {
         }
       }
 
+      "encode and decode a dynamic config object" in {
+        val cslc: DynamicCfg = ConsumerSpecificLimitCfg(
+          groupId = WsGroupId("group-1"),
+          messagesPerSecond = Some(123),
+          maxConnections = Some(1),
+          batchSize = Some(1234)
+        )
+        val js = cslc.asJson
+
+        js.as[DynamicCfg] match {
+          case Right(res) =>
+            res match {
+              case cfg: ConsumerSpecificLimitCfg =>
+                cfg.groupId.value mustBe "group-1"
+                cfg.messagesPerSecond.value mustBe 123
+                cfg.maxConnections.value mustBe 1
+                cfg.batchSize.value mustBe 1234
+
+              case wrong =>
+                fail(
+                  "Expected a ConsumerSpecificLimitCfg but" +
+                    s" got ${wrong.niceClassSimpleName}"
+                )
+            }
+
+          case Left(err) =>
+            err.printStackTrace()
+            fail(s"Decoding failed with message: ${err.message}")
+        }
+      }
+
+      "fail when decoding an incorrect dynamic config object" in {
+        val json = """{
+                     |  "batch-size" : 1234,
+                     |  "grop-id" : "group-1",
+                     |  "max-connections" : 1,
+                     |  "messages-per-second" : 123
+                     |}""".stripMargin
+        val js = parse(json).rightValue
+
+        js.as[DynamicCfg] match {
+          case Right(_) =>
+            fail("Expected invalid json")
+
+          case Left(err) =>
+            err.message must include("Cannot convert configuration")
+        }
+      }
+
     }
   }
 
 }
+// scalastyle:on magic.number

@@ -39,7 +39,7 @@ class ActiveSessionsSpec
     }
 
     "return none if a session is not found" in {
-      as.find(SessionId("s10")) mustBe empty
+      as.find(SessionId("s10")) mustBe None
     }
 
     "add a new session" in {
@@ -55,7 +55,6 @@ class ActiveSessionsSpec
       val as2 = as.updateSession(SessionId("s2"), ns)
 
       as2.rightValue must not be as
-
       as2.rightValue.find(SessionId("s2")).value mustBe ns
     }
 

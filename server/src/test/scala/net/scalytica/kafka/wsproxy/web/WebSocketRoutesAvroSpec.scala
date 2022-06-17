@@ -49,7 +49,7 @@ class WebSocketRoutesAvroSpec extends BaseWebSocketRoutesSpec {
     "both kafka and the proxy is unsecured" should {
 
       "produce messages with Avro key and value" in
-        plainProducerContext(nextTopic) { ctx =>
+        plainProducerContext(nextTopic) { implicit ctx =>
           implicit val wsClient = ctx.producerProbe
 
           val messages = createAvroProducerRecordAvroAvro(1)
@@ -58,7 +58,7 @@ class WebSocketRoutesAvroSpec extends BaseWebSocketRoutesSpec {
             producerId = producerId("avro", topicCounter),
             instanceId = None,
             topic = ctx.topicName,
-            routes = Route.seal(ctx.route),
+            routes = Route.seal(wsRouteFromProducerContext),
             keyType = Some(AvroType),
             valType = AvroType,
             messages = messages
@@ -66,7 +66,7 @@ class WebSocketRoutesAvroSpec extends BaseWebSocketRoutesSpec {
         }
 
       "produce messages with String key and Avro value" in
-        plainProducerContext(nextTopic) { ctx =>
+        plainProducerContext(nextTopic) { implicit ctx =>
           implicit val wsClient = ctx.producerProbe
 
           val messages = createAvroProducerRecordStringBytes(1)
@@ -75,7 +75,7 @@ class WebSocketRoutesAvroSpec extends BaseWebSocketRoutesSpec {
             producerId = producerId("avro", topicCounter),
             instanceId = None,
             topic = ctx.topicName,
-            routes = Route.seal(ctx.route),
+            routes = Route.seal(wsRouteFromProducerContext),
             keyType = Some(StringType),
             valType = AvroType,
             messages = messages
@@ -83,7 +83,7 @@ class WebSocketRoutesAvroSpec extends BaseWebSocketRoutesSpec {
         }
 
       "produce messages with String key and Avro value with headers" in
-        plainProducerContext(nextTopic) { ctx =>
+        plainProducerContext(nextTopic) { implicit ctx =>
           implicit val wsClient = ctx.producerProbe
 
           val messages =
@@ -93,7 +93,7 @@ class WebSocketRoutesAvroSpec extends BaseWebSocketRoutesSpec {
             producerId = producerId("avro", topicCounter),
             instanceId = None,
             topic = ctx.topicName,
-            routes = Route.seal(ctx.route),
+            routes = Route.seal(wsRouteFromProducerContext),
             keyType = Some(StringType),
             valType = AvroType,
             messages = messages
@@ -101,7 +101,7 @@ class WebSocketRoutesAvroSpec extends BaseWebSocketRoutesSpec {
         }
 
       "produce messages with Avro value" in
-        plainProducerContext(nextTopic) { ctx =>
+        plainProducerContext(nextTopic) { implicit ctx =>
           implicit val wsClient = ctx.producerProbe
 
           val messages = createAvroProducerRecordNoneAvro(1)
@@ -110,7 +110,7 @@ class WebSocketRoutesAvroSpec extends BaseWebSocketRoutesSpec {
             producerId = producerId("avro", topicCounter),
             instanceId = None,
             topic = ctx.topicName,
-            routes = Route.seal(ctx.route),
+            routes = Route.seal(wsRouteFromProducerContext),
             keyType = None,
             valType = AvroType,
             messages = messages
@@ -118,7 +118,7 @@ class WebSocketRoutesAvroSpec extends BaseWebSocketRoutesSpec {
         }
 
       "produce messages with String key and Avro value and message ID" in
-        plainProducerContext(nextTopic) { ctx =>
+        plainProducerContext(nextTopic) { implicit ctx =>
           implicit val wsClient = ctx.producerProbe
 
           val messages =
@@ -128,7 +128,7 @@ class WebSocketRoutesAvroSpec extends BaseWebSocketRoutesSpec {
             producerId = producerId("avro", topicCounter),
             instanceId = None,
             topic = ctx.topicName,
-            routes = Route.seal(ctx.route),
+            routes = Route.seal(wsRouteFromProducerContext),
             keyType = Some(StringType),
             valType = AvroType,
             messages = messages,
@@ -142,7 +142,7 @@ class WebSocketRoutesAvroSpec extends BaseWebSocketRoutesSpec {
           keyType = Some(AvroType),
           valType = AvroType,
           numMessages = 10
-        ) { ctx =>
+        ) { implicit ctx =>
           implicit val kcfg = ctx.embeddedKafkaConfig
 
           val outPath = "/socket/out?" +
@@ -159,22 +159,24 @@ class WebSocketRoutesAvroSpec extends BaseWebSocketRoutesSpec {
 
           verifyTestKeyAndAlbum(rk, rv)
 
-          WS(outPath, ctx.consumerProbe.flow) ~> ctx.route ~> check {
-            isWebSocketUpgrade mustBe true
+          WS(outPath, ctx.consumerProbe.flow) ~>
+            wsRouteFromConsumerContext ~>
+            check {
+              isWebSocketUpgrade mustBe true
 
-            forAll(1 to 10) { i =>
-              val expectedTracks = (1 to 3).map { i =>
-                TestTypes.Track(s"track-$i", (120 seconds).toMillis)
+              forAll(1 to 10) { i =>
+                val expectedTracks = (1 to 3).map { i =>
+                  TestTypes.Track(s"track-$i", (120 seconds).toMillis)
+                }
+                ctx.consumerProbe.expectWsConsumerKeyValueResultAvro(
+                  expectedTopic = ctx.topicName,
+                  expectedKey = Option(TestTypes.TestKey(s"foo-$i", 1234567L)),
+                  expectedValue =
+                    TestTypes.Album(s"artist-$i", s"title-$i", expectedTracks)
+                )
               }
-              ctx.consumerProbe.expectWsConsumerKeyValueResultAvro(
-                expectedTopic = ctx.topicName,
-                expectedKey = Option(TestTypes.TestKey(s"foo-$i", 1234567L)),
-                expectedValue =
-                  TestTypes.Album(s"artist-$i", s"title-$i", expectedTracks)
-              )
-            }
 
-          }
+            }
         }
 
       "consume messages with String key and value" in
@@ -183,7 +185,7 @@ class WebSocketRoutesAvroSpec extends BaseWebSocketRoutesSpec {
           keyType = Some(StringType),
           valType = StringType,
           numMessages = 10
-        ) { ctx =>
+        ) { implicit ctx =>
           implicit val kcfg = ctx.embeddedKafkaConfig
 
           val outPath = "/socket/out?" +
@@ -200,24 +202,26 @@ class WebSocketRoutesAvroSpec extends BaseWebSocketRoutesSpec {
           rk mustBe "foo-1"
           rv mustBe "artist-1"
 
-          WS(outPath, ctx.consumerProbe.flow) ~> ctx.route ~> check {
-            isWebSocketUpgrade mustBe true
+          WS(outPath, ctx.consumerProbe.flow) ~>
+            wsRouteFromConsumerContext ~>
+            check {
+              isWebSocketUpgrade mustBe true
 
-            forAll(1 to 10) { i =>
-              ctx.consumerProbe.expectWsConsumerResultAvro[String, String](
-                expectedTopic = ctx.topicName,
-                keyFormat = StringType,
-                valFormat = StringType
-              ) {
-                case ConsumerKeyValueRecord(_, _, _, _, _, key, value, _) =>
-                  key.value mustBe s"foo-$i"
-                  value.value mustBe s"artist-$i"
+              forAll(1 to 10) { i =>
+                ctx.consumerProbe.expectWsConsumerResultAvro[String, String](
+                  expectedTopic = ctx.topicName,
+                  keyFormat = StringType,
+                  valFormat = StringType
+                ) {
+                  case ConsumerKeyValueRecord(_, _, _, _, _, key, value, _) =>
+                    key.value mustBe s"foo-$i"
+                    value.value mustBe s"artist-$i"
 
-                case _ =>
-                  fail("Unexpected ConsumerValueRecord")
+                  case _ =>
+                    fail("Unexpected ConsumerValueRecord")
+                }
               }
             }
-          }
         }
 
       "consume messages with String key and value with headers" in
@@ -227,7 +231,7 @@ class WebSocketRoutesAvroSpec extends BaseWebSocketRoutesSpec {
           valType = StringType,
           numMessages = 10,
           withHeaders = true
-        ) { ctx =>
+        ) { implicit ctx =>
           implicit val kcfg = ctx.embeddedKafkaConfig
 
           val outPath = "/socket/out?" +
@@ -244,25 +248,27 @@ class WebSocketRoutesAvroSpec extends BaseWebSocketRoutesSpec {
           rk mustBe "foo-1"
           rv mustBe "artist-1"
 
-          WS(outPath, ctx.consumerProbe.flow) ~> ctx.route ~> check {
-            isWebSocketUpgrade mustBe true
+          WS(outPath, ctx.consumerProbe.flow) ~>
+            wsRouteFromConsumerContext ~>
+            check {
+              isWebSocketUpgrade mustBe true
 
-            forAll(1 to 10) { i =>
-              ctx.consumerProbe.expectWsConsumerResultAvro[String, String](
-                expectedTopic = ctx.topicName,
-                expectHeaders = true,
-                keyFormat = StringType,
-                valFormat = StringType
-              ) {
-                case ConsumerKeyValueRecord(_, _, _, _, _, key, value, _) =>
-                  key.value mustBe s"foo-$i"
-                  value.value mustBe s"artist-$i"
+              forAll(1 to 10) { i =>
+                ctx.consumerProbe.expectWsConsumerResultAvro[String, String](
+                  expectedTopic = ctx.topicName,
+                  expectHeaders = true,
+                  keyFormat = StringType,
+                  valFormat = StringType
+                ) {
+                  case ConsumerKeyValueRecord(_, _, _, _, _, key, value, _) =>
+                    key.value mustBe s"foo-$i"
+                    value.value mustBe s"artist-$i"
 
-                case _ =>
-                  fail("Unexpected ConsumerValueRecord")
+                  case _ =>
+                    fail("Unexpected ConsumerValueRecord")
+                }
               }
             }
-          }
         }
 
       "consume messages with String value" in
@@ -271,7 +277,7 @@ class WebSocketRoutesAvroSpec extends BaseWebSocketRoutesSpec {
           keyType = None,
           valType = StringType,
           numMessages = 10
-        ) { ctx =>
+        ) { implicit ctx =>
           implicit val kcfg = ctx.embeddedKafkaConfig
 
           val outPath = "/socket/out?" +
@@ -285,23 +291,25 @@ class WebSocketRoutesAvroSpec extends BaseWebSocketRoutesSpec {
           val rv = consumeFirstMessageFrom[String](ctx.topicName.value)
           rv mustBe "artist-1"
 
-          WS(outPath, ctx.consumerProbe.flow) ~> ctx.route ~> check {
-            isWebSocketUpgrade mustBe true
+          WS(outPath, ctx.consumerProbe.flow) ~>
+            wsRouteFromConsumerContext ~>
+            check {
+              isWebSocketUpgrade mustBe true
 
-            forAll(1 to 10) { i =>
-              ctx.consumerProbe.expectWsConsumerResultAvro[String, String](
-                expectedTopic = ctx.topicName,
-                keyFormat = NoType,
-                valFormat = StringType
-              ) {
-                case ConsumerValueRecord(_, _, _, _, _, value, _) =>
-                  value.value mustBe s"artist-$i"
+              forAll(1 to 10) { i =>
+                ctx.consumerProbe.expectWsConsumerResultAvro[String, String](
+                  expectedTopic = ctx.topicName,
+                  keyFormat = NoType,
+                  valFormat = StringType
+                ) {
+                  case ConsumerValueRecord(_, _, _, _, _, value, _) =>
+                    value.value mustBe s"artist-$i"
 
-                case _ =>
-                  fail("Unexpected ConsumerKeyValueRecord.")
+                  case _ =>
+                    fail("Unexpected ConsumerKeyValueRecord.")
+                }
               }
             }
-          }
         }
 
       "consume message with Long key and String value" in
@@ -310,7 +318,7 @@ class WebSocketRoutesAvroSpec extends BaseWebSocketRoutesSpec {
           keyType = Some(LongType),
           valType = StringType,
           numMessages = 10
-        ) { ctx =>
+        ) { implicit ctx =>
           implicit val kcfg = ctx.embeddedKafkaConfig
 
           val outPath = "/socket/out?" +
@@ -327,24 +335,26 @@ class WebSocketRoutesAvroSpec extends BaseWebSocketRoutesSpec {
           rk mustBe 1L
           rv mustBe "artist-1"
 
-          WS(outPath, ctx.consumerProbe.flow) ~> ctx.route ~> check {
-            isWebSocketUpgrade mustBe true
+          WS(outPath, ctx.consumerProbe.flow) ~>
+            wsRouteFromConsumerContext ~>
+            check {
+              isWebSocketUpgrade mustBe true
 
-            forAll(1 to 10) { i =>
-              ctx.consumerProbe.expectWsConsumerResultAvro[Long, String](
-                expectedTopic = ctx.topicName,
-                keyFormat = LongType,
-                valFormat = StringType
-              ) {
-                case ConsumerKeyValueRecord(_, _, _, _, _, key, value, _) =>
-                  key.value mustBe i.toLong
-                  value.value mustBe s"artist-$i"
+              forAll(1 to 10) { i =>
+                ctx.consumerProbe.expectWsConsumerResultAvro[Long, String](
+                  expectedTopic = ctx.topicName,
+                  keyFormat = LongType,
+                  valFormat = StringType
+                ) {
+                  case ConsumerKeyValueRecord(_, _, _, _, _, key, value, _) =>
+                    key.value mustBe i.toLong
+                    value.value mustBe s"artist-$i"
 
-                case _ =>
-                  fail("Unexpected ConsumerValueRecord")
+                  case _ =>
+                    fail("Unexpected ConsumerValueRecord")
+                }
               }
             }
-          }
         }
 
     }
@@ -352,7 +362,7 @@ class WebSocketRoutesAvroSpec extends BaseWebSocketRoutesSpec {
     "kafka is secure and the server is unsecured" should {
 
       "produce messages to a secured cluster" in
-        secureKafkaClusterProducerContext(topic = nextTopic) { ctx =>
+        secureKafkaClusterProducerContext(topic = nextTopic) { implicit ctx =>
           implicit val wsClient = ctx.producerProbe
 
           val messages = createAvroProducerRecordNoneAvro(1)
@@ -361,7 +371,7 @@ class WebSocketRoutesAvroSpec extends BaseWebSocketRoutesSpec {
             producerId = producerId("avro", topicCounter),
             instanceId = None,
             topic = ctx.topicName,
-            routes = Route.seal(ctx.route),
+            routes = Route.seal(wsRouteFromProducerContext),
             keyType = None,
             valType = AvroType,
             messages = messages,
@@ -375,7 +385,7 @@ class WebSocketRoutesAvroSpec extends BaseWebSocketRoutesSpec {
           keyType = Some(AvroType),
           valType = AvroType,
           numMessages = 10
-        ) { ctx =>
+        ) { implicit ctx =>
           implicit val kcfg = ctx.embeddedKafkaConfig
 
           val outPath = "/socket/out?" +
@@ -394,7 +404,7 @@ class WebSocketRoutesAvroSpec extends BaseWebSocketRoutesSpec {
 
           WS(outPath, ctx.consumerProbe.flow) ~>
             addKafkaCreds(creds) ~>
-            ctx.route ~>
+            wsRouteFromConsumerContext ~>
             check {
               isWebSocketUpgrade mustBe true
 
@@ -422,7 +432,7 @@ class WebSocketRoutesAvroSpec extends BaseWebSocketRoutesSpec {
             secureServerProducerContext(
               topic = nextTopic,
               serverOpenIdCfg = Option(cfg)
-            ) { ctx =>
+            ) { implicit ctx =>
               implicit val wsClient = ctx.producerProbe
 
               val messages = createAvroProducerRecordNoneAvro(1)
@@ -431,7 +441,7 @@ class WebSocketRoutesAvroSpec extends BaseWebSocketRoutesSpec {
                 producerId = producerId("avro", topicCounter),
                 instanceId = None,
                 topic = ctx.topicName,
-                routes = Route.seal(ctx.route),
+                routes = Route.seal(wsRouteFromProducerContext),
                 keyType = None,
                 valType = AvroType,
                 messages = messages,
@@ -448,7 +458,7 @@ class WebSocketRoutesAvroSpec extends BaseWebSocketRoutesSpec {
             secureServerProducerContext(
               topic = nextTopic,
               serverOpenIdCfg = Option(cfg)
-            ) { ctx =>
+            ) { implicit ctx =>
               implicit val wsClient = ctx.producerProbe
 
               val messages = createAvroProducerRecordNoneAvro(1)
@@ -457,7 +467,7 @@ class WebSocketRoutesAvroSpec extends BaseWebSocketRoutesSpec {
                 producerId = producerId("avro", topicCounter),
                 instanceId = None,
                 topic = ctx.topicName,
-                routes = Route.seal(ctx.route),
+                routes = Route.seal(wsRouteFromProducerContext),
                 keyType = None,
                 valType = AvroType,
                 messages = messages,
@@ -482,7 +492,7 @@ class WebSocketRoutesAvroSpec extends BaseWebSocketRoutesSpec {
             secureServerProducerContext(
               topic = nextTopic,
               serverOpenIdCfg = Option(oidcCfg)
-            ) { ctx =>
+            ) { implicit ctx =>
               implicit val wsClient = ctx.producerProbe
 
               val messages = createAvroProducerRecordNoneAvro(1)
@@ -491,7 +501,7 @@ class WebSocketRoutesAvroSpec extends BaseWebSocketRoutesSpec {
                 producerId = producerId("avro", topicCounter),
                 instanceId = None,
                 topic = ctx.topicName,
-                routes = Route.seal(ctx.route),
+                routes = Route.seal(wsRouteFromProducerContext),
                 keyType = None,
                 valType = AvroType,
                 messages = messages,

@@ -3,6 +3,12 @@ package net.scalytica.kafka.wsproxy.session
 import akka.actor.typed.{ActorRef, Scheduler}
 import akka.actor.typed.scaladsl.AskPattern._
 import akka.util.Timeout
+import net.scalytica.kafka.wsproxy.actor.ActorWithProtocolExtensions
+import net.scalytica.kafka.wsproxy.config.Configuration.{
+  ClientSpecificLimitCfg,
+  ConsumerSpecificLimitCfg,
+  ProducerSpecificLimitCfg
+}
 import net.scalytica.kafka.wsproxy.errors.{
   FatalProxyServerError,
   RetryFailedError
@@ -15,6 +21,7 @@ import net.scalytica.kafka.wsproxy.models.{
   WsProducerId,
   WsServerId
 }
+import net.scalytica.kafka.wsproxy.session.SessionHandlerProtocol._
 import net.scalytica.kafka.wsproxy.utils.BlockingRetry
 
 import java.util.concurrent.TimeoutException
@@ -23,9 +30,9 @@ import scala.concurrent.duration._
 
 object SessionHandlerImplicits extends WithProxyLogger {
 
-  implicit class SessionHandlerOpExtensions(
-      sh: ActorRef[SessionHandlerProtocol.Protocol]
-  ) {
+  implicit class SessionHandlerProtocolExtensions(val ref: ActorRef[Protocol])
+      extends ActorWithProtocolExtensions[Protocol, SessionOpResult] {
+
     private[this] def handleClientError[T](
         sessionId: SessionId,
         appId: Option[String],
@@ -37,20 +44,19 @@ object SessionHandlerImplicits extends WithProxyLogger {
         .headOption
         .map(_.getMethodName)
         .getOrElse("unknown")
-      val cid = instanceId.map(c => s"for $c").getOrElse("")
-      val sid = serverId.map(s => s"on $s").getOrElse("")
-      val gid = appId.map(g => s"in $g").getOrElse("")
+      val cid        = instanceId.map(c => s"for $c").getOrElse("")
+      val sid        = serverId.map(s => s"on $s").getOrElse("")
+      val gid        = appId.map(g => s"in $g").getOrElse("")
+      val timeoutMsg = s"Timeout calling $op $cid $gid in $sessionId $sid"
+      val otherMsg = s"Unhandled error calling $op $cid $gid in $sessionId $sid"
 
       throwable match {
         case t: TimeoutException =>
-          log.debug(s"Timeout calling $op $cid $gid in $sessionId $sid", t)
+          log.debug(timeoutMsg, t)
           Future.successful(timeoutResponse(t.getMessage))
 
         case t: Throwable =>
-          log.warn(
-            s"Unhandled error calling $op $cid $gid in $sessionId $sid",
-            t
-          )
+          log.warn(otherMsg, t)
           throw t
       }
     }
@@ -75,14 +81,8 @@ object SessionHandlerImplicits extends WithProxyLogger {
         scheduler: Scheduler
     ): Future[SessionOpResult] = {
       val sid = SessionId(groupId)
-      sh.ask[SessionOpResult] { ref =>
-        SessionHandlerProtocol.InitConsumerSession(
-          sessionId = sid,
-          groupId = groupId,
-          maxConnections = consumerLimit,
-          replyTo = ref
-        )
-      }.recoverWith(handleClientSessionOpError(sid)(_))
+      doAsk(ref => InitConsumerSession(sid, groupId, consumerLimit, ref))
+        .recoverWith(handleClientSessionOpError(sid)(_))
     }
 
     def initProducerSession(producerId: WsProducerId, maxClients: Int)(
@@ -91,14 +91,8 @@ object SessionHandlerImplicits extends WithProxyLogger {
         scheduler: Scheduler
     ): Future[SessionOpResult] = {
       val sid = SessionId(producerId)
-      sh.ask[SessionOpResult] { ref =>
-        SessionHandlerProtocol.InitProducerSession(
-          sessionId = sid,
-          producerId = producerId,
-          maxConnections = maxClients,
-          replyTo = ref
-        )
-      }.recoverWith(handleClientSessionOpError(sid)(_))
+      doAsk(ref => InitProducerSession(sid, producerId, maxClients, ref))
+        .recoverWith(handleClientSessionOpError(sid)(_))
     }
 
     def addConsumer(
@@ -110,14 +104,7 @@ object SessionHandlerImplicits extends WithProxyLogger {
         scheduler: Scheduler
     ): Future[SessionOpResult] = {
       val sid = SessionId(fullConsumerId.groupId)
-      sh.ask[SessionOpResult] { ref =>
-        SessionHandlerProtocol.AddConsumer(
-          sessionId = sid,
-          serverId = serverId,
-          fullClientId = fullConsumerId,
-          replyTo = ref
-        )
-      }.recoverWith(
+      doAsk(ref => AddConsumer(sid, serverId, fullConsumerId, ref)).recoverWith(
         handleClientSessionOpError(
           sessionId = sid,
           appId = Option(fullConsumerId.groupId.value),
@@ -136,21 +123,15 @@ object SessionHandlerImplicits extends WithProxyLogger {
         scheduler: Scheduler
     ): Future[SessionOpResult] = {
       val sid = SessionId(fullProducerId.producerId)
-      sh.ask[SessionOpResult] { ref =>
-        SessionHandlerProtocol.AddProducer(
-          sessionId = sid,
-          serverId = serverId,
-          fullClientId = fullProducerId,
-          replyTo = ref
+      doAsk(ref => AddProducer(sid, serverId, fullProducerId, replyTo = ref))
+        .recoverWith(
+          handleClientSessionOpError(
+            sessionId = sid,
+            appId = Option(fullProducerId.producerId.value),
+            instanceId = fullProducerId.instanceId.map(_.value),
+            serverId = Option(serverId.value)
+          )(_)
         )
-      }.recoverWith(
-        handleClientSessionOpError(
-          sessionId = sid,
-          appId = Option(fullProducerId.producerId.value),
-          instanceId = fullProducerId.instanceId.map(_.value),
-          serverId = Option(serverId.value)
-        )(_)
-      )
     }
 
     def removeConsumer(
@@ -162,14 +143,7 @@ object SessionHandlerImplicits extends WithProxyLogger {
         scheduler: Scheduler
     ): Future[SessionOpResult] = {
       val sid = SessionId(fullConsumerId.groupId)
-
-      sh.ask[SessionOpResult] { ref =>
-        SessionHandlerProtocol.RemoveConsumer(
-          sessionId = sid,
-          fullClientId = fullConsumerId,
-          replyTo = ref
-        )
-      }.recoverWith(
+      doAsk(ref => RemoveConsumer(sid, fullConsumerId, ref)).recoverWith(
         handleClientSessionOpError(
           sessionId = sid,
           appId = Option(fullConsumerId.groupId.value),
@@ -203,13 +177,7 @@ object SessionHandlerImplicits extends WithProxyLogger {
         timeout: Timeout,
         scheduler: Scheduler
     ): Future[SessionOpResult] = {
-      sh.ask[SessionOpResult] { ref =>
-        SessionHandlerProtocol.RemoveProducer(
-          sessionId = sessionId,
-          fullClientId = fullProducerId,
-          replyTo = ref
-        )
-      }.recoverWith(
+      doAsk(ref => RemoveProducer(sessionId, fullProducerId, ref)).recoverWith(
         handleClientSessionOpError(
           sessionId = sessionId,
           appId = Option(fullProducerId.producerId.value),
@@ -228,9 +196,7 @@ object SessionHandlerImplicits extends WithProxyLogger {
         attemptTimeout =>
           implicit val at: Timeout = attemptTimeout
 
-          sh.ask[SessionOpResult] { ref =>
-            SessionHandlerProtocol.SessionHandlerReady(ref)
-          }.map {
+          doAsk(ref => CheckSessionHandlerReady(ref)).map {
             case ssr: SessionStateRestored =>
               log.trace("Session state is restored.")
               ssr
@@ -255,20 +221,50 @@ object SessionHandlerImplicits extends WithProxyLogger {
       }
     }
 
-    def sessionHandlerShutdown()(
+    def sessionHandlerStop()(
         implicit ec: ExecutionContext,
         timeout: Timeout,
         scheduler: Scheduler
     ): Future[SessionOpResult] = {
-      sh.ask[SessionOpResult] { ref =>
-        SessionHandlerProtocol.StopSessionHandler(ref)
-      }.recoverWith {
+      doAsk(ref => StopSessionHandler(ref)).recoverWith {
         case t: TimeoutException =>
-          log.debug("Timeout calling sessionShutdown()", t)
+          log.debug("Timeout calling sessionHandlerStop()", t)
           Future.successful(IncompleteOperation(t.getMessage))
 
         case t: Throwable =>
-          log.warn("An unknown error occurred calling sessionShutdown()", t)
+          log.warn("Unknown error calling sessionHandlerStop()", t)
+          throw t
+      }
+    }
+
+    def updateSessionConfig(cslCfg: ClientSpecificLimitCfg)(
+        implicit ec: ExecutionContext,
+        timeout: Timeout,
+        scheduler: Scheduler
+    ): Future[SessionOpResult] = {
+      val res = cslCfg match {
+        case consCfg: ConsumerSpecificLimitCfg =>
+          val sid = SessionId(consCfg.groupId)
+          doAskWithStandardRecovery { ref =>
+            UpdateConsumerSession(sid, consCfg, ref)
+          } { case (msg, _) =>
+            IncompleteOperation(msg)
+          }
+
+        case prodCfg: ProducerSpecificLimitCfg =>
+          val sid = SessionId(prodCfg.producerId)
+          doAsk { ref =>
+            UpdateProducerSession(sid, prodCfg, ref)
+          }
+      }
+
+      res.recoverWith {
+        case t: TimeoutException =>
+          log.debug("Timeout calling updateSessionConfig()", t)
+          Future.successful(IncompleteOperation(t.getMessage))
+
+        case t: Throwable =>
+          log.warn("Unknown error calling updateSessionConfig()", t)
           throw t
       }
     }
@@ -279,16 +275,16 @@ object SessionHandlerImplicits extends WithProxyLogger {
         scheduler: Scheduler
     ): Future[Option[ConsumerSession]] = {
       val sid = SessionId(groupId)
-      sh.ask[Option[ConsumerSession]] { ref =>
-        SessionHandlerProtocol.GetConsumerSession(sid, ref)
-      }.recoverWith(
-        handleClientError[Option[ConsumerSession]](
-          sessionId = sid,
-          appId = Option(groupId.value),
-          instanceId = None,
-          serverId = None
-        )(_ => None)(_)
-      )
+      ref
+        .ask[Option[ConsumerSession]](ref => GetConsumerSession(sid, ref))
+        .recoverWith(
+          handleClientError[Option[ConsumerSession]](
+            sessionId = sid,
+            appId = Option(groupId.value),
+            instanceId = None,
+            serverId = None
+          )(_ => None)(_)
+        )
     }
 
     def getProducerSession(producerId: WsProducerId)(
@@ -297,16 +293,16 @@ object SessionHandlerImplicits extends WithProxyLogger {
         scheduler: Scheduler
     ): Future[Option[ProducerSession]] = {
       val sid = SessionId(producerId)
-      sh.ask[Option[ProducerSession]] { ref =>
-        SessionHandlerProtocol.GetProducerSession(sid, ref)
-      }.recoverWith(
-        handleClientError[Option[ProducerSession]](
-          sessionId = sid,
-          appId = Option(producerId.value),
-          instanceId = None,
-          serverId = None
-        )(_ => None)(_)
-      )
+      ref
+        .ask[Option[ProducerSession]](ref => GetProducerSession(sid, ref))
+        .recoverWith(
+          handleClientError[Option[ProducerSession]](
+            sessionId = sid,
+            appId = Option(producerId.value),
+            instanceId = None,
+            serverId = None
+          )(_ => None)(_)
+        )
     }
 
   }

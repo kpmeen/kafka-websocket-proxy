@@ -53,6 +53,12 @@
   <variable name="WS_PROXY_APP_LOG_LEVEL" value="${WS_PROXY_APP_LOG_LEVEL:-DEBUG}"/>
   <variable name="WS_PROXY_AUTH_LOG_LEVEL" value="${WS_PROXY_AUTH_LOG_LEVEL:-DEBUG}"/>
   <variable name="WS_PROXY_ADMIN_LOG_LEVEL" value="${WS_PROXY_ADMIN_LOG_LEVEL:-WARN}"/>
+  <variable name="WS_PROXY_CODECS_LOG_LEVEL" value="${WS_PROXY_CODECS_LOG_LEVEL:-WARN}"/>
+  <variable name="WS_PROXY_CONFIG_LOG_LEVEL" value="${WS_PROXY_CONFIG_LOG_LEVEL:-WARN}"/>
+  <variable name="WS_PROXY_CONSUMER_LOG_LEVEL" value="${WS_PROXY_CONSUMER_LOG_LEVEL:-WARN}"/>
+  <variable name="WS_PROXY_PRODUCER_LOG_LEVEL" value="${WS_PROXY_PRODUCER_LOG_LEVEL:-WARN}"/>
+  <variable name="WS_PROXY_SESSION_LOG_LEVEL" value="${WS_PROXY_SESSION_LOG_LEVEL:-WARN}"/>
+  <variable name="WS_PROXY_UTILS_LOG_LEVEL" value="${WS_PROXY_UTILS_LOG_LEVEL:-WARN}"/>
   <variable name="WS_PROXY_ROOT_LOG_LEVEL" value="${WS_PROXY_ROOT_LOG_LEVEL:-WARN}"/>
 
   <logger name="akka.actor" level="${WS_PROXY_AKKA_ACTOR_LOG_LEVEL}"/>
@@ -61,10 +67,19 @@
 
   <logger name="org.apache.kafka.clients" level="${WS_PROXY_KAFKA_CLIENTS_LOG_LEVEL}"/>
 
-  <logger name="net.scalytica.kafka.wsproxy" level="${WS_PROXY_APP_LOG_LEVEL}"/>
-  <logger name="net.scalytica.kafka.wsproxy.auth" level="${WS_PROXY_AUTH_LOG_LEVEL}"/>
+  <!-- Admin and general configuration -->
   <logger name="net.scalytica.kafka.wsproxy.admin" level="${WS_PROXY_ADMIN_LOG_LEVEL}"/>
   <logger name="net.scalytica.kafka.wsproxy.jmx" level="${WS_PROXY_ADMIN_LOG_LEVEL}"/>
+  <logger name="net.scalytica.kafka.wsproxy.config" level="${WS_PROXY_CONFIG_LOG_LEVEL}"/>
+  <!-- Client usage related -->
+  <logger name="net.scalytica.kafka.wsproxy.auth" level="${WS_PROXY_AUTH_LOG_LEVEL}"/>
+  <logger name="net.scalytica.kafka.wsproxy.codecs" level="${WS_PROXY_CODECS_LOG_LEVEL}"/>
+  <logger name="net.scalytica.kafka.wsproxy.consumer" level="${WS_PROXY_CONSUMER_LOG_LEVEL}"/>
+  <logger name="net.scalytica.kafka.wsproxy.producer" level="${WS_PROXY_PRODUCER_LOG_LEVEL}"/>
+  <logger name="net.scalytica.kafka.wsproxy.session" level="${WS_PROXY_SESSION_LOG_LEVEL}"/>
+  <logger name="net.scalytica.kafka.wsproxy.utils" level="${WS_PROXY_UTILS_LOG_LEVEL}"/>
+  <!-- Base application logging -->
+  <logger name="net.scalytica.kafka.wsproxy" level="${WS_PROXY_APP_LOG_LEVEL}"/>
 
   <!-- Root loggers catch all other events that are not explicitly handled-->
   <root level="${WS_PROXY_ROOT_LOG_LEVEL}">

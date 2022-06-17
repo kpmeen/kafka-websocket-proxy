@@ -16,11 +16,12 @@ import scala.concurrent.duration._
 
 trait BaseWebSocketRoutesSpec
     extends AnyWordSpecLike
+    with TestServerRoutes
     with WsProxyConsumerKafkaSpec
+    with MockOpenIdServer
+    with EmbeddedHttpServer
     with OptionValues
     with ScalaFutures
-    with EmbeddedHttpServer
-    with MockOpenIdServer
     with BeforeAndAfterAll
     with TestDataGenerators { self: Suite =>
 
@@ -76,7 +77,7 @@ trait BaseWebSocketRoutesSpec
       topicName = Some(ctx.topicName)
     )
 
-    assertProducerWS(ctx.route, uri) {
+    assertProducerWS(wsRouteFromProducerContext, uri) {
       isWebSocketUpgrade mustBe false
       status mustBe BadRequest
       responseAs[String] must include("clientId")
@@ -94,7 +95,7 @@ trait BaseWebSocketRoutesSpec
       topicName = Some(ctx.topicName)
     )
 
-    assertProducerWS(ctx.route, uri) {
+    assertProducerWS(wsRouteFromProducerContext, uri) {
       if (useSession) {
         isWebSocketUpgrade mustBe false
         status mustBe BadRequest
@@ -116,7 +117,7 @@ trait BaseWebSocketRoutesSpec
       topicName = None
     )
 
-    assertProducerWS(ctx.route, uri) {
+    assertProducerWS(wsRouteFromProducerContext, uri) {
       isWebSocketUpgrade mustBe false
       status mustBe BadRequest
       responseAs[String] must include("topic")

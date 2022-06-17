@@ -22,3 +22,7 @@ project/metals.sbt
 project/*-shim.sbt
 target
 ext/
+server/src/test/resources/sasl/server/*.crt
+server/src/test/resources/sasl/server/*.csr
+server/src/test/resources/sasl/server/*.jks
+

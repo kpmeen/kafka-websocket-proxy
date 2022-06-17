@@ -3,6 +3,7 @@ package net.scalytica.kafka.wsproxy.codecs
 import io.circe._
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.semiauto._
+import net.scalytica.kafka.wsproxy.config.Configuration._
 import net.scalytica.kafka.wsproxy.models.Formats.FormatType
 import net.scalytica.kafka.wsproxy.models.ValueDetails.{
   InValueDetails,
@@ -12,7 +13,7 @@ import net.scalytica.kafka.wsproxy.models._
 import net.scalytica.kafka.wsproxy.session._
 
 import scala.annotation.nowarn
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 trait Decoders {
 
@@ -90,6 +91,20 @@ trait Decoders {
 
   implicit val timestampDecoder: Decoder[Timestamp] = { json =>
     json.as[Long].map(Timestamp.apply)
+  }
+
+  implicit val dynamicCfgDecoder: Decoder[DynamicCfg] = { cursor =>
+    cursor.value.asObject
+      .map { _ =>
+        Try(loadDynamicCfgString(cursor.value.toString)) match {
+          case Success(v) => Right(v)
+          case Failure(e) =>
+            Left(DecodingFailure.fromThrowable(e, List.empty))
+        }
+      }
+      .getOrElse(
+        Left(DecodingFailure("Invalid JSON", List.empty))
+      )
   }
 
   implicit val wsCommitDecoder: Decoder[WsCommit] = deriveConfiguredDecoder

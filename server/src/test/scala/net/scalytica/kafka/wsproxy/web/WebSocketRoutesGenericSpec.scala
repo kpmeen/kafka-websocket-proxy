@@ -70,7 +70,7 @@ class WebSocketRoutesGenericSpec
           val in = shortProducerUri(s"json-test-$topicCounter", None)
 
           withEmbeddedServer(
-            routes = ctx.route,
+            routes = wsRouteFromProducerContext,
             completionWaitDuration = Some(10 seconds)
           ) { (host, port) =>
             // validate first request
@@ -87,7 +87,7 @@ class WebSocketRoutesGenericSpec
               shortProducerUri("limit-test-producer-2", Some("instance-1"))
 
             withEmbeddedServer(
-              routes = ctx.route,
+              routes = wsRouteFromProducerContext,
               completionWaitDuration = Some(10 seconds)
             ) { (host, port) =>
               // validate first request
@@ -105,11 +105,13 @@ class WebSocketRoutesGenericSpec
             lazy val in = (instance: String) =>
               shortProducerUri("limit-test-producer-2", Some(instance))
 
+            val route = wsRouteFromProducerContext
+
             withEmbeddedServer(
-              routes = ctx.route,
+              routes = route,
               completionWaitDuration = Some(10 seconds)
             ) { (host, port) =>
-              WS(in("instance-1"), wsClient.flow) ~> ctx.route ~> check {
+              WS(in("instance-1"), wsClient.flow) ~> route ~> check {
                 isWebSocketUpgrade mustBe true
                 // Make sure socket 1 is ready and registered in session
                 Thread.sleep((4 seconds).toMillis)
@@ -133,16 +135,18 @@ class WebSocketRoutesGenericSpec
             lazy val in = (instance: String) =>
               shortProducerUri("limit-test-producer-3", Some(instance))
 
-            WS(in("instance-1"), wsClient1.flow) ~> ctx.route ~> check {
+            val route = wsRouteFromProducerContext
+
+            WS(in("instance-1"), wsClient1.flow) ~> route ~> check {
               isWebSocketUpgrade mustBe true
 
-              WS(in("instance-2"), wsClient2.flow) ~> ctx.route ~> check {
+              WS(in("instance-2"), wsClient2.flow) ~> route ~> check {
                 isWebSocketUpgrade mustBe true
 
                 // Make sure both sockets are ready and registered in session
                 Thread.sleep((4 seconds).toMillis)
 
-                WS(in("instance-3"), wsClient3.flow) ~> ctx.route ~> check {
+                WS(in("instance-3"), wsClient3.flow) ~> route ~> check {
                   isWebSocketUpgrade mustBe true
                 }
               }
@@ -159,12 +163,14 @@ class WebSocketRoutesGenericSpec
               // Producer ID is specifically defined in application-test.conf
               shortProducerUri("limit-test-producer-1", Some(instance))
 
-            WS(in("instance-1"), wsClient1.flow) ~> ctx.route ~> check {
+            val route = wsRouteFromProducerContext
+
+            WS(in("instance-1"), wsClient1.flow) ~> route ~> check {
               isWebSocketUpgrade mustBe true
               // Make sure consumer socket 1 is ready and registered in session
               Thread.sleep((4 seconds).toMillis)
 
-              WS(in("instance-2"), wsClient2.flow) ~> ctx.route ~> check {
+              WS(in("instance-2"), wsClient2.flow) ~> route ~> check {
                 status mustBe BadRequest
                 val res = responseAs[String]
                 res must include(
@@ -176,7 +182,7 @@ class WebSocketRoutesGenericSpec
         }
 
       "return HTTP 400 when attempting to produce to a non-existing topic" in
-        plainProducerContext(nextTopic) { ctx =>
+        plainProducerContext(nextTopic) { implicit ctx =>
           val topicName = TopicName("non-existing-topic")
 
           val uri = baseProducerUri(
@@ -185,9 +191,11 @@ class WebSocketRoutesGenericSpec
             topicName = topicName
           )
 
-          WS(uri, ctx.producerProbe.flow) ~> Route.seal(ctx.route) ~> check {
-            status mustBe BadRequest
-          }
+          WS(uri, ctx.producerProbe.flow) ~>
+            Route.seal(wsRouteFromProducerContext) ~>
+            check {
+              status mustBe BadRequest
+            }
         }
 
       "reject a new connection if the consumer already exists" taggedAs
@@ -198,7 +206,7 @@ class WebSocketRoutesGenericSpec
           partitions = 2,
           numMessages = 0,
           prePopulate = false
-        ) { ctx =>
+        ) { implicit ctx =>
           val rejectionMsg =
             s"WebSocket for consumer json-test-$topicCounter in session " +
               s"json-test-group-$topicCounter not established because a" +
@@ -211,16 +219,18 @@ class WebSocketRoutesGenericSpec
             s"&valType=${StringType.name}" +
             "&autoCommit=false"
 
+          val route = wsRouteFromConsumerContext
+
           val probe1 = WSProbe()
           val probe2 = ctx.consumerProbe
 
-          WS(out, probe1.flow) ~> ctx.route ~> check {
+          WS(out, probe1.flow) ~> route ~> check {
             isWebSocketUpgrade mustBe true
             // Make sure consumer socket 1 is ready and registered in session
             // FIXME: This test is really flaky!!!
             Thread.sleep((10 seconds).toMillis)
 
-            WS(out, probe2.flow) ~> ctx.route ~> check {
+            WS(out, probe2.flow) ~> route ~> check {
               status mustBe BadRequest
               responseAs[String] must include(rejectionMsg)
             }
@@ -233,7 +243,7 @@ class WebSocketRoutesGenericSpec
           keyType = None,
           valType = StringType,
           partitions = 2
-        ) { ctx =>
+        ) { implicit ctx =>
           val out = "/socket/out?" +
             s"clientId=json-test-$topicCounter" +
             s"&groupId=json-test-group-$topicCounter" +
@@ -242,7 +252,7 @@ class WebSocketRoutesGenericSpec
             "&autoCommit=false"
 
           withEmbeddedServer(
-            routes = ctx.route,
+            routes = wsRouteFromConsumerContext,
             completionWaitDuration = Some(10 seconds)
           ) { (host, port) =>
             // validate first request
@@ -261,7 +271,7 @@ class WebSocketRoutesGenericSpec
           valType = StringType,
           numMessages = 0,
           prePopulate = false
-        ) { ctx =>
+        ) { implicit ctx =>
           val rejectionMsg =
             "The max number of WebSockets for session dummy has been reached." +
               " Limit is 1"
@@ -274,14 +284,16 @@ class WebSocketRoutesGenericSpec
               s"&valType=${StringType.name}" +
               "&autoCommit=false"
 
+          val route = wsRouteFromConsumerContext
+
           val probe1 = WSProbe()
 
-          WS(out("a"), probe1.flow) ~> ctx.route ~> check {
+          WS(out("a"), probe1.flow) ~> route ~> check {
             isWebSocketUpgrade mustBe true
             // Make sure consumer socket 1 is ready and registered in session
             Thread.sleep((4 seconds).toMillis)
 
-            WS(out("b"), ctx.consumerProbe.flow) ~> ctx.route ~> check {
+            WS(out("b"), ctx.consumerProbe.flow) ~> route ~> check {
               status mustBe BadRequest
               responseAs[String] must include(rejectionMsg)
             }
@@ -299,7 +311,7 @@ class WebSocketRoutesGenericSpec
           valType = StringType,
           numMessages = 0,
           prePopulate = false
-        ) { ctx =>
+        ) { implicit ctx =>
           val out = "/socket/out?" +
             s"clientId=json-test-$topicCounter" +
             s"&groupId=json-test-group-$topicCounter" +
@@ -313,7 +325,7 @@ class WebSocketRoutesGenericSpec
 
           WS(out, ctx.consumerProbe.flow) ~>
             wrongCreds ~>
-            Route.seal(ctx.route) ~>
+            Route.seal(wsRouteFromConsumerContext) ~>
             check {
               status mustBe Unauthorized
             }
@@ -336,7 +348,7 @@ class WebSocketRoutesGenericSpec
 
           inspectWebSocket(
             uri = baseUri,
-            routes = Route.seal(ctx.route),
+            routes = Route.seal(wsRouteFromProducerContext),
             kafkaCreds = Some(wrongCreds)
           ) {
             status mustBe Unauthorized
@@ -352,7 +364,7 @@ class WebSocketRoutesGenericSpec
             secureServerProducerContext(
               topic = nextTopic,
               serverOpenIdCfg = Option(cfg)
-            ) { ctx =>
+            ) { implicit ctx =>
               implicit val wsClient = ctx.producerProbe
 
               val token = AccessToken("Bearer", "foo.bar.baz", 3600L, None)
@@ -368,7 +380,7 @@ class WebSocketRoutesGenericSpec
 
               inspectWebSocket(
                 uri = baseUri,
-                routes = Route.seal(ctx.route),
+                routes = Route.seal(wsRouteFromProducerContext),
                 creds = Some(token.bearerToken),
                 kafkaCreds = Some(creds)
               ) {
@@ -383,7 +395,7 @@ class WebSocketRoutesGenericSpec
             secureServerProducerContext(
               topic = nextTopic,
               serverOpenIdCfg = Option(cfg)
-            ) { ctx =>
+            ) { implicit ctx =>
               implicit val wsClient = ctx.producerProbe
 
               val token = invalidAccessToken(oidcHost, oidcPort)
@@ -399,7 +411,7 @@ class WebSocketRoutesGenericSpec
 
               inspectWebSocket(
                 uri = baseUri,
-                routes = Route.seal(ctx.route),
+                routes = Route.seal(wsRouteFromProducerContext),
                 creds = Some(token.bearerToken)
               ) {
                 status mustBe Unauthorized
@@ -413,7 +425,7 @@ class WebSocketRoutesGenericSpec
             secureServerProducerContext(
               topic = nextTopic,
               serverOpenIdCfg = Option(cfg)
-            ) { ctx =>
+            ) { implicit ctx =>
               implicit val wsClient = ctx.producerProbe
 
               val baseUri = baseProducerUri(
@@ -427,7 +439,7 @@ class WebSocketRoutesGenericSpec
 
               inspectWebSocket(
                 uri = baseUri,
-                routes = Route.seal(ctx.route),
+                routes = Route.seal(wsRouteFromProducerContext),
                 creds = Some(token.bearerToken),
                 kafkaCreds = Some(creds)
               ) {

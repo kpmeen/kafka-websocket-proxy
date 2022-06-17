@@ -12,7 +12,11 @@ import akka.http.scaladsl.testkit.{
   WSProbe
 }
 import akka.testkit.TestDuration
+import net.scalytica.kafka.wsproxy.auth.OpenIdClient
 import net.scalytica.kafka.wsproxy.codecs.ProtocolSerdes
+import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.config.ReadableDynamicConfigHandlerRef
+import net.scalytica.kafka.wsproxy.session.SessionHandlerRef
 import net.scalytica.kafka.wsproxy.web.Headers.XKafkaAuthHeader
 import org.scalatest.Suite
 import org.scalatest.matchers.must.Matchers
@@ -21,15 +25,23 @@ import scala.concurrent.duration._
 
 trait WsClientSpec
     extends ScalatestRouteTest
+    with TestServerRoutes
     with Matchers
     with ProtocolSerdes { self: Suite =>
 
   implicit private[this] val routeTestTimeout =
     RouteTestTimeout((20 seconds).dilated)
 
-  implicit val testRejectHandler = TestServerRoutes.serverRejectionHandler
-  implicit override val testExceptionHandler =
-    TestServerRoutes.wsExceptionHandler
+//  implicit val testRejectHandler = TestServerRoutes.serverRejectionHandler
+//  implicit override val testExceptionHandler =
+//    TestServerRoutes.wsExceptionHandler
+
+  protected def wsRouteFrom(
+      implicit cfg: AppCfg,
+      shRef: SessionHandlerRef,
+      optReadCfgRef: Option[ReadableDynamicConfigHandlerRef],
+      optOidc: Option[OpenIdClient]
+  ): Route = wsProxyRoutes
 
   /** Verify the server routes using an unsecured Kafka cluster */
   private[this] def defaultRouteCheck[T](

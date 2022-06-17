@@ -26,6 +26,7 @@ import net.scalytica.kafka.wsproxy.codecs.ProtocolSerdes.{
   avroConsumerRecordSerde
 }
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.config.ReadableDynamicConfigHandlerRef
 import net.scalytica.kafka.wsproxy.consumer.{CommitStackHandler, WsConsumer}
 import net.scalytica.kafka.wsproxy.errors.{
   RequestValidationError,
@@ -49,7 +50,10 @@ import net.scalytica.kafka.wsproxy.web.SocketProtocol.{AvroPayload, JsonPayload}
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 
-trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
+trait OutboundWebSocket
+    extends ProxyFlowExtras
+    with ClientSpecificCfgLoader
+    with WithProxyLogger {
 
   implicit private[this] val timeout: Timeout = 10 seconds
 
@@ -140,6 +144,7 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
   )(
       implicit cfg: AppCfg,
       maybeOpenIdClient: Option[OpenIdClient],
+      maybeDynamicCfgHandlerRef: Option[ReadableDynamicConfigHandlerRef],
       as: ActorSystem,
       mat: Materializer,
       ec: ExecutionContext,
@@ -150,8 +155,24 @@ trait OutboundWebSocket extends ProxyFlowExtras with WithProxyLogger {
       s"Initialising outbound WebSocket for topic ${args.topic.value} " +
         s"with payload ${args.socketPayload}"
     )
+    outboundWebSocketRoute(args)(cfg)
+  }
 
-    implicit val scheduler = as.scheduler.toTyped
+  def outboundWebSocketRoute(
+      args: OutSocketArgs
+  )(
+      appCfg: AppCfg
+  )(
+      implicit maybeOpenIdClient: Option[OpenIdClient],
+      maybeDynamicCfgHandlerRef: Option[ReadableDynamicConfigHandlerRef],
+      as: ActorSystem,
+      mat: Materializer,
+      ec: ExecutionContext,
+      sessionHandler: ActorRef[SessionHandlerProtocol.Protocol],
+      jmxManager: Option[JmxManager]
+  ): Route = {
+    implicit val scheduler   = as.scheduler.toTyped
+    implicit val cfg: AppCfg = applyDynamicConfigs(args)(appCfg)
 
     val wsAdminClient   = new WsKafkaAdminClient(cfg)
     val topicPartitions = wsAdminClient.numTopicPartitions(args.topic)

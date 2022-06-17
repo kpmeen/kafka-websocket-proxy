@@ -5,10 +5,11 @@ import net.scalytica.kafka.wsproxy.config.Configuration.{
   AppCfg,
   ClientLimitsCfg,
   ConsumerSpecificLimitCfg,
-  KafkaBootstrapHosts
+  KafkaBootstrapHosts,
+  ProducerSpecificLimitCfg
 }
 import net.scalytica.kafka.wsproxy.errors.ConfigurationError
-import net.scalytica.kafka.wsproxy.models.WsGroupId
+import net.scalytica.kafka.wsproxy.models.{WsGroupId, WsProducerId}
 import net.scalytica.test.FileLoader.testConfigPath
 import org.scalatest.OptionValues
 import org.scalatest.matchers.must.Matchers
@@ -18,8 +19,10 @@ import pureconfig.error.ConfigReaderException
 
 import scala.concurrent.duration._
 
+// scalastyle:off magic.number
 class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
 
+  // scalastyle:off
   lazy val invalidCfg1 = ConfigFactory
     .parseString(
       s"""kafka.ws.proxy {
@@ -85,9 +88,9 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
       |  }
       |
       |  session-handler {
-      |    session-state-topic-name = "_wsproxy.session.state"
-      |    session-state-replication-factor = 3
-      |    session-state-retention = 30 days
+      |    topic-name = "_wsproxy.session.state"
+      |    topic-replication-factor = 3
+      |    topic-retention = 30 days
       |  }
       |
       |  commit-handler {
@@ -165,9 +168,9 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
       |  }
       |
       |  session-handler {
-      |    session-state-topic-name = "_wsproxy.session.state"
-      |    session-state-replication-factor = 3
-      |    session-state-retention = 30 days
+      |    topic-name = "_wsproxy.session.state"
+      |    topic-replication-factor = 3
+      |    topic-retention = 30 days
       |  }
       |
       |  commit-handler {
@@ -179,6 +182,7 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
       |}""".stripMargin
     )
     .resolve()
+  // scalastyle:on
 
   "The Configuration" should {
 
@@ -254,9 +258,9 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
       limitedClient2Cfg.maxConnections.value mustBe 2
 
       val shCfg = cfg.sessionHandler
-      shCfg.sessionStateTopicName.value mustBe "_wsproxy.session.state"
-      shCfg.sessionStateReplicationFactor mustBe 3
-      shCfg.sessionStateRetention mustBe 30.days
+      shCfg.topicName.value mustBe "_wsproxy.session.state"
+      shCfg.topicReplicationFactor mustBe 3
+      shCfg.topicRetention mustBe 30.days
 
       val chCfg = cfg.commitHandler
       chCfg.maxStackSize mustBe 20
@@ -292,9 +296,9 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
         cfg.producer.limits.clientSpecificLimits mustBe empty
 
         val shCfg = cfg.sessionHandler
-        shCfg.sessionStateTopicName.value mustBe "_wsproxy.session.state"
-        shCfg.sessionStateReplicationFactor mustBe 3
-        shCfg.sessionStateRetention mustBe 30.days
+        shCfg.topicName.value mustBe "_wsproxy.session.state"
+        shCfg.topicReplicationFactor mustBe 3
+        shCfg.topicRetention mustBe 30.days
 
         val chCfg = cfg.commitHandler
         chCfg.maxStackSize mustBe 100
@@ -339,9 +343,9 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
       cfg.producer.limits.clientSpecificLimits mustBe empty
 
       val shCfg = cfg.sessionHandler
-      shCfg.sessionStateTopicName.value mustBe "_wsproxy.session.state"
-      shCfg.sessionStateReplicationFactor mustBe 3
-      shCfg.sessionStateRetention mustBe 30.days
+      shCfg.topicName.value mustBe "_wsproxy.session.state"
+      shCfg.topicReplicationFactor mustBe 3
+      shCfg.topicRetention mustBe 30.days
 
       val chCfg = cfg.commitHandler
       chCfg.maxStackSize mustBe 100
@@ -417,7 +421,7 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
     "fail when trying to load the default config without providing the " +
       "bootstrap-hosts with a value" in {
         a[ConfigurationError] should be thrownBy Configuration
-          .loadTypesafeConfig()
+          .loadLightbendConfig()
       }
 
     "fail when trying to load an invalid configuration" in {
@@ -435,6 +439,113 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
       )
       a[ConfigReaderException[AppCfg]] should be thrownBy Configuration
         .loadConfig(tcfg)
+    }
+
+    "render ProducerSpecificLimitCfg as a HOCON string" in {
+      val cfg = Configuration.loadFile(testConfigPath)
+
+      val str = cfg.producer.limits.clientSpecificLimits.headOption.value
+        .asHoconString()
+      str must include("""producer-id=limit-test-producer-1""")
+      str must include("""messages-per-second=10""")
+      str must include("""max-connections=1""")
+    }
+
+    "render ProducerSpecificLimitCfg as a JSON string" in {
+      // scalastyle:off line.size.limit
+      val expected =
+        """{"max-connections":1,"messages-per-second":10,"producer-id":"limit-test-producer-1"}"""
+      // scalastyle:on line.size.limit
+      val cfg = Configuration.loadFile(testConfigPath)
+
+      cfg.producer.limits.clientSpecificLimits.headOption.value
+        .asHoconString(useJson = true) mustBe expected
+    }
+
+    "render ConsumerSpecificLimitCfg as a HOCON string" in {
+      val cfg = Configuration.loadFile(testConfigPath)
+      val str = cfg.consumer.limits.clientSpecificLimits.headOption.value
+        .asHoconString()
+      str must include("""max-connections=2""")
+      str must include("""messages-per-second=10""")
+      str must include("""group-id=dummy""")
+    }
+
+    "render ConsumerSpecificLimitCfg as a JSON string" in {
+      // scalastyle:off line.size.limit
+      val expected =
+        """{"group-id":"dummy","max-connections":2,"messages-per-second":10}"""
+      // scalastyle:on line.size.limit
+      val cfg = Configuration.loadFile(testConfigPath)
+
+      cfg.consumer.limits.clientSpecificLimits.headOption.value
+        .asHoconString(useJson = true) mustBe expected
+    }
+
+    "load a HOCON string containing a ProducerSpecificLimitCfg" in {
+      val hoconString =
+        """{
+          |  producer-id=test-me
+          |  messages-per-second=10
+          |  max-connections=1
+          |}""".stripMargin
+
+      val res = Configuration.loadDynamicCfgString(hoconString)
+      res mustBe ProducerSpecificLimitCfg(
+        producerId = WsProducerId("test-me"),
+        messagesPerSecond = Some(10),
+        maxConnections = Some(1)
+      )
+    }
+
+    "load a JSON string containing a ProducerSpecificLimitCfg" in {
+      val hoconString =
+        """{
+          |  "producer-id": "test-me",
+          |  "messages-per-second": 10,
+          |  "max-connections": 1
+          |}""".stripMargin
+
+      val res = Configuration.loadDynamicCfgString(hoconString)
+      res mustBe ProducerSpecificLimitCfg(
+        producerId = WsProducerId("test-me"),
+        messagesPerSecond = Some(10),
+        maxConnections = Some(1)
+      )
+    }
+
+    "load a HOCON string containing a ConsumerSpecificLimitCfg" in {
+      val hoconString =
+        """{
+          |  group-id=test-me
+          |  max-connections=2
+          |  messages-per-second=10
+          |}""".stripMargin
+
+      val res = Configuration.loadDynamicCfgString(hoconString)
+      res mustBe ConsumerSpecificLimitCfg(
+        groupId = WsGroupId("test-me"),
+        messagesPerSecond = Some(10),
+        maxConnections = Some(2),
+        batchSize = None
+      )
+    }
+
+    "load a JSON string containing a ConsumerSpecificLimitCfg" in {
+      val hoconString =
+        """{
+          |  "group-id": "test-me",
+          |  "messages-per-second": 10,
+          |  "max-connections": 2
+          |}""".stripMargin
+
+      val res = Configuration.loadDynamicCfgString(hoconString)
+      res mustBe ConsumerSpecificLimitCfg(
+        groupId = WsGroupId("test-me"),
+        messagesPerSecond = Some(10),
+        maxConnections = Some(2),
+        batchSize = None
+      )
     }
 
   }

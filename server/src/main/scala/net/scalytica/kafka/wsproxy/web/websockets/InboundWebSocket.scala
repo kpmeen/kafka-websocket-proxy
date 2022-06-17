@@ -20,6 +20,7 @@ import net.scalytica.kafka.wsproxy.codecs.ProtocolSerdes.{
   avroProducerResultSerde
 }
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.config.ReadableDynamicConfigHandlerRef
 import net.scalytica.kafka.wsproxy.errors.{
   RequestValidationError,
   UnexpectedError
@@ -36,7 +37,7 @@ import net.scalytica.kafka.wsproxy.web.SocketProtocol.{AvroPayload, JsonPayload}
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 
-trait InboundWebSocket extends WithProxyLogger {
+trait InboundWebSocket extends ClientSpecificCfgLoader with WithProxyLogger {
 
   implicit private[this] val timeout: Timeout = 10 seconds
 
@@ -104,12 +105,12 @@ trait InboundWebSocket extends WithProxyLogger {
    * @see
    *   [[WsProducer.produceJson]]
    */
-  // scalastyle:off method.length
   def inboundWebSocket(
       args: InSocketArgs
   )(
       implicit cfg: AppCfg,
       maybeOpenIdClient: Option[OpenIdClient],
+      maybeDynamicCfgHandlerRef: Option[ReadableDynamicConfigHandlerRef],
       as: ActorSystem,
       mat: Materializer,
       ec: ExecutionContext,
@@ -120,7 +121,25 @@ trait InboundWebSocket extends WithProxyLogger {
       s"Initialising inbound WebSocket for topic ${args.topic.value}" +
         s" with payload ${args.socketPayload}"
     )
-    implicit val scheduler = as.scheduler.toTyped
+    inboundWebSocketRoute(args)(cfg)
+  }
+
+  // scalastyle:off method.length
+  private[this] def inboundWebSocketRoute(
+      args: InSocketArgs
+  )(
+      appCfg: AppCfg
+  )(
+      implicit maybeOpenIdClient: Option[OpenIdClient],
+      maybeDynamicCfgHandlerRef: Option[ReadableDynamicConfigHandlerRef],
+      as: ActorSystem,
+      mat: Materializer,
+      ec: ExecutionContext,
+      sessionHandler: ActorRef[SessionHandlerProtocol.Protocol],
+      jmxManager: Option[JmxManager]
+  ): Route = {
+    implicit val scheduler   = as.toTyped.scheduler
+    implicit val cfg: AppCfg = applyDynamicConfigs(args)(appCfg)
 
     val serverId       = cfg.server.serverId
     val producerId     = args.producerId

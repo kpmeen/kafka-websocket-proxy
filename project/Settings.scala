@@ -67,7 +67,7 @@ object Settings {
     scalaVersion  := Versions.ScalaVersion,
     scalacOptions := BaseScalacOpts ++ ExperimentalScalacOpts,
     Test / scalacOptions ++= Seq("-Yrangepos"),
-    // Require compilation against JDK 11.
+    // Require compilation against JDK 17.
     javacOptions ++= Seq("-source", "17", "-target", "17"),
     javaOptions ++= Seq(
       // Set timezone to UTC
@@ -162,7 +162,7 @@ object Settings {
         )
       },
       // ----------------------------------------------------
-      // enable JMX
+      // JMX
       // ----------------------------------------------------
       bashScriptExtraDefines += {
         """addJava "-Dcom.sun.management.jmxremote """ +

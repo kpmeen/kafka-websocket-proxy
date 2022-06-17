@@ -1,5 +1,6 @@
 package net.scalytica.kafka.wsproxy.web
 
+import akka.actor.typed.ActorRef
 import akka.actor.typed.scaladsl.adapter._
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes._
@@ -18,7 +19,7 @@ import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models._
 import net.scalytica.kafka.wsproxy.session.SessionHandlerImplicits._
 import net.scalytica.kafka.wsproxy.session.{
-  SessionHandlerRef,
+  SessionHandlerProtocol,
   SessionId,
   SessionOpResult
 }
@@ -34,11 +35,27 @@ import scala.util.{Failure, Success, Try}
  */
 trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
 
-  implicit private[this] val sessionHandlerTimeout: Timeout = 3 seconds
-
-  protected var sessionHandler: SessionHandlerRef = _
+  implicit private val sessionHandlerTimeout: Timeout = 3 seconds
 
   protected val serverId: WsServerId
+
+  implicit protected def jsonToString(json: Json): String = json.spaces2
+
+  protected def jsonMessageFromString(msg: String): Json =
+    Json.obj("message" -> Json.fromString(msg))
+
+  private[this] def jsonResponseMsg(
+      statusCode: StatusCode,
+      message: String
+  ): HttpResponse = {
+    HttpResponse(
+      status = statusCode,
+      entity = HttpEntity(
+        contentType = ContentTypes.`application/json`,
+        string = jsonMessageFromString(message)
+      )
+    )
+  }
 
   protected def basicAuthCredentials(
       creds: Credentials
@@ -149,22 +166,6 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
     else provide(AuthDisabled)
   }
 
-  private[this] def jsonMessageFromString(msg: String): Json =
-    Json.obj("message" -> Json.fromString(msg))
-
-  private[this] def jsonResponseMsg(
-      statusCode: StatusCode,
-      message: String
-  ): HttpResponse = {
-    HttpResponse(
-      status = statusCode,
-      entity = HttpEntity(
-        contentType = ContentTypes.`application/json`,
-        string = jsonMessageFromString(message).spaces2
-      )
-    )
-  }
-
   private[this] def removeClientComplete(
       sid: SessionId,
       fid: FullClientId
@@ -203,76 +204,97 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
 
   private[this] def rejectRequest(
       request: HttpRequest
+  )(
+      cleanup: (SessionId, FullClientId) => Unit
   )(c: => ToResponseMarshallable) = {
     paramsOnError(request) { args =>
-      extractActorSystem { implicit sys =>
-        extractMaterializer { implicit mat =>
-          implicit val s = sys.scheduler.toTyped
-          implicit val e = sys.dispatcher
+      extractMaterializer { implicit mat =>
+        args match {
+          case ConsumerParamError(sid, cid, gid) =>
+            val fid = FullConsumerId(gid, cid)
+            cleanup(sid, fid)
 
-          args match {
-            case ConsumerParamError(sid, cid, gid) =>
-              val fid = FullConsumerId(gid, cid)
-              sessionHandler.shRef
-                .removeConsumer(fid, serverId)
-                .onComplete(removeClientComplete(sid, fid))
+          case ProducerParamError(sid, pid, ins) =>
+            val fid = FullProducerId(pid, ins)
+            cleanup(sid, fid)
 
-            case ProducerParamError(sid, pid, ins) =>
-              val fid = FullProducerId(pid, ins)
-              sessionHandler.shRef
-                .removeProducer(fid, serverId)
-                .onComplete(removeClientComplete(sid, fid))
-
-            case wrong =>
-              log.warn(
-                "Insufficient information in request to remove internal " +
-                  s"client references due to ${wrong.niceClassSimpleName}"
-              )
-          }
-
-          request.discardEntityBytes()
-          complete(c)
+          case other =>
+            log.warn(s"Request rejected with ${other.niceClassSimpleName}")
         }
+
+        request.discardEntityBytes()
+        complete(c)
       }
     }
   }
 
   private[this] def rejectAndComplete(
       m: => ToResponseMarshallable
-  ) = {
+  )(cleanup: (SessionId, FullClientId) => Unit) = {
     extractRequest { request =>
       log.warn(
         s"Request ${request.method.value} ${request.uri.toString} failed"
       )
-      rejectRequest(request)(m)
+      rejectRequest(request)(cleanup)(m)
     }
   }
+
+  private[this] val noOp = (_: SessionId, _: FullClientId) => ()
 
   private[this] def notAuthenticatedRejection(
-      proxyError: ProxyError,
-      clientError: ClientError
+      proxyErr: ProxyError,
+      clientErr: ClientError
   ) = extractUri { uri =>
-    log.info(s"Request to $uri could not be authenticated.", proxyError)
-    rejectAndComplete(jsonResponseMsg(clientError, proxyError.getMessage))
+    log.info(s"Request to $uri could not be authenticated.", proxyErr)
+    val msg = jsonResponseMsg(clientErr, proxyErr.getMessage)
+    rejectAndComplete(msg)(noOp)
   }
 
-  private[this] def invalidTokenRejection(tokenError: InvalidTokenError) =
+  private[this] def invalidTokenRejection(tokenErr: InvalidTokenError) =
     extractUri { uri =>
-      log.info(s"JWT token in request $uri is not valid.", tokenError)
-      rejectAndComplete(jsonResponseMsg(Unauthorized, tokenError.getMessage))
+      log.info(s"JWT token in request $uri is not valid.", tokenErr)
+      val msg = jsonResponseMsg(Unauthorized, tokenErr.getMessage)
+      rejectAndComplete(msg)(noOp)
     }
 
-  def wsExceptionHandler: ExceptionHandler =
+  private[this] def cleanupClient(
+      sid: SessionId,
+      fid: FullClientId
+  )(
+      implicit sh: ActorRef[SessionHandlerProtocol.Protocol],
+      mat: Materializer
+  ): Unit = {
+    implicit val ec        = mat.executionContext
+    implicit val scheduler = mat.system.toTyped.scheduler
+
+    fid match {
+      case fcid: FullConsumerId =>
+        sh.removeConsumer(fcid, serverId)
+          .onComplete(removeClientComplete(sid, fid))
+
+      case fpid: FullProducerId =>
+        sh.removeProducer(fpid, serverId)
+          .onComplete(removeClientComplete(sid, fid))
+    }
+  }
+
+  // scalastyle:off method.length
+  def wsExceptionHandler(
+      implicit sh: ActorRef[SessionHandlerProtocol.Protocol],
+      mat: Materializer
+  ): ExceptionHandler =
     ExceptionHandler {
       case t: TopicNotFoundError =>
         extractUri { uri =>
           log.info(s"Topic in request $uri was not found.", t)
-          rejectAndComplete(jsonResponseMsg(BadRequest, t.message))
+          val msg = jsonResponseMsg(BadRequest, t.message)
+          rejectAndComplete(msg)(cleanupClient)
         }
 
       case r: RequestValidationError =>
         log.info(s"Request failed with RequestValidationError", r)
-        rejectAndComplete(jsonResponseMsg(BadRequest, r.msg))
+        val msg = jsonResponseMsg(BadRequest, r.msg)
+        rejectAndComplete(msg)(cleanupClient)
 
       case i: InvalidPublicKeyError =>
         log.warn(s"Request failed with an InvalidPublicKeyError.", i)
@@ -293,21 +315,25 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
       case o: OpenIdConnectError =>
         extractUri { uri =>
           log.warn(s"Request to $uri failed with an OpenIDConnectError.", o)
-          rejectAndComplete(jsonResponseMsg(ServiceUnavailable, o.getMessage))
+          val msg = jsonResponseMsg(ServiceUnavailable, o.getMessage)
+          rejectAndComplete(msg)(cleanupClient)
         }
 
       case k: KafkaException =>
         extractUri { uri =>
           log.warn(s"Request to $uri failed with a KafkaException.", k)
-          rejectAndComplete(jsonResponseMsg(InternalServerError, k.getMessage))
+          val msg = jsonResponseMsg(InternalServerError, k.getMessage)
+          rejectAndComplete(msg)(cleanupClient)
         }
 
       case t =>
         extractUri { uri =>
           log.warn(s"Request to $uri could not be handled normally", t)
-          rejectAndComplete(jsonResponseMsg(InternalServerError, t.getMessage))
+          val msg = jsonResponseMsg(InternalServerError, t.getMessage)
+          rejectAndComplete(msg)(cleanupClient)
         }
     }
+  // scalastyle:on method.length
 
   implicit def serverRejectionHandler: RejectionHandler = {
     RejectionHandler
@@ -318,7 +344,7 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
             statusCode = BadRequest,
             message = s"Request is missing required parameter '$paramName'"
           )
-        )
+        )(noOp)
       }
       .handleNotFound {
         rejectAndComplete(
@@ -326,15 +352,19 @@ trait BaseRoutes extends QueryParamParsers with WithProxyLogger {
             statusCode = NotFound,
             message = "This is not the resource you are looking for."
           )
-        )
+        )(noOp)
       }
       .result()
       .withFallback(RejectionHandler.default)
       .mapRejectionResponse { res =>
         res.entity match {
           case HttpEntity.Strict(ContentTypes.`text/plain(UTF-8)`, body) =>
-            val js = jsonMessageFromString(body.utf8String).noSpaces
-            res.withEntity(HttpEntity(ContentTypes.`application/json`, js))
+            res.withEntity(
+              HttpEntity(
+                contentType = ContentTypes.`application/json`,
+                string = jsonMessageFromString(body.utf8String)
+              )
+            )
 
           case _ => res
         }

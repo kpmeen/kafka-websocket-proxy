@@ -28,26 +28,28 @@ trait SchemaRoutes { self: BaseRoutes =>
       maybeOpenIdClient: Option[OpenIdClient]
   ): Route = {
     extractMaterializer { implicit mat =>
-      pathPrefix("schemas") {
-        pathPrefix("avro") {
-          pathPrefix("producer") {
-            path("record") {
-              maybeAuthenticate(cfg, maybeOpenIdClient, mat) { _ =>
-                complete(avroSchemaString(AvroProducerRecord.schema))
+      maybeAuthenticate(cfg, maybeOpenIdClient, mat) { _ =>
+        pathPrefix("schemas") {
+          pathPrefix("avro") {
+            pathPrefix("producer") {
+              path("record") {
+                get {
+                  complete(avroSchemaString(AvroProducerRecord.schema))
+                }
+              } ~ path("result") {
+                get {
+                  complete(avroSchemaString(AvroProducerResult.schema))
+                }
               }
-            } ~ path("result") {
-              maybeAuthenticate(cfg, maybeOpenIdClient, mat) { _ =>
-                complete(avroSchemaString(AvroProducerResult.schema))
-              }
-            }
-          } ~ pathPrefix("consumer") {
-            path("record") {
-              maybeAuthenticate(cfg, maybeOpenIdClient, mat) { _ =>
-                complete(avroSchemaString(AvroConsumerRecord.schema))
-              }
-            } ~ path("commit") {
-              maybeAuthenticate(cfg, maybeOpenIdClient, mat) { _ =>
-                complete(avroSchemaString(AvroCommit.schema))
+            } ~ pathPrefix("consumer") {
+              path("record") {
+                get {
+                  complete(avroSchemaString(AvroConsumerRecord.schema))
+                }
+              } ~ path("commit") {
+                get {
+                  complete(avroSchemaString(AvroCommit.schema))
+                }
               }
             }
           }
