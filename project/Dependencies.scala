@@ -33,7 +33,7 @@ object Versions {
   val LogbackVersion   = "1.2.11"
   val LogbackJsVersion = "0.1.5"
   val JaninoVersion    = "3.1.7"
-  val ScalaTestVersion = "3.2.12"
+  val ScalaTestVersion = "3.2.13"
 
   val JolokiaAgentVersion = "1.6.2"
 
