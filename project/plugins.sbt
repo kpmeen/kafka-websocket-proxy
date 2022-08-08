@@ -2,9 +2,9 @@
 logLevel := Level.Warn
 
 resolvers ++= DefaultOptions.resolvers(snapshot = false)
+resolvers ++= Resolver.sonatypeOssRepos("releases")
 resolvers ++= Seq(
   Resolver.typesafeRepo("releases"),
-  Resolver.sonatypeRepo("releases"),
   // Remove below resolver once the following issues has been resolved:
   // https://issues.jboss.org/projects/JBINTER/issues/JBINTER-21
   "JBoss" at "https://repository.jboss.org/"
