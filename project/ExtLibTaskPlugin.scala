@@ -4,7 +4,6 @@ import com.typesafe.sbt.packager.docker.DockerPlugin
 import lmcoursier.{CoursierConfiguration, CoursierDependencyResolution}
 import sbt.Keys._
 import sbt._
-import sbt.internal.CustomHttp
 import sbt.internal.util.ManagedLogger
 import sbt.librarymanagement.DependencyResolution
 import sbt.librarymanagement.ivy.IvyDependencyResolution
@@ -144,7 +143,7 @@ object ExtLibTaskPlugin extends AutoPlugin {
           if (useCoursier.value) {
             CoursierDependencyResolution(csrCfg)
           } else {
-            IvyDependencyResolution(ivyCfg, CustomHttp.okhttpClient.value)
+            IvyDependencyResolution(ivyCfg)
           }
         }
         .value
