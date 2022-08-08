@@ -21,9 +21,9 @@ object Versions {
   val AlpakkaVersion = "1.0.2"
 
   val AkkaHttpCirceVersion      = "1.25.2"
-  val CirceVersion              = "0.14.1"
+  val CirceVersion              = "0.14.2"
   val CirceGenericExtrasVersion = CirceVersion
-  val CirceOpticsVersion        = CirceVersion
+  val CirceOpticsVersion        = "0.14.1"
 
   val JwtScalaVersion = "9.0.5"
 
