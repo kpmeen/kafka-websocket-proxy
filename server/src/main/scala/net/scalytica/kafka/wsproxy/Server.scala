@@ -54,7 +54,7 @@ object Server extends App with ServerRoutes with ServerBindings {
       |                                      |___/
       |
       |""".stripMargin
-    // scalastyle:on
+      // scalastyle:on
   )
 
   WsProxyEnvLoggerConfigurator.load()
