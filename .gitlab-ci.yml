@@ -12,13 +12,6 @@ variables:
   CS_MAJOR_VERSION: 2
   CI_APPLICATION_REPOSITORY: $CI_REGISTRY_IMAGE/server
   CI_APPLICATION_TAG: $CI_COMMIT_SHA
-  # Static Application Security Testing properties
-  SAST_JAVA_VERSION: 17
-  SAST_EXCLUDED_PATHS: "target, */target, */src/test, website"
-  SAST_DEFAULT_ANALYZERS: "spotbugs, kubesec, mobsf"
-  SAST_EXCLUDED_ANALYZERS: "eslint, nodejs-scan"
-  # Dependency scan properties
-  DS_DEFAULT_ANALYZERS: "gemnasium-maven"
   # Flag to trigger manual publishing of pages
   MANUAL_PUBLISH_PAGES: "false"
 
