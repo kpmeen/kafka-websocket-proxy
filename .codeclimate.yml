@@ -45,3 +45,5 @@ exclude_patterns:
   - "script/"
   - "**/spec/"
   - "**/test/"
+  - "docs/"
+  - "website/"
