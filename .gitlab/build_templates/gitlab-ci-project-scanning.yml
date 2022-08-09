@@ -13,6 +13,8 @@ variables:
   DS_DEFAULT_ANALYZERS: gemnasium-maven
   # Container scanning properties
   CS_ANALYZER_IMAGE: registry.gitlab.com/security-products/container-scanning:5
+  CS_DISABLE_DEPENDENCY_LIST: 'true'
+  CS_SEVERITY_THRESHOLD: "CRITICAL"
 
 stages:
   - test
