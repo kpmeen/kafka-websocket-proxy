@@ -113,18 +113,24 @@ both inbound and outbound messages.
 
 **Query parameters**:
 
-| Name                | Type         | Required | Default value |
-|:------------------- |:------------ |:--------:|:------------- |
-| clientId            | string       |    y     |               |
-| groupId             | string       |    n     |               |
-| topic               | string       |    y     |               |
-| socketPayload       | payload type |     n    |      json     |
-| keyType             | format type  |    n     |               |
-| valType             | format type  |    y     |               |
-| offsetResetStrategy | string       |    n     |   earliest    |
-| rate                | integer      |    n     |               |
-| batchSize           | integer      |    n     |               |
-| autoCommit          | boolean      |    n     |     true      |
+| Name                | Type         | Required | Default value    |
+|:--------------------|:-------------|:--------:|:-----------------|
+| clientId            | string       |    y     |                  |
+| groupId             | string       |    n     |                  |
+| topic               | string       |    y     |                  |
+| socketPayload       | payload type |    n     | json             |
+| keyType             | format type  |    n     |                  |
+| valType             | format type  |    y     |                  |
+| offsetResetStrategy | string       |    n     | earliest         |
+| isolationLevel      | string       |    n     | read_uncommitted |
+| rate                | integer      |    n     |                  |
+| batchSize           | integer      |    n     |                  |
+| autoCommit          | boolean      |    n     | true             |
+
+> **Note:**
+> 
+> `isolationLevel` values are the same as defined for the regular Kafka client.
+> Please see [here](https://docs.confluent.io/platform/current/installation/configuration/consumer-configs.html#consumerconfigs_isolation.level) for more details.
 
 ##### Output (JSON)
 

@@ -262,7 +262,7 @@ object Formats {
 
     def unsafeFromString(s: String): FormatType =
       fromString(s).getOrElse {
-        throw new IllegalArgumentException(s"$s is not a valid format type")
+        throw new IllegalArgumentException(s"'$s' is not a valid format type")
       }
 
   }

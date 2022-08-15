@@ -76,6 +76,13 @@ trait QueryParamParsers {
       }
     }
 
+  implicit val isoLevelUnmarshaller: Unmarshaller[String, ReadIsolationLevel] =
+    Unmarshaller.strict[String, ReadIsolationLevel] { str =>
+      Option(str).map(ReadIsolationLevel.unsafeFromString).getOrElse {
+        throw Unmarshaller.NoContentException
+      }
+    }
+
   sealed trait ParamError
   case object InvalidPath          extends ParamError
   case object MissingRequiredParam extends ParamError
@@ -145,10 +152,21 @@ trait QueryParamParsers {
       Symbol("valType").as[FormatType] ? (StringType: FormatType),
       Symbol("offsetResetStrategy")
         .as[OffsetResetStrategy] ? OffsetResetStrategy.EARLIEST,
+      Symbol("isolationLevel")
+        .as[ReadIsolationLevel] ? (ReadUncommitted: ReadIsolationLevel),
       Symbol("rate").as[Int] ?,
       Symbol("batchSize").as[Int] ?,
       Symbol("autoCommit").as[Boolean] ? true
-    ).tmap(OutSocketArgs.fromTupledQueryParams)
+    ).tmap(OutSocketArgs.fromTupledQueryParams).recover { rejections =>
+      rejections.headOption
+        .map {
+          case MissingQueryParamRejection(pname) =>
+            throw RequestValidationError(s"Request param '$pname' is missing.")
+          case mqpr: MalformedQueryParamRejection =>
+            throw RequestValidationError(mqpr.errorMsg)
+        }
+        .getOrElse(throw RequestValidationError("The request was invalid"))
+    }
 
   /**
    * @return
@@ -165,10 +183,11 @@ trait QueryParamParsers {
       Symbol("valType").as[FormatType] ? (StringType: FormatType)
     ).tmap(InSocketArgs.fromTupledQueryParams).recover { rejections =>
       rejections.headOption
-        .map { case MissingQueryParamRejection(paramName) =>
-          throw RequestValidationError(
-            s"Request param $paramName is missing or invalid."
-          )
+        .map {
+          case MissingQueryParamRejection(pname) =>
+            throw RequestValidationError(s"Request param '$pname' is missing.")
+          case mqpr: MalformedQueryParamRejection =>
+            throw RequestValidationError(mqpr.errorMsg)
         }
         .getOrElse(throw RequestValidationError("The request was invalid"))
     }

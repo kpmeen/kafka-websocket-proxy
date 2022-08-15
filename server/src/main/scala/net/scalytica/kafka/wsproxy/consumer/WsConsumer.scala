@@ -53,7 +53,8 @@ object WsConsumer extends WithProxyLogger {
       .withProperties(
         AUTO_OFFSET_RESET_CONFIG       -> args.offsetResetStrategyString,
         ENABLE_AUTO_COMMIT_CONFIG      -> s"$autoCommit",
-        AUTO_COMMIT_INTERVAL_MS_CONFIG -> s"${50.millis.toMillis}"
+        AUTO_COMMIT_INTERVAL_MS_CONFIG -> s"${50.millis.toMillis}",
+        ISOLATION_LEVEL_CONFIG         -> args.isolationLevel.value
       )
       .withClientId(args.clientId.value)
       .withGroupId(args.groupId.value)
