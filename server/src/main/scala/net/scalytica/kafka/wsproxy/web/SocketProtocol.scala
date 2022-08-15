@@ -23,7 +23,9 @@ object SocketProtocol {
 
     def unsafeFromString(s: String): SocketPayload =
       fromString(s).getOrElse {
-        throw new IllegalArgumentException(s"$s is not a valid socket payload")
+        throw new IllegalArgumentException(
+          s"'$s' is not a valid socket payload"
+        )
       }
   }
 

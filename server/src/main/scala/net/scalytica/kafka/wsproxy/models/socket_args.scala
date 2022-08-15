@@ -23,33 +23,43 @@ sealed trait SocketArgs {
  *   the Kafka topic to subscribe to.
  * @param socketPayload
  *   the type of payload to expect through the socket.
- * @param aclCredentials
- *   the Kafka ACL credentials to use with the Kafka client
  * @param keyType
  *   optional type for the message keys in the topic.
  * @param valType
  *   the type for the message values in the topic.
  * @param offsetResetStrategy
  *   the offset strategy to use. Defaults to EARLIEST
+ * @param isolationLevel
+ *   Controls how to read messages written transactionally. If set to
+ *   [[ReadCommitted]], the consumer will only return transactional messages
+ *   which have been committed. If set to [[ReadCommitted]] (the default), the
+ *   consumer will return all messages, even transactional messages which have
+ *   been aborted. Non-transactional messages will be returned unconditionally
+ *   in either mode.
  * @param rateLimit
  *   max number of messages per second to pass through.
  * @param batchSize
  *   the number messages to include per batch.
  * @param autoCommit
  *   enable kafka consumer auto-commit interval.
+ * @param aclCredentials
+ *   the Kafka ACL credentials to use with the Kafka client
+ * @param bearerToken
+ *   if present, contains the auth bearer token
  */
 case class OutSocketArgs(
     clientId: WsClientId,
     groupId: WsGroupId,
     topic: TopicName,
     socketPayload: SocketPayload,
-    aclCredentials: Option[AclCredentials] = None,
     keyType: Option[Formats.FormatType] = None,
     valType: Formats.FormatType,
     offsetResetStrategy: OffsetResetStrategy = OffsetResetStrategy.EARLIEST,
+    isolationLevel: ReadIsolationLevel = ReadUncommitted,
     rateLimit: Option[Int] = None,
     batchSize: Option[Int] = None,
     autoCommit: Boolean = true,
+    aclCredentials: Option[AclCredentials] = None,
     bearerToken: Option[OAuth2BearerToken] = None
 ) extends SocketArgs {
 
@@ -73,6 +83,7 @@ object OutSocketArgs {
       Option[Formats.FormatType],
       Formats.FormatType,
       OffsetResetStrategy,
+      ReadIsolationLevel,
       Option[Int],
       Option[Int],
       Boolean
@@ -88,9 +99,10 @@ object OutSocketArgs {
     keyTpe = t._5,
     valTpe = t._6,
     offsetResetStrategy = t._7,
-    rateLimit = t._8,
-    batchSize = t._9,
-    autoCommit = t._10
+    isolationLevel = t._8,
+    rateLimit = t._9,
+    batchSize = t._10,
+    autoCommit = t._11
   )
 
   // scalastyle:off
@@ -102,6 +114,7 @@ object OutSocketArgs {
       keyTpe: Option[Formats.FormatType],
       valTpe: Formats.FormatType,
       offsetResetStrategy: OffsetResetStrategy,
+      isolationLevel: ReadIsolationLevel,
       rateLimit: Option[Int],
       batchSize: Option[Int],
       autoCommit: Boolean
@@ -114,6 +127,7 @@ object OutSocketArgs {
       keyType = keyTpe,
       valType = valTpe,
       offsetResetStrategy = offsetResetStrategy,
+      isolationLevel = isolationLevel,
       rateLimit = rateLimit,
       batchSize = batchSize,
       autoCommit = autoCommit
@@ -133,21 +147,23 @@ object OutSocketArgs {
  *   the Kafka topic to subscribe to.
  * @param socketPayload
  *   the type of payload to expect through the socket.
- * @param aclCredentials
- *   the Kafka ACL credentials to use with the Kafka client
  * @param keyType
  *   optional type for the message keys in the topic.
  * @param valType
  *   the type for the message values in the topic.
+ * @param aclCredentials
+ *   the Kafka ACL credentials to use with the Kafka client
+ * @param bearerToken
+ *   if present, contains the auth bearer token
  */
 case class InSocketArgs(
     producerId: WsProducerId,
     topic: TopicName,
     socketPayload: SocketPayload,
     instanceId: Option[WsProducerInstanceId] = None,
-    aclCredentials: Option[AclCredentials] = None,
     keyType: Option[Formats.FormatType] = None,
     valType: Formats.FormatType = Formats.StringType,
+    aclCredentials: Option[AclCredentials] = None,
     bearerToken: Option[OAuth2BearerToken] = None
 ) extends SocketArgs {
 
