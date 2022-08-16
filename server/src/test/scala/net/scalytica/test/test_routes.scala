@@ -1,8 +1,7 @@
 package net.scalytica.test
 
-import akka.actor.{ActorSystem => ClassicActorSystem}
-import akka.actor.typed.{ActorRef, ActorSystem}
-import akka.actor.typed.scaladsl.Behaviors
+import akka.actor.ActorSystem
+import akka.actor.typed.ActorRef
 import akka.actor.typed.scaladsl.adapter._
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.Directives.handleExceptions
@@ -20,11 +19,10 @@ trait TestAdHocRoute extends RoutesPrereqs with RouteFailureHandlers {
   ): Unit = ()
 
   def routeWithExceptionHandler(route: Route)(
-      implicit as: ClassicActorSystem,
+      implicit as: ActorSystem,
       mat: Materializer
   ): Route = {
-    implicit val tas   = ActorSystem.wrap(as)
-    implicit val shRef = tas.ignoreRef[SessionHandlerProtocol.Protocol]
+    implicit val shRef = as.toTyped.ignoreRef[SessionHandlerProtocol.Protocol]
     handleExceptions(wsExceptionHandler)(route)
   }
 }
