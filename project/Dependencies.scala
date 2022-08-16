@@ -8,11 +8,12 @@ object Versions {
   val PureConfigVersion      = "0.17.1"
 
   val Avro4sVersion                 = "4.1.0"
-  val ConfluentPlatformVersion      = "7.2.1"
-  val KafkaVersion                  = s"$ConfluentPlatformVersion-ccs"
   val ApacheKafkaVersion            = "3.2.1"
+  val ConfluentPlatformBaseVersion  = "7.2"
+  val ConfluentPlatformPatchVersion = s"$ConfluentPlatformBaseVersion.1"
+  val ConfluentKafkaVersion         = s"$ConfluentPlatformPatchVersion-ccs"
   val EmbeddedKafkaVersion          = ApacheKafkaVersion
-  val EmbeddedSchemaRegistryVersion = ConfluentPlatformVersion
+  val EmbeddedSchemaRegistryVersion = s"$ConfluentPlatformBaseVersion.+"
 
   val AkkaVersion            = "2.6.19"
   val AkkaHttpVersion        = "10.2.9"
@@ -115,32 +116,32 @@ object Dependencies {
 
     // official kafka libs
     val Clients =
-      "org.apache.kafka" % "kafka-clients" % KafkaVersion excludeAll (Exclusions: _*)
+      "org.apache.kafka" % "kafka-clients" % ConfluentKafkaVersion excludeAll (Exclusions: _*)
 
     val Kafka =
-      "org.apache.kafka" %% "kafka" % KafkaVersion excludeAll (Exclusions: _*)
+      "org.apache.kafka" %% "kafka" % ConfluentKafkaVersion excludeAll (Exclusions: _*)
 
   }
 
   object ConfluentKafka {
 
     val AvroSerializer =
-      "io.confluent" % "kafka-avro-serializer" % ConfluentPlatformVersion excludeAll (Exclusions: _*)
+      "io.confluent" % "kafka-avro-serializer" % ConfluentPlatformPatchVersion excludeAll (Exclusions: _*)
 
     val JsonSerializer =
-      "io.confluent" % "kafka-json-serializer" % ConfluentPlatformVersion excludeAll (Exclusions: _*)
+      "io.confluent" % "kafka-json-serializer" % ConfluentPlatformPatchVersion excludeAll (Exclusions: _*)
 
     val StreamsAvroSerde =
-      "io.confluent" % "kafka-streams-avro-serde" % ConfluentPlatformVersion excludeAll (Exclusions: _*)
+      "io.confluent" % "kafka-streams-avro-serde" % ConfluentPlatformPatchVersion excludeAll (Exclusions: _*)
 
     val SchemaRegistry =
-      "io.confluent" % "kafka-schema-registry" % ConfluentPlatformVersion excludeAll (Exclusions: _*)
+      "io.confluent" % "kafka-schema-registry" % ConfluentPlatformPatchVersion excludeAll (Exclusions: _*)
 
     val SchemaRegistryClient =
-      "io.confluent" % "kafka-schema-registry-client" % ConfluentPlatformVersion excludeAll (Exclusions: _*)
+      "io.confluent" % "kafka-schema-registry-client" % ConfluentPlatformPatchVersion excludeAll (Exclusions: _*)
 
     val MonitoringInterceptors =
-      "io.confluent" % "monitoring-interceptors" % ConfluentPlatformVersion excludeAll (Exclusions: _*)
+      "io.confluent" % "monitoring-interceptors" % ConfluentPlatformPatchVersion excludeAll (Exclusions: _*)
   }
 
   object Config {
@@ -246,9 +247,9 @@ object Dependencies {
 
     val Deps = Seq(
       "org.apache.avro"    % "avro"             % AvroVersion,
-      "org.apache.kafka"   % "kafka-clients"    % KafkaVersion,
-      "org.apache.kafka"   % "kafka-streams"    % KafkaVersion,
-      "org.apache.kafka"  %% "kafka"            % KafkaVersion,
+      "org.apache.kafka"   % "kafka-clients"    % ConfluentKafkaVersion,
+      "org.apache.kafka"   % "kafka-streams"    % ConfluentKafkaVersion,
+      "org.apache.kafka"  %% "kafka"            % ConfluentKafkaVersion,
       "org.apache.commons" % "commons-compress" % CommonsCompressVersion,
       "com.fasterxml.jackson.core" % "jackson-databind" % JacksonDatabindVersion,
       "org.typelevel"     %% "jawn-parser"       % JawnParserVersion,
