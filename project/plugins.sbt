@@ -17,8 +17,8 @@ addSbtPlugin("com.github.sbt" % "sbt-git" % "2.0.0")
 addSbtPlugin("com.timushev.sbt" % "sbt-updates" % "0.6.3")
 
 // Formatting and style checking
-addSbtPlugin("org.scalameta"   % "sbt-scalafmt"          % "2.4.6")
-addSbtPlugin("org.scalastyle" %% "scalastyle-sbt-plugin" % "1.0.0")
+addSbtPlugin("org.scalameta"       % "sbt-scalafmt"   % "2.4.6")
+addSbtPlugin("com.beautiful-scala" % "sbt-scalastyle" % "1.5.1")
 
 // Code coverage
 addSbtPlugin("org.scoverage" %% "sbt-scoverage" % "1.9.3")
