@@ -123,9 +123,15 @@ both inbound and outbound messages.
 | keyType             | [format type](#format-types)   |    n     |                    |                                                                                                                           |
 | valType             | [format type](#format-types)   |    n     | `string`           |                                                                                                                           |
 | offsetResetStrategy | string                         |    n     | `earliest`         |                                                                                                                           |
+| isolationLevel      | string                         |    n     | `read_uncommitted` |                                                                                                                           |
 | rate                | integer                        |    n     |                    |                                                                                                                           |
 | batchSize           | integer                        |    n     |                    |                                                                                                                           |
 | autoCommit          | boolean                        |    n     | `true`             |                                                                                                                           |
+
+> **Note:**
+> 
+> `isolationLevel` values are the same as defined for the regular Kafka client.
+> Please see [here](https://docs.confluent.io/platform/current/installation/configuration/consumer-configs.html#consumerconfigs_isolation.level) for more details.
 
 ##### Output (JSON)
 
