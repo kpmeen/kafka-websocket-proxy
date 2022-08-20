@@ -10,7 +10,11 @@ module.exports = {
   organizationName: 'kpmeen',
   projectName: 'kafka-websocket-proxy',
   themeConfig: {
-    hideableSidebar: true,
+    docs: {
+      sidebar: {
+        hideable: true
+      }
+    },
     navbar: {
       title: 'Kafka WebSocket Proxy',
       items: [
