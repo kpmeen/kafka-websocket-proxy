@@ -55,13 +55,14 @@ both inbound and outbound messages.
 
 **Query parameters**:
 
-| Name          | Type         | Required | Default value |
-|:------------- |:-----------  |:--------:|:------------- |
-| clientId      | string       |     y    |               |
-| topic         | string       |     y    |               |
-| socketPayload | payload type |     n    |      json     |
-| keyType       | format type  |     n    |               |
-| valType       | format type  |     y    |               |
+| Name          | Type                           | Required | Default value | Description                                                                                                                                                                                                                |
+|:--------------|:-------------------------------|:--------:|:--------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| clientId      | string                         |    y     |               | For the `in` endpoint, the `clientId` parameter is used to group 1 or more `in` (producer) connections into one group that identifies the client application. Much like `groupId` is used for Kafka consumers.             |
+| instanceId    | string                         |    n     |               | When more than one connection is made using the same `clientId`, and `kafka.ws.proxy.producer.sessions-enabled` is `true`, the `instanceId` is **required** and is used to differentiate between the different connections. |
+| topic         | string                         |    y     |               | The topic name to write data into.                                                                                                                                                                                         |
+| socketPayload | [payload type](#payload-types) |    n     | `json`        | The type of payload being sent via the proxy.                                                                                                                                                                       |
+| keyType       | [format type](#format-types)   |    n     |               |                                                                                                                                                                                                                            |
+| valType       | [format type](#format-types)   |    y     | `string`      |                                                                                                                                                                                                                            |
 
 ##### Input (JSON)
 
@@ -113,19 +114,18 @@ both inbound and outbound messages.
 
 **Query parameters**:
 
-| Name                | Type         | Required | Default value    |
-|:--------------------|:-------------|:--------:|:-----------------|
-| clientId            | string       |    y     |                  |
-| groupId             | string       |    n     |                  |
-| topic               | string       |    y     |                  |
-| socketPayload       | payload type |    n     | json             |
-| keyType             | format type  |    n     |                  |
-| valType             | format type  |    y     |                  |
-| offsetResetStrategy | string       |    n     | earliest         |
-| isolationLevel      | string       |    n     | read_uncommitted |
-| rate                | integer      |    n     |                  |
-| batchSize           | integer      |    n     |                  |
-| autoCommit          | boolean      |    n     | true             |
+| Name                | Type                           | Required | Default value      | Description                                                                                                               |
+|:--------------------|:-------------------------------|:--------:|:-------------------|---------------------------------------------------------------------------------------------------------------------------|
+| clientId            | string                         |    y     |                    | Identifies a single client connection / Kafka consumer instance.                                                          |
+| groupId             | string                         |    n     |                    | Id used to group all connections/clients into one logical instance that will consume different partitions from the topic. |
+| topic               | string                         |    y     |                    | The topic name to write data into.                                                                                        |
+| socketPayload       | [payload type](#payload-types) |    n     | `json`             | The type of payload being sent via the proxy.                                                                             |
+| keyType             | [format type](#format-types)   |    n     |                    |                                                                                                                           |
+| valType             | [format type](#format-types)   |    n     | `string`           |                                                                                                                           |
+| offsetResetStrategy | string                         |    n     | `earliest`         |                                                                                                                           |
+| rate                | integer                        |    n     |                    |                                                                                                                           |
+| batchSize           | integer                        |    n     |                    |                                                                                                                           |
+| autoCommit          | boolean                        |    n     | `true`             |                                                                                                                           |
 
 > **Note:**
 > 
