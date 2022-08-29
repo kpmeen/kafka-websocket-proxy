@@ -1,13 +1,11 @@
 package net.scalytica.kafka.wsproxy.logging
 
 import java.io.ByteArrayInputStream
-
 import ch.qos.logback.classic.joran.JoranConfigurator
 import ch.qos.logback.classic.{Level, Logger => LogbackLogger}
 import net.scalytica.kafka.wsproxy.StringExtensions
 import net.scalytica.kafka.wsproxy.utils.{WsProxyEnvLoader => env}
-import org.slf4j.ILoggerFactory
-import org.slf4j.impl.StaticLoggerBinder
+import org.slf4j.{ILoggerFactory, LoggerFactory}
 
 trait WsProxyEnvLoggerConfigurator {
 
@@ -16,7 +14,7 @@ trait WsProxyEnvLoggerConfigurator {
   val LogbackCfgEnv = "WSPROXY_LOGBACK_XML_CONFIG"
 
   private[this] lazy val loggerFactory: ILoggerFactory =
-    StaticLoggerBinder.getSingleton.getLoggerFactory
+    LoggerFactory.getILoggerFactory
 
   private[this] val log =
     loggerFactory.getLogger(getClass.getCanonicalName)

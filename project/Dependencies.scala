@@ -28,24 +28,26 @@ object Versions {
 
   val JwtScalaVersion = "9.0.6"
 
+  // logging
   val ScalaLoggingVersion = "3.9.5"
+  val Slf4JVersion        = "2.0.0"
+  val LogbackVersion      = "1.4.0"
+  val LogbackJsVersion    = "0.1.5"
+  val JaninoVersion       = "3.1.7"
 
-  val Slf4JVersion     = "1.7.36"
-  val LogbackVersion   = "1.2.11"
-  val LogbackJsVersion = "0.1.5"
-  val JaninoVersion    = "3.1.7"
+  // testing
   val ScalaTestVersion = "3.2.13"
+  val GatlingVersion   = "3.1.1"
 
-  val JolokiaAgentVersion = "1.6.2"
-
+  // monitoring
+  val JolokiaAgentVersion    = "1.6.2"
   val PrometheusAgentVersion = "0.14.0"
-  val GatlingVersion         = "3.1.1"
 
   // Override versions
-  val AvroVersion            = "1.11.0"
+  val AvroVersion            = "1.11.1"
   val CommonsCompressVersion = "1.21"
-  val JacksonDatabindVersion = "2.13.2.2"
-  val JawnParserVersion      = "1.3.2"
+  val JacksonDatabindVersion = "2.13.3"
+  val JawnParserVersion      = "1.4.0"
 }
 
 object Dependencies {
@@ -105,6 +107,7 @@ object Dependencies {
   }
 
   object Avro {
+    val Avro        = "org.apache.avro"      % "avro"         % AvroVersion
     val Avro4sCore  = "com.sksamuel.avro4s" %% "avro4s-core"  % Avro4sVersion
     val Avro4sKafka = "com.sksamuel.avro4s" %% "avro4s-kafka" % Avro4sVersion
     val Avro4sJson  = "com.sksamuel.avro4s" %% "avro4s-json"  % Avro4sVersion
@@ -210,19 +213,29 @@ object Dependencies {
 
     private[this] val lbPkg = "ch.qos.logback"
 
-    val ScalaLogging =
-      "com.typesafe.scala-logging" %% "scala-logging" % ScalaLoggingVersion
+    private[this] val ExcludeSlfj = Seq(
+      ExclusionRule("org.slf4j", "slf4j-api"),
+      ExclusionRule("org.slf4j", "log4j-over-slf4j"),
+      ExclusionRule("org.slf4j", "slf4j-log4j12"),
+      ExclusionRule("org.slf4j", "jul-to-slf4j"),
+      ExclusionRule("org.slf4j", "slf4j-nop")
+    )
 
-    val Logback = lbPkg % "logback-classic" % LogbackVersion
+    val ScalaLogging =
+      "com.typesafe.scala-logging" %% "scala-logging" % ScalaLoggingVersion excludeAll (ExcludeSlfj: _*)
+
+    val Logback =
+      lbPkg % "logback-classic" % LogbackVersion excludeAll (ExcludeSlfj: _*)
 
     val LogbackJson =
-      s"$lbPkg.contrib" % "logback-json-classic" % LogbackJsVersion
+      s"$lbPkg.contrib" % "logback-json-classic" % LogbackJsVersion excludeAll (ExcludeSlfj: _*)
 
     val LogbackJackson =
-      s"$lbPkg.contrib" % "logback-jackson" % LogbackJsVersion
+      s"$lbPkg.contrib" % "logback-jackson" % LogbackJsVersion excludeAll (ExcludeSlfj: _*)
 
-    val Janino = "org.codehaus.janino" % "janino"    % JaninoVersion
-    val Slf4j  = "org.slf4j"           % "slf4j-api" % Slf4JVersion
+    val Janino = "org.codehaus.janino" % "janino" % JaninoVersion
+
+    val Slf4j          = "org.slf4j" % "slf4j-api"        % Slf4JVersion
     val Log4jOverSlf4j = "org.slf4j" % "log4j-over-slf4j" % Slf4JVersion
     val Slf4jLog4j     = "org.slf4j" % "slf4j-log4j12"    % Slf4JVersion
     val JulToSlf4j     = "org.slf4j" % "jul-to-slf4j"     % Slf4JVersion
