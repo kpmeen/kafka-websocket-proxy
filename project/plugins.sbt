@@ -35,7 +35,7 @@ addSbtPlugin("com.github.sbt" % "sbt-release" % "1.1.0")
 //classpathTypes += "maven-plugin"
 
 // Scalafix for automated code re-writes when updating dependencies
-addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.10.1")
+addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.10.2")
 
 // documentation generator
 addSbtPlugin("org.scalameta" % "sbt-mdoc" % "2.3.3")
