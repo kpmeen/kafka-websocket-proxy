@@ -26,7 +26,7 @@ services:
     image: kpmeen/kafka-websocket-proxy:latest
     ...
     healthcheck:
-      test: ['CMD-SHELL', 'curl -f http://localhost:8087/healthcheck || exit 1']
+      test: ['CMD-SHELL', 'curl -f http://localhost:8078/healthcheck || exit 1']
       interval: 30s
       timeout: 3s
       retries: 40
