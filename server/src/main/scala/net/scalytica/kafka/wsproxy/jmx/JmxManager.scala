@@ -264,6 +264,8 @@ case class JmxManager(
 
   { val _ = scheduleProxyStatus() }
 
+  def close(): Unit = adminClient.close()
+
 }
 
 object JmxManager {

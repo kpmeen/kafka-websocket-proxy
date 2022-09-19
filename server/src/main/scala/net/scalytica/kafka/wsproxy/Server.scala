@@ -99,9 +99,8 @@ object Server extends App with ServerRoutes with ServerBindings {
   val sessionHandlerStream    = sessionHandler.stream
 
   implicit val optRunnableDynCfgHandler = {
-    if (cfg.dynamicConfigHandler.enabled) {
-      Option(DynamicConfigHandler.init)
-    } else None
+    if (cfg.dynamicConfigHandler.enabled) Option(DynamicConfigHandler.init)
+    else None
   }
   implicit val optReadableDynCfgHandler =
     optRunnableDynCfgHandler.map(_.asReadOnlyRef)
@@ -145,7 +144,7 @@ object Server extends App with ServerRoutes with ServerBindings {
       Http().shutdownAllConnectionPools().map(_ => Done)
     }
 
-    cs.addTask(PhaseBeforeClusterShutdown, "session-consumer-shutdown") { () =>
+    cs.addTask(PhaseBeforeClusterShutdown, "internal-consumer-shutdown") { () =>
       info("Session data consumer shutting down...")
       sessionCtrl.drainAndShutdown(evalDone)
       info("Dynamic config consumer shutting down...")
@@ -171,6 +170,8 @@ object Server extends App with ServerRoutes with ServerBindings {
         info("Session handler has been stopped.")
         Done
       }
+      // Ensure that the admin client in the JMX Manager is closed.
+      Future.successful(jmxMngr.map(_.close()).map(_ => Done).getOrElse(Done))
     }
 
     cs
