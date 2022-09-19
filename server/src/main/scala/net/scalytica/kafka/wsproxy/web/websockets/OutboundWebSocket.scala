@@ -158,6 +158,17 @@ trait OutboundWebSocket
     outboundWebSocketRoute(args)(cfg)
   }
 
+  private[this] def fetchNumTopicPartitions(
+      topicName: TopicName
+  )(implicit cfg: AppCfg): Int = {
+    val wsAdminClient = new WsKafkaAdminClient(cfg)
+    try {
+      wsAdminClient.numTopicPartitions(topicName)
+    } finally {
+      wsAdminClient.close()
+    }
+  }
+
   def outboundWebSocketRoute(
       args: OutSocketArgs
   )(
@@ -174,14 +185,13 @@ trait OutboundWebSocket
     implicit val scheduler   = as.scheduler.toTyped
     implicit val cfg: AppCfg = applyDynamicConfigs(args)(appCfg)
 
-    val wsAdminClient   = new WsKafkaAdminClient(cfg)
-    val topicPartitions = wsAdminClient.numTopicPartitions(args.topic)
+    val numTopicPartitions = fetchNumTopicPartitions(args.topic)
 
     val serverId       = cfg.server.serverId
     val clientId       = args.clientId
     val groupId        = args.groupId
     val fullConsumerId = FullConsumerId(groupId, clientId)
-    val maxConLimit    = calculateMaxConnections(topicPartitions, groupId)
+    val maxConLimit    = calculateMaxConnections(numTopicPartitions, groupId)
 
     val consumerAddResult = initSessionForConsumer(
       serverId = serverId,

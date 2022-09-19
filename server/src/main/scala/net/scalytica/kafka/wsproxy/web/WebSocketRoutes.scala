@@ -13,6 +13,38 @@ import scala.util.Try
 trait WebSocketRoutes { self: BaseRoutes =>
 
   /**
+   * Uses the WsKafkaAdminCient to check if a given [[TopicName]] exists, and
+   * makes sure to close the admin client when done.
+   *
+   * @param topic
+   *   The [[TopicName]] to check for
+   * @param cfg
+   *   The [[AppCfg]] to use
+   * @return
+   *   true if the topic exists, otherwise false
+   */
+  private[this] def checkTopicExists(
+      topic: TopicName
+  )(implicit cfg: AppCfg): Boolean = {
+    log.trace(s"Verifying if topic ${topic.value} exists...")
+    val admin = new WsKafkaAdminClient(cfg)
+
+    try {
+      Try(admin.topicExists(topic)) match {
+        case scala.util.Success(v) => v
+        case scala.util.Failure(t) =>
+          log.warn(
+            s"An error occurred while checking if topic $topic exists",
+            t
+          )
+          false
+      }
+    } finally {
+      admin.close()
+    }
+  }
+
+  /**
    * @param args
    *   The socket args provided
    * @param webSocketHandler
@@ -30,17 +62,7 @@ trait WebSocketRoutes { self: BaseRoutes =>
       implicit cfg: AppCfg
   ): Route = {
     val topic = args.topic
-    log.trace(s"Verifying if topic $topic exists...")
-    val admin = new WsKafkaAdminClient(cfg)
-    val topicExists = Try(admin.topicExists(topic)) match {
-      case scala.util.Success(v) => v
-      case scala.util.Failure(t) =>
-        log.warn(s"An error occurred while checking if topic $topic exists", t)
-        false
-    }
-    admin.close()
-
-    if (topicExists) webSocketHandler
+    if (checkTopicExists(topic)) webSocketHandler
     else reject(ValidationRejection(s"Topic ${topic.value} does not exist"))
   }
 
