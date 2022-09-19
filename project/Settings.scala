@@ -1,7 +1,7 @@
 import com.github.sbt.git.SbtGit
 import com.typesafe.sbt.packager.Keys._
 import com.typesafe.sbt.packager.docker.DockerPlugin.autoImport.Docker
-import com.typesafe.sbt.packager.docker.{Cmd, DockerAlias}
+import com.typesafe.sbt.packager.docker.{Cmd, DockerAlias, DockerStageBreak}
 import com.typesafe.sbt.packager.universal.UniversalPlugin.autoImport.Universal
 import net.scalytica.sbt.plugin.ExtLibTaskPlugin
 import net.scalytica.sbt.plugin.ExtLibTaskPlugin.autoImport._
@@ -140,12 +140,23 @@ object Settings {
       dockerBaseImage             := "azul/zulu-openjdk-debian:17",
       Docker / dockerExposedPorts := Seq(exposedPort),
       dockerCommands := {
-        val (front, back) = dockerCommands.value.splitAt(12)
-        val aptCmd = Cmd(
-          "RUN",
-          "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y apt-utils curl"
+        val aptCmd = Seq(
+          Cmd(
+            "RUN",
+            "apt-get update",
+            "&&",
+            "DEBIAN_FRONTEND=noninteractive",
+            "apt-get install -y apt-utils curl"
+          )
         )
-        front ++ Seq(aptCmd) ++ back
+
+        val endStage = dockerCommands.value.indexOf(DockerStageBreak)
+        val (stageCmds, buildCmds) = dockerCommands.value.splitAt(endStage + 1)
+        val usrRoot =
+          buildCmds.indexWhere(_.makeContent.trim.equalsIgnoreCase("USER root"))
+        val (buildStart, buildEnd) = buildCmds.splitAt(usrRoot + 1)
+
+        stageCmds ++ buildStart ++ aptCmd ++ buildEnd
       },
       // ----------------------------------------------------
       // Extra file mappings to external libs and configs
