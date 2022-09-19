@@ -75,9 +75,19 @@ trait DynamicConfigHandler extends WithProxyLogger {
         System.exit(1)
       }
       val offset = admin.lastOffsetForDynamicConfigTopic
-      log.debug(s"Dynamic config topic ready. LAtest offset is $offset")
+      log.debug(s"Dynamic config topic ready. Latest offset is $offset")
       if (latestOffset == 0) stateRestored = true
       offset
+    } catch {
+      case ex: Throwable =>
+        log.error(
+          "A fatal error occurred while attempting to init and verify the" +
+            " dynamic config topic. Server will terminate",
+          ex
+        )
+        System.exit(1)
+        // FIXME: Dirty hack to align types
+        -1L
     } finally {
       admin.close()
     }
@@ -118,7 +128,6 @@ trait DynamicConfigHandler extends WithProxyLogger {
 
     val name = s"dynamic-config-handler-actor-${cfg.server.serverId.value}"
     log.debug(s"Initialising dynamic config handler $name")
-
     latestOffset = prepareTopic
 
     val ref = sys.spawn(dynamicConfigHandler, name)

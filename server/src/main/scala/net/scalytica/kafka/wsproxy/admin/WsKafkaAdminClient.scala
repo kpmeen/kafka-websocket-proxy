@@ -22,6 +22,7 @@ import org.apache.kafka.common.{
 import org.apache.kafka.common.config.TopicConfig._
 import org.apache.kafka.common.errors.UnknownTopicOrPartitionException
 
+import java.util.UUID
 import scala.jdk.CollectionConverters._
 import scala.concurrent.duration._
 import scala.util.Try
@@ -37,10 +38,11 @@ import scala.util.control.NonFatal
 class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
 
   // scalastyle:off line.size.limit
-  private[this] lazy val admConfig = {
+  private[this] def admConfig = {
+    val uuidSuffix = UUID.randomUUID().toString
     cfg.adminClient.kafkaClientProperties ++ Map[String, AnyRef](
       BOOTSTRAP_SERVERS_CONFIG -> cfg.kafkaClient.bootstrapHosts.mkString(),
-      CLIENT_ID_CONFIG         -> "kafka-websocket-proxy-admin"
+      CLIENT_ID_CONFIG         -> s"kafka-websocket-proxy-admin-${uuidSuffix}"
     )
   }
   // scalastyle:on line.size.limit

@@ -57,7 +57,7 @@ trait SessionHandler extends WithProxyLogger {
     }
   }
 
-  private[this] def prepareStateTopic(implicit cfg: AppCfg): Long = {
+  private[this] def prepareTopic(implicit cfg: AppCfg): Long = {
     val admin = new WsKafkaAdminClient(cfg)
     try {
       val ready = admin.clusterReady
@@ -70,6 +70,16 @@ trait SessionHandler extends WithProxyLogger {
       log.debug(s"Session state topic ready. Latest offset is $offset")
       if (latestOffset == 0) stateRestored = true
       offset
+    } catch {
+      case ex: Throwable =>
+        log.error(
+          "A fatal error occurred while attempting to init and verify the" +
+            " session state topic. Server will terminate",
+          ex
+        )
+        System.exit(1)
+        // FIXME: Dirty hack to align types
+        -1L
     } finally {
       admin.close()
     }
@@ -133,7 +143,7 @@ trait SessionHandler extends WithProxyLogger {
 
     val name = s"session-handler-actor-${cfg.server.serverId.value}"
     log.debug(s"Initialising session handler $name...")
-    latestOffset = prepareStateTopic
+    latestOffset = prepareTopic
 
     val ref = sys.spawn(sessionHandler, name)
 
