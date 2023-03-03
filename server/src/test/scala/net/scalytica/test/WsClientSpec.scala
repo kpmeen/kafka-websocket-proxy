@@ -32,10 +32,6 @@ trait WsClientSpec
   implicit private[this] val routeTestTimeout =
     RouteTestTimeout((20 seconds).dilated)
 
-//  implicit val testRejectHandler = TestServerRoutes.serverRejectionHandler
-//  implicit override val testExceptionHandler =
-//    TestServerRoutes.wsExceptionHandler
-
   protected def wsRouteFrom(
       implicit cfg: AppCfg,
       shRef: SessionHandlerRef,

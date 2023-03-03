@@ -4,6 +4,7 @@ import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.unmarshalling.Unmarshaller
+import net.scalytica.kafka.wsproxy.config.Configuration.{AppCfg, ProducerCfg}
 import net.scalytica.kafka.wsproxy.errors.RequestValidationError
 import net.scalytica.kafka.wsproxy.web.SocketProtocol._
 import net.scalytica.kafka.wsproxy.models.Formats._
@@ -83,6 +84,19 @@ trait QueryParamParsers {
       }
     }
 
+  private[this] lazy val ProducerTransactionsDisabledMsg =
+    "Unable to provide transactional producer. Server is not configured to " +
+      "allow producer transactions."
+
+  private[this] lazy val ProducerInstanceIdRequiredWhenMsg = (why: String) =>
+    s"Request param 'instanceId' is required when $why."
+
+  private[this] lazy val ProducerTransactionsDisabledError =
+    RequestValidationError(ProducerTransactionsDisabledMsg)
+
+  private[this] lazy val ProducerInstanceIdRequiredError = (why: String) =>
+    RequestValidationError(ProducerInstanceIdRequiredWhenMsg(why))
+
   sealed trait ParamError
   case object InvalidPath          extends ParamError
   case object MissingRequiredParam extends ParamError
@@ -138,6 +152,26 @@ trait QueryParamParsers {
   }
 
   /**
+   * Shared handling of common [[Rejection]] types from parameter parsing.
+   * @param rejections
+   *   a collection of [[Rejection]]s
+   * @return
+   *   a [[Directive]] that complies with the parameter parser
+   */
+  private[this] def rejectionHandler[ArgType <: SocketArgs](
+      rejections: Seq[Rejection]
+  ): Directive[Tuple1[ArgType]] = {
+    rejections.headOption
+      .map {
+        case MissingQueryParamRejection(pname) =>
+          throw RequestValidationError(s"Request param '$pname' is missing.")
+        case mqpr: MalformedQueryParamRejection =>
+          throw RequestValidationError(mqpr.errorMsg)
+      }
+      .getOrElse(throw RequestValidationError("The request was invalid"))
+  }
+
+  /**
    * @return
    *   Directive extracting query parameters for the outbound (consuming) socket
    *   communication.
@@ -157,39 +191,63 @@ trait QueryParamParsers {
       Symbol("rate").as[Int] ?,
       Symbol("batchSize").as[Int] ?,
       Symbol("autoCommit").as[Boolean] ? true
-    ).tmap(OutSocketArgs.fromTupledQueryParams).recover { rejections =>
-      rejections.headOption
-        .map {
-          case MissingQueryParamRejection(pname) =>
-            throw RequestValidationError(s"Request param '$pname' is missing.")
-          case mqpr: MalformedQueryParamRejection =>
-            throw RequestValidationError(mqpr.errorMsg)
-        }
-        .getOrElse(throw RequestValidationError("The request was invalid"))
-    }
+    ).tmap(OutSocketArgs.fromTupledQueryParams)
+      .recover[Tuple1[OutSocketArgs]](rejectionHandler)
 
+  // ==================================================================
+
+  private[this] def isInParamsTransNoSessionId(
+      tx: Boolean,
+      iid: Option[WsProducerInstanceId]
+  )(implicit prodCfg: ProducerCfg): Boolean = {
+    prodCfg.hasValidTransactionCfg && tx && iid.isEmpty
+  }
+
+  private[this] def isInParamsNoInstanceId(
+      tx: Boolean,
+      iid: Option[WsProducerInstanceId]
+  )(implicit prodCfg: ProducerCfg): Boolean = {
+    !prodCfg.exactlyOnceEnabled && prodCfg.sessionsEnabled && !tx && iid.isEmpty
+  }
+
+  // scalastyle:off cyclomatic.complexity
   /**
+   * Parser implementation for incoming query parameters for setting up an
+   * inbound WebSocket connection.
+   *
+   * @param appCfg
+   *   The [[AppCfg]] to use
    * @return
    *   Directive extracting query parameters for the inbound (producer) socket
    *   communication.
    */
-  def inParams: Directive[Tuple1[InSocketArgs]] =
+  def inParams(appCfg: AppCfg): Directive[Tuple1[InSocketArgs]] = {
+    implicit val prodCfg = appCfg.producer
+
     parameters(
       Symbol("clientId").as[WsProducerId],
       Symbol("instanceId").as[WsProducerInstanceId] ?,
       Symbol("topic").as[TopicName],
       Symbol("socketPayload").as[SocketPayload] ? (JsonPayload: SocketPayload),
       Symbol("keyType").as[FormatType] ?,
-      Symbol("valType").as[FormatType] ? (StringType: FormatType)
-    ).tmap(InSocketArgs.fromTupledQueryParams).recover { rejections =>
-      rejections.headOption
-        .map {
-          case MissingQueryParamRejection(pname) =>
-            throw RequestValidationError(s"Request param '$pname' is missing.")
-          case mqpr: MalformedQueryParamRejection =>
-            throw RequestValidationError(mqpr.errorMsg)
-        }
-        .getOrElse(throw RequestValidationError("The request was invalid"))
-    }
+      Symbol("valType").as[FormatType] ? (StringType: FormatType),
+      Symbol("transactional").as[Boolean] ? false
+    ).tmap {
+      case (_, _, _, _, _, _, tx) if tx && !prodCfg.hasValidTransactionCfg =>
+        throw ProducerTransactionsDisabledError
+
+      case (_, iid, _, _, _, _, tx) if isInParamsTransNoSessionId(tx, iid) =>
+        throw ProducerInstanceIdRequiredError("using transactional")
+
+      case (_, iid, _, _, _, _, tx) if isInParamsNoInstanceId(tx, iid) =>
+        throw ProducerInstanceIdRequiredError(
+          "producer sessions are enabled on the proxy server"
+        )
+
+      // When all cases above are OK, the request should be valid
+      case tuple => InSocketArgs.fromTupledQueryParams(tuple)
+
+    }.recover[Tuple1[InSocketArgs]](rejectionHandler)
+  }
 
 }

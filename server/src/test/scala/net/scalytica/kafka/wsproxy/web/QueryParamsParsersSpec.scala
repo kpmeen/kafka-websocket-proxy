@@ -5,6 +5,7 @@ import akka.http.scaladsl.server.{Directives, Route}
 import net.scalytica.test.{TestAdHocRoute, WsProxyKafkaSpec}
 import org.scalatest.wordspec.AnyWordSpec
 
+// scalastyle:off magic.number
 class QueryParamsParsersSpec
     extends AnyWordSpec
     with WsProxyKafkaSpec
@@ -14,6 +15,21 @@ class QueryParamsParsersSpec
 
   val Ok         = HttpResponse()
   val completeOk = complete(Ok)
+
+  lazy val transAppCfg = appTestConfig(
+    kafkaPort = 9092,
+    useProducerSessions = true,
+    useExactlyOnce = true
+  )
+  lazy val transNoSessAppCfg = appTestConfig(
+    kafkaPort = 9092,
+    useExactlyOnce = true
+  )
+
+  lazy val sessNoTransAppCfg = appTestConfig(
+    kafkaPort = 9092,
+    useProducerSessions = true
+  )
 
   def echoComplete[T]: T => Route = { x => complete(x.toString) }
 
@@ -28,7 +44,9 @@ class QueryParamsParsersSpec
             "instanceId=test-instance&" +
             "keyType=string&" +
             "valType=string"
-        ) ~> routeWithExceptionHandler(inParams(echoComplete)) ~> check {
+        ) ~> routeWithExceptionHandler(
+          inParams(defaultTestAppCfg)(echoComplete)
+        ) ~> check {
           status mustBe StatusCodes.OK
         }
       }
@@ -38,17 +56,21 @@ class QueryParamsParsersSpec
           "/?clientId=foobar&" +
             "socketPayload=json&" +
             "topic=test-topic"
-        ) ~> routeWithExceptionHandler(inParams(echoComplete)) ~> check {
+        ) ~> routeWithExceptionHandler(
+          inParams(defaultTestAppCfg)(echoComplete)
+        ) ~> check {
           status mustBe StatusCodes.OK
         }
       }
 
-      "fail when an argument has an invalid value" in {
+      "reject when an argument has an invalid value" in {
         Get(
           "/?clientId=foobar&" +
             "socketPayload=protobuf&" +
             "topic=test-topic"
-        ) ~> routeWithExceptionHandler(inParams(echoComplete)) ~> check {
+        ) ~> routeWithExceptionHandler(
+          inParams(defaultTestAppCfg)(echoComplete)
+        ) ~> check {
           status mustBe StatusCodes.BadRequest
           contentType mustBe ContentTypes.`application/json`
           responseAs[String] must include(
@@ -57,15 +79,103 @@ class QueryParamsParsersSpec
         }
       }
 
-      "fail when a required parameter is missing" in {
+      "reject when a required parameter is missing" in {
         Get(
           "/?clientId=foobar&" +
             "socketPayload=json"
-        ) ~> routeWithExceptionHandler(inParams(echoComplete)) ~> check {
+        ) ~> routeWithExceptionHandler(
+          inParams(defaultTestAppCfg)(echoComplete)
+        ) ~> check {
           status mustBe StatusCodes.BadRequest
           contentType mustBe ContentTypes.`application/json`
           responseAs[String] must include(
             "Request param 'topic' is missing."
+          )
+        }
+      }
+
+      "reject when instanceId is missing and producer sessions are enabled" in {
+        Get(
+          "/?clientId=foobar&" +
+            "socketPayload=json&" +
+            "topic=test-topic"
+        ) ~> routeWithExceptionHandler(
+          inParams(sessNoTransAppCfg)(echoComplete)
+        ) ~> check {
+          status mustBe StatusCodes.BadRequest
+          contentType mustBe ContentTypes.`application/json`
+          responseAs[String] must include(
+            "Request param 'instanceId' is required when producer " +
+              "sessions are enabled on the proxy server."
+          )
+        }
+      }
+
+      "succeed transactional when transactions and sessions are enabled" in {
+        Get(
+          "/?clientId=foobar&" +
+            "socketPayload=json&" +
+            "topic=test-topic&" +
+            "instanceId=test-instance&" +
+            "transactional=true"
+        ) ~> routeWithExceptionHandler(
+          inParams(transAppCfg)(echoComplete)
+        ) ~> check {
+          status mustBe StatusCodes.OK
+        }
+      }
+
+      "reject transactional when not enabled" in {
+        Get(
+          "/?clientId=foobar&" +
+            "socketPayload=json&" +
+            "topic=test-topic&" +
+            "instanceId=test-instance&" +
+            "transactional=true"
+        ) ~> routeWithExceptionHandler(
+          inParams(defaultTestAppCfg)(echoComplete)
+        ) ~> check {
+          status mustBe StatusCodes.BadRequest
+          contentType mustBe ContentTypes.`application/json`
+          responseAs[String] must include(
+            "Unable to provide transactional producer. Server is not " +
+              "configured to allow producer transactions."
+          )
+        }
+      }
+
+      "reject transactional when producer sessions are not enabled" in {
+        Get(
+          "/?clientId=foobar&" +
+            "socketPayload=json&" +
+            "topic=test-topic&" +
+            "instanceId=test-instance&" +
+            "transactional=true"
+        ) ~> routeWithExceptionHandler(
+          inParams(transNoSessAppCfg)(echoComplete)
+        ) ~> check {
+          status mustBe StatusCodes.BadRequest
+          contentType mustBe ContentTypes.`application/json`
+          responseAs[String] must include(
+            "Unable to provide transactional producer. Server is not " +
+              "configured to allow producer transactions."
+          )
+        }
+      }
+
+      "reject transactional when no instanceId is provided" in {
+        Get(
+          "/?clientId=foobar&" +
+            "socketPayload=json&" +
+            "topic=test-topic&" +
+            "transactional=true"
+        ) ~> routeWithExceptionHandler(
+          inParams(transAppCfg)(echoComplete)
+        ) ~> check {
+          status mustBe StatusCodes.BadRequest
+          contentType mustBe ContentTypes.`application/json`
+          responseAs[String] must include(
+            "Request param 'instanceId' is required when using transactional."
           )
         }
       }
@@ -99,7 +209,7 @@ class QueryParamsParsersSpec
         }
       }
 
-      "fail when an argument has an invalid value" in {
+      "reject when an argument has an invalid value" in {
         Get(
           "/?clientId=foobar&" +
             "groupId=test-group&" +
@@ -122,7 +232,7 @@ class QueryParamsParsersSpec
         }
       }
 
-      "fail when a required parameter is missing" in {
+      "reject when a required parameter is missing" in {
         Get(
           "/?groupId=test-group&" +
             "topic=test-topic&" +

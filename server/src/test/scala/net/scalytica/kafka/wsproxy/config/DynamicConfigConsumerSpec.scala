@@ -92,7 +92,7 @@ class DynamicConfigConsumerSpec
 
         forAll(recs) {
           case UpdateDynamicConfigRecord(key, value, _) =>
-            expectedMap.containsKey(key) mustBe true
+            expectedMap.keys.exists(_.equals(key)) mustBe true
             expectedMap.get(key).value mustBe value
 
           case RemoveDynamicConfigRecord(key, offset) =>

@@ -146,9 +146,14 @@ trait InboundWebSocket extends ClientSpecificCfgLoader with WithProxyLogger {
     val sessionId      = SessionId(producerId)
     val fullProducerId = FullProducerId(producerId, args.instanceId)
     val prodLimitCfg   = cfg.producer.limits.forProducer(producerId)
-    val maxCons = prodLimitCfg
-      .flatMap(_.maxConnections)
-      .getOrElse(cfg.producer.limits.defaultMaxConnectionsPerClient)
+    val maxCons = {
+      if (args.transactional) 1
+      else {
+        prodLimitCfg
+          .flatMap(_.maxConnections)
+          .getOrElse(cfg.producer.limits.defaultMaxConnectionsPerClient)
+      }
+    }
 
     val producerAddResult = initSessionForProducer(
       serverId = serverId,
@@ -189,10 +194,10 @@ trait InboundWebSocket extends ClientSpecificCfgLoader with WithProxyLogger {
             "instance with the same ID is already registered."
         )
 
-      case InstanceLimitReached(s) =>
+      case InstanceLimitReached(_) =>
         throw RequestValidationError(
           s"The max number of WebSockets for session ${sessionId.value} " +
-            s"has been reached. Limit is ${s.maxConnections}"
+            s"has been reached. Limit is $maxCons."
         )
 
       case SessionNotFound(_) =>

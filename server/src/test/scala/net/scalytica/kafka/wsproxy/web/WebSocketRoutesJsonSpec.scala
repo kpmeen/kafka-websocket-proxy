@@ -3,6 +3,7 @@ package net.scalytica.kafka.wsproxy.web
 import akka.http.scaladsl.server._
 import io.github.embeddedkafka.Codecs.stringDeserializer
 import net.scalytica.kafka.wsproxy.models.Formats.{NoType, StringType}
+import net.scalytica.kafka.wsproxy.models.ReadCommitted
 import net.scalytica.test._
 import org.scalatest.Inspectors.forAll
 import org.scalatest.wordspec.AnyWordSpec
@@ -115,6 +116,38 @@ class WebSocketRoutesJsonSpec
             routes = Route.seal(wsRouteFromProducerContext),
             messages = messages,
             validateMessageId = true
+          )
+
+          // validate the topic contents
+          val (k, v) =
+            consumeFirstKeyedMessageFrom[String, String](ctx.topicName.value)
+          k mustBe "foo-1"
+          v mustBe "bar-1"
+        }
+
+      "produce messages using exactly once semantics" in
+        plainProducerContext(
+          nextTopic,
+          useProducerSessions = true,
+          useExactlyOnce = true
+        ) { implicit ctx =>
+          implicit val wsClient = ctx.producerProbe
+          implicit val kcfg =
+            ctx.embeddedKafkaConfig.withConsumerReadIsolation(ReadCommitted)
+
+          val messages =
+            createJsonKeyValue(1, withHeaders = true, withMessageId = true)
+
+          produceAndAssertJson(
+            producerId = producerId("json", topicCounter),
+            instanceId = Option(instanceId("instance-1")),
+            topic = ctx.topicName,
+            keyType = StringType,
+            valType = StringType,
+            routes = Route.seal(wsRouteFromProducerContext),
+            messages = messages,
+            validateMessageId = true,
+            exactlyOnce = true
           )
 
           // validate the topic contents

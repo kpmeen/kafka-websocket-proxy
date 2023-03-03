@@ -1,5 +1,6 @@
 package net.scalytica.kafka.wsproxy.web
 
+import akka.http.scaladsl.model.ContentTypes
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers.BasicHttpCredentials
 import akka.http.scaladsl.server._
@@ -27,15 +28,48 @@ class WebSocketRoutesGenericSpec
 
   override protected val testTopicPrefix: String = "generic-test-topic"
 
-  private[this] def shortProducerUri(pid: String, iid: Option[String])(
+  private[this] def shortProducerUri(
+      pid: String,
+      iid: Option[String],
+      useExactlyOnce: Boolean = false
+  )(
       implicit ctx: ProducerContext
   ) = {
     baseProducerUri(
       producerId = WsProducerId(pid),
       instanceId = iid.map(WsProducerInstanceId.apply),
       topicName = ctx.topicName,
-      payloadType = JsonPayload
+      payloadType = JsonPayload,
+      exactlyOnce = useExactlyOnce
     )
+  }
+
+  private[this] def assertInvalidTransactionalConfig(
+      useProducerSessions: Boolean,
+      useExactlyOnce: Boolean
+  ) = {
+    plainProducerContext(
+      nextTopic,
+      useProducerSessions = useProducerSessions,
+      useExactlyOnce = useExactlyOnce
+    ) { implicit ctx =>
+      implicit val wsClient = ctx.producerProbe
+      val uri = buildProducerUri(
+        producerId = Some(producerId("producer", topicCounter)),
+        instanceId = Some(WsProducerInstanceId("producer-a")),
+        topicName = Some(ctx.topicName),
+        transactional = Some(true)
+      )
+
+      assertProducerWS(wsRouteFromProducerContext, uri) {
+        isWebSocketUpgrade mustBe false
+        status mustBe BadRequest
+        responseAs[String] must include(
+          "Server is not configured to allow producer transactions"
+        )
+        contentType mustBe ContentTypes.`application/json`
+      }
+    }
   }
 
   "Using the WebSockets" when {
@@ -51,13 +85,13 @@ class WebSocketRoutesGenericSpec
         "is not set" in
         plainProducerContext(nextTopic, useProducerSessions = true) {
           implicit ctx =>
-            assertRejectMissingInstanceId(useSession = true)
+            assertNoInstanceId(useSession = true)
         }
 
       "allow producer connection when sessions are enabled and instanceId " +
         "is not set" in
         plainProducerContext(nextTopic) { implicit ctx =>
-          assertRejectMissingInstanceId(useSession = false)
+          assertNoInstanceId(useSession = false)
         }
 
       "reject producer connection when the required topic is not set" in
@@ -177,9 +211,38 @@ class WebSocketRoutesGenericSpec
                   "The max number of WebSockets for session " +
                     "limit-test-producer-1 has been reached. Limit is 1"
                 )
+                contentType mustBe ContentTypes.`application/json`
               }
             }
         }
+
+      // TODO: Implement test cases for exactly once producer semantics
+
+      "reject exactly once producer connection when no instanceId" in
+        plainProducerContext(
+          nextTopic,
+          useProducerSessions = true,
+          useExactlyOnce = true
+        ) { implicit ctx =>
+          assertNoInstanceId(
+            useSession = true,
+            exactlyOnce = Some(true)
+          )
+        }
+
+      "reject exactly once producer when transactions are disabled" in {
+        assertInvalidTransactionalConfig(
+          useProducerSessions = true,
+          useExactlyOnce = false
+        )
+      }
+
+      "reject exactly once producer when sessions are disabled" in {
+        assertInvalidTransactionalConfig(
+          useProducerSessions = false,
+          useExactlyOnce = true
+        )
+      }
 
       "return HTTP 400 when attempting to produce to a non-existing topic" in
         plainProducerContext(nextTopic) { implicit ctx =>
@@ -195,6 +258,7 @@ class WebSocketRoutesGenericSpec
             Route.seal(wsRouteFromProducerContext) ~>
             check {
               status mustBe BadRequest
+              contentType mustBe ContentTypes.`application/json`
             }
         }
 
@@ -233,6 +297,7 @@ class WebSocketRoutesGenericSpec
             WS(out, probe2.flow) ~> route ~> check {
               status mustBe BadRequest
               responseAs[String] must include(rejectionMsg)
+              contentType mustBe ContentTypes.`application/json`
             }
           }
         }
@@ -296,6 +361,7 @@ class WebSocketRoutesGenericSpec
             WS(out("b"), ctx.consumerProbe.flow) ~> route ~> check {
               status mustBe BadRequest
               responseAs[String] must include(rejectionMsg)
+              contentType mustBe ContentTypes.`application/json`
             }
           }
         }
@@ -328,6 +394,7 @@ class WebSocketRoutesGenericSpec
             Route.seal(wsRouteFromConsumerContext) ~>
             check {
               status mustBe Unauthorized
+              contentType mustBe ContentTypes.`application/json`
             }
         }
 
@@ -352,6 +419,7 @@ class WebSocketRoutesGenericSpec
             kafkaCreds = Some(wrongCreds)
           ) {
             status mustBe Unauthorized
+            contentType mustBe ContentTypes.`application/json`
           }
         }
     }
@@ -385,6 +453,7 @@ class WebSocketRoutesGenericSpec
                 kafkaCreds = Some(creds)
               ) {
                 status mustBe Unauthorized
+                contentType mustBe ContentTypes.`application/json`
               }
             }
         }
@@ -415,6 +484,7 @@ class WebSocketRoutesGenericSpec
                 creds = Some(token.bearerToken)
               ) {
                 status mustBe Unauthorized
+                contentType mustBe ContentTypes.`application/json`
               }
             }
         }
@@ -444,6 +514,7 @@ class WebSocketRoutesGenericSpec
                 kafkaCreds = Some(creds)
               ) {
                 status mustBe ServiceUnavailable
+                contentType mustBe ContentTypes.`application/json`
               }
             }
         }

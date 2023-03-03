@@ -14,13 +14,9 @@ import net.scalytica.kafka.wsproxy.errors.{
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails
 import net.scalytica.kafka.wsproxy.models._
-import net.scalytica.kafka.wsproxy.{
-  consumerMetricsProperties,
-  mapToProperties,
-  SaslJaasConfig
-}
+import net.scalytica.kafka.wsproxy.{consumerMetricsProperties, SaslJaasConfig}
 import org.apache.kafka.clients.consumer.ConsumerConfig._
-import org.apache.kafka.clients.consumer.{ConsumerRecord, KafkaConsumer}
+import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.errors.{
   AuthenticationException,
   AuthorizationException
@@ -28,7 +24,6 @@ import org.apache.kafka.common.errors.{
 import org.apache.kafka.common.serialization.Deserializer
 
 import scala.concurrent.duration._
-import scala.jdk.CollectionConverters._
 
 /** Functions for initialising Kafka consumer sources. */
 object WsConsumer extends WithProxyLogger {
@@ -58,54 +53,32 @@ object WsConsumer extends WithProxyLogger {
       )
       .withClientId(args.clientId.value)
       .withGroupId(args.groupId.value)
-      .withConsumerFactory(initialiseConsumer(args.aclCredentials))
+      .withProperties(completeConsumerSettings(args.aclCredentials))
   }
 
   /**
-   * Initialise a new [[KafkaConsumer]] instance
+   * Build the complete set of consumer configurations
    *
    * @param aclCredentials
-   *   Option containing the [[AclCredentials]] to use
-   * @param cs
-   *   the [[ConsumerSettings]] to apply
+   *   Option containing the [[AclCredentials]] to use the [[ConsumerSettings]]
+   *   to apply
    * @param cfg
    *   the [[AppCfg]] to use for configurable parameters
-   * @tparam K
-   *   the type used for configuring the default key serdes.
-   * @tparam V
-   *   the type used for configuring the default value serdes.
    * @return
-   *   a [[KafkaConsumer]] instance for keys of type [[K]] and value [[V]]
+   *   a Map of all the configurations for the consumer client
    */
-  private[this] def initialiseConsumer[K, V](
+  private[this] def completeConsumerSettings(
       aclCredentials: Option[AclCredentials]
-  )(
-      cs: ConsumerSettings[K, V]
-  )(implicit cfg: AppCfg): KafkaConsumer[K, V] = {
-    val props = {
-      val saslMechanism = cfg.consumer.saslMechanism
-      val kafkaLoginModule =
-        KafkaLoginModules.fromSaslMechanism(saslMechanism, aclCredentials)
-      val jaasProps = KafkaLoginModules.buildJaasProperty(kafkaLoginModule)
-      // Strip away the default sasl_jaas_config, since the client needs to
-      // use their own credentials for auth.
-      val kcp = cfg.consumer.kafkaClientProperties - SaslJaasConfig
+  )(implicit cfg: AppCfg): Map[String, String] = {
+    val saslMechanism = cfg.consumer.saslMechanism
+    val kafkaLoginModule =
+      KafkaLoginModules.fromSaslMechanism(saslMechanism, aclCredentials)
+    val jaasProps = KafkaLoginModules.buildJaasProperty(kafkaLoginModule)
+    // Strip away the default sasl_jaas_config, since the client needs to
+    // use their own credentials for auth.
+    val kcp = cfg.consumer.kafkaClientProperties - SaslJaasConfig
 
-      kcp ++
-        cs.getProperties.asScala.toMap ++
-        consumerMetricsProperties ++
-        jaasProps
-    }
-
-    log.trace(
-      s"Using consumer configuration: ${props.mkString("\n  ", "\n  ", "")}"
-    )
-
-    new KafkaConsumer[K, V](
-      props,
-      cs.keyDeserializerOpt.orNull,
-      cs.valueDeserializerOpt.orNull
-    )
+    kcp ++ consumerMetricsProperties ++ jaasProps
   }
 
   /** Convenience function for logging a [[ConsumerRecord]]. */

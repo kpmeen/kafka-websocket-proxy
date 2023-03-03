@@ -12,10 +12,7 @@ import org.apache.kafka.clients.consumer.ConsumerConfig.{
   AUTO_OFFSET_RESET_CONFIG,
   ENABLE_AUTO_COMMIT_CONFIG
 }
-import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.consumer.OffsetResetStrategy.EARLIEST
-
-import scala.jdk.CollectionConverters._
 
 /**
  * Consumer for processing all updates to session state topic and transforming
@@ -52,23 +49,8 @@ private[session] class SessionDataConsumer(
         AUTO_OFFSET_RESET_CONFIG  -> EARLIEST.name.toLowerCase,
         ENABLE_AUTO_COMMIT_CONFIG -> "false"
       )
-      .withConsumerFactory(initialiseConsumer)
-  }
-
-  private[this] def initialiseConsumer(
-      cs: ConsumerSettings[String, Session]
-  ): KafkaConsumer[String, Session] = {
-    val props = cfg.consumer.kafkaClientProperties ++
-      cs.getProperties.asScala.toMap ++
-      consumerMetricsProperties
-
-    log.trace(s"Using consumer configuration:\n${props.mkString("\n")}")
-
-    new KafkaConsumer[String, Session](
-      props,
-      cs.keyDeserializerOpt.orNull,
-      cs.valueDeserializerOpt.orNull
-    )
+      .withProperties(cfg.consumer.kafkaClientProperties)
+      .withProperties(consumerMetricsProperties)
   }
 
   /** The akka-stream Source consuming messages from the session state topic. */

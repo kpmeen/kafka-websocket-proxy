@@ -119,7 +119,7 @@ trait WebSocketRoutes { self: BaseRoutes =>
           path("in") {
             optionalHeaderValueByType(XKafkaAuthHeader) { headerCreds =>
               val creds = extractKafkaCreds(authResult, headerCreds)
-              inParams { inArgs =>
+              inParams(cfg) { inArgs =>
                 val args = inArgs
                   .withAclCredentials(creds)
                   .withBearerToken(authResult.maybeBearerToken)

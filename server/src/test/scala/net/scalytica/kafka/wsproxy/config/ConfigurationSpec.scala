@@ -79,6 +79,8 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
       |  }
       |
       |  producer {
+      |    sessions-enabled = false
+      |    exactly-once-enabled = false
       |    limits {
       |      default-messages-per-second = 0
       |      default-max-connections-per-client = 0
@@ -157,6 +159,8 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
       |  }
       |
       |  producer {
+      |    sessions-enabled = false
+      |    exactly-once-enabled = false
       |    limits {
       |      default-messages-per-second = 0
       |      default-max-connections-per-client = 0
@@ -243,16 +247,17 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
       cfg.consumer.limits.defaultBatchSize mustBe 0
       cfg.consumer.limits.defaultMessagesPerSecond mustBe 0
 
-      cfg.producer.limits.defaultMessagesPerSecond mustBe 0
-      cfg.producer.limits.defaultMaxConnectionsPerClient mustBe 0
-      cfg.producer.limits.clientSpecificLimits must have size 2
-      val limitedClient1Cfg =
-        cfg.producer.limits.clientSpecificLimits.headOption.value
+      val prd = cfg.producer
+      prd.sessionsEnabled mustBe false
+      prd.exactlyOnceEnabled mustBe false
+      prd.limits.defaultMessagesPerSecond mustBe 0
+      prd.limits.defaultMaxConnectionsPerClient mustBe 0
+      prd.limits.clientSpecificLimits must have size 2
+      val limitedClient1Cfg = prd.limits.clientSpecificLimits.headOption.value
       limitedClient1Cfg.id mustBe "limit-test-producer-1"
       limitedClient1Cfg.messagesPerSecond.value mustBe 10
       limitedClient1Cfg.maxConnections.value mustBe 1
-      val limitedClient2Cfg =
-        cfg.producer.limits.clientSpecificLimits.lastOption.value
+      val limitedClient2Cfg = prd.limits.clientSpecificLimits.lastOption.value
       limitedClient2Cfg.id mustBe "limit-test-producer-2"
       limitedClient2Cfg.messagesPerSecond.value mustBe 10
       limitedClient2Cfg.maxConnections.value mustBe 2
@@ -291,9 +296,12 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
         cfg.consumer.limits.defaultBatchSize mustBe 0
         cfg.consumer.limits.defaultMessagesPerSecond mustBe 0
 
-        cfg.producer.limits.defaultMessagesPerSecond mustBe 0
-        cfg.producer.limits.defaultMaxConnectionsPerClient mustBe 0
-        cfg.producer.limits.clientSpecificLimits mustBe empty
+        val prd = cfg.producer
+        prd.sessionsEnabled mustBe false
+        prd.exactlyOnceEnabled mustBe false
+        prd.limits.defaultMessagesPerSecond mustBe 0
+        prd.limits.defaultMaxConnectionsPerClient mustBe 0
+        prd.limits.clientSpecificLimits mustBe empty
 
         val shCfg = cfg.sessionHandler
         shCfg.topicName.value mustBe "_wsproxy.session.state"
@@ -338,9 +346,12 @@ class ConfigurationSpec extends AnyWordSpec with Matchers with OptionValues {
       cfg.consumer.limits.defaultBatchSize mustBe 0
       cfg.consumer.limits.defaultMessagesPerSecond mustBe 0
 
-      cfg.producer.limits.defaultMessagesPerSecond mustBe 0
-      cfg.producer.limits.defaultMaxConnectionsPerClient mustBe 0
-      cfg.producer.limits.clientSpecificLimits mustBe empty
+      val prd = cfg.producer
+      prd.sessionsEnabled mustBe false
+      prd.exactlyOnceEnabled mustBe false
+      prd.limits.defaultMessagesPerSecond mustBe 0
+      prd.limits.defaultMaxConnectionsPerClient mustBe 0
+      prd.limits.clientSpecificLimits mustBe empty
 
       val shCfg = cfg.sessionHandler
       shCfg.topicName.value mustBe "_wsproxy.session.state"

@@ -18,25 +18,15 @@ import net.scalytica.kafka.wsproxy.errors.{
 }
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models._
-import net.scalytica.kafka.wsproxy.{
-  mapToProperties,
-  producerMetricsProperties,
-  SaslJaasConfig
-}
-import org.apache.kafka.clients.producer.{
-  KafkaProducer,
-  ProducerConfig,
-  ProducerRecord
-}
+import net.scalytica.kafka.wsproxy.{producerMetricsProperties, SaslJaasConfig}
+import org.apache.kafka.clients.producer.ProducerConfig._
 import org.apache.kafka.common.errors.{
   AuthenticationException,
   AuthorizationException
 }
-import org.apache.kafka.common.header.Header
 import org.apache.kafka.common.serialization.Serializer
 
 import scala.concurrent.ExecutionContext
-import scala.jdk.CollectionConverters._
 
 /** Functions for initialising Kafka producer sinks and flows. */
 object WsProducer extends ProducerFlowExtras with WithProxyLogger {
@@ -48,6 +38,9 @@ object WsProducer extends ProducerFlowExtras with WithProxyLogger {
     Source(it)
   }
 
+  private[this] def useTransactions(args: InSocketArgs, cfg: AppCfg): Boolean =
+    cfg.producer.exactlyOnceEnabled && args.transactional
+
   /** Create producer settings to use for the Kafka producer. */
   private[this] def producerSettings[K, V](
       args: InSocketArgs
@@ -56,40 +49,43 @@ object WsProducer extends ProducerFlowExtras with WithProxyLogger {
       as: ActorSystem,
       ks: Option[Serializer[K]],
       vs: Option[Serializer[V]]
-  ) = {
+  ): ProducerSettings[K, V] = {
     val kafkaUrl = cfg.kafkaClient.bootstrapHosts.mkString()
 
-    ProducerSettings(as, ks, vs)
+    val settings = ProducerSettings(as, ks, vs)
       .withCloseProducerOnStop(true)
       .withBootstrapServers(kafkaUrl)
-      .withProducerFactory(initialiseProducer(args.aclCredentials))
-      .withProperty(ProducerConfig.CLIENT_ID_CONFIG, args.producerId.value)
+      .withProperty(CLIENT_ID_CONFIG, args.producerId.value)
+      .withProperties(completeProducerSettings(args.aclCredentials))
+
+    if (useTransactions(args, cfg)) {
+      log.debug("Configuring transactional Kafka producer...")
+      // Enabling transactions requires instanceId to be present.
+      val transId = FullProducerId(args.producerId, args.instanceId)
+      settings
+        .withProperty(ENABLE_IDEMPOTENCE_CONFIG, "true")
+        .withProperty(ACKS_CONFIG, "all")
+        .withProperty(MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, "1")
+        .withProperty(TRANSACTIONAL_ID_CONFIG, transId.value)
+    } else {
+      log.debug("Configuring standard Kafka producer...")
+      settings
+    }
   }
 
-  private[this] def initialiseProducer[K, V](
+  private[this] def completeProducerSettings(
       aclCredentials: Option[AclCredentials]
-  )(ps: ProducerSettings[K, V])(implicit cfg: AppCfg): KafkaProducer[K, V] = {
-    val props = {
-      val saslMechanism = cfg.consumer.saslMechanism
-      val kafkaLoginModule =
-        KafkaLoginModules.fromSaslMechanism(saslMechanism, aclCredentials)
-      val jaasProps = KafkaLoginModules.buildJaasProperty(kafkaLoginModule)
+  )(implicit cfg: AppCfg): Map[String, String] = {
+    val saslMechanism = cfg.consumer.saslMechanism
+    val kafkaLoginModule =
+      KafkaLoginModules.fromSaslMechanism(saslMechanism, aclCredentials)
+    val jaasProps = KafkaLoginModules.buildJaasProperty(kafkaLoginModule)
 
-      // Strip away the default sasl_jaas_config, since the client needs to
-      // use their own credentials for auth.
-      val kcp = cfg.producer.kafkaClientProperties - SaslJaasConfig
+    // Strip away the default sasl_jaas_config, since the client needs to
+    // use their own credentials for auth.
+    val kcp = cfg.producer.kafkaClientProperties - SaslJaasConfig
 
-      kcp ++
-        ps.getProperties.asScala.toMap ++
-        producerMetricsProperties ++
-        jaasProps
-    }
-
-    new KafkaProducer[K, V](
-      props,
-      ps.keySerializerOpt.orNull,
-      ps.valueSerializerOpt.orNull
-    )
+    kcp ++ producerMetricsProperties ++ jaasProps
   }
 
   /**
@@ -103,52 +99,6 @@ object WsProducer extends ProducerFlowExtras with WithProxyLogger {
       ks: Serializer[K],
       vs: Serializer[V]
   ) = producerSettings(args)(cfg, as, Option(ks), Option(vs))
-
-  /**
-   * Converts a [[WsProducerRecord]] into a Kafka [[ProducerRecord]].
-   *
-   * @param topic
-   *   the topic name the record is to be written to.
-   * @param msg
-   *   the message to send to the Kafka topic.
-   * @tparam K
-   *   the message key type
-   * @tparam V
-   *   the message value type
-   * @return
-   *   an instance of [[ProducerRecord]]
-   */
-  @throws[IllegalStateException]
-  private[this] def asKafkaProducerRecord[K, V](
-      topic: TopicName,
-      msg: WsProducerRecord[K, V]
-  ): ProducerRecord[K, V] = {
-    val headers: Iterable[Header] =
-      msg.headers.getOrElse(Seq.empty).map(_.asRecordHeader)
-
-    msg match {
-      case kvm: ProducerKeyValueRecord[K, V] =>
-        new ExtendedProducerRecord[K, V](
-          topic.value,
-          kvm.key.value,
-          kvm.value.value,
-          headers.asJava
-        )
-
-      case vm: ProducerValueRecord[V] =>
-        new ExtendedProducerRecord[K, V](
-          topic.value,
-          vm.value.value,
-          headers.asJava
-        )
-
-      case ProducerEmptyMessage =>
-        throw new IllegalStateException(
-          "EmptyMessage passed through stream pipeline, but should have" +
-            " been filtered out."
-        )
-    }
-  }
 
   /**
    * Call partitionsFor with the client to validate auth etc. This is a
@@ -197,6 +147,23 @@ object WsProducer extends ProducerFlowExtras with WithProxyLogger {
     }
   }
 
+  private[this] def producerFlow[K, V](
+      args: InSocketArgs,
+      cfg: AppCfg,
+      settings: ProducerSettings[K, V]
+  ) = {
+    if (!useTransactions(args, cfg)) {
+      Producer.flexiFlow[K, V, WsProducerRecord[K, V]](settings)
+    } else {
+      val transId = FullProducerId(args.producerId, args.instanceId).value
+      log.debug(
+        s"Initializing transactional producer for transaction.id $transId"
+      )
+      WsTransactionalProducer
+        .flexiFlow[K, V, WsProducerRecord[K, V]](settings, transId)
+    }
+  }
+
   /**
    * @param args
    *   input arguments defining the base configs for the producer.
@@ -238,16 +205,42 @@ object WsProducer extends ProducerFlowExtras with WithProxyLogger {
 
     checkClient(args.topic, settings)
 
-    rateLimitedJsonToWsProducerRecordFlow[K, V](args)
-      .map { wpr =>
-        val record = asKafkaProducerRecord(args.topic, wpr)
-        ProducerMessage.Message(record, wpr)
+    val producer = producerFlow[K, V](args, cfg, settings)
+
+    val pflow = Flow[WsProducerRecord[K, V]]
+      .map { r =>
+        ProducerMessage.single(
+          record = WsProducerRecord.asKafkaProducerRecord(args.topic, r),
+          passThrough = r
+        )
       }
-      .via(Producer.flexiFlow(settings))
+      .via(producer)
       .map(r => WsProducerResult.fromProducerResult(r))
       .flatMapConcat(seqToSource)
+
+    rateLimitedJsonToWsProducerRecordFlow[K, V](args).via(pflow)
   }
 
+  /**
+   * @param args
+   *   input arguments defining the base configs for the producer.
+   * @param cfg
+   *   the [[AppCfg]] containing application configurations.
+   * @param as
+   *   actor system to use
+   * @param mat
+   *   actor materializer to use
+   * @param serde
+   *   the Avro SerDes to use for serializing the message.
+   * @tparam K
+   *   the message key type
+   * @tparam V
+   *   the message value type
+   * @return
+   *   a [[Flow]] that sends messages to Kafka and passes on the result
+   *   down-stream for further processing. For example sending the metadata to
+   *   the external web client for it to process locally.
+   */
   def produceAvro[K, V](args: InSocketArgs)(
       implicit cfg: AppCfg,
       as: ActorSystem,
@@ -267,14 +260,18 @@ object WsProducer extends ProducerFlowExtras with WithProxyLogger {
 
     checkClient(args.topic, settings)
 
+    val producer = producerFlow[keyType.Aux, valType.Aux](args, cfg, settings)
+
     rateLimitedAvroToWsProducerRecordFlow[keyType.Aux, valType.Aux](
       args = args,
       keyType = keyType,
       valType = valType
-    ).map { wpr =>
-      val record = asKafkaProducerRecord(args.topic, wpr)
-      ProducerMessage.Message(record, wpr)
-    }.via(Producer.flexiFlow(settings))
+    ).map { r =>
+      ProducerMessage.single(
+        record = WsProducerRecord.asKafkaProducerRecord(args.topic, r),
+        passThrough = r
+      )
+    }.via(producer)
       .map(r => WsProducerResult.fromProducerResult(r))
       .flatMapConcat(seqToSource)
   }
