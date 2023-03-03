@@ -2,9 +2,11 @@ package net.scalytica.kafka.wsproxy.models
 
 import org.apache.kafka.common.IsolationLevel
 
+import java.util.Locale
+
 sealed trait ReadIsolationLevel {
   protected val level: IsolationLevel
-  lazy val value: String               = level.toString.toLowerCase
+  lazy val value: String               = level.toString.toLowerCase(Locale.ROOT)
   def isSameName(str: String): Boolean = value.equalsIgnoreCase(str)
 }
 

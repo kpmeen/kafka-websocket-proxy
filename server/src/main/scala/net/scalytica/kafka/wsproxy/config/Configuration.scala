@@ -24,11 +24,15 @@ trait Configuration extends WithProxyLogger {
 
   protected val CfgRootKey = "kafka.ws.proxy"
 
-  private[this] def lightbendConfigToMap(cfg: Config): Map[String, AnyRef] = {
-    cfg.entrySet().asScala.map(e => e.getKey -> e.getValue.unwrapped).toMap
+  private[this] def lightbendConfigToMap(cfg: Config): Map[String, String] = {
+    cfg
+      .entrySet()
+      .asScala
+      .map(e => e.getKey -> e.getValue.unwrapped().toString)
+      .toMap
   }
 
-  implicit lazy val configAsMap: ConfigReader[Map[String, AnyRef]] =
+  implicit lazy val configAsMap: ConfigReader[Map[String, String]] =
     ConfigReader
       .fromCursor(_.asObjectCursor.map(_.objValue.toConfig))
       .map(lightbendConfigToMap)
@@ -156,15 +160,15 @@ trait Configuration extends WithProxyLogger {
   case class SchemaRegistryCfg(
       url: String,
       autoRegisterSchemas: Boolean,
-      properties: Map[String, AnyRef] = Map.empty
+      properties: Map[String, String] = Map.empty
   )
 
   case class ConfluentMonitoringCfg(
       bootstrapHosts: KafkaBootstrapHosts,
-      properties: Map[String, AnyRef]
+      properties: Map[String, String]
   ) {
 
-    def asPrefixedProperties: Map[String, AnyRef] =
+    def asPrefixedProperties: Map[String, String] =
       ConfluentMonitoringCfg
         .withConfluentMonitoringPrefix(bootstrapHosts, properties)
 
@@ -177,8 +181,8 @@ trait Configuration extends WithProxyLogger {
 
     def withConfluentMonitoringPrefix(
         bootstrapHosts: KafkaBootstrapHosts,
-        props: Map[String, AnyRef]
-    ): Map[String, AnyRef] = {
+        props: Map[String, String]
+    ): Map[String, String] = {
       props.map { case (key, value) =>
         s"${ConfluentMonitoringCfg.MonitoringPrefix}.$key" -> value
       } + (BootstrapServersKey -> bootstrapHosts.hosts.mkString(","))
@@ -190,12 +194,12 @@ trait Configuration extends WithProxyLogger {
       bootstrapHosts: KafkaBootstrapHosts,
       schemaRegistry: Option[SchemaRegistryCfg],
       monitoringEnabled: Boolean,
-      properties: Map[String, AnyRef],
+      properties: Map[String, String],
       confluentMonitoring: Option[ConfluentMonitoringCfg]
   )
 
   case class AdminClientCfg(
-      kafkaClientProperties: Map[String, AnyRef]
+      kafkaClientProperties: Map[String, String]
   )
 
   sealed trait DynamicCfg {
@@ -296,11 +300,11 @@ trait Configuration extends WithProxyLogger {
 
   case class ConsumerCfg(
       limits: ClientLimitsCfg,
-      kafkaClientProperties: Map[String, AnyRef]
+      kafkaClientProperties: Map[String, String]
   ) {
 
     def saslMechanism: Option[String] =
-      kafkaClientProperties.get(SaslConfigs.SASL_MECHANISM).map(_.toString)
+      kafkaClientProperties.get(SaslConfigs.SASL_MECHANISM)
 
     def addConsumerLimitCfg(cfg: ConsumerSpecificLimitCfg): ConsumerCfg = {
       this.copy(limits = limits.addConsumerSpecificLimitCfg(cfg))
@@ -310,12 +314,17 @@ trait Configuration extends WithProxyLogger {
 
   case class ProducerCfg(
       sessionsEnabled: Boolean,
+      exactlyOnceEnabled: Boolean,
       limits: ClientLimitsCfg,
-      kafkaClientProperties: Map[String, AnyRef]
+      kafkaClientProperties: Map[String, String]
   ) {
 
+    def hasValidTransactionCfg: Boolean = {
+      sessionsEnabled && exactlyOnceEnabled
+    }
+
     def saslMechanism: Option[String] =
-      kafkaClientProperties.get(SaslConfigs.SASL_MECHANISM).map(_.toString)
+      kafkaClientProperties.get(SaslConfigs.SASL_MECHANISM)
 
     def addProducerLimitCfg(cfg: ProducerSpecificLimitCfg): ProducerCfg = {
       this.copy(limits = limits.addProducerSpecificLimitCfg(cfg))

@@ -12,6 +12,7 @@ import io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig.{
 }
 import io.confluent.kafka.serializers.subject.TopicNameStrategy
 import io.confluent.kafka.serializers.subject.strategy.SubjectNameStrategy
+import io.github.embeddedkafka.{EmbeddedKafkaConfig, EmbeddedKafkaConfigImpl}
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
   AvroConsumerRecord,
   AvroProducerResult
@@ -21,6 +22,7 @@ import net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde
 import net.scalytica.kafka.wsproxy.models.Formats.{AvroType, FormatType}
 import net.scalytica.kafka.wsproxy.models._
 import net.scalytica.test.TestTypes.{Album, TestKey}
+import org.apache.kafka.clients.consumer.ConsumerConfig.ISOLATION_LEVEL_CONFIG
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.{Assertion, OptionValues}
 
@@ -62,6 +64,22 @@ package object test {
         // scalastyle:on
       }
       .getOrElse(Map.empty)
+  }
+
+  implicit class EmbeddedKafkaCfgExtensions(kcfg: EmbeddedKafkaConfig) {
+
+    def withConsumerReadIsolation(
+        isolationLevel: ReadIsolationLevel
+    ): EmbeddedKafkaConfig = {
+      kcfg
+        .asInstanceOf[EmbeddedKafkaConfigImpl]
+        .copy(
+          customConsumerProperties = Map[String, String](
+            ISOLATION_LEVEL_CONFIG -> isolationLevel.value
+          )
+        )
+    }
+
   }
 
   implicit class AddFutureAwaitResult[T](future: Future[T]) {

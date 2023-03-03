@@ -40,7 +40,7 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
   // scalastyle:off line.size.limit
   private[this] def admConfig = {
     val uuidSuffix = UUID.randomUUID().toString
-    cfg.adminClient.kafkaClientProperties ++ Map[String, AnyRef](
+    cfg.adminClient.kafkaClientProperties ++ Map[String, String](
       BOOTSTRAP_SERVERS_CONFIG -> cfg.kafkaClient.bootstrapHosts.mkString(),
       CLIENT_ID_CONFIG         -> s"kafka-websocket-proxy-admin-${uuidSuffix}"
     )

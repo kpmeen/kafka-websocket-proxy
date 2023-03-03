@@ -151,6 +151,8 @@ object OutSocketArgs {
  *   optional type for the message keys in the topic.
  * @param valType
  *   the type for the message values in the topic.
+ * @param transactional
+ *   flag indicating if the producer should use Kafka transactions or not.
  * @param aclCredentials
  *   the Kafka ACL credentials to use with the Kafka client
  * @param bearerToken
@@ -163,6 +165,7 @@ case class InSocketArgs(
     instanceId: Option[WsProducerInstanceId] = None,
     keyType: Option[Formats.FormatType] = None,
     valType: Formats.FormatType = Formats.StringType,
+    transactional: Boolean = false,
     aclCredentials: Option[AclCredentials] = None,
     bearerToken: Option[OAuth2BearerToken] = None
 ) extends SocketArgs {
@@ -182,7 +185,8 @@ object InSocketArgs {
       TopicName,
       SocketPayload,
       Option[FormatType],
-      FormatType
+      FormatType,
+      Boolean
   )
 
   def fromTupledQueryParams(
@@ -193,7 +197,8 @@ object InSocketArgs {
     topicName = t._3,
     socketPayload = t._4,
     keyTpe = t._5,
-    valTpe = t._6
+    valTpe = t._6,
+    transactional = t._7
   )
 
   def fromQueryParams(
@@ -202,7 +207,8 @@ object InSocketArgs {
       topicName: TopicName,
       socketPayload: SocketPayload,
       keyTpe: Option[FormatType],
-      valTpe: FormatType
+      valTpe: FormatType,
+      transactional: Boolean
   ): InSocketArgs =
     InSocketArgs(
       producerId = clientId,
@@ -210,7 +216,8 @@ object InSocketArgs {
       topic = topicName,
       socketPayload = socketPayload,
       keyType = keyTpe,
-      valType = valTpe
+      valType = valTpe,
+      transactional = transactional
     )
 
 }

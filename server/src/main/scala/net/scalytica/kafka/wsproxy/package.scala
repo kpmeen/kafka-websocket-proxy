@@ -31,25 +31,25 @@ package object wsproxy {
 
   def monitoringProperties(
       interceptorClassStr: String
-  )(implicit cfg: AppCfg): Map[String, AnyRef] = {
+  )(implicit cfg: AppCfg): Map[String, String] = {
     if (cfg.kafkaClient.monitoringEnabled) {
       // Enables stream monitoring in confluent control center
       Map(INTERCEPTOR_CLASSES_CONFIG -> interceptorClassStr) ++
         cfg.kafkaClient.confluentMonitoring
           .map(cmr => cmr.asPrefixedProperties)
-          .getOrElse(Map.empty[String, AnyRef])
+          .getOrElse(Map.empty[String, String])
     } else {
-      Map.empty[String, AnyRef]
+      Map.empty[String, String]
     }
   }
 
-  def producerMetricsProperties(implicit cfg: AppCfg): Map[String, AnyRef] =
+  def producerMetricsProperties(implicit cfg: AppCfg): Map[String, String] =
     monitoringProperties(ProducerInterceptorClass)
 
-  def consumerMetricsProperties(implicit cfg: AppCfg): Map[String, AnyRef] =
+  def consumerMetricsProperties(implicit cfg: AppCfg): Map[String, String] =
     monitoringProperties(ConsumerInterceptorClass)
 
-  implicit def mapToProperties(m: Map[String, AnyRef]): JProps = {
+  implicit def mapToProperties(m: Map[String, String]): JProps = {
     val props = new JProps()
     m.foreach(kv => props.put(kv._1, kv._2))
     props
@@ -100,7 +100,7 @@ package object wsproxy {
 
   implicit class JavaFutureConverter[A](
       val jf: java.util.concurrent.Future[A]
-  ) extends AnyVal {
+  ) {
 
     def toScalaFuture: Future[A] = {
       val sup = FunctionConverters.asJavaSupplier[A](() => jf.get)

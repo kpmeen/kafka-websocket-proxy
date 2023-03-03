@@ -3,6 +3,11 @@ package net.scalytica.kafka.wsproxy.models
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroProducerRecord
 import net.scalytica.kafka.wsproxy.models.Formats.FormatType
 import net.scalytica.kafka.wsproxy.models.ValueDetails.InValueDetails
+import net.scalytica.kafka.wsproxy.producer.ExtendedProducerRecord
+import org.apache.kafka.clients.producer.ProducerRecord
+import org.apache.kafka.common.header.Header
+
+import scala.jdk.CollectionConverters._
 
 /**
  * ADT describing any record that can come in to the service through the
@@ -54,6 +59,52 @@ object WsProducerRecord {
           clientMessageId = avro.clientMessageId
         )
       }
+  }
+
+  /**
+   * Converts a [[WsProducerRecord]] into a Kafka [[ProducerRecord]].
+   *
+   * @param topic
+   *   the topic name the record is to be written to.
+   * @param msg
+   *   the message to send to the Kafka topic.
+   * @tparam K
+   *   the message key type
+   * @tparam V
+   *   the message value type
+   * @return
+   *   an instance of [[ProducerRecord]]
+   */
+  @throws[IllegalStateException]
+  def asKafkaProducerRecord[K, V](
+      topic: TopicName,
+      msg: WsProducerRecord[K, V]
+  ): ProducerRecord[K, V] = {
+    val headers: Iterable[Header] =
+      msg.headers.getOrElse(Seq.empty).map(_.asRecordHeader)
+
+    msg match {
+      case kvm: ProducerKeyValueRecord[K, V] =>
+        new ExtendedProducerRecord[K, V](
+          topic.value,
+          kvm.key.value,
+          kvm.value.value,
+          headers.asJava
+        )
+
+      case vm: ProducerValueRecord[V] =>
+        new ExtendedProducerRecord[K, V](
+          topic.value,
+          vm.value.value,
+          headers.asJava
+        )
+
+      case ProducerEmptyMessage =>
+        throw new IllegalStateException(
+          "EmptyMessage passed through stream pipeline, but should have" +
+            " been filtered out."
+        )
+    }
   }
 
 }

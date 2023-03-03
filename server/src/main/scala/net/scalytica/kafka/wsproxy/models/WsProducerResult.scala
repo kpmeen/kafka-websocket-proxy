@@ -21,12 +21,18 @@ import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
  */
 case class WsProducerResult(
     topic: String,
-    partition: Int,
-    offset: Long,
-    timestamp: Long,
+    partition: Int = 0,
+    offset: Long = 0,
+    timestamp: Long = 0,
     clientMessageId: Option[String] = None
 ) {
 
+  /**
+   * Converts this WsProducerResult into an [[AvroProducerResult]]
+   *
+   * @return
+   *   an instance of [[AvroProducerResult]]
+   */
   def toAvro: AvroProducerResult = {
     AvroProducerResult(
       topic = topic,
@@ -36,13 +42,14 @@ case class WsProducerResult(
       clientMessageId = clientMessageId
     )
   }
-
 }
 
 object WsProducerResult extends WithProxyLogger {
 
-  def fromProducerResult[K, V](
-      res: ProducerMessage.Results[K, V, WsProducerRecord[K, V]]
+  private[this] def fromResult[K, V, PassThrough](
+      res: ProducerMessage.Results[K, V, PassThrough]
+  )(
+      clientMessageId: PassThrough => Option[String]
   ): Seq[WsProducerResult] = {
     res match {
       case ProducerMessage.Result(md, ProducerMessage.Message(_, pt)) =>
@@ -54,7 +61,7 @@ object WsProducerResult extends WithProxyLogger {
           partition = md.partition,
           offset = md.offset,
           timestamp = md.timestamp,
-          clientMessageId = pt.clientMessageId
+          clientMessageId = clientMessageId(pt)
         )
         Seq(pr)
 
@@ -74,5 +81,23 @@ object WsProducerResult extends WithProxyLogger {
         Seq.empty
     }
   }
+
+  /**
+   * Function to transform an instance of [[akka.kafka.ProducerMessage.Results]]
+   * to a collection of [[WsProducerResult]] instances.
+   *
+   * @param res
+   *   The Kafka producer result to transform
+   * @tparam K
+   *   The type of the key element of the Kafka producer result
+   * @tparam V
+   *   The type of the value element of the Kafka producer result
+   * @return
+   *   a collection containing one-to-one transformations of kafka producer
+   *   results to [[WsProducerResult]]s
+   */
+  def fromProducerResult[K, V](
+      res: ProducerMessage.Results[K, V, WsProducerRecord[K, V]]
+  ): Seq[WsProducerResult] = fromResult(res)(pt => pt.clientMessageId)
 
 }

@@ -1,13 +1,12 @@
 package net.scalytica.kafka.wsproxy.config
 
 import akka.actor.typed.ActorSystem
-import akka.actor.typed.scaladsl.adapter._
 import akka.kafka.scaladsl.Consumer
 import akka.kafka.{ConsumerSettings, Subscriptions}
 import akka.stream.scaladsl.Source
 import net.scalytica.kafka.wsproxy._
 import net.scalytica.kafka.wsproxy.codecs.{BasicSerdes, DynamicCfgSerde}
-import net.scalytica.kafka.wsproxy.config.Configuration.{AppCfg, DynamicCfg}
+import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.config.DynamicConfigHandlerProtocol.{
   InternalCommand,
   RemoveDynamicConfigRecord,
@@ -18,13 +17,12 @@ import org.apache.kafka.clients.consumer.ConsumerConfig.{
   AUTO_OFFSET_RESET_CONFIG,
   ENABLE_AUTO_COMMIT_CONFIG
 }
-import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.consumer.OffsetResetStrategy.EARLIEST
 
-import scala.jdk.CollectionConverters._
-
 /**
- * Consumer implementation for reading [[DynamicCfg]] messages from Kafka.
+ * Consumer implementation for reading
+ * [[net.scalytica.kafka.wsproxy.config.Configuration.DynamicCfg]] messages from
+ * Kafka.
  *
  * @param cfg
  *   The [[AppCfg]] to use.
@@ -45,8 +43,10 @@ private[config] class DynamicConfigConsumer(
   private[this] lazy val cid = dynCfgConsumerGroupId
 
   private[this] lazy val consumerProps = {
-    ConsumerSettings(sys.toClassic, kDes, vDes)
+    ConsumerSettings(sys, kDes, vDes)
       .withBootstrapServers(kafkaUrl)
+      .withProperties(cfg.consumer.kafkaClientProperties)
+      .withProperties(consumerMetricsProperties)
       .withGroupId(cid)
       .withClientId(cid)
       .withProperties(
@@ -54,31 +54,6 @@ private[config] class DynamicConfigConsumer(
         AUTO_OFFSET_RESET_CONFIG  -> EARLIEST.name.toLowerCase,
         ENABLE_AUTO_COMMIT_CONFIG -> "false"
       )
-      .withConsumerFactory(initialiseConsumer)
-  }
-
-  /**
-   * Helper function to initialise a Kafka Consumer with the correct settings.
-   *
-   * @param cs
-   *   The [[ConsumerSettings]] to use.
-   * @return
-   *   an instance of [[KafkaConsumer]]
-   */
-  private[this] def initialiseConsumer(
-      cs: ConsumerSettings[String, DynamicCfg]
-  ): KafkaConsumer[String, DynamicCfg] = {
-    val props = cfg.consumer.kafkaClientProperties ++
-      cs.getProperties.asScala.toMap ++
-      consumerMetricsProperties
-
-    log.trace(s"Using consumer configuration:\n${props.mkString("\n")}")
-
-    new KafkaConsumer[String, DynamicCfg](
-      props,
-      cs.keyDeserializerOpt.orNull,
-      cs.valueDeserializerOpt.orNull
-    )
   }
 
   /**

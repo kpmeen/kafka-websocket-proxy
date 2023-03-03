@@ -8,10 +8,9 @@ import net.scalytica.kafka.wsproxy._
 import net.scalytica.kafka.wsproxy.codecs.{BasicSerdes, SessionSerde}
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
-import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
+import org.apache.kafka.clients.producer.ProducerRecord
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success}
 
 private[session] class SessionDataProducer(
@@ -30,24 +29,8 @@ private[session] class SessionDataProducer(
   private[this] lazy val producerProps =
     ProducerSettings(sys.toClassic, Some(kSer), Some(vSer))
       .withBootstrapServers(kafkaUrl)
-      .withProducerFactory(initialiseProducer)
-
-  private[this] def initialiseProducer(
-      ps: ProducerSettings[String, Session]
-  ): KafkaProducer[String, Session] = {
-    val props =
-      cfg.producer.kafkaClientProperties ++
-        ps.getProperties.asScala.toMap ++
-        producerMetricsProperties
-
-    log.trace(s"Using producer configuration:\n${props.mkString("\n")}")
-
-    new KafkaProducer[String, Session](
-      props,
-      ps.keySerializerOpt.orNull,
-      ps.valueSerializerOpt.orNull
-    )
-  }
+      .withProperties(cfg.producer.kafkaClientProperties)
+      .withProperties(producerMetricsProperties)
 
   private[this] lazy val producer = producerProps.createKafkaProducer()
 

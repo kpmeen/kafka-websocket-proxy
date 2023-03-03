@@ -42,7 +42,8 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
       topicName: Option[TopicName],
       payloadType: Option[SocketPayload] = None,
       keyType: Option[FormatType] = None,
-      valType: Option[FormatType] = None
+      valType: Option[FormatType] = None,
+      transactional: Option[Boolean] = None
   ): String = {
     val cidArg     = producerId.map(cid => s"clientId=${cid.value}")
     val insArg     = instanceId.map(iid => s"instanceId=${iid.value}")
@@ -50,11 +51,13 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
     val payloadArg = payloadType.map(pt => s"socketPayload=${pt.name}")
     val keyArg     = keyType.map(kt => s"keyType=${kt.name}")
     val valArg     = valType.map(vt => s"valType=${vt.name}")
+    val transArg   = transactional.map(t => s"transactional=$t")
 
-    val args = List(cidArg, insArg, topicArg, payloadArg, keyArg, valArg)
-      .filterNot(_.isEmpty)
-      .collect { case Some(arg) => arg }
-      .mkString("", "&", "")
+    val args =
+      List(cidArg, insArg, topicArg, payloadArg, keyArg, valArg, transArg)
+        .filterNot(_.isEmpty)
+        .collect { case Some(arg) => arg }
+        .mkString("", "&", "")
 
     s"/socket/in?$args"
   }
@@ -69,16 +72,23 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
       topicName: TopicName,
       payloadType: SocketPayload = JsonPayload,
       keyType: FormatType = StringType,
-      valType: FormatType = StringType
+      valType: FormatType = StringType,
+      exactlyOnce: Boolean = false
   ): String = {
-    val baseUri =
-      "/socket/in?" +
-        s"clientId=${producerId.value}" +
-        instanceId.map(id => s"&instanceId=${id.value}").getOrElse("") +
-        s"&topic=${topicName.value}" +
-        s"&socketPayload=${payloadType.name}" +
-        s"&valType=${valType.name}"
-    if (keyType != NoType) baseUri + s"&keyType=${keyType.name}" else baseUri
+    val keyTypeArg =
+      if (keyType != NoType) s"&keyType=${keyType.name}" else ""
+
+    val transactionalArg =
+      if (exactlyOnce) s"&transactional=$exactlyOnce" else ""
+
+    "/socket/in?" +
+      s"clientId=${producerId.value}" +
+      instanceId.map(id => s"&instanceId=${id.value}").getOrElse("") +
+      s"&topic=${topicName.value}" +
+      s"&socketPayload=${payloadType.name}" +
+      s"&valType=${valType.name}" +
+      keyTypeArg +
+      transactionalArg
   }
 
   def assertProducerWS[T](
@@ -106,6 +116,7 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
       valType: FormatType,
       routes: Route,
       messages: Seq[String],
+      exactlyOnce: Boolean = false,
       validateMessageId: Boolean = false,
       kafkaCreds: Option[BasicHttpCredentials] = None,
       creds: Option[HttpCredentials] = None,
@@ -117,10 +128,10 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
         instanceId = instanceId,
         topicName = topic,
         keyType = keyType,
-        valType = valType
+        valType = valType,
+        exactlyOnce = exactlyOnce
       )
     }
-
     inspectWebSocket(
       uri = uri,
       routes = routes,

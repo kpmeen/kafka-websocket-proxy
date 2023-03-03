@@ -43,7 +43,7 @@ object KafkaLoginModules extends WithProxyLogger {
 
     def buildJaasConfigValue: String
 
-    def buildJaasProperty: Map[String, AnyRef] = {
+    def buildJaasProperty: Map[String, String] = {
       Map(SaslJaasConfig -> buildJaasConfigValue)
     }
   }
@@ -111,7 +111,7 @@ object KafkaLoginModules extends WithProxyLogger {
 
   def buildJaasProperty(
       maybeLogin: Option[KafkaLoginModule]
-  ): Map[String, AnyRef] = {
+  ): Map[String, String] = {
     maybeLogin.map(_.buildJaasProperty).getOrElse(Map(SaslJaasConfig -> ""))
   }
 

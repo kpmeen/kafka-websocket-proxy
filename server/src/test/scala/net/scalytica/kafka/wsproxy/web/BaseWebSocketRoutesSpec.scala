@@ -85,14 +85,31 @@ trait BaseWebSocketRoutesSpec
     }
   }
 
-  final protected def assertRejectMissingInstanceId(
-      useSession: Boolean
+  /**
+   * Assert cases for when there is no instanceId provided in the URI
+   * parameters.
+   *
+   * @param useSession
+   *   If true, will enable producer sessions
+   * @param exactlyOnce
+   *   if {{{Some(true)}}} will enable exactly once semantics (aka
+   *   transactional), otherwise it will be disabled. If this argument has a
+   *   true value, the [[useSession]] argument _must_ be true also.
+   * @param ctx
+   *   The [[ProducerContext]] to use
+   * @return
+   *   [[Assertion]]
+   */
+  final protected def assertNoInstanceId(
+      useSession: Boolean,
+      exactlyOnce: Option[Boolean] = None
   )(implicit ctx: ProducerContext): Assertion = {
     implicit val wsClient = ctx.producerProbe
     val uri = buildProducerUri(
       producerId = Some(producerId("producer", topicCounter)),
       instanceId = None,
-      topicName = Some(ctx.topicName)
+      topicName = Some(ctx.topicName),
+      transactional = exactlyOnce
     )
 
     assertProducerWS(wsRouteFromProducerContext, uri) {
