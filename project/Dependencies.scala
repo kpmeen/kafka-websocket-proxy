@@ -2,13 +2,13 @@ import sbt._
 
 object Versions {
 
-  val ScalaVersion = "2.13.8"
+  val ScalaVersion = "2.13.10"
 
   val LightbendConfigVersion = "1.4.2"
-  val PureConfigVersion      = "0.17.1"
+  val PureConfigVersion      = "0.17.2"
 
   val Avro4sVersion                 = "4.1.0"
-  val ApacheKafkaVersion            = "3.2.1"
+  val ApacheKafkaVersion            = "3.2.3"
   val ConfluentPlatformBaseVersion  = "7.2"
   val ConfluentPlatformPatchVersion = s"$ConfluentPlatformBaseVersion.1"
   val ConfluentKafkaVersion         = s"$ConfluentPlatformPatchVersion-ccs"
@@ -26,17 +26,17 @@ object Versions {
   val CirceGenericExtrasVersion = CirceVersion
   val CirceOpticsVersion        = CirceVersion
 
-  val JwtScalaVersion = "9.1.1"
+  val JwtScalaVersion = "9.1.2"
 
   // logging
   val ScalaLoggingVersion = "3.9.5"
-  val Slf4JVersion        = "2.0.1"
-  val LogbackVersion      = "1.4.1"
+  val Slf4JVersion        = "2.0.6"
+  val LogbackVersion      = "1.4.5"
   val LogbackJsVersion    = "0.1.5"
-  val JaninoVersion       = "3.1.8"
+  val JaninoVersion       = "3.1.9"
 
   // testing
-  val ScalaTestVersion = "3.2.13"
+  val ScalaTestVersion = "3.2.15"
   val GatlingVersion   = "3.1.1"
 
   // monitoring
