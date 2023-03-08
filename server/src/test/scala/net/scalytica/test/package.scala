@@ -55,7 +55,7 @@ package object test {
     schemaRegistryPort
       .map { _ =>
         // scalastyle:off
-        Map(
+        Map[String, Any](
           SCHEMA_REGISTRY_URL_CONFIG -> s"http://${serverHost(schemaRegistryPort)}",
           AUTO_REGISTER_SCHEMAS         -> true,
           "key.subject.name.strategy"   -> keySubjNameStrategy.getCanonicalName,
