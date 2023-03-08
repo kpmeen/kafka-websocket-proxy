@@ -65,8 +65,8 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
     val topic = new NewTopic(ist.topicName.value, 1, replFactor).configs(tconf)
 
     log.info(s"Creating topic ${ist.topicName.value}...")
-    Try {
-      underlying.createTopics(Seq(topic).asJava).all().get()
+    Try[Unit] {
+      val _: Any = underlying.createTopics(Seq(topic).asJava).all().get()
     }.recover {
       KafkaFutureErrorHandler.handle {
         log.info("Topic already exists")

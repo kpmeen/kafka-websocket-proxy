@@ -8,9 +8,9 @@ object Versions {
   val PureConfigVersion      = "0.17.2"
 
   val Avro4sVersion                 = "4.1.0"
-  val ApacheKafkaVersion            = "3.2.3"
-  val ConfluentPlatformBaseVersion  = "7.2"
-  val ConfluentPlatformPatchVersion = s"$ConfluentPlatformBaseVersion.1"
+  val ApacheKafkaVersion            = "3.3.2"
+  val ConfluentPlatformBaseVersion  = "7.3"
+  val ConfluentPlatformPatchVersion = s"$ConfluentPlatformBaseVersion.2"
   val ConfluentKafkaVersion         = s"$ConfluentPlatformPatchVersion-ccs"
   val EmbeddedKafkaVersion          = ApacheKafkaVersion
   val EmbeddedSchemaRegistryVersion = s"$ConfluentPlatformBaseVersion.+"
