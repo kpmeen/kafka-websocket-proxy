@@ -31,7 +31,7 @@ connections from the same host as the application is running on.
 
 ### Configuring JMX
 
-See [Server Configuration](/configuration/#server-configuration) for details on
+See [Server Configuration](configuration.md#server-configuration) for details on
 how to configure the JMX related application properties.
 
 ## Enable Jolokia
