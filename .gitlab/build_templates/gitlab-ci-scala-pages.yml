@@ -33,7 +33,7 @@ pages:
   rules:
     - !reference [.shared_rules, rules]
   stage: deploy
-  image: node:17-alpine
+  image: node:18-alpine
   needs:
     - job: pages:build
       artifacts: true
