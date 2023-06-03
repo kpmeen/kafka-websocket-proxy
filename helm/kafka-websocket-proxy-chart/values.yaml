@@ -1,0 +1,10 @@
+replicaCount: 3
+image:
+  repository: kpmeen/kafka-websocket-proxy
+  tag: latest
+service:
+  type: ClusterIP
+  port: 8078
+env:
+  WSPROXY_KAFKA_BOOTSTRAP_HOSTS: "localhost:8082"
+  WSPROXY_KAFKA_PRODUCER_COMPRESSION_TYPE: "lz4"
