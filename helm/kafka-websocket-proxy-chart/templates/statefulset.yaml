@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    app: kafka-websocket-proxy
+spec:
+  serviceName: {{ .Release.Name }}
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: kafka-websocket-proxy
+  template:
+    metadata:
+      labels:
+        app: kafka-websocket-proxy
+    spec:
+      containers:
+        - name: kafka-websocket-proxy
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          ports:
+            - containerPort: {{ .Values.service.port }}
+          env:
+            - name: WSPROXY_SERVER_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: WSPROXY_KAFKA_BOOTSTRAP_HOSTS
+              value: {{ .Values.env.WSPROXY_KAFKA_BOOTSTRAP_HOSTS }}
+            - name: WSPROXY_KAFKA_PRODUCER_COMPRESSION_TYPE
+              value: {{ .Values.env.WSPROXY_KAFKA_PRODUCER_COMPRESSION_TYPE }}
+            # Add additional container configuration here if needed
+          livenessProbe:
+            httpGet:
+              path: /healthcheck
+              port: {{ .Values.service.port }}
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
