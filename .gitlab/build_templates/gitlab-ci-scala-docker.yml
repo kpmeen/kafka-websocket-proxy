@@ -20,9 +20,11 @@ stages:
 publish docker containers:
   stage: publish-docker
   tags:
-    - docker
+    # FIXME: Using version 19 because GitLab CI behaviour changed when moving to v 20+.
+    - docker:19
   services:
-    - docker:dind
+    # FIXME: Using version 19 because GitLab CI behaviour changed when moving to v 20+.
+    - docker:dind-19
   script:
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN registry.gitlab.com
     - docker login -u kpmeen -p $DOCKERHUB_TOKEN
