@@ -21,7 +21,7 @@ publish docker containers:
   stage: publish-docker
   tags:
     # FIXME: Using version 19 because GitLab CI behaviour changed when moving to v 20+.
-    - docker:19
+    - docker
   services:
     # FIXME: Using version 19 because GitLab CI behaviour changed when moving to v 20+.
     - docker:dind-19
