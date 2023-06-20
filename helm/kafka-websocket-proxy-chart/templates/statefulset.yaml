@@ -26,9 +26,23 @@ spec:
                 fieldRef:
                   fieldPath: metadata.name
             - name: WSPROXY_KAFKA_BOOTSTRAP_HOSTS
-              value: {{ .Values.env.WSPROXY_KAFKA_BOOTSTRAP_HOSTS }}
+              value: "{{ .Values.env.WSPROXY_KAFKA_BOOTSTRAP_HOSTS }}"
             - name: WSPROXY_KAFKA_PRODUCER_COMPRESSION_TYPE
-              value: {{ .Values.env.WSPROXY_KAFKA_PRODUCER_COMPRESSION_TYPE }}
+              value: "{{ .Values.env.WSPROXY_KAFKA_PRODUCER_COMPRESSION_TYPE }}"
+            - name: WSPROXY_CH_MAX_STACK_SIZE
+              value: "{{ .Values.env.WSPROXY_CH_MAX_STACK_SIZE }}"
+            - name: WSPROXY_CH_AUTOCOMMIT_ENABLED
+              value: "{{ .Values.env.WSPROXY_CH_AUTOCOMMIT_ENABLED }}"
+            - name: WSPROXY_SECURE_HEALTHCHECK_ENDPOINT
+              value: "{{ .Values.env.WSPROXY_SECURE_HEALTHCHECK_ENDPOINT }}"
+            - name: WSPROXY_BASIC_AUTH_ENABLED
+              value: "{{ .Values.env.WSPROXY_BASIC_AUTH_ENABLED }}"
+            - name: WSPROXY_BASIC_AUTH_USERNAME
+              value: "{{ .Values.env.WSPROXY_BASIC_AUTH_USERNAME }}"
+            - name: WSPROXY_BASIC_AUTH_PASSWORD
+              value: "{{ .Values.env.WSPROXY_BASIC_AUTH_PASSWORD }}"
+            - name: WSPROXY_BASIC_AUTH_REALM
+              value: "{{ .Values.env.WSPROXY_BASIC_AUTH_REALM }}"
             # Add additional container configuration here if needed
           livenessProbe:
             httpGet:
