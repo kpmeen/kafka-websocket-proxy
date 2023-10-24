@@ -9,6 +9,7 @@ service:
     enabled: "false"
     host: kafka-websocket-proxy.example.com
 env:
+  WSPROXY_SERVER_ID: "kafka-websocket-proxy"
   WSPROXY_KAFKA_BOOTSTRAP_HOSTS: "localhost:8082"
   WSPROXY_KAFKA_PRODUCER_COMPRESSION_TYPE: "lz4"
   WSPROXY_CH_MAX_STACK_SIZE: "100"
