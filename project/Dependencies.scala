@@ -26,7 +26,7 @@ object Versions {
   val CirceGenericExtrasVersion = CirceVersion
   val CirceOpticsVersion        = CirceVersion
 
-  val JwtScalaVersion = "9.2.0"
+  val JwtScalaVersion = "9.3.0"
 
   // logging
   val ScalaLoggingVersion = "3.9.5"
