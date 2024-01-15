@@ -3,8 +3,8 @@ package net.scalytica.kafka.wsproxy.jmx.mbeans
 import java.beans.ConstructorProperties
 import java.time.{LocalDateTime, ZoneOffset}
 
-import akka.actor.typed.{ActorRef, Behavior}
-import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
+import org.apache.pekko.actor.typed.{ActorRef, Behavior}
+import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.jmx.MXBeanActor
 import net.scalytica.kafka.wsproxy.jmx.mbeans.ProxyStatusProtocol._

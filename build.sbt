@@ -81,27 +81,27 @@ lazy val server = (project in file("server"))
   .settings(libraryDependencies ++= OAuth.All)
   .settings(
     libraryDependencies ++= Seq(
-      Akka.Actor,
-      Akka.ActorTyped,
-      Akka.Slf4j,
-      Akka.Stream,
-      Akka.StreamTyped,
-      Akka.Http,
-      Akka.AkkaStreamKafka,
+      Pekko.Actor,
+      Pekko.ActorTyped,
+      Pekko.Slf4j,
+      Pekko.Stream,
+      Pekko.StreamTyped,
+      Pekko.Http,
+      Pekko.Kafka,
       Avro.Avro4sKafka,
       Kafka.Clients,
       ConfluentKafka.AvroSerializer,
       ConfluentKafka.MonitoringInterceptors,
-      Logging.Log4jOverSlf4j         % Test,
-      Logging.JulToSlf4j             % Test,
-      Testing.ScalaTest              % Test,
-      Testing.EmbeddedKafka          % Test,
-      Testing.AkkaTestKit            % Test,
-      Testing.AkkaTypedTestKit       % Test,
-      Testing.AkkaHttpTestKit        % Test,
-      Testing.AkkaStreamTestKit      % Test,
-      Testing.AkkaStreamKafkaTestKit % Test,
-      Testing.Scalactic              % Test
+      Logging.Log4jOverSlf4j          % Test,
+      Logging.JulToSlf4j              % Test,
+      Testing.ScalaTest               % Test,
+      Testing.EmbeddedKafka           % Test,
+      Testing.PekkoTestKit            % Test,
+      Testing.PekkoTypedTestKit       % Test,
+      Testing.PekkoHttpTestKit        % Test,
+      Testing.PekkoStreamTestKit      % Test,
+      Testing.PekkoStreamKafkaTestKit % Test,
+      Testing.Scalactic               % Test
     )
   )
   .settings(dependencyOverrides ++= Overrides.Deps: _*)

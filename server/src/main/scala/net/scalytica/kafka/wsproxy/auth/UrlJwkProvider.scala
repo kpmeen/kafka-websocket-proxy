@@ -1,9 +1,9 @@
 package net.scalytica.kafka.wsproxy.auth
 
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.model._
-import akka.http.scaladsl.model.headers.Accept
-import akka.stream.Materializer
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.model._
+import org.apache.pekko.http.scaladsl.model.headers.Accept
+import org.apache.pekko.stream.Materializer
 import io.circe.generic.extras.auto._
 import io.circe.parser._
 import net.scalytica.kafka.wsproxy.StringExtensions
@@ -16,7 +16,7 @@ import scala.util.{Failure, Success, Try}
 
 /**
  * JWK provider based on the {{com.auth0.jwk.UrlJwkProvider}}. Intention here is
- * to provide an async Scala based akka-http alternative without all the
+ * to provide an async Scala based pekko-http alternative without all the
  * exceptions being thrown around. It also uses circe for parsing the JSON
  * responses when loading the JWK config.
  *

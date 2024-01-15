@@ -1,7 +1,7 @@
 package net.scalytica.kafka.wsproxy.web
 
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server._
+import org.apache.pekko.http.scaladsl.server.Directives._
+import org.apache.pekko.http.scaladsl.server._
 import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
 import net.scalytica.kafka.wsproxy.auth.OpenIdClient
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg

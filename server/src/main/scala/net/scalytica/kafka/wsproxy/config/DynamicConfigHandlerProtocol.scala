@@ -1,6 +1,6 @@
 package net.scalytica.kafka.wsproxy.config
 
-import akka.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.ActorRef
 import net.scalytica.kafka.wsproxy.config.Configuration.DynamicCfg
 
 object DynamicConfigHandlerProtocol {

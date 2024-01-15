@@ -1,6 +1,6 @@
 package net.scalytica.kafka.wsproxy.web
 
-import akka.http.scaladsl.server._
+import org.apache.pekko.http.scaladsl.server._
 import io.github.embeddedkafka.Codecs.stringDeserializer
 import net.scalytica.kafka.wsproxy.models.Formats.{NoType, StringType}
 import net.scalytica.kafka.wsproxy.models.ReadCommitted

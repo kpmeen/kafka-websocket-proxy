@@ -1,12 +1,12 @@
 package net.scalytica.kafka.wsproxy.web
 
-import akka.actor.typed.scaladsl.adapter._
-import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.model._
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server._
-import akka.stream.Materializer
-import akka.util.Timeout
+import org.apache.pekko.actor.typed.scaladsl.adapter._
+import org.apache.pekko.http.scaladsl.model.StatusCodes._
+import org.apache.pekko.http.scaladsl.model._
+import org.apache.pekko.http.scaladsl.server.Directives._
+import org.apache.pekko.http.scaladsl.server._
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.util.Timeout
 import io.circe.{Json, Printer}
 import io.circe.syntax._
 import io.circe.parser._
@@ -325,7 +325,7 @@ trait AdminRoutes extends AdminRoutesResponses { self: BaseRoutes =>
    * @param mat
    *   The [[Materializer]] to use.
    * @return
-   *   An akka-http [[Route]]
+   *   A pekko-http [[Route]]
    */
   private[this] def findClientConfig(id: String, isConsumer: Boolean)(
       implicit cfg: AppCfg,
@@ -379,7 +379,7 @@ trait AdminRoutes extends AdminRoutesResponses { self: BaseRoutes =>
    * @param ec
    *   The [[ExecutionContext]] to use.
    * @return
-   *   An akka-http [[Route]].
+   *   A pekko-http [[Route]].
    */
   private[this] def saveDynamicConfig(
       dc: DynamicCfg

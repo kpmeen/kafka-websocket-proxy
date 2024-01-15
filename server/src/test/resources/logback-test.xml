@@ -1,50 +1,51 @@
 <configuration>
 
-  <conversionRule conversionWord="colouredLevel"
-                  converterClass="net.scalytica.kafka.wsproxy.logging.ColouredLevel"/>
+    <conversionRule conversionWord="colouredLevel"
+                    converterClass="net.scalytica.kafka.wsproxy.logging.ColouredLevel"/>
 
-  <contextListener class="ch.qos.logback.classic.jul.LevelChangePropagator">
-    <resetJUL>true</resetJUL>
-  </contextListener>
+    <contextListener class="ch.qos.logback.classic.jul.LevelChangePropagator">
+        <resetJUL>true</resetJUL>
+    </contextListener>
 
-  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
-    <encoder>
-      <pattern>
-        %d{HH:mm:ss.SSS} %colouredLevel %logger{36} [%F:%L] - %msg%n
-      </pattern>
-    </encoder>
-  </appender>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>
+                %d{HH:mm:ss.SSS} %colouredLevel %logger{36} [%F:%L] - %msg%n
+            </pattern>
+        </encoder>
+    </appender>
 
-  <logger name="akka.actor" level="OFF"/>
-  <logger name="akka.stream" level="OFF"/>
-  <logger name="akka.kafka" level="OFF"/>
-  <logger name="akka.http" level="OFF"/>
+    <!--  <logger name="org.apache.pekko" level="OFF"/>-->
+    <logger name="org.apache.pekko.actor" level="OFF"/>
+    <logger name="org.apache.pekko.stream" level="OFF"/>
+    <logger name="org.apache.pekko.kafka" level="OFF"/>
+    <logger name="org.apache.pekko.http" level="OFF"/>
 
-  <logger name="org.apache.kafka.clients" level="OFF"/>
+    <logger name="org.apache.kafka.clients" level="OFF"/>
 
-  <logger name="net.scalytica" level="OFF"/>
-  <!--  <logger name="net.scalytica.test" level="TRACE"/>-->
-  <!--  <logger name="net.scalytica.kafka.wsproxy" level="TRACE"/>-->
-  <!--  <logger name="net.scalytica.kafka.wsproxy.admin" level="TRACE"/>-->
-  <!--  <logger name="net.scalytica.kafka.wsproxy.auth.JwtValidationTickerFlow" level="TRACE"/>-->
-  <!--  <logger name="net.scalytica.kafka.wsproxy.auth.OpenIdClient" level="TRACE"/>-->
-  <!--  <logger name="net.scalytica.kafka.wsproxy.auth.UrlJwkProvider" level="TRACE"/>-->
-  <!--  <logger name="net.scalytica.kafka.wsproxy.codecs" level="INFO"/>-->
-  <!--  <logger name="net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde" level="TRACE"/>-->
-  <!--  <logger name="net.scalytica.kafka.wsproxy.config" level="TRACE" />-->
-  <!--  <logger name="net.scalytica.kafka.wsproxy.config.DynamicConfigHandler" level="TRACE" />-->
-  <!--  <logger name="net.scalytica.kafka.wsproxy.consumer" level="TRACE"/>-->
-  <!--  <logger name="net.scalytica.kafka.wsproxy.errors" level="TRACE"/>-->
-  <!--  <logger name="net.scalytica.kafka.wsproxy.logging.DefaultProxyLogger" level="TRACE"/>-->
-  <!--  <logger name="net.scalytica.kafka.wsproxy.models" level="TRACE"/>-->
-  <!--  <logger name="net.scalytica.kafka.wsproxy.producer" level="TRACE"/>-->
-  <!--  <logger name="net.scalytica.kafka.wsproxy.session" level="TRACE" />-->
-  <!--  <logger name="net.scalytica.kafka.wsproxy.session.SessionHandler" level="TRACE"/>-->
-  <!--  <logger name="net.scalytica.kafka.wsproxy.utils" level="TRACE"/>-->
+    <logger name="net.scalytica" level="OFF"/>
+    <!--  <logger name="net.scalytica.test" level="TRACE"/>-->
+    <!--  <logger name="net.scalytica.kafka.wsproxy" level="TRACE"/>-->
+    <!--  <logger name="net.scalytica.kafka.wsproxy.admin" level="TRACE"/>-->
+    <!--  <logger name="net.scalytica.kafka.wsproxy.auth.JwtValidationTickerFlow" level="TRACE"/>-->
+    <!--  <logger name="net.scalytica.kafka.wsproxy.auth.OpenIdClient" level="TRACE"/>-->
+    <!--  <logger name="net.scalytica.kafka.wsproxy.auth.UrlJwkProvider" level="TRACE"/>-->
+    <!--  <logger name="net.scalytica.kafka.wsproxy.codecs" level="INFO"/>-->
+    <!--  <logger name="net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde" level="TRACE"/>-->
+    <!--  <logger name="net.scalytica.kafka.wsproxy.config" level="TRACE" />-->
+    <!--  <logger name="net.scalytica.kafka.wsproxy.config.DynamicConfigHandler" level="TRACE" />-->
+    <!--  <logger name="net.scalytica.kafka.wsproxy.consumer" level="TRACE"/>-->
+    <!--  <logger name="net.scalytica.kafka.wsproxy.errors" level="TRACE"/>-->
+    <!--  <logger name="net.scalytica.kafka.wsproxy.logging.DefaultProxyLogger" level="TRACE"/>-->
+    <!--  <logger name="net.scalytica.kafka.wsproxy.models" level="TRACE"/>-->
+    <!--  <logger name="net.scalytica.kafka.wsproxy.producer" level="TRACE"/>-->
+    <!--  <logger name="net.scalytica.kafka.wsproxy.session" level="TRACE" />-->
+    <!--  <logger name="net.scalytica.kafka.wsproxy.session.SessionHandler" level="TRACE"/>-->
+    <!--  <logger name="net.scalytica.kafka.wsproxy.utils" level="TRACE"/>-->
 
-  <!-- Root loggers catch all other events that are not explicitly handled-->
-  <root level="OFF">
-    <appender-ref ref="STDOUT"/>
-  </root>
+    <!-- Root loggers catch all other events that are not explicitly handled-->
+    <root level="OFF">
+        <appender-ref ref="STDOUT"/>
+    </root>
 
 </configuration>

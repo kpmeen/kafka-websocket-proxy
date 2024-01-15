@@ -1,10 +1,10 @@
 package net.scalytica.kafka.wsproxy.auth
 
-import akka.NotUsed
-import akka.http.scaladsl.model.headers.OAuth2BearerToken
-import akka.stream.scaladsl.Flow
-import akka.stream.stage._
-import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
+import org.apache.pekko.NotUsed
+import org.apache.pekko.http.scaladsl.model.headers.OAuth2BearerToken
+import org.apache.pekko.stream.scaladsl.Flow
+import org.apache.pekko.stream.stage._
+import org.apache.pekko.stream.{Attributes, FlowShape, Inlet, Outlet}
 import net.scalytica.kafka.wsproxy.auth.JwtValidationTickerFlow._
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.errors.OpenIdConnectError
@@ -15,7 +15,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 
 /**
- * The JwtValidationTickerFlow is intended to be plugged into an akka-http
+ * The JwtValidationTickerFlow is intended to be plugged into an pekko-http
  * connection that needs to be kept open for longer durations. This could be
  * WebSockets, Server Sent Events connection or a HTTP long-poll connection.
  *

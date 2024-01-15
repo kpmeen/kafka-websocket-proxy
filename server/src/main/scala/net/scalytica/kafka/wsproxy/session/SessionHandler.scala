@@ -1,11 +1,11 @@
 package net.scalytica.kafka.wsproxy.session
 
-import akka.Done
-import akka.actor.typed.scaladsl.Behaviors
-import akka.actor.typed.scaladsl.adapter._
-import akka.actor.typed.Behavior
-import akka.kafka.scaladsl.Consumer
-import akka.stream.scaladsl.{RunnableGraph, Sink}
+import org.apache.pekko.Done
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.actor.typed.scaladsl.adapter._
+import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.kafka.scaladsl.Consumer
+import org.apache.pekko.stream.scaladsl.{RunnableGraph, Sink}
 import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
@@ -122,22 +122,23 @@ trait SessionHandler extends WithProxyLogger {
   }
 
   /**
-   * Initialises a new SessionHandler actor. The [[akka.actor.typed.ActorRef]]
-   * is named so there will only be 1 instance per proxy server instance.
+   * Initialises a new SessionHandler actor. The
+   * [[org.apache.pekko.actor.typed.ActorRef]] is named so there will only be 1
+   * instance per proxy server instance.
    *
    * @param cfg
    *   implicit [[AppCfg]] to use
    * @param sys
-   *   the untyped / classic [[akka.actor.ActorSystem]] to use
+   *   the untyped / classic [[org.apache.pekko.actor.ActorSystem]] to use
    * @return
    *   a [[SessionHandlerRef]] containing a reference to the [[RunnableGraph]]
    *   that executes the [[SessionDataConsumer]] stream. And a typed
-   *   [[akka.actor.typed.ActorRef]] that understands messages from the defined
-   *   protocol in [[SessionHandlerProtocol.Protocol]].
+   *   [[org.apache.pekko.actor.typed.ActorRef]] that understands messages from
+   *   the defined protocol in [[SessionHandlerProtocol.Protocol]].
    */
   def init(
       implicit cfg: AppCfg,
-      sys: akka.actor.ActorSystem
+      sys: org.apache.pekko.actor.ActorSystem
   ): SessionHandlerRef = {
     implicit val typedSys = sys.toTyped
 

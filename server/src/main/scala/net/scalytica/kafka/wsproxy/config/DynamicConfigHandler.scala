@@ -1,9 +1,9 @@
 package net.scalytica.kafka.wsproxy.config
 
-import akka.actor.typed.Behavior
-import akka.actor.typed.scaladsl.Behaviors
-import akka.actor.typed.scaladsl.adapter._
-import akka.stream.scaladsl.Sink
+import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.actor.typed.scaladsl.adapter._
+import org.apache.pekko.stream.scaladsl.Sink
 import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.config.DynamicConfigHandlerProtocol._
@@ -116,13 +116,13 @@ trait DynamicConfigHandler extends WithProxyLogger {
    * @param cfg
    *   The [[AppCfg]] to use.
    * @param sys
-   *   The [[akka.actor.ActorSystem]] to use.
+   *   The [[org.apache.pekko.actor.ActorSystem]] to use.
    * @return
    *   An instance of [[RunnableDynamicConfigHandlerRef]].
    */
   def init(
       implicit cfg: AppCfg,
-      sys: akka.actor.ActorSystem
+      sys: org.apache.pekko.actor.ActorSystem
   ): RunnableDynamicConfigHandlerRef = {
     implicit val typedSys = sys.toTyped
 

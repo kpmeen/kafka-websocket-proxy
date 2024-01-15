@@ -5,9 +5,9 @@ import java.nio.charset.Charset
 import java.nio.file.FileSystems.{getFileSystem, newFileSystem}
 import java.nio.file.{Path, Paths}
 
-import akka.stream.{IOResult, Materializer}
-import akka.stream.scaladsl.{FileIO, Source}
-import akka.util.ByteString
+import org.apache.pekko.stream.{IOResult, Materializer}
+import org.apache.pekko.stream.scaladsl.{FileIO, Source}
+import org.apache.pekko.util.ByteString
 import com.typesafe.config.{Config, ConfigFactory}
 
 import scala.jdk.CollectionConverters._

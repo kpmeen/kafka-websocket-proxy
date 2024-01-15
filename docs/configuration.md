@@ -4,11 +4,11 @@ title: Configuration
 slug: /configuration
 ---
 
-The Kafka WebSocket Proxy is built on Akka. More specifically:
+The Kafka WebSocket Proxy is built on Apache Pekko, which is a fork of the Akka project. More specifically:
 
-* [akka-http](https://doc.akka.io/docs/akka-http/current/scala.html)
-* [akka-streams](https://doc.akka.io/docs/akka/current/stream/index.html)
-* [alpakka-kafka](https://doc.akka.io/docs/akka-stream-kafka/current/home.html)
+* [Apache Pekko HTTP](https://pekko.apache.org/docs/pekko-http/current//server-side/websocket-support.html)
+* [Apache Pekko Streams](https://pekko.apache.org/docs/pekko/current//stream/index.html)
+* [Apache Pekko Connectors Kafka connector](https://pekko.apache.org/docs/pekko-connectors-kafka/current/index.html)
 
 All of these libraries/frameworks come with their own set of configuration
 parameters and possibilities. In the Kafka WebSocket Proxy, these are kept in
@@ -307,7 +307,7 @@ configuration properties can be omitted.
 | kafka.ws.proxy.server.openid-connect.enabled                   | WSPROXY_OPENID_ENABLED                   |   `false`    | Indicates if the server should use OpenID Connect to authenticate Bearer tokens for the endpoints.                                                                                                                                |
 | kafka.ws.proxy.server.openid-connect.well-known-url            | WSPROXY_OPENID_WELLKNOWN                 |   not set    | The full URL pointing to the OIDC `.well-known` OIDC configuration.                                                                                                                                                               |
 | kafka.ws.proxy.server.openid-connect.audience                  | WSPROXY_OPENID_AUDIENCE                  |   not set    | The OIDC audience to be used when communicating with the OIDC server.                                                                                                                                                             |
-| kafka.ws.proxy.server.openid-connect.realm                     | WSPROXY_OPENID_REALM                     |     `""`     | (Optional) Configuration that isn't really used by OIDC, but it's present in akka-http for API consistency. If not set, an empty string will be used.                                                                             |
+| kafka.ws.proxy.server.openid-connect.realm                     | WSPROXY_OPENID_REALM                     |     `""`     | (Optional) Configuration that isn't really used by OIDC, but it's present in pekko-http for API consistency. If not set, an empty string will be used.                                                                            |
 | kafka.ws.proxy.server.openid-connect.allow-detailed-logging    | WSPROXY_OPENID_ALLOW_DETAILED_LOGGING    |   `false`    | If set to `true` the proxy will log some details of the tokens being validated. Not recommended for use in production.                                                                                                            |
 | kafka.ws.proxy.server.openid-connect.revalidation-interval     | WSPROXY_OPENID_REVALIDATION_INTERVAL     | `10 minutes` | The interval to verify that the JWT token is valid when a WebSocket connection is open.                                                                                                                                           |
 | kafka.ws.proxy.server.openid-connect.revalidation-errors-limit | WSPROXY_OPENID_REVALIDATION_ERRORS_LIMIT |     `-1`     | The number of times the JWT validation check for an open WebSocket may fail due to e.g. OpenID Connect server being unavailable. Once the limit is reached, the connection is terminated. A value of `-1` will disable the limit. |

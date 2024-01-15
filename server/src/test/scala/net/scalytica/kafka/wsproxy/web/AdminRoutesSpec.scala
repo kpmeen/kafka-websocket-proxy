@@ -1,15 +1,15 @@
 package net.scalytica.kafka.wsproxy.web
 
-import akka.http.scaladsl.model.ContentTypes._
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
-import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.model.headers.{
+import org.apache.pekko.http.scaladsl.model.ContentTypes._
+import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity}
+import org.apache.pekko.http.scaladsl.model.StatusCodes._
+import org.apache.pekko.http.scaladsl.model.headers.{
   `WWW-Authenticate`,
   HttpChallenge,
   OAuth2BearerToken
 }
-import akka.http.scaladsl.server._
-import akka.http.scaladsl.testkit.RouteTestTimeout
+import org.apache.pekko.http.scaladsl.server._
+import org.apache.pekko.http.scaladsl.testkit.RouteTestTimeout
 import io.circe.{ACursor, HCursor, Json}
 import io.circe.parser._
 import io.circe.syntax._

@@ -1,10 +1,10 @@
 package net.scalytica.kafka.wsproxy.web
 
-import akka.http.scaladsl.model.ContentTypes
-import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.model.headers.BasicHttpCredentials
-import akka.http.scaladsl.server._
-import akka.http.scaladsl.testkit.WSProbe
+import org.apache.pekko.http.scaladsl.model.ContentTypes
+import org.apache.pekko.http.scaladsl.model.StatusCodes._
+import org.apache.pekko.http.scaladsl.model.headers.BasicHttpCredentials
+import org.apache.pekko.http.scaladsl.server._
+import org.apache.pekko.http.scaladsl.testkit.WSProbe
 import net.scalytica.kafka.wsproxy.auth.AccessToken
 import net.scalytica.kafka.wsproxy.models.Formats.{JsonType, NoType, StringType}
 import net.scalytica.kafka.wsproxy.models.{

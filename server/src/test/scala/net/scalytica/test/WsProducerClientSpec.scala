@@ -1,10 +1,13 @@
 package net.scalytica.test
 
-import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.model.headers.{BasicHttpCredentials, HttpCredentials}
-import akka.http.scaladsl.server.Route
-import akka.http.scaladsl.testkit.WSProbe
-import akka.util.ByteString
+import org.apache.pekko.http.scaladsl.model.StatusCodes
+import org.apache.pekko.http.scaladsl.model.headers.{
+  BasicHttpCredentials,
+  HttpCredentials
+}
+import org.apache.pekko.http.scaladsl.server.Route
+import org.apache.pekko.http.scaladsl.testkit.WSProbe
+import org.apache.pekko.util.ByteString
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroProducerRecord
 import net.scalytica.kafka.wsproxy.models.Formats._
 import net.scalytica.kafka.wsproxy.models.{

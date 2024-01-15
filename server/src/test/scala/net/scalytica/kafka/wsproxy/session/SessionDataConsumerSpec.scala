@@ -1,7 +1,7 @@
 package net.scalytica.kafka.wsproxy.session
 
-import akka.actor.testkit.typed.scaladsl.ActorTestKit
-import akka.stream.scaladsl.Sink
+import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
+import org.apache.pekko.stream.scaladsl.Sink
 import io.github.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import net.scalytica.kafka.wsproxy.codecs.{
   BasicSerdes,

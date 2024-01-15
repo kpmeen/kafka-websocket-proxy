@@ -1,9 +1,9 @@
 package net.scalytica.kafka.wsproxy.config
 
-import akka.actor.typed.ActorSystem
-import akka.kafka.scaladsl.Consumer
-import akka.kafka.{ConsumerSettings, Subscriptions}
-import akka.stream.scaladsl.Source
+import org.apache.pekko.actor.typed.ActorSystem
+import org.apache.pekko.kafka.scaladsl.Consumer
+import org.apache.pekko.kafka.{ConsumerSettings, Subscriptions}
+import org.apache.pekko.stream.scaladsl.Source
 import net.scalytica.kafka.wsproxy._
 import net.scalytica.kafka.wsproxy.codecs.{BasicSerdes, DynamicCfgSerde}
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
@@ -57,7 +57,7 @@ private[config] class DynamicConfigConsumer(
   }
 
   /**
-   * The akka-stream Source consuming messages from the dynamic config topic.
+   * The pekko-stream Source consuming messages from the dynamic config topic.
    */
   lazy val dynamicCfgSource: Source[InternalCommand, Consumer.Control] = {
     val subscription = Subscriptions.topics(Set(dynCfgTopic))

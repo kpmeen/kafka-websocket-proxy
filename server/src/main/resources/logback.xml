@@ -61,9 +61,9 @@
   <variable name="WS_PROXY_UTILS_LOG_LEVEL" value="${WS_PROXY_UTILS_LOG_LEVEL:-WARN}"/>
   <variable name="WS_PROXY_ROOT_LOG_LEVEL" value="${WS_PROXY_ROOT_LOG_LEVEL:-WARN}"/>
 
-  <logger name="akka.actor" level="${WS_PROXY_AKKA_ACTOR_LOG_LEVEL}"/>
-  <logger name="akka.http" level="${WS_PROXY_AKKA_HTTP_LOG_LEVEL}"/>
-  <logger name="akka.kafka" level="${WS_PROXY_AKKA_KAFKA_LOG_LEVEL}"/>
+  <logger name="org.apache.pekko.actor" level="${WS_PROXY_AKKA_ACTOR_LOG_LEVEL}"/>
+  <logger name="org.apache.pekko.http" level="${WS_PROXY_AKKA_HTTP_LOG_LEVEL}"/>
+  <logger name="org.apache.pekko.kafka" level="${WS_PROXY_AKKA_KAFKA_LOG_LEVEL}"/>
 
   <logger name="org.apache.kafka.clients" level="${WS_PROXY_KAFKA_CLIENTS_LOG_LEVEL}"/>
 

@@ -1,9 +1,9 @@
 package net.scalytica.kafka.wsproxy.web
 
-import akka.http.scaladsl.marshalling.ToResponseMarshallable
-import akka.http.scaladsl.model._
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server._
+import org.apache.pekko.http.scaladsl.marshalling.ToResponseMarshallable
+import org.apache.pekko.http.scaladsl.model._
+import org.apache.pekko.http.scaladsl.server.Directives._
+import org.apache.pekko.http.scaladsl.server._
 import net.scalytica.kafka.wsproxy.auth.OpenIdClient
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
   AvroCommit,

@@ -1,6 +1,6 @@
 package net.scalytica.kafka.wsproxy.models
 
-import akka.kafka.ProducerMessage
+import org.apache.pekko.kafka.ProducerMessage
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroProducerResult
 import net.scalytica.kafka.wsproxy.errors.ImpossibleError
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
@@ -83,8 +83,9 @@ object WsProducerResult extends WithProxyLogger {
   }
 
   /**
-   * Function to transform an instance of [[akka.kafka.ProducerMessage.Results]]
-   * to a collection of [[WsProducerResult]] instances.
+   * Function to transform an instance of
+   * [[org.apache.pekko.kafka.ProducerMessage.Results]] to a collection of
+   * [[WsProducerResult]] instances.
    *
    * @param res
    *   The Kafka producer result to transform

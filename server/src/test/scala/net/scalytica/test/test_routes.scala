@@ -1,11 +1,11 @@
 package net.scalytica.test
 
-import akka.actor.ActorSystem
-import akka.actor.typed.ActorRef
-import akka.actor.typed.scaladsl.adapter._
-import akka.http.scaladsl.server.Route
-import akka.http.scaladsl.server.Directives.handleExceptions
-import akka.stream.Materializer
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.scaladsl.adapter._
+import org.apache.pekko.http.scaladsl.server.Route
+import org.apache.pekko.http.scaladsl.server.Directives.handleExceptions
+import org.apache.pekko.stream.Materializer
 import net.scalytica.kafka.wsproxy.models.{FullClientId, WsServerId}
 import net.scalytica.kafka.wsproxy.session.{SessionHandlerProtocol, SessionId}
 import net.scalytica.kafka.wsproxy.web._

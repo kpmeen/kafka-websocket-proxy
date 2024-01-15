@@ -1,8 +1,8 @@
 package net.scalytica.kafka.wsproxy.actor
 
-import akka.actor.typed.{ActorRef, Scheduler}
-import akka.actor.typed.scaladsl.AskPattern._
-import akka.util.Timeout
+import org.apache.pekko.actor.typed.{ActorRef, Scheduler}
+import org.apache.pekko.actor.typed.scaladsl.AskPattern._
+import org.apache.pekko.util.Timeout
 import net.scalytica.kafka.wsproxy._
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 

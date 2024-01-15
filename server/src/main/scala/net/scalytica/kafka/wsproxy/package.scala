@@ -1,6 +1,6 @@
 package net.scalytica.kafka
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import com.typesafe.scalalogging.Logger
 import io.confluent.monitoring.clients.interceptor.{
   MonitoringConsumerInterceptor,
@@ -16,7 +16,8 @@ import scala.util.Try
 import org.apache.kafka.clients.consumer.ConsumerConfig.INTERCEPTOR_CLASSES_CONFIG
 // scalastyle:on
 
-import scala.compat.java8.{FunctionConverters, FutureConverters}
+import scala.jdk.FunctionConverters
+import scala.jdk.FutureConverters._
 import scala.concurrent.Future
 
 package object wsproxy {
@@ -103,9 +104,9 @@ package object wsproxy {
   ) {
 
     def toScalaFuture: Future[A] = {
-      val sup = FunctionConverters.asJavaSupplier[A](() => jf.get)
+      val sup = FunctionConverters.enrichAsJavaSupplier[A](() => jf.get)
       try {
-        FutureConverters.toScala(CompletableFuture.supplyAsync(sup))
+        CompletableFuture.supplyAsync(sup.asJavaSupplier).asScala
       } catch {
         case juce: java.util.concurrent.ExecutionException =>
           Option(juce.getCause).map(cause => throw cause).getOrElse(throw juce)

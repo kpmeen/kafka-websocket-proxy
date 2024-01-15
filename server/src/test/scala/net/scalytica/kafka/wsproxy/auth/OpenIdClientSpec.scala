@@ -1,6 +1,6 @@
 package net.scalytica.kafka.wsproxy.auth
 
-import akka.util.Timeout
+import org.apache.pekko.util.Timeout
 import net.scalytica.kafka.wsproxy.errors.{
   AuthenticationError,
   OpenIdConnectError

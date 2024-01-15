@@ -1,10 +1,10 @@
 package net.scalytica.test
 
-import akka.actor.ActorSystem
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.model._
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.{ExceptionHandler, Route}
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.model._
+import org.apache.pekko.http.scaladsl.server.Directives._
+import org.apache.pekko.http.scaladsl.server.{ExceptionHandler, Route}
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._

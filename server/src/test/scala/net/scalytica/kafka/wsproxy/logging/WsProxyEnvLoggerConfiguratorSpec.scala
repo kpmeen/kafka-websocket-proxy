@@ -1,7 +1,7 @@
 package net.scalytica.kafka.wsproxy.logging
 
-import akka.actor.ActorSystem
-import akka.stream.Materializer
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.Materializer
 import ch.qos.logback.classic.{Logger => LogbackLogger, LoggerContext}
 import com.typesafe.config.ConfigFactory
 import net.scalytica.test.FileLoader
@@ -28,8 +28,8 @@ class WsProxyEnvLoggerConfiguratorSpec
   private val rootLogger         = "ROOT"
   private val scalyticaLogger    = "net.scalytica"
   private val proxyLogger        = "net.scalytica.kafka.wsproxy"
-  private val akkaKafkaLogger    = "akka.kafka"
-  private val akkaActorLogger    = "akka.actor"
+  private val pekkoKafkaLogger   = "org.apache.pekko.kafka"
+  private val pekkoActorLogger   = "org.apache.pekko.actor"
   private val kafkaClientsLogger = "org.apache.kafka.clients"
   private val testLogger         = "test.TestLogger"
   private val logbackConfigEnv   = WsProxyEnvLoggerConfigurator.LogbackCfgEnv
@@ -52,8 +52,8 @@ class WsProxyEnvLoggerConfiguratorSpec
       |    </encoder>
       |  </appender>
       |
-      |  <logger name="akka.actor" level="WARN"/>
-      |  <logger name="akka.kafka" level="WARN"/>
+      |  <logger name="org.apache.pekko.actor" level="WARN"/>
+      |  <logger name="org.apache.pekko.kafka" level="WARN"/>
       |  <logger name="net.scalytica.kafka.wsproxy" level="DEBUG"/>
       |
       |  <!-- Root loggers catch all other events that are not explicitly handled-->
@@ -66,8 +66,8 @@ class WsProxyEnvLoggerConfiguratorSpec
 
   val defaultLoggers = Map[String, Option[String]](
     "ROOT"                     -> Some("OFF"),
-    "akka.actor"               -> Some("OFF"),
-    "akka.kafka"               -> Some("OFF"),
+    "org.apache.pekko.actor"   -> Some("OFF"),
+    "org.apache.pekko.kafka"   -> Some("OFF"),
     "net.scalytica"            -> Some("OFF"),
     "org.apache.kafka.clients" -> Some("OFF")
   )
@@ -131,8 +131,8 @@ class WsProxyEnvLoggerConfiguratorSpec
         (_, levels) =>
           levels must contain(scalyticaLogger -> Some("DEBUG"))
           levels must contain(rootLogger -> Some("OFF"))
-          levels must contain(akkaActorLogger -> Some("OFF"))
-          levels must contain(akkaKafkaLogger -> Some("OFF"))
+          levels must contain(pekkoActorLogger -> Some("OFF"))
+          levels must contain(pekkoKafkaLogger -> Some("OFF"))
           levels must contain(kafkaClientsLogger -> Some("OFF"))
       }
 
@@ -140,14 +140,14 @@ class WsProxyEnvLoggerConfiguratorSpec
       testContext(1, logbackConfigEnv -> logbackConfigString) { (_, levels) =>
         // assert keys with value null
         levels.get(scalyticaLogger).value mustBe None
-        levels.get("akka").value mustBe None
+        levels.get("org.apache.pekko").value mustBe None
         levels.get("net").value mustBe None
         levels.get("org").value mustBe None
         levels.get("org.apache").value mustBe None
         // assert values
         levels.get(rootLogger).value mustBe Some("ERROR")
-        levels.get(akkaActorLogger).value mustBe Some("WARN")
-        levels.get(akkaKafkaLogger).value mustBe Some("WARN")
+        levels.get(pekkoActorLogger).value mustBe Some("WARN")
+        levels.get(pekkoKafkaLogger).value mustBe Some("WARN")
         levels.get(proxyLogger).value mustBe Some("DEBUG")
         // assert non-existing keys
         levels.get("io.confluent") mustBe None

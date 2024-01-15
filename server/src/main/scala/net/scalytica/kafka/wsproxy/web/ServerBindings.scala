@@ -1,8 +1,12 @@
 package net.scalytica.kafka.wsproxy.web
 
-import akka.actor.ActorSystem
-import akka.http.scaladsl.server.Route
-import akka.http.scaladsl.{ConnectionContext, Http, HttpsConnectionContext}
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.server.Route
+import org.apache.pekko.http.scaladsl.{
+  ConnectionContext,
+  Http,
+  HttpsConnectionContext
+}
 import net.scalytica.kafka.wsproxy.config.Configuration.{AppCfg, ServerSslCfg}
 
 import java.nio.file.{Files, Path}

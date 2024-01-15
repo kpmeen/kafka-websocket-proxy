@@ -1,10 +1,10 @@
 package net.scalytica.kafka.wsproxy.session
 
-import akka.Done
-import akka.actor.typed.{ActorRef, Scheduler}
-import akka.actor.typed.scaladsl.adapter._
-import akka.util.Timeout
-import akka.testkit.TestDuration
+import org.apache.pekko.Done
+import org.apache.pekko.actor.typed.{ActorRef, Scheduler}
+import org.apache.pekko.actor.typed.scaladsl.adapter._
+import org.apache.pekko.util.Timeout
+import org.apache.pekko.testkit.TestDuration
 import io.github.embeddedkafka._
 import net.scalytica.kafka.wsproxy.codecs.{SessionIdSerde, SessionSerde}
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg

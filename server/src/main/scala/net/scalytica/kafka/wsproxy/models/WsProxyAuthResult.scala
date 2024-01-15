@@ -1,6 +1,6 @@
 package net.scalytica.kafka.wsproxy.models
 
-import akka.http.scaladsl.model.headers.OAuth2BearerToken
+import org.apache.pekko.http.scaladsl.model.headers.OAuth2BearerToken
 import io.circe.Json
 import io.circe.parser._
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg

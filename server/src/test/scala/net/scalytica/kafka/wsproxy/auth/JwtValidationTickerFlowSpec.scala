@@ -1,10 +1,10 @@
 package net.scalytica.kafka.wsproxy.auth
 
-import akka.actor.Cancellable
-import akka.stream.scaladsl.{Keep, Sink, Source}
-import akka.stream.testkit.scaladsl.{TestSink, TestSource}
-import akka.stream.testkit.{TestPublisher, TestSubscriber}
-import akka.util.Timeout
+import org.apache.pekko.actor.Cancellable
+import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
+import org.apache.pekko.stream.testkit.scaladsl.{TestSink, TestSource}
+import org.apache.pekko.stream.testkit.{TestPublisher, TestSubscriber}
+import org.apache.pekko.util.Timeout
 import com.typesafe.config.ConfigValueFactory
 import net.scalytica.kafka.wsproxy.config.Configuration.{
   AppCfg,
@@ -33,13 +33,13 @@ class JwtValidationTickerFlowSpec
 
   override lazy val defaultTypesafeConfig = loadConfig("/application-test.conf")
     .withValue(
-      "akka.http.client.connecting-timeout",
+      "pekko.http.client.connecting-timeout",
       ConfigValueFactory.fromAnyRef("20ms")
     )
     .withValue(
       // This is a "hack" to ensure the host will not retry HTTP connections
       // on failure in a test scenario.
-      "akka.http.host-connection-pool.max-retries",
+      "pekko.http.host-connection-pool.max-retries",
       ConfigValueFactory.fromAnyRef(Int.box(0))
     )
 

@@ -1,11 +1,11 @@
 package net.scalytica.kafka.wsproxy.producer
 
-import akka.NotUsed
-import akka.actor.ActorSystem
-import akka.actor.testkit.typed.scaladsl.ActorTestKit
-import akka.kafka.{ProducerMessage, ProducerSettings}
-import akka.stream.{KillSwitches, Materializer}
-import akka.stream.scaladsl._
+import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
+import org.apache.pekko.kafka.{ProducerMessage, ProducerSettings}
+import org.apache.pekko.stream.{KillSwitches, Materializer}
+import org.apache.pekko.stream.scaladsl._
 import io.github.embeddedkafka.EmbeddedKafkaConfig
 import net.scalytica.kafka.wsproxy.codecs.BasicSerdes.{
   StringDeserializer,

@@ -1,8 +1,8 @@
 package net.scalytica.kafka.wsproxy
 
-import akka.stream.Materializer
-import akka.stream.scaladsl.Source
-import akka.util.ByteString
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.Source
+import org.apache.pekko.util.ByteString
 import com.typesafe.scalalogging.Logger
 import io.circe.generic.extras.{Configuration => CirceConfiguration}
 import pdi.jwt.{JwtBase64, JwtClaim}
