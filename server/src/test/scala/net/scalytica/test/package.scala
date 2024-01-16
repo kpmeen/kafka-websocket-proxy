@@ -1,9 +1,9 @@
 package net.scalytica
 
-import akka.http.scaladsl.model.ws.{BinaryMessage, TextMessage}
-import akka.http.scaladsl.testkit.WSProbe
-import akka.stream.Materializer
-import akka.stream.scaladsl.Sink
+import org.apache.pekko.http.scaladsl.model.ws.{BinaryMessage, TextMessage}
+import org.apache.pekko.http.scaladsl.testkit.WSProbe
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.Sink
 import io.circe.Decoder
 import io.circe.parser.parse
 import io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig.{

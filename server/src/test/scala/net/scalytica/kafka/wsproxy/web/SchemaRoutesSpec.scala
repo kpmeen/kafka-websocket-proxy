@@ -1,8 +1,8 @@
 package net.scalytica.kafka.wsproxy.web
 
-import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.server._
-import akka.http.scaladsl.testkit.RouteTestTimeout
+import org.apache.pekko.http.scaladsl.model.StatusCodes._
+import org.apache.pekko.http.scaladsl.server._
+import org.apache.pekko.http.scaladsl.testkit.RouteTestTimeout
 import io.circe.Json
 import net.scalytica.kafka.wsproxy.auth.OpenIdClient
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{

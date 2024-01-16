@@ -15,13 +15,12 @@ object Versions {
   val EmbeddedKafkaVersion          = ApacheKafkaVersion
   val EmbeddedSchemaRegistryVersion = s"$ConfluentPlatformBaseVersion.+"
 
-  val AkkaVersion            = "2.6.20"
-  val AkkaHttpVersion        = "10.2.10"
-  val AkkaStreamKafkaVersion = "3.0.1"
+  // Pekko dependencies
+  val PekkoVersion           = "1.0.2"
+  val PekkoConnectorsVersion = "1.0.+"
+  val PekkoCirceVersion      = "1.0.0"
 
-  val AlpakkaVersion = "1.0.2"
-
-  val AkkaHttpCirceVersion      = "1.25.2"
+  // Circe dependencies
   val CirceVersion              = "0.14.+"
   val CirceGenericExtrasVersion = CirceVersion
   val CirceOpticsVersion        = CirceVersion
@@ -79,24 +78,22 @@ object Dependencies {
     LoggerExclusionsTest ++
       Seq(ExclusionRule("org.apache.zookeeper", "zookeeper"))
 
-  object Akka {
-
-    val Actor        = "com.typesafe.akka" %% "akka-actor"         % AkkaVersion
-    val Stream       = "com.typesafe.akka" %% "akka-stream"        % AkkaVersion
-    val ActorTyped   = "com.typesafe.akka" %% "akka-actor-typed"   % AkkaVersion
-    val StreamTyped  = "com.typesafe.akka" %% "akka-stream-typed"  % AkkaVersion
-    val ClusterTyped = "com.typesafe.akka" %% "akka-cluster-typed" % AkkaVersion
-
+  object Pekko {
+    val Actor       = "org.apache.pekko" %% "pekko-actor"        % PekkoVersion
+    val Stream      = "org.apache.pekko" %% "pekko-stream"       % PekkoVersion
+    val ActorTyped  = "org.apache.pekko" %% "pekko-actor-typed"  % PekkoVersion
+    val StreamTyped = "org.apache.pekko" %% "pekko-stream-typed" % PekkoVersion
+    val ClusterTyped =
+      "org.apache.pekko" %% "pekko-cluster-typed" % PekkoVersion
     val DistDataTyped =
-      "com.typesafe.akka" %% "akka-cluster-typed" % AkkaVersion
-    val Slf4j = "com.typesafe.akka" %% "akka-slf4j" % AkkaVersion
-    val Http  = "com.typesafe.akka" %% "akka-http"  % AkkaHttpVersion
+      "org.apache.pekko" %% "pekko-cluster-typed" % PekkoVersion
+    val Slf4j = "org.apache.pekko" %% "pekko-slf4j" % PekkoVersion
 
-    val AkkaStreamKafka =
-      "com.typesafe.akka" %% "akka-stream-kafka" % AkkaStreamKafkaVersion
-
-    val AlpakkaCsv =
-      "com.lightbend.akka" %% "akka-stream-alpakka-csv" % AlpakkaVersion
+    val Http = "org.apache.pekko" %% "pekko-http" % PekkoConnectorsVersion
+    val Kafka =
+      "org.apache.pekko" %% "pekko-connectors-kafka" % PekkoConnectorsVersion
+    val Csv =
+      "org.apache.pekko" %% "pekko-connectors-csv" % PekkoConnectorsVersion
   }
 
   object OAuth {
@@ -155,9 +152,10 @@ object Dependencies {
   }
 
   object Circe {
-
-    val AkkaHttpSupport =
-      "de.heikoseeberger" %% "akka-http-circe" % AkkaHttpCirceVersion
+    val PekkoCirceSupport = Seq(
+      "org.mdedetrich" %% "pekko-stream-circe",
+      "org.mdedetrich" %% "pekko-http-circe"
+    ).map(_ % PekkoCirceVersion)
 
     val Optics = "io.circe" %% "circe-optics" % CirceOpticsVersion
 
@@ -183,19 +181,15 @@ object Dependencies {
     val EmbeddedSchemaRegistry =
       "io.github.embeddedkafka" %% "embedded-kafka-schema-registry" % EmbeddedSchemaRegistryVersion excludeAll (LoggerExclusionsTest: _*)
 
-    val AkkaTestKit = "com.typesafe.akka" %% "akka-testkit" % AkkaVersion
-
-    val AkkaTypedTestKit =
-      "com.typesafe.akka" %% "akka-actor-testkit-typed" % AkkaVersion
-
-    val AkkaHttpTestKit =
-      "com.typesafe.akka" %% "akka-http-testkit" % AkkaHttpVersion
-
-    val AkkaStreamTestKit =
-      "com.typesafe.akka" %% "akka-stream-testkit" % AkkaVersion
-
-    val AkkaStreamKafkaTestKit =
-      "com.typesafe.akka" %% "akka-stream-kafka-testkit" % AkkaStreamKafkaVersion
+    val PekkoTestKit = "org.apache.pekko" %% "pekko-testkit" % PekkoVersion
+    val PekkoTypedTestKit =
+      "org.apache.pekko" %% "pekko-actor-testkit-typed" % PekkoVersion
+    val PekkoStreamTestKit =
+      "org.apache.pekko" %% "pekko-stream-testkit" % PekkoVersion
+    val PekkoHttpTestKit =
+      "org.apache.pekko" %% "pekko-http-testkit" % PekkoConnectorsVersion
+    val PekkoStreamKafkaTestKit =
+      "org.apache.pekko" %% "pekko-connectors-kafka-testkit" % PekkoConnectorsVersion
   }
 
   object GatlingDeps {
@@ -265,13 +259,12 @@ object Dependencies {
       "org.apache.kafka"  %% "kafka"            % ConfluentKafkaVersion,
       "org.apache.commons" % "commons-compress" % CommonsCompressVersion,
       "com.fasterxml.jackson.core" % "jackson-databind" % JacksonDatabindVersion,
-      "org.typelevel"     %% "jawn-parser"       % JawnParserVersion,
-      "com.typesafe.akka" %% "akka-stream-kafka" % AkkaStreamKafkaVersion,
-      "org.slf4j"          % "slf4j-api"         % Slf4JVersion,
-      "org.slf4j"          % "log4j-over-slf4j"  % Slf4JVersion,
-      "org.slf4j"          % "slf4j-log4j12"     % Slf4JVersion,
-      "org.slf4j"          % "jul-to-slf4j"      % Slf4JVersion,
-      "org.slf4j"          % "slf4j-nop"         % Slf4JVersion
+      "org.typelevel" %% "jawn-parser"      % JawnParserVersion,
+      "org.slf4j"      % "slf4j-api"        % Slf4JVersion,
+      "org.slf4j"      % "log4j-over-slf4j" % Slf4JVersion,
+      "org.slf4j"      % "slf4j-log4j12"    % Slf4JVersion,
+      "org.slf4j"      % "jul-to-slf4j"     % Slf4JVersion,
+      "org.slf4j"      % "slf4j-nop"        % Slf4JVersion
     )
   }
 }

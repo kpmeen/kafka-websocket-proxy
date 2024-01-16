@@ -1,7 +1,11 @@
 package net.scalytica.kafka.wsproxy.web
 
-import akka.http.scaladsl.model.{ContentTypes, HttpResponse, StatusCodes}
-import akka.http.scaladsl.server.{Directives, Route}
+import org.apache.pekko.http.scaladsl.model.{
+  ContentTypes,
+  HttpResponse,
+  StatusCodes
+}
+import org.apache.pekko.http.scaladsl.server.{Directives, Route}
 import net.scalytica.test.{TestAdHocRoute, WsProxyKafkaSpec}
 import org.scalatest.wordspec.AnyWordSpec
 

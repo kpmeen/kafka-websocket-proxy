@@ -21,10 +21,10 @@
     <appender-ref ref="STDOUT"/>
   </appender>
 
-  <logger name="akka.actor" level="OFF"/>
-  <logger name="akka.stream" level="OFF"/>
-  <logger name="akka.kafka" level="OFF"/>
-  <logger name="akka.http" level="OFF"/>
+  <logger name="org.apache.pekko.actor" level="OFF"/>
+  <logger name="org.apache.pekko.stream" level="OFF"/>
+  <logger name="org.apache.pekko.kafka" level="OFF"/>
+  <logger name="org.apache.pekko.http" level="OFF"/>
 
   <logger name="org.apache.kafka.clients" level="OFF"/>
 

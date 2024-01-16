@@ -1,7 +1,7 @@
 package net.scalytica.kafka.wsproxy.jmx.mbeans
 
-import akka.actor.testkit.typed.scaladsl.ActorTestKit
-import akka.actor.typed.scaladsl.adapter._
+import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
+import org.apache.pekko.actor.typed.scaladsl.adapter._
 import net.scalytica.kafka.wsproxy.jmx.mbeans.ConsumerClientStatsProtocol._
 import net.scalytica.kafka.wsproxy.jmx.{consumerStatsName, TestJmxQueries}
 import net.scalytica.kafka.wsproxy.models.{

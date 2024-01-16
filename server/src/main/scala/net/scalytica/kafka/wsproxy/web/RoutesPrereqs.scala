@@ -1,6 +1,6 @@
 package net.scalytica.kafka.wsproxy.web
 
-import akka.http.scaladsl.model.{
+import org.apache.pekko.http.scaladsl.model.{
   ContentTypes,
   HttpEntity,
   HttpResponse,

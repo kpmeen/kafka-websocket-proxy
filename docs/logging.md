@@ -29,9 +29,9 @@ default values are.
 
 | Logger                               | Environment                      | Default |
 |:-------------------------------------|:---------------------------------|:-------:|
-| akka.actor                           | WS_PROXY_AKKA_ACTOR_LOG_LEVEL    |  WARN   |
-| akka.http                            | WS_PROXY_AKKA_HTTP_LOG_LEVEL     |  WARN   |
-| akka.kafka                           | WS_PROXY_AKKA_KAFKA_LOG_LEVEL    |  WARN   |
+| org.apache.pekko.actor               | WS_PROXY_AKKA_ACTOR_LOG_LEVEL    |  WARN   |
+| org.apache.pekko.http                | WS_PROXY_AKKA_HTTP_LOG_LEVEL     |  WARN   |
+| org.apache.pekko.kafka               | WS_PROXY_AKKA_KAFKA_LOG_LEVEL    |  WARN   |
 | org.apache.kafka.clients             | WS_PROXY_KAFKA_CLIENTS_LOG_LEVEL |  WARN   |
 | net.scalytica.kafka.wsproxy.auth     | WS_PROXY_AUTH_LOG_LEVEL          |  DEBUG  |
 | net.scalytica.kafka.wsproxy.admin    | WS_PROXY_ADMIN_LOG_LEVEL         |  WARN   |

@@ -1,7 +1,7 @@
 package net.scalytica.kafka.wsproxy
 
-import akka.kafka.scaladsl.Consumer
-import akka.stream.scaladsl.Source
+import org.apache.pekko.kafka.scaladsl.Consumer
+import org.apache.pekko.stream.scaladsl.Source
 import net.scalytica.kafka.wsproxy.config.Configuration.{
   AppCfg,
   ClientSpecificLimitCfg,

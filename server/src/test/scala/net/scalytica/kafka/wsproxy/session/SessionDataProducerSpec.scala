@@ -1,6 +1,6 @@
 package net.scalytica.kafka.wsproxy.session
 
-import akka.actor.testkit.typed.scaladsl.ActorTestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
 import io.github.embeddedkafka._
 import net.scalytica.kafka.wsproxy.codecs.{SessionIdSerde, SessionSerde}
 import net.scalytica.kafka.wsproxy.models.WsGroupId

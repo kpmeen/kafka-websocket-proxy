@@ -1,10 +1,10 @@
 package net.scalytica.kafka.wsproxy.producer
 
-import akka.Done
-import akka.kafka.ProducerMessage._
-import akka.kafka.ProducerSettings
-import akka.stream.stage._
-import akka.stream._
+import org.apache.pekko.Done
+import org.apache.pekko.kafka.ProducerMessage._
+import org.apache.pekko.kafka.ProducerSettings
+import org.apache.pekko.stream.stage._
+import org.apache.pekko.stream._
 
 import scala.annotation.unused
 import net.scalytica.kafka.wsproxy.utils.JavaDurationConverters._

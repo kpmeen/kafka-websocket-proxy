@@ -1,17 +1,17 @@
 package net.scalytica.test
 
-import akka.http.scaladsl.model.headers.{
+import org.apache.pekko.http.scaladsl.model.headers.{
   Authorization,
   BasicHttpCredentials,
   HttpCredentials
 }
-import akka.http.scaladsl.server.Route
-import akka.http.scaladsl.testkit.{
+import org.apache.pekko.http.scaladsl.server.Route
+import org.apache.pekko.http.scaladsl.testkit.{
   RouteTestTimeout,
   ScalatestRouteTest,
   WSProbe
 }
-import akka.testkit.TestDuration
+import org.apache.pekko.testkit.TestDuration
 import net.scalytica.kafka.wsproxy.auth.OpenIdClient
 import net.scalytica.kafka.wsproxy.codecs.ProtocolSerdes
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg

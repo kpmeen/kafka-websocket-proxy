@@ -1,6 +1,6 @@
 package net.scalytica.kafka.wsproxy.models
 
-import akka.kafka.ConsumerMessage
+import org.apache.pekko.kafka.ConsumerMessage
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
   AvroConsumerRecord,
   AvroValueTypesCoproduct,

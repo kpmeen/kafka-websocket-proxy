@@ -2,14 +2,14 @@ package net.scalytica.kafka.wsproxy.auth
 
 import io.circe.syntax._
 import io.circe.generic.extras.auto._
-import akka.http.scaladsl.model.{
+import org.apache.pekko.http.scaladsl.model.{
   ContentTypes,
   HttpEntity,
   HttpMethods,
   HttpRequest
 }
-import akka.http.scaladsl.model.headers.OAuth2BearerToken
-import akka.util.ByteString
+import org.apache.pekko.http.scaladsl.model.headers.OAuth2BearerToken
+import org.apache.pekko.util.ByteString
 
 case class TokenRequest private (
     clientId: String,
@@ -21,7 +21,7 @@ case class TokenRequest private (
   def jsonString: String = this.asJson.noSpaces
 
   /**
-   * Creates an akka-http [[HttpRequest]] instance from this [[TokenRequest]]
+   * Creates a pekko-http [[HttpRequest]] instance from this [[TokenRequest]]
    *
    * @param url
    *   The URL that the request will be executed against

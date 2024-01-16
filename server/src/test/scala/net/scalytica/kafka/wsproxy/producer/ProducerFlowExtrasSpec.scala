@@ -1,10 +1,10 @@
 package net.scalytica.kafka.wsproxy.producer
 
-import akka.actor.testkit.typed.scaladsl.ActorTestKit
-import akka.http.scaladsl.model.ws.{Message, TextMessage}
-import akka.stream.Materializer
-import akka.stream.scaladsl._
-import akka.stream.testkit.scaladsl.{TestSink, TestSource}
+import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
+import org.apache.pekko.http.scaladsl.model.ws.{Message, TextMessage}
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl._
+import org.apache.pekko.stream.testkit.scaladsl.{TestSink, TestSource}
 import net.scalytica.kafka.wsproxy.models.WsProducerId
 import net.scalytica.test.{TestDataGenerators, WsProxyKafkaSpec}
 import org.scalatest.Inspectors.forAll

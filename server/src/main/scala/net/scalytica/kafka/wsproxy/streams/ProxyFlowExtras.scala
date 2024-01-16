@@ -1,10 +1,14 @@
 package net.scalytica.kafka.wsproxy.streams
 
-import akka.NotUsed
-import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
-import akka.stream.Materializer
-import akka.stream.scaladsl.{Flow, Sink}
-import akka.util.ByteString
+import org.apache.pekko.NotUsed
+import org.apache.pekko.http.scaladsl.model.ws.{
+  BinaryMessage,
+  Message,
+  TextMessage
+}
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.{Flow, Sink}
+import org.apache.pekko.util.ByteString
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 
 import scala.concurrent.ExecutionContext

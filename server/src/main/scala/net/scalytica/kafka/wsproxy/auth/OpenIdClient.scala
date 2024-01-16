@@ -1,9 +1,9 @@
 package net.scalytica.kafka.wsproxy.auth
 
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.model._
-import akka.http.scaladsl.model.headers.OAuth2BearerToken
-import akka.stream.{Materializer, StreamTcpException}
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.model._
+import org.apache.pekko.http.scaladsl.model.headers.OAuth2BearerToken
+import org.apache.pekko.stream.{Materializer, StreamTcpException}
 import io.circe._
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.auto._

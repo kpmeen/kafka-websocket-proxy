@@ -1,10 +1,10 @@
 package net.scalytica.kafka.wsproxy.config
 
-import akka.Done
-import akka.actor.typed.Scheduler
-import akka.actor.typed.scaladsl.adapter._
-import akka.util.Timeout
-import akka.testkit.TestDuration
+import org.apache.pekko.Done
+import org.apache.pekko.actor.typed.Scheduler
+import org.apache.pekko.actor.typed.scaladsl.adapter._
+import org.apache.pekko.util.Timeout
+import org.apache.pekko.testkit.TestDuration
 import net.scalytica.kafka.wsproxy.codecs.BasicSerdes.StringDeserializer
 import net.scalytica.kafka.wsproxy.codecs.DynamicCfgSerde
 import io.github.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}

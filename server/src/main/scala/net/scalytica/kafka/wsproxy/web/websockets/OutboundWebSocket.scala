@@ -1,17 +1,21 @@
 package net.scalytica.kafka.wsproxy.web.websockets
 
-import akka.actor.ActorSystem
-import akka.actor.typed.scaladsl.adapter._
-import akka.actor.typed.{ActorRef, Scheduler}
-import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.Route
-import akka.kafka.scaladsl.Consumer
-import akka.stream.Materializer
-import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
-import akka.stream.typed.scaladsl.ActorSink
-import akka.util.{ByteString, Timeout}
-import akka.{Done, NotUsed}
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed.scaladsl.adapter._
+import org.apache.pekko.actor.typed.{ActorRef, Scheduler}
+import org.apache.pekko.http.scaladsl.model.ws.{
+  BinaryMessage,
+  Message,
+  TextMessage
+}
+import org.apache.pekko.http.scaladsl.server.Directives._
+import org.apache.pekko.http.scaladsl.server.Route
+import org.apache.pekko.kafka.scaladsl.Consumer
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.{Flow, Keep, Sink, Source}
+import org.apache.pekko.stream.typed.scaladsl.ActorSink
+import org.apache.pekko.util.{ByteString, Timeout}
+import org.apache.pekko.{Done, NotUsed}
 import io.circe.Encoder
 import io.circe.Printer.noSpaces
 import io.circe.parser.parse

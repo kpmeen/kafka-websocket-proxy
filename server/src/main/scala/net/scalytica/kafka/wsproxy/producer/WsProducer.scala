@@ -1,12 +1,12 @@
 package net.scalytica.kafka.wsproxy.producer
 
-import akka.NotUsed
-import akka.actor.ActorSystem
-import akka.http.scaladsl.model.ws.Message
-import akka.kafka.scaladsl.Producer
-import akka.kafka.{ProducerMessage, ProducerSettings}
-import akka.stream.Materializer
-import akka.stream.scaladsl._
+import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.model.ws.Message
+import org.apache.pekko.kafka.scaladsl.Producer
+import org.apache.pekko.kafka.{ProducerMessage, ProducerSettings}
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl._
 import io.circe.Decoder
 import net.scalytica.kafka.wsproxy.auth.KafkaLoginModules
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroProducerRecord
@@ -102,7 +102,8 @@ object WsProducer extends ProducerFlowExtras with WithProxyLogger {
 
   /**
    * Call partitionsFor with the client to validate auth etc. This is a
-   * workaround for the following issues identified in alpakka-kafka client:
+   * workaround for the following issues identified in alpakka-kafka client, pre
+   * pekko fork:
    *
    *   - https://github.com/akka/alpakka-kafka/issues/814
    *   - https://github.com/akka/alpakka-kafka/issues/796

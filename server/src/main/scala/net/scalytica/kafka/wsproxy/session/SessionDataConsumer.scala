@@ -1,9 +1,9 @@
 package net.scalytica.kafka.wsproxy.session
 
-import akka.actor.typed.ActorSystem
-import akka.actor.typed.scaladsl.adapter._
-import akka.kafka.scaladsl.Consumer
-import akka.kafka.{ConsumerSettings, Subscriptions}
+import org.apache.pekko.actor.typed.ActorSystem
+import org.apache.pekko.actor.typed.scaladsl.adapter._
+import org.apache.pekko.kafka.scaladsl.Consumer
+import org.apache.pekko.kafka.{ConsumerSettings, Subscriptions}
 import net.scalytica.kafka.wsproxy._
 import net.scalytica.kafka.wsproxy.codecs.{BasicSerdes, SessionSerde}
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
@@ -53,7 +53,9 @@ private[session] class SessionDataConsumer(
       .withProperties(consumerMetricsProperties)
   }
 
-  /** The akka-stream Source consuming messages from the session state topic. */
+  /**
+   * The pekko-stream Source consuming messages from the session state topic.
+   */
   lazy val sessionStateSource: SessionSource = {
     val subscription = Subscriptions.topics(Set(sessionStateTopic))
 

@@ -1,10 +1,10 @@
 package net.scalytica.kafka.wsproxy.consumer
 
-import akka.actor.ActorSystem
-import akka.kafka.ConsumerMessage.CommittableOffset
-import akka.kafka.scaladsl.Consumer
-import akka.kafka.{ConsumerSettings, Subscriptions}
-import akka.stream.scaladsl.Source
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.kafka.ConsumerMessage.CommittableOffset
+import org.apache.pekko.kafka.scaladsl.Consumer
+import org.apache.pekko.kafka.{ConsumerSettings, Subscriptions}
+import org.apache.pekko.stream.scaladsl.Source
 import net.scalytica.kafka.wsproxy.auth.KafkaLoginModules
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.errors.{
@@ -93,7 +93,8 @@ object WsConsumer extends WithProxyLogger {
 
   /**
    * Call partitionsFor with the client to validate auth etc. This is a
-   * workaround for the following issues identified in alpakka-kafka client:
+   * workaround for the following issues identified in alpakka-kafka client,
+   * pre-forking into pekko:
    *
    *   - https://github.com/akka/alpakka-kafka/issues/814
    *   - https://github.com/akka/alpakka-kafka/issues/796
@@ -139,7 +140,7 @@ object WsConsumer extends WithProxyLogger {
   }
 
   /**
-   * Creates an akka-streams based Kafka Source for messages where the keys are
+   * Creates a pekko-streams based Kafka Source for messages where the keys are
    * of type [[K]] and values of type [[V]].
    *
    * Instances of this consumer will automatically commit offsets to Kafka,
@@ -184,7 +185,7 @@ object WsConsumer extends WithProxyLogger {
   }
 
   /**
-   * Creates an akka-streams based Kafka Source for messages where the keys are
+   * Creates a pekko-streams based Kafka Source for messages where the keys are
    * of type [[K]] and values of type [[V]].
    *
    * Instances of this consumer will emit [[WsConsumerRecord]] s that include a

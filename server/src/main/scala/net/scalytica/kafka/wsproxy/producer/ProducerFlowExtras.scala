@@ -1,10 +1,10 @@
 package net.scalytica.kafka.wsproxy.producer
 
-import akka.NotUsed
-import akka.http.scaladsl.model.ws.Message
-import akka.stream.scaladsl.Flow
-import akka.stream.{Materializer, OverflowStrategy}
-import akka.util.ByteString
+import org.apache.pekko.NotUsed
+import org.apache.pekko.http.scaladsl.model.ws.Message
+import org.apache.pekko.stream.scaladsl.Flow
+import org.apache.pekko.stream.{Materializer, OverflowStrategy}
+import org.apache.pekko.util.ByteString
 import io.circe.Decoder
 import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroProducerRecord
 import net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde

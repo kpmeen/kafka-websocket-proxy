@@ -2,11 +2,11 @@ package net.scalytica.kafka.wsproxy.streams
 
 import java.nio.charset.StandardCharsets
 
-import akka.actor.testkit.typed.scaladsl._
-import akka.http.scaladsl.model.ws.{BinaryMessage, TextMessage}
-import akka.stream.Materializer
-import akka.stream.scaladsl._
-import akka.util.ByteString
+import org.apache.pekko.actor.testkit.typed.scaladsl._
+import org.apache.pekko.http.scaladsl.model.ws.{BinaryMessage, TextMessage}
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl._
+import org.apache.pekko.util.ByteString
 import net.scalytica.test.WsProxyKafkaSpec
 import org.scalatest.{BeforeAndAfterAll, OptionValues}
 import org.scalatest.concurrent.{Eventually, ScalaFutures}

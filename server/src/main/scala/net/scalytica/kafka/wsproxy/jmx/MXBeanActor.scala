@@ -1,7 +1,11 @@
 package net.scalytica.kafka.wsproxy.jmx
 
-import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors}
-import akka.actor.typed.{Behavior, PostStop, PreRestart, Signal}
+import org.apache.pekko.actor.typed.scaladsl.{
+  AbstractBehavior,
+  ActorContext,
+  Behaviors
+}
+import org.apache.pekko.actor.typed.{Behavior, PostStop, PreRestart, Signal}
 import javax.management.ObjectName
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 

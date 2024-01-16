@@ -1,12 +1,12 @@
 package net.scalytica.kafka.wsproxy.jmx
 
-import akka.NotUsed
-import akka.actor.Cancellable
-import akka.actor.typed.scaladsl.adapter._
-import akka.actor.typed.{ActorRef, ActorSystem}
-import akka.http.scaladsl.model.ws.Message
-import akka.stream.scaladsl.{Flow, Sink}
-import akka.stream.typed.scaladsl.ActorSink
+import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.Cancellable
+import org.apache.pekko.actor.typed.scaladsl.adapter._
+import org.apache.pekko.actor.typed.{ActorRef, ActorSystem}
+import org.apache.pekko.http.scaladsl.model.ws.Message
+import org.apache.pekko.stream.scaladsl.{Flow, Sink}
+import org.apache.pekko.stream.typed.scaladsl.ActorSink
 import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.models.{
@@ -272,7 +272,7 @@ object JmxManager {
 
   def apply()(
       implicit appCfg: AppCfg,
-      classicSys: akka.actor.ActorSystem
+      classicSys: org.apache.pekko.actor.ActorSystem
   ): JmxManager = {
     val adminClient = new WsKafkaAdminClient(appCfg)
     new JmxManager(appCfg, classicSys.toTyped, adminClient)

@@ -1,9 +1,9 @@
 package net.scalytica.kafka.wsproxy.web
 
-import akka.http.scaladsl.model.HttpRequest
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server._
-import akka.http.scaladsl.unmarshalling.Unmarshaller
+import org.apache.pekko.http.scaladsl.model.HttpRequest
+import org.apache.pekko.http.scaladsl.server.Directives._
+import org.apache.pekko.http.scaladsl.server._
+import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshaller
 import net.scalytica.kafka.wsproxy.config.Configuration.{AppCfg, ProducerCfg}
 import net.scalytica.kafka.wsproxy.errors.RequestValidationError
 import net.scalytica.kafka.wsproxy.web.SocketProtocol._

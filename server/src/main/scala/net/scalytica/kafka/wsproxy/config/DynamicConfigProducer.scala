@@ -1,9 +1,9 @@
 package net.scalytica.kafka.wsproxy.config
 
-import akka.Done
-import akka.actor.typed.ActorSystem
-import akka.actor.typed.scaladsl.adapter._
-import akka.kafka.ProducerSettings
+import org.apache.pekko.Done
+import org.apache.pekko.actor.typed.ActorSystem
+import org.apache.pekko.actor.typed.scaladsl.adapter._
+import org.apache.pekko.kafka.ProducerSettings
 import net.scalytica.kafka.wsproxy._
 import net.scalytica.kafka.wsproxy.codecs.{BasicSerdes, DynamicCfgSerde}
 import net.scalytica.kafka.wsproxy.config.Configuration.{AppCfg, DynamicCfg}

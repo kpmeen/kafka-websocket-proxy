@@ -1,7 +1,7 @@
 package net.scalytica.kafka.wsproxy.config
 
-import akka.actor.typed.Scheduler
-import akka.util.Timeout
+import org.apache.pekko.actor.typed.Scheduler
+import org.apache.pekko.util.Timeout
 import net.scalytica.kafka.wsproxy.actor.ActorWithProtocolExtensions
 import net.scalytica.kafka.wsproxy.config.Configuration.{
   ConsumerSpecificLimitCfg,

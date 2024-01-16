@@ -1,6 +1,6 @@
 package net.scalytica.kafka.wsproxy.web
 
-import akka.http.scaladsl.server._
+import org.apache.pekko.http.scaladsl.server._
 import io.github.embeddedkafka.Codecs._
 import net.scalytica.kafka.wsproxy.config.Configuration.CustomJwtCfg
 import net.scalytica.kafka.wsproxy.models.Formats.{

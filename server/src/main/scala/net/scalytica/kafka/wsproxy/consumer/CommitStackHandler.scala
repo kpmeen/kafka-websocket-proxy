@@ -1,9 +1,9 @@
 package net.scalytica.kafka.wsproxy.consumer
 
-import akka.actor.typed.scaladsl.Behaviors
-import akka.actor.typed.{ActorRef, Behavior}
-import akka.kafka.CommitterSettings
-import akka.stream.Materializer
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.actor.typed.{ActorRef, Behavior}
+import org.apache.pekko.kafka.CommitterSettings
+import org.apache.pekko.stream.Materializer
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.consumer.CommitStackTypes._
 import net.scalytica.kafka.wsproxy.models.{WsCommit, WsConsumerRecord}

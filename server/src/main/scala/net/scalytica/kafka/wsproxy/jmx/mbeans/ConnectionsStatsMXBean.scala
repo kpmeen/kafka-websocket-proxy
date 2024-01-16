@@ -1,7 +1,7 @@
 package net.scalytica.kafka.wsproxy.jmx.mbeans
 
-import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
-import akka.actor.typed.{ActorRef, Behavior}
+import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
+import org.apache.pekko.actor.typed.{ActorRef, Behavior}
 import net.scalytica.kafka.wsproxy.jmx.MXBeanActor
 import net.scalytica.kafka.wsproxy.jmx.mbeans.ConnectionsStatsProtocol._
 

@@ -1,12 +1,12 @@
 package net.scalytica.kafka.wsproxy
 
-import akka.Done
-import akka.actor.CoordinatedShutdown
-import akka.actor.CoordinatedShutdown._
-import akka.actor.typed.scaladsl.adapter._
-import akka.http.scaladsl.Http
-import akka.stream.Materializer
-import akka.util.Timeout
+import org.apache.pekko.Done
+import org.apache.pekko.actor.CoordinatedShutdown
+import org.apache.pekko.actor.CoordinatedShutdown._
+import org.apache.pekko.actor.typed.scaladsl.adapter._
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.util.Timeout
 import net.scalytica.kafka.wsproxy.auth.OpenIdClient
 import net.scalytica.kafka.wsproxy.config.Configuration.{
   AppCfg,
@@ -68,8 +68,8 @@ object Server extends App with ServerRoutes with ServerBindings {
 
   override val serverId = cfg.server.serverId
 
-  implicit val classicSys: akka.actor.ActorSystem =
-    akka.actor.ActorSystem("kafka-ws-proxy", config)
+  implicit val classicSys: org.apache.pekko.actor.ActorSystem =
+    org.apache.pekko.actor.ActorSystem("kafka-ws-proxy", config)
   implicit val mat: Materializer     = Materializer.matFromSystem
   implicit val ctx: ExecutionContext = classicSys.dispatcher
 

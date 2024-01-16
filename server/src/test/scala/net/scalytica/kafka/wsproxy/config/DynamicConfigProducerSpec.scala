@@ -1,6 +1,6 @@
 package net.scalytica.kafka.wsproxy.config
 
-import akka.actor.testkit.typed.scaladsl.ActorTestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
 import io.github.embeddedkafka.EmbeddedKafka
 import net.scalytica.kafka.wsproxy.codecs.BasicSerdes.StringDeserializer
 import net.scalytica.kafka.wsproxy.codecs.DynamicCfgSerde

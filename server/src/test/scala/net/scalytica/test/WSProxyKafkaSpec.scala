@@ -1,10 +1,10 @@
 package net.scalytica.test
 
-import akka.Done
-import akka.actor.typed.scaladsl.adapter._
-import akka.http.scaladsl.model.headers.BasicHttpCredentials
-import akka.http.scaladsl.server.Route
-import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
+import org.apache.pekko.Done
+import org.apache.pekko.actor.typed.scaladsl.adapter._
+import org.apache.pekko.http.scaladsl.model.headers.BasicHttpCredentials
+import org.apache.pekko.http.scaladsl.server.Route
+import org.apache.pekko.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
 import com.typesafe.config.Config
 import io.github.embeddedkafka.EmbeddedKafkaConfigImpl
 import net.scalytica.kafka.wsproxy.config.{

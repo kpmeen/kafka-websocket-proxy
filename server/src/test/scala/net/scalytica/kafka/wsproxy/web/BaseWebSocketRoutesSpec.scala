@@ -1,11 +1,11 @@
 package net.scalytica.kafka.wsproxy.web
 
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.ContentTypes
-import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.model.headers.Upgrade
-import akka.http.scaladsl.model.ws.{Message, WebSocketRequest}
-import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.model.ContentTypes
+import org.apache.pekko.http.scaladsl.model.StatusCodes._
+import org.apache.pekko.http.scaladsl.model.headers.Upgrade
+import org.apache.pekko.http.scaladsl.model.ws.{Message, WebSocketRequest}
+import org.apache.pekko.stream.scaladsl.{Flow, Keep, Sink, Source}
 import net.scalytica.test._
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Minutes, Span}

@@ -6,7 +6,7 @@ slug: /monitoring
 
 
 The `kafka-websocket-proxy` is built around libraries that themselves expose
-telemetry and monitoring data via JMX. The most important ones are [akka-http](https://doc.akka.io/docs/akka-http/current/index.html)
+telemetry and monitoring data via JMX. The most important ones are [pekko-http](https://pekko.apache.org/docs/pekko-http/current//server-side/websocket-support.html)
 and [kafka-clients](https://kafka.apache.org/documentation/#monitoring).
 
 In addition to these the `kafka-websocket-proxy` exposes relevant metrics for

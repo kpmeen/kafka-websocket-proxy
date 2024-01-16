@@ -1,7 +1,10 @@
 package net.scalytica.kafka.wsproxy.consumer
 
-import akka.actor.testkit.typed.scaladsl.{BehaviorTestKit, TestInbox}
-import akka.kafka.testkit.ConsumerResultFactory
+import org.apache.pekko.actor.testkit.typed.scaladsl.{
+  BehaviorTestKit,
+  TestInbox
+}
+import org.apache.pekko.kafka.testkit.ConsumerResultFactory
 import net.scalytica.kafka.wsproxy.consumer.CommitStackHandler._
 import net.scalytica.kafka.wsproxy.consumer.CommitStackTypes._
 import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails

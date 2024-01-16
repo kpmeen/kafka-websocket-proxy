@@ -1,7 +1,7 @@
 package net.scalytica.kafka.wsproxy.jmx
 
 import java.lang.management.ManagementFactory
-import akka.actor.typed.Behavior
+import org.apache.pekko.actor.typed.Behavior
 
 import javax.management._
 import net.scalytica.kafka.wsproxy.jmx.mbeans.{

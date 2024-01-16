@@ -1,22 +1,19 @@
-/*
-    IMPORTANT: The package _must_ be akka.kafka.scaladsl in order to be able to
-    use the package protected implementation of TransactionalProducerStage.
- */
 package net.scalytica.kafka.wsproxy.producer
 
-import akka.NotUsed
-import akka.kafka.ProducerMessage.{Envelope, Results}
-import akka.kafka.ProducerSettings
-import akka.stream.ActorAttributes
-import akka.stream.scaladsl.Flow
+import org.apache.pekko.NotUsed
+import org.apache.pekko.kafka.ProducerMessage.{Envelope, Results}
+import org.apache.pekko.kafka.ProducerSettings
+import org.apache.pekko.stream.ActorAttributes
+import org.apache.pekko.stream.scaladsl.Flow
 
 object WsTransactionalProducer {
 
   /**
-   * This is a generic variation of [[akka.kafka.scaladsl.Transactional.flow]].
-   * Instead of "forcing" the pass-through message to be an instance of
-   * [[akka.kafka.ConsumerMessage.PartitionOffset]], it allows sending any data
-   * type as the pass through element.
+   * This is a generic variation of
+   * [[org.apache.pekko.kafka.scaladsl.Transactional.flow]]. Instead of
+   * "forcing" the pass-through message to be an instance of
+   * [[org.apache.pekko.kafka.ConsumerMessage.PartitionOffset]], it allows
+   * sending any data type as the pass through element.
    *
    * @param settings
    *   The Kafka [[ProducerSettings]] to use
@@ -31,7 +28,7 @@ object WsTransactionalProducer {
    * @return
    *
    * @see
-   *   [[akka.kafka.scaladsl.Transactional.flow]]
+   *   [[org.apache.pekko.kafka.scaladsl.Transactional.flow]]
    */
   def flexiFlow[K, V, PassThrough](
       settings: ProducerSettings[K, V],

@@ -1,8 +1,8 @@
 package net.scalytica.kafka.wsproxy
 
-import akka.NotUsed
-import akka.kafka.ProducerMessage.Envelope
-import akka.stream.scaladsl.Flow
+import org.apache.pekko.NotUsed
+import org.apache.pekko.kafka.ProducerMessage.Envelope
+import org.apache.pekko.stream.scaladsl.Flow
 import net.scalytica.kafka.wsproxy.models.{WsProducerRecord, WsProducerResult}
 
 package object producer {
