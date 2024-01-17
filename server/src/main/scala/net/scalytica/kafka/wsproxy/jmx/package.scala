@@ -10,17 +10,26 @@ package object jmx {
 
   private[jmx] val MXBeanSuffix = "MXBean"
 
-  def asObjectName(name: String, tpe: String): ObjectName = new ObjectName(
-    BasePackage, {
-      import scala.jdk.CollectionConverters._
-      new java.util.Hashtable(
-        Map(
-          "name" -> name,
-          "type" -> tpe
-        ).asJava
-      )
-    }
-  )
+  private[this] def asObjectNameInternal(
+      name: String,
+      tpe: String = WildcardString
+  ): ObjectName = {
+    val attributes: Map[String, String] = Map("name" -> name, "type" -> tpe)
+    new ObjectName(
+      BasePackage, {
+        import scala.jdk.CollectionConverters._
+        new java.util.Hashtable(attributes.asJava)
+      }
+    )
+  }
+
+  def asObjectName(name: String, tpe: String): ObjectName =
+    asObjectNameInternal(name, tpe)
+
+  lazy val AllDomainMXBeansQuery: ObjectName =
+    asObjectNameInternal(WildcardString)
+
+  lazy val WildcardString: String = "*"
 
   def mxBeanType[T](clazz: Class[T]): String = {
     clazz.getInterfaces

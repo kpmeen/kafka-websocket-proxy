@@ -14,7 +14,8 @@ import net.scalytica.kafka.wsproxy.models.{
   FullProducerId,
   WsCommit,
   WsConsumerRecord,
-  WsProducerId
+  WsProducerId,
+  WsProducerInstanceId
 }
 
 import scala.concurrent.ExecutionContext
@@ -31,16 +32,20 @@ import scala.util.{Failure, Success, Try}
 
 trait BaseJmxManager {
   val appCfg: AppCfg
-  val sys: ActorSystem[_]
-  val adminClient: WsKafkaAdminClient
+
+  def sys: ActorSystem[_]
+  def adminClient: WsKafkaAdminClient
 
   implicit lazy val ec: ExecutionContext = sys.executionContext
+
+  def close(): Unit
 
 }
 
 trait JmxProxyStatusOps { self: BaseJmxManager with WithProxyLogger =>
 
-  protected val proxyStatusActor = {
+  protected val proxyStatusActor
+      : ActorRef[ProxyStatusProtocol.ProxyStatusCommand] = {
     sys.systemActorOf(
       behavior = ProxyStatusMXBeanActor(appCfg),
       name = "wsproxy-status"
@@ -75,10 +80,12 @@ trait JmxProxyStatusOps { self: BaseJmxManager with WithProxyLogger =>
 
 trait JmxConnectionStatsOps { self: BaseJmxManager with WithProxyLogger =>
 
-  final protected val connectionStatsActor = sys.systemActorOf(
-    behavior = ConnectionsStatsMXBeanActor(),
-    name = "wsproxy-connections"
-  )
+  final protected val connectionStatsActor
+      : ActorRef[ConnectionsStatsProtocol.ConnectionsStatsCommand] =
+    sys.systemActorOf(
+      behavior = ConnectionsStatsMXBeanActor(),
+      name = "wsproxy-connections"
+    )
 
   def addConsumerConnection(): Unit = try {
     connectionStatsActor.tell(
@@ -121,11 +128,12 @@ trait JmxConsumerStatsOps { self: BaseJmxManager =>
 
   final protected def setupConsumerStatsSink(
       ref: ActorRef[ConsumerClientStatsCommand]
-  ) = ActorSink.actorRef[ConsumerClientStatsCommand](
-    ref = ref,
-    onCompleteMessage = ConsumerClientStatsProtocol.Stop,
-    onFailureMessage = _ => ConsumerClientStatsProtocol.Stop
-  )
+  ): Sink[ConsumerClientStatsCommand, NotUsed] =
+    ActorSink.actorRef[ConsumerClientStatsCommand](
+      ref = ref,
+      onCompleteMessage = ConsumerClientStatsProtocol.Stop,
+      onFailureMessage = _ => ConsumerClientStatsProtocol.Stop
+    )
 
   def initConsumerClientStatsActor(
       fullConsumerId: FullConsumerId
@@ -136,7 +144,8 @@ trait JmxConsumerStatsOps { self: BaseJmxManager =>
     )
   }
 
-  final protected val totalConsumerClientStatsActor =
+  final protected val totalConsumerClientStatsActor
+      : ActorRef[ConsumerClientStatsCommand] =
     initConsumerClientStatsActor(
       FullConsumerId(WsGroupId("all"), WsClientId("total"))
     )
@@ -167,12 +176,12 @@ trait JmxConsumerStatsOps { self: BaseJmxManager =>
         .to(sink)
     }
 
-  def incrementTotalConsumerRecordsSent(): Unit =
+  private[this] def incrementTotalConsumerRecordsSent(): Unit =
     totalConsumerClientStatsActor.tell(
       ConsumerClientStatsProtocol.IncrementRecordSent(sys.ignoreRef)
     )
 
-  def incrementTotalConsumerCommitsReceived(): Unit =
+  private[this] def incrementTotalConsumerCommitsReceived(): Unit =
     totalConsumerClientStatsActor.tell(
       ConsumerClientStatsProtocol.IncrementCommitsReceived(sys.ignoreRef)
     )
@@ -181,8 +190,11 @@ trait JmxConsumerStatsOps { self: BaseJmxManager =>
 
 trait JmxProducerStatsOps { self: BaseJmxManager =>
 
-  final protected val totalProducerClientStatsActor =
-    initProducerClientStatsActor(FullProducerId(WsProducerId("all"), None))
+  final protected val totalProducerClientStatsActor
+      : ActorRef[ProducerClientStatsCommand] =
+    initProducerClientStatsActor(
+      FullProducerId(WsProducerId("all"), Some(WsProducerInstanceId("total")))
+    )
 
   def initProducerClientStatsActor(
       fullProducerId: FullProducerId
@@ -191,12 +203,6 @@ trait JmxProducerStatsOps { self: BaseJmxManager =>
       behavior = ProducerClientStatsMXBeanActor(fullProducerId),
       name = producerStatsName(fullProducerId)
     )
-  }
-
-  def initProducerClientStatsActorForConnection(
-      fullProducerId: FullProducerId
-  ): ActorRef[ProducerClientStatsCommand] = {
-    initProducerClientStatsActor(fullProducerId)
   }
 
   final protected def setupProducerStatsSink(

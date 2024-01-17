@@ -36,6 +36,7 @@
     <!--  <logger name="net.scalytica.kafka.wsproxy.config.DynamicConfigHandler" level="TRACE" />-->
     <!--  <logger name="net.scalytica.kafka.wsproxy.consumer" level="TRACE"/>-->
     <!--  <logger name="net.scalytica.kafka.wsproxy.errors" level="TRACE"/>-->
+    <!--  <logger name="net.scalytica.kafka.wsproxy.jmx" level="TRACE"/>-->
     <!--  <logger name="net.scalytica.kafka.wsproxy.logging.DefaultProxyLogger" level="TRACE"/>-->
     <!--  <logger name="net.scalytica.kafka.wsproxy.models" level="TRACE"/>-->
     <!--  <logger name="net.scalytica.kafka.wsproxy.producer" level="TRACE"/>-->

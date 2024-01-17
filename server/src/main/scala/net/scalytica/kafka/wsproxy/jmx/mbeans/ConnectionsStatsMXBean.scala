@@ -46,7 +46,9 @@ class ConnectionsStatsMXBeanActor(ctx: ActorContext[ConnectionsStatsCommand])
     decrementTotal()
   }
 
-  override def onMessage(msg: ConnectionsStatsCommand) = {
+  override def onMessage(
+      msg: ConnectionsStatsCommand
+  ): Behavior[ConnectionsStatsCommand] = {
     msg match {
       case AddProducer(replyTo) =>
         incrementProducers()
@@ -68,9 +70,9 @@ class ConnectionsStatsMXBeanActor(ctx: ActorContext[ConnectionsStatsCommand])
     Behaviors.same
   }
 
-  override def getOpenWebSocketsTotal     = total
-  override def getOpenWebSocketsProducers = producers
-  override def getOpenWebSocketsConsumers = consumers
+  override def getOpenWebSocketsTotal: Int     = total
+  override def getOpenWebSocketsProducers: Int = producers
+  override def getOpenWebSocketsConsumers: Int = consumers
 }
 
 object ConnectionsStatsMXBeanActor {
