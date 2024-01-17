@@ -1,6 +1,6 @@
 package net.scalytica.kafka.wsproxy.web.websockets
 
-import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.{typed, ActorSystem}
 import org.apache.pekko.actor.typed.scaladsl.adapter._
 import org.apache.pekko.actor.typed.{ActorRef, Scheduler}
 import org.apache.pekko.http.scaladsl.model.ws.{
@@ -50,6 +50,7 @@ import net.scalytica.kafka.wsproxy.session.{
 }
 import net.scalytica.kafka.wsproxy.streams.ProxyFlowExtras
 import net.scalytica.kafka.wsproxy.web.SocketProtocol.{AvroPayload, JsonPayload}
+import org.apache.kafka.common.serialization.Deserializer
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
@@ -96,7 +97,7 @@ trait OutboundWebSocket
       j.initConsumerClientStatsActor(fullConsumerId)
     }
     .getOrElse {
-      implicit val tas = as.toTyped
+      implicit val tas: typed.ActorSystem[Nothing] = as.toTyped
       tas.ignoreRef[ConsumerClientStatsCommand]
     }
 
@@ -186,8 +187,8 @@ trait OutboundWebSocket
       sessionHandler: ActorRef[SessionHandlerProtocol.Protocol],
       jmxManager: Option[JmxManager]
   ): Route = {
-    implicit val scheduler   = as.scheduler.toTyped
-    implicit val cfg: AppCfg = applyDynamicConfigs(args)(appCfg)
+    implicit val scheduler: Scheduler = as.scheduler.toTyped
+    implicit val cfg: AppCfg          = applyDynamicConfigs(args)(appCfg)
 
     val numTopicPartitions = fetchNumTopicPartitions(args.topic)
 
@@ -289,7 +290,8 @@ trait OutboundWebSocket
       if (args.autoCommit) None
       else Some(as.spawn(CommitStackHandler.commitStack, args.clientId.value))
 
-    implicit val statsActorRef = prepareJmx(fullConsumerId)
+    implicit val statsActorRef: ActorRef[ConsumerClientStatsCommand] =
+      prepareJmx(fullConsumerId)
 
     // Init inbound monitoring flow
     val jmxInFlow = jmxManager
@@ -477,8 +479,8 @@ trait OutboundWebSocket
       .getOrElse(Flow[WsConsumerRecord[Key, Val]])
 
     // Kafka serdes
-    implicit val keyDes = keyTpe.deserializer
-    implicit val valDes = valTpe.deserializer
+    implicit val keyDes: Deserializer[keyTpe.Aux] = keyTpe.deserializer
+    implicit val valDes: Deserializer[valTpe.Aux] = valTpe.deserializer
     // JSON encoders
     implicit val keyEnc: Encoder[Key] = keyTpe.encoder
     implicit val valEnc: Encoder[Val] = valTpe.encoder

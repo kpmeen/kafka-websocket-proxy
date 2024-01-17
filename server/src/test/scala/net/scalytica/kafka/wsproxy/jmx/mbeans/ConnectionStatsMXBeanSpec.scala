@@ -18,7 +18,7 @@ class ConnectionStatsMXBeanSpec
     with BeforeAndAfterAll
     with WsProxyKafkaSpec {
 
-  val testKit = ActorTestKit(system.toTyped)
+  val testKit: ActorTestKit = ActorTestKit(system.toTyped)
 
   override protected def afterAll(): Unit = {
     super.afterAll()

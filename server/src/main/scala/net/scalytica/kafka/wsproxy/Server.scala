@@ -13,17 +13,24 @@ import net.scalytica.kafka.wsproxy.config.Configuration.{
   OpenIdConnectCfg
 }
 import net.scalytica.kafka.wsproxy.config.DynamicConfigHandlerImplicits._
-import net.scalytica.kafka.wsproxy.config.{Configuration, DynamicConfigHandler}
-import net.scalytica.kafka.wsproxy.jmx.JmxManager
+import net.scalytica.kafka.wsproxy.config.{
+  Configuration,
+  DynamicConfigHandler,
+  ReadableDynamicConfigHandlerRef,
+  RunnableDynamicConfigHandlerRef
+}
+import net.scalytica.kafka.wsproxy.jmx.{JmxManager, WsProxyJmxRegistrar}
 import net.scalytica.kafka.wsproxy.logging.DefaultProxyLogger._
 import net.scalytica.kafka.wsproxy.logging.WsProxyEnvLoggerConfigurator
-import net.scalytica.kafka.wsproxy.session.SessionHandler
+import net.scalytica.kafka.wsproxy.session.{SessionHandler, SessionHandlerRef}
 import net.scalytica.kafka.wsproxy.session.SessionHandlerImplicits._
 import net.scalytica.kafka.wsproxy.utils.HostResolver.{
   resolveKafkaBootstrapHosts,
   HostResolutionError
 }
 import net.scalytica.kafka.wsproxy.web.{ServerBindings, ServerRoutes}
+import org.apache.pekko.actor.typed.Scheduler
+import org.apache.pekko.http.scaladsl.server.Route
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
@@ -89,25 +96,28 @@ object Server extends App with ServerRoutes with ServerBindings {
     System.exit(1)
   }
 
-  implicit val maybeOpenIdClient = cfg.server.openidConnect.collect {
-    case oidc: OpenIdConnectCfg if oidc.enabled => OpenIdClient(cfg)
-  }
+  implicit val maybeOpenIdClient: Option[OpenIdClient] =
+    cfg.server.openidConnect.collect {
+      case oidc: OpenIdConnectCfg if oidc.enabled => OpenIdClient(cfg)
+    }
 
-  implicit val jmxMngr = Option(JmxManager())
+  implicit val jmxMngr: Option[JmxManager] = Option(JmxManager())
 
-  implicit val sessionHandler = SessionHandler.init
-  val sessionHandlerStream    = sessionHandler.stream
+  implicit val sessionHandler: SessionHandlerRef = SessionHandler.init
+  val sessionHandlerStream                       = sessionHandler.stream
 
-  implicit val optRunnableDynCfgHandler = {
+  implicit val optRunnableDynCfgHandler
+      : Option[RunnableDynamicConfigHandlerRef] = {
     if (cfg.dynamicConfigHandler.enabled) Option(DynamicConfigHandler.init)
     else None
   }
-  implicit val optReadableDynCfgHandler =
+  implicit val optReadableDynCfgHandler
+      : Option[ReadableDynamicConfigHandlerRef] =
     optRunnableDynCfgHandler.map(_.asReadOnlyRef)
 
   private[this] val plainPort = cfg.server.port
 
-  implicit val routes = wsProxyRoutes
+  implicit val routes: Route = wsProxyRoutes
 
   val dynCfgCtrl  = optRunnableDynCfgHandler.map(_.stream.run())
   val sessionCtrl = sessionHandlerStream.run()
@@ -152,8 +162,8 @@ object Server extends App with ServerRoutes with ServerBindings {
     }
 
     cs.addTask(PhaseBeforeActorSystemTerminate, "cleanup-state") { () =>
-      implicit val timeout: Timeout = 10 seconds
-      implicit val typedScheduler   = classicSys.scheduler.toTyped
+      implicit val timeout: Timeout          = 10 seconds
+      implicit val typedScheduler: Scheduler = classicSys.scheduler.toTyped
 
       info("Shutting down dynamic config handler...")
       optRunnableDynCfgHandler
@@ -170,6 +180,8 @@ object Server extends App with ServerRoutes with ServerBindings {
         info("Session handler has been stopped.")
         Done
       }
+      // Unregister all MBeans properly
+      WsProxyJmxRegistrar.unregisterAllWsProxyMBeans()
       // Ensure that the admin client in the JMX Manager is closed.
       Future.successful(jmxMngr.map(_.close()).map(_ => Done).getOrElse(Done))
     }

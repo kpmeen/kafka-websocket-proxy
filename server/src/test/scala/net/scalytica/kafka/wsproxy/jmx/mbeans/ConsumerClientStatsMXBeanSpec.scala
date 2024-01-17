@@ -52,12 +52,14 @@ class ConsumerClientStatsMXBeanSpec
       ref ! IncrementRecordSent(probe.ref)
       probe.expectMessage(1 second, RecordsSentIncremented)
       proxy.getNumRecordsSentTotal mustBe 1
+      proxy.getNumUncommittedRecords mustBe 1
     }
 
     "increment number of commits received" in {
       ref ! IncrementCommitsReceived(probe.ref)
       probe.expectMessage(1 second, CommitsReceivedIncremented)
       proxy.getNumCommitsReceivedTotal mustBe 1
+      proxy.getNumUncommittedRecords mustBe 0
     }
 
     "aggregate number of records for the last minute" in {
@@ -84,12 +86,6 @@ class ConsumerClientStatsMXBeanSpec
       ref ! UpdateCommitsPerHour(1, probe.ref)
       probe.expectMessage(1 second, CommitsPerHourUpdated)
       proxy.getNumCommitsReceivedLastHour mustBe 1
-    }
-
-    "update number of uncommitted records" in {
-      ref ! UpdateUncommitted(1, probe.ref)
-      probe.expectMessage(1 second, UncommittedUpdated)
-      proxy.getNumCommitsReceivedTotal mustBe 1
     }
 
   }
