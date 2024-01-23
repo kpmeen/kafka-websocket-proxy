@@ -55,7 +55,7 @@ case class OpenIdConnectConfig(
     scopesSupported: Option[List[String]] = None
 ) {
 
-  override def toString = {
+  override def toString: String = {
     // format: off
     // scalastyle:off
     s"""OpenIdConnectConfig(

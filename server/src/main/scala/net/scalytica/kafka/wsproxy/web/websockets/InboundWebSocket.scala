@@ -49,7 +49,7 @@ trait InboundWebSocket extends ClientSpecificCfgLoader with WithProxyLogger {
       serverId: WsServerId,
       fullProducerId: FullProducerId,
       maxConnections: Int,
-      sh: ActorRef[SessionHandlerProtocol.Protocol]
+      sh: ActorRef[SessionHandlerProtocol.SessionProtocol]
   )(
       implicit cfg: AppCfg,
       ec: ExecutionContext,
@@ -118,7 +118,7 @@ trait InboundWebSocket extends ClientSpecificCfgLoader with WithProxyLogger {
       as: ActorSystem,
       mat: Materializer,
       ec: ExecutionContext,
-      sessionHandler: ActorRef[SessionHandlerProtocol.Protocol],
+      sessionHandler: ActorRef[SessionHandlerProtocol.SessionProtocol],
       jmxManager: Option[JmxManager]
   ): Route = {
     log.debug(
@@ -139,7 +139,7 @@ trait InboundWebSocket extends ClientSpecificCfgLoader with WithProxyLogger {
       as: ActorSystem,
       mat: Materializer,
       ec: ExecutionContext,
-      sessionHandler: ActorRef[SessionHandlerProtocol.Protocol],
+      sessionHandler: ActorRef[SessionHandlerProtocol.SessionProtocol],
       jmxManager: Option[JmxManager]
   ): Route = {
     implicit val scheduler   = as.toTyped.scheduler

@@ -3,7 +3,7 @@ package net.scalytica.kafka.wsproxy.session
 import org.apache.pekko.Done
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.adapter._
-import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.{ActorSystem, Behavior}
 import org.apache.pekko.kafka.scaladsl.Consumer
 import org.apache.pekko.stream.scaladsl.{RunnableGraph, Sink}
 import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
@@ -12,7 +12,7 @@ import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models.FullClientId
 import net.scalytica.kafka.wsproxy.session.SessionHandlerProtocol._
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 
 object SessionHandler extends SessionHandler
 
@@ -49,8 +49,8 @@ trait SessionHandler extends WithProxyLogger {
   private[this] def nextOrSameBehavior(
       either: Either[String, ActiveSessions]
   )(
-      behavior: ActiveSessions => Behavior[Protocol]
-  ): Behavior[Protocol] = {
+      behavior: ActiveSessions => Behavior[SessionProtocol]
+  ): Behavior[SessionProtocol] = {
     either match {
       case Left(_)   => Behaviors.same
       case Right(ns) => behavior(ns)
@@ -134,13 +134,13 @@ trait SessionHandler extends WithProxyLogger {
    *   a [[SessionHandlerRef]] containing a reference to the [[RunnableGraph]]
    *   that executes the [[SessionDataConsumer]] stream. And a typed
    *   [[org.apache.pekko.actor.typed.ActorRef]] that understands messages from
-   *   the defined protocol in [[SessionHandlerProtocol.Protocol]].
+   *   the defined protocol in [[SessionHandlerProtocol.SessionProtocol]].
    */
   def init(
       implicit cfg: AppCfg,
       sys: org.apache.pekko.actor.ActorSystem
   ): SessionHandlerRef = {
-    implicit val typedSys = sys.toTyped
+    implicit val typedSys: ActorSystem[_] = sys.toTyped
 
     val name = s"session-handler-actor-${cfg.server.serverId.value}"
     log.debug(s"Initialising session handler $name...")
@@ -175,12 +175,14 @@ trait SessionHandler extends WithProxyLogger {
     SessionHandlerRef(consumerStream, ref)
   }
 
-  protected def sessionHandler(implicit cfg: AppCfg): Behavior[Protocol] = {
+  protected def sessionHandler(
+      implicit cfg: AppCfg
+  ): Behavior[SessionProtocol] = {
     Behaviors.setup { implicit ctx =>
-      implicit val sys = ctx.system
-      implicit val ec  = sys.executionContext
+      implicit val sys: ActorSystem[_]          = ctx.system
+      implicit val ec: ExecutionContextExecutor = sys.executionContext
       log.debug("Initialising session data producer...")
-      implicit val producer = new SessionDataProducer()
+      implicit val producer: SessionDataProducer = new SessionDataProducer()
       behavior()
     }
   }
@@ -191,9 +193,9 @@ trait SessionHandler extends WithProxyLogger {
       implicit ec: ExecutionContext,
       cfg: AppCfg,
       producer: SessionDataProducer
-  ): Behavior[Protocol] = {
+  ): Behavior[SessionProtocol] = {
     Behaviors.receiveMessage {
-      case c: SessionProtocol =>
+      case c: ClientSessionProtocol =>
         log.trace(s"Received a SessionProtocol message [$c]")
         sessionProtocolHandler(active, c)
 
@@ -205,12 +207,12 @@ trait SessionHandler extends WithProxyLogger {
 
   private[this] def sessionProtocolHandler(
       active: ActiveSessions,
-      sp: SessionProtocol
+      sp: ClientSessionProtocol
   )(
       implicit ec: ExecutionContext,
       cfg: AppCfg,
       producer: SessionDataProducer
-  ): Behavior[Protocol] = {
+  ): Behavior[SessionProtocol] = {
     val serverId = cfg.server.serverId
 
     sp match {
@@ -258,7 +260,7 @@ trait SessionHandler extends WithProxyLogger {
       implicit ec: ExecutionContext,
       cfg: AppCfg,
       producer: SessionDataProducer
-  ): Behavior[Protocol] = {
+  ): Behavior[SessionProtocol] = {
     log.trace(s"CLIENT_SESSION: got consumer session protocol message $csp")
 
     csp match {
@@ -281,7 +283,7 @@ trait SessionHandler extends WithProxyLogger {
       implicit ec: ExecutionContext,
       cfg: AppCfg,
       producer: SessionDataProducer
-  ): Behavior[Protocol] = {
+  ): Behavior[SessionProtocol] = {
     log.trace(s"CLIENT_SESSION: got producer session protocol message $psp")
 
     psp match {
@@ -306,7 +308,7 @@ trait SessionHandler extends WithProxyLogger {
       implicit ec: ExecutionContext,
       cfg: AppCfg,
       producer: SessionDataProducer
-  ): Behavior[Protocol] = {
+  ): Behavior[SessionProtocol] = {
     active.find(cmd.sessionId) match {
       case Some(s) =>
         log.debug(
@@ -347,13 +349,13 @@ trait SessionHandler extends WithProxyLogger {
     }
   }
 
-  type AddCmd = AddClientCmd[_ <: FullClientId]
-  type RemCmd = RemoveClientCmd[_ <: FullClientId]
+  private[this] type AddCmd = AddClientCmd[_ <: FullClientId]
+  private[this] type RemCmd = RemoveClientCmd[_ <: FullClientId]
 
-  def notAdded[Add <: AddCmd](
+  private[this] def notAdded[Add <: AddCmd](
       cmd: Add,
       op: SessionOpResult
-  ): Behavior[Protocol] = {
+  ): Behavior[SessionProtocol] = {
     log.debug(
       s"ADD_CLIENT: session op result for session ${cmd.sessionId.value}" +
         s" trying to add client ${cmd.fullClientId.value} on server" +
@@ -369,7 +371,7 @@ trait SessionHandler extends WithProxyLogger {
   )(
       implicit ec: ExecutionContext,
       producer: SessionDataProducer
-  ): Behavior[Protocol] = {
+  ): Behavior[SessionProtocol] = {
     log.debug(
       s"ADD_CLIENT: adding client instance ${cmd.fullClientId.value} " +
         s"connected to server ${cmd.serverId.value} to " +
@@ -421,7 +423,7 @@ trait SessionHandler extends WithProxyLogger {
   )(
       implicit ec: ExecutionContext,
       producer: SessionDataProducer
-  ): Behavior[Protocol] = {
+  ): Behavior[SessionProtocol] = {
     log.debug(
       s"REMOVE_CLIENT: remove client instance ${cmd.fullClientId} from " +
         s"session ${cmd.sessionId.value} on server..."
@@ -464,7 +466,7 @@ trait SessionHandler extends WithProxyLogger {
       implicit ec: ExecutionContext,
       cfg: AppCfg,
       producer: SessionDataProducer
-  ): Behavior[Protocol] = {
+  ): Behavior[SessionProtocol] = {
     active
       .find(ucs.sessionId)
       .flatMap { s =>
@@ -488,7 +490,7 @@ trait SessionHandler extends WithProxyLogger {
       implicit ec: ExecutionContext,
       cfg: AppCfg,
       producer: SessionDataProducer
-  ): Behavior[Protocol] = {
+  ): Behavior[SessionProtocol] = {
     active
       .find(ups.sessionId)
       .flatMap { s =>
@@ -508,7 +510,7 @@ trait SessionHandler extends WithProxyLogger {
   private[this] def getConsumerSessionHandler(
       active: ActiveSessions,
       gs: GetConsumerSession
-  ): Behavior[Protocol] = {
+  ): Behavior[SessionProtocol] = {
     gs.replyTo ! active.find(gs.sessionId).flatMap {
       case cs: ConsumerSession => Option(cs)
       case _                   => None
@@ -519,7 +521,7 @@ trait SessionHandler extends WithProxyLogger {
   private[this] def getProducerSessionHandler(
       active: ActiveSessions,
       gs: GetProducerSession
-  ): Behavior[Protocol] = {
+  ): Behavior[SessionProtocol] = {
     gs.replyTo ! active.find(gs.sessionId).flatMap {
       case ps: ProducerSession => Option(ps)
       case _                   => None
@@ -534,7 +536,7 @@ trait SessionHandler extends WithProxyLogger {
       implicit ec: ExecutionContext,
       cfg: AppCfg,
       producer: SessionDataProducer
-  ): Behavior[Protocol] = ip match {
+  ): Behavior[SessionProtocol] = ip match {
     case UpdateSession(sessionId, s, _) =>
       log.debug(s"INTERNAL: Updating session ${sessionId.value}...")
       nextOrSameBehavior(active.updateSession(sessionId, s))(behavior)

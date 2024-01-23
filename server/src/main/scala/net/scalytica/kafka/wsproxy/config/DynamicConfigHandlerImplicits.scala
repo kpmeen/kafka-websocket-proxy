@@ -1,6 +1,6 @@
 package net.scalytica.kafka.wsproxy.config
 
-import org.apache.pekko.actor.typed.Scheduler
+import org.apache.pekko.actor.typed.{ActorRef, Scheduler}
 import org.apache.pekko.util.Timeout
 import net.scalytica.kafka.wsproxy.actor.ActorWithProtocolExtensions
 import net.scalytica.kafka.wsproxy.config.Configuration.{
@@ -54,7 +54,7 @@ object DynamicConfigHandlerImplicits extends WithProxyLogger {
         DynamicConfigOpResult
       ] {
     val handler: T
-    override val ref = handler.dchRef
+    override val ref: ActorRef[DynamicConfigProtocol] = handler.dchRef
   }
   // scalastyle:on
 

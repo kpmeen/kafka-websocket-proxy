@@ -22,7 +22,7 @@ import scala.jdk.CollectionConverters._
 // scalastyle:off number.of.methods
 trait Configuration extends WithProxyLogger {
 
-  protected val CfgRootKey = "kafka.ws.proxy"
+  protected val CfgRootKey: String = "kafka.ws.proxy"
 
   private[this] def lightbendConfigToMap(cfg: Config): Map[String, String] = {
     cfg
@@ -55,7 +55,8 @@ trait Configuration extends WithProxyLogger {
   implicit lazy val stringAsTopicName: ConfigReader[TopicName] =
     ConfigReader.fromString(str => Right(TopicName(str)))
 
-  implicit lazy val schemaRegistryCfgReader = {
+  implicit lazy val schemaRegistryCfgReader
+      : ConfigReader[Option[SchemaRegistryCfg]] = {
     ConfigReader.fromCursor[Option[SchemaRegistryCfg]] { cursor =>
       val urlCursor = cursor.fluent.at("url").asString
       urlCursor match {
@@ -90,7 +91,7 @@ trait Configuration extends WithProxyLogger {
     }
   }
 
-  implicit lazy val customJwtCfgReader = {
+  implicit lazy val customJwtCfgReader: ConfigReader[Option[CustomJwtCfg]] = {
     ConfigReader.fromCursor[Option[CustomJwtCfg]] { c =>
       c.fluent
         .at("jwt-kafka-username-key")
@@ -109,7 +110,7 @@ trait Configuration extends WithProxyLogger {
     }
   }
 
-  implicit lazy val jmxManagerCfgReader = {
+  implicit lazy val jmxManagerCfgReader: ConfigReader[JmxManagerConfig] = {
     ConfigReader.fromCursor[JmxManagerConfig] { c =>
       c.fluent
         .at("proxy", "status", "interval")
@@ -175,9 +176,10 @@ trait Configuration extends WithProxyLogger {
   }
 
   object ConfluentMonitoringCfg {
-    val MonitoringPrefix = "confluent.monitoring.interceptor"
+    val MonitoringPrefix: String = "confluent.monitoring.interceptor"
 
-    val BootstrapServersKey = s"$MonitoringPrefix.$BOOTSTRAP_SERVERS_CONFIG"
+    val BootstrapServersKey: String =
+      s"$MonitoringPrefix.$BOOTSTRAP_SERVERS_CONFIG"
 
     def withConfluentMonitoringPrefix(
         bootstrapHosts: KafkaBootstrapHosts,
@@ -222,7 +224,7 @@ trait Configuration extends WithProxyLogger {
   ) extends ClientSpecificLimitCfg {
     override val id = groupId.value
 
-    override def asHoconString(useJson: Boolean = false) = {
+    override def asHoconString(useJson: Boolean = false): String = {
       ConfigWriter[ConsumerSpecificLimitCfg]
         .to(this)
         .render(ConfigRenderOptions.concise().setJson(useJson))
@@ -235,10 +237,10 @@ trait Configuration extends WithProxyLogger {
       maxConnections: Option[Int]
   ) extends ClientSpecificLimitCfg {
 
-    override val id        = producerId.value
-    override val batchSize = None
+    override val id: String                 = producerId.value
+    override val batchSize: Option[Nothing] = None
 
-    override def asHoconString(useJson: Boolean = false) = {
+    override def asHoconString(useJson: Boolean = false): String = {
       ConfigWriter[ProducerSpecificLimitCfg]
         .to(this)
         .render(ConfigRenderOptions.concise().setJson(useJson))

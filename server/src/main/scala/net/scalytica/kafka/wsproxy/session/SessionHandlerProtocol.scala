@@ -16,17 +16,17 @@ import net.scalytica.kafka.wsproxy.models._
 object SessionHandlerProtocol {
 
   /** Main protocol to be used by the session handler */
-  sealed trait Protocol
+  sealed trait SessionProtocol
 
   /**
    * Protocol to use for session related behaviour from outside the session
    * handler.
    */
-  sealed trait SessionProtocol extends Protocol
+  sealed trait ClientSessionProtocol extends SessionProtocol
   /** Consumer session specific protocol */
-  sealed trait ConsumerSessionProtocol extends SessionProtocol
+  sealed trait ConsumerSessionProtocol extends ClientSessionProtocol
   /** Producer session specific protocol */
-  sealed trait ProducerSessionProtocol extends SessionProtocol
+  sealed trait ProducerSessionProtocol extends ClientSessionProtocol
 
   sealed trait SessionInitCmd {
     val sessionId: SessionId
@@ -39,16 +39,12 @@ object SessionHandlerProtocol {
     val serverId: WsServerId
     val fullClientId: ID
     val replyTo: ActorRef[SessionOpResult]
-
-    lazy val clientIdString: String = fullClientId.value
   }
 
   sealed trait RemoveClientCmd[ID <: FullClientId] {
     val sessionId: SessionId
     val fullClientId: ID
     val replyTo: ActorRef[SessionOpResult]
-
-    lazy val clientIdString: String = fullClientId.value
   }
 
   /**
@@ -59,11 +55,11 @@ object SessionHandlerProtocol {
    */
   final case class StopSessionHandler(
       replyTo: ActorRef[SessionOpResult]
-  ) extends SessionProtocol
+  ) extends ClientSessionProtocol
 
   final case class CheckSessionHandlerReady(
       replyTo: ActorRef[SessionOpResult]
-  ) extends SessionProtocol
+  ) extends ClientSessionProtocol
 
   // Consumer session specific commands
   final case class InitConsumerSession(
@@ -136,8 +132,9 @@ object SessionHandlerProtocol {
       replyTo: ActorRef[Option[ProducerSession]]
   ) extends ProducerSessionProtocol
 
-  /** Sub-protocol only to be used by the Kafka consumer */
-  sealed private[session] trait InternalSessionProtocol extends Protocol {
+  /** Internal Sub-protocol only to be used by the internal Kafka consumer */
+  sealed private[session] trait InternalSessionProtocol
+      extends SessionProtocol {
     val offset: Long
   }
 

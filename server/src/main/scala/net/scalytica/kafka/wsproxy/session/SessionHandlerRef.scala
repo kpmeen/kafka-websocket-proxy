@@ -6,5 +6,5 @@ import org.apache.pekko.stream.scaladsl.RunnableGraph
 
 case class SessionHandlerRef(
     stream: RunnableGraph[Consumer.Control],
-    shRef: ActorRef[SessionHandlerProtocol.Protocol]
+    shRef: ActorRef[SessionHandlerProtocol.SessionProtocol]
 )

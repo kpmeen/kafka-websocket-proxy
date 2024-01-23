@@ -18,7 +18,7 @@ import scala.util.Try
 trait WsProxyJmxQueries extends WithProxyLogger {
   protected lazy val mbs: MBeanServer = ManagementFactory.getPlatformMBeanServer
 
-  def findNamedMBean(on: ObjectName): Option[MBeanInfo] = {
+  def findByName(on: ObjectName): Option[MBeanInfo] = {
     val tryRes = Try(mbs.getMBeanInfo(on))
     tryRes.recoverWith {
       case t: InstanceNotFoundException =>
@@ -32,8 +32,8 @@ trait WsProxyJmxQueries extends WithProxyLogger {
     tryRes.toOption
   }
 
-  private[this] def listAllNamesFor(on: ObjectName): Set[ObjectName] = {
-    log.trace(s"Using query ${on}")
+  def allNamesFor(on: ObjectName): Set[ObjectName] = {
+    log.trace(s"Using ObjectName ${on.getCanonicalName}")
     val res: Set[ObjectName] =
       Try(mbs.queryNames(on, null)) // scalastyle:ignore
         .recoverWith { case t: Throwable =>
@@ -50,28 +50,35 @@ trait WsProxyJmxQueries extends WithProxyLogger {
     res
   }
 
-  def listAllWSProxyMBeanNames: Set[ObjectName] = {
-    listAllNamesFor(AllDomainMXBeansQuery)
+  def allWSProxyMBeanNames: Set[ObjectName] = {
+    allNamesFor(AllDomainMXBeansQuery)
   }
 
-  def listAllMBeanNamesForType[T](
+  def allNamesForType[T](
       implicit ct: ClassTag[T]
   ): Set[ObjectName] = {
     val tpe = mxBeanType(ct.runtimeClass)
-    listAllNamesFor(asObjectName(WildcardString, tpe))
+    allNamesFor(asObjectName(WildcardString, tpe))
   }
 
-  def findMBeanByTypeAndName[T](objectNameString: String)(
+  def namesForNameAndType[T](beanName: String)(
+      implicit ct: ClassTag[T]
+  ): Set[ObjectName] = {
+    val tpe = mxBeanType(ct.runtimeClass)
+    allNamesFor(asObjectName(beanName, tpe))
+  }
+
+  def findByTypeAndName[T](objectNameString: String)(
       implicit ct: ClassTag[T]
   ): Option[MBeanInfo] = {
     val on = asObjectName(objectNameString, mxBeanType(ct.runtimeClass))
-    findNamedMBean(on)
+    findByName(on)
   }
 
   def findConsumerClientMBean(
       fullConsumerId: FullConsumerId
   ): Option[MBeanInfo] = {
-    findMBeanByTypeAndName[ConsumerClientStatsMXBean](
+    findByTypeAndName[ConsumerClientStatsMXBean](
       consumerStatsName(fullConsumerId)
     )
   }
@@ -79,7 +86,7 @@ trait WsProxyJmxQueries extends WithProxyLogger {
   def findProducerClientMBean(
       fullProducerId: FullProducerId
   ): Option[MBeanInfo] = {
-    findMBeanByTypeAndName[ProducerClientStatsMXBean](
+    findByTypeAndName[ProducerClientStatsMXBean](
       producerStatsName(fullProducerId)
     )
   }
@@ -139,8 +146,6 @@ object WsProxyJmxRegistrar extends WsProxyJmxQueries {
   @throws[RuntimeOperationsException]
   @throws[RuntimeMBeanException]
   @throws[RuntimeErrorException]
-  @throws[InstanceNotFoundException]
-  @throws[MBeanRegistrationException]
   def unregisterFromMBeanServer(objName: ObjectName): Unit = {
     log.debug(s"Unregistering MBean ${objName.getCanonicalName}")
     mbs.unregisterMBean(objName)
@@ -149,11 +154,20 @@ object WsProxyJmxRegistrar extends WsProxyJmxQueries {
   @throws[RuntimeOperationsException]
   @throws[RuntimeMBeanException]
   @throws[RuntimeErrorException]
-  @throws[InstanceNotFoundException]
-  @throws[MBeanRegistrationException]
   def unregisterAllWsProxyMBeans(): Unit = {
     log.debug(s"Unregistering all MBeans for Kafka WebSocket Proxy")
-    listAllWSProxyMBeanNames.foreach(unregisterFromMBeanServer)
+    allWSProxyMBeanNames.foreach(unregisterFromMBeanServer)
+  }
+
+  @throws[RuntimeOperationsException]
+  @throws[RuntimeMBeanException]
+  @throws[RuntimeErrorException]
+  def unregisterNamedWsProxyMBeans(objName: ObjectName): Unit = {
+    log.debug(
+      "Unregistering MBeans matching the following ObjectName:" +
+        s" ${objName.getCanonicalName}"
+    )
+    allNamesFor(objName).foreach(on => unregisterFromMBeanServer(on))
   }
 
 }

@@ -8,18 +8,18 @@ import scala.reflect.ClassTag
 /** Convenience trait for providing loggers to different objects and classes. */
 trait WithProxyLogger { self =>
 
-  protected lazy val loggerName = self.niceClassName
+  protected lazy val loggerName: String = self.niceClassName
 
-  final protected lazy val _log = Logger(loggerName)
+  final protected lazy val _log: Logger = Logger(loggerName)
 
-  final protected lazy val log = _log
+  final protected lazy val log: Logger = _log
 
 }
 
 object WithProxyLogger {
 
   private[this] case class ClassProxyLogger(n: String) extends WithProxyLogger {
-    override protected lazy val loggerName = n
+    override protected lazy val loggerName: String = n
   }
 
   def namedLoggerFor[T](implicit ct: ClassTag[T]): Logger = {
@@ -31,7 +31,7 @@ object WithProxyLogger {
 
 object DefaultProxyLogger extends WithProxyLogger {
 
-  override protected lazy val loggerName =
+  override protected lazy val loggerName: String =
     this.packageName.stripSuffix("logging") + "Server"
 
   def trace(msg: String): Unit                   = log.trace(msg)

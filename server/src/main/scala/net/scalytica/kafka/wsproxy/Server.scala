@@ -24,6 +24,7 @@ import net.scalytica.kafka.wsproxy.logging.DefaultProxyLogger._
 import net.scalytica.kafka.wsproxy.logging.WsProxyEnvLoggerConfigurator
 import net.scalytica.kafka.wsproxy.session.{SessionHandler, SessionHandlerRef}
 import net.scalytica.kafka.wsproxy.session.SessionHandlerImplicits._
+import net.scalytica.kafka.wsproxy.utils.HostResolver
 import net.scalytica.kafka.wsproxy.utils.HostResolver.{
   resolveKafkaBootstrapHosts,
   HostResolutionError
@@ -31,6 +32,8 @@ import net.scalytica.kafka.wsproxy.utils.HostResolver.{
 import net.scalytica.kafka.wsproxy.web.{ServerBindings, ServerRoutes}
 import org.apache.pekko.actor.typed.Scheduler
 import org.apache.pekko.http.scaladsl.server.Route
+import org.apache.pekko.kafka.scaladsl.Consumer
+import org.apache.pekko.stream.scaladsl.RunnableGraph
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
@@ -77,10 +80,12 @@ object Server extends App with ServerRoutes with ServerBindings {
 
   implicit val classicSys: org.apache.pekko.actor.ActorSystem =
     org.apache.pekko.actor.ActorSystem("kafka-ws-proxy", config)
+
   implicit val mat: Materializer     = Materializer.matFromSystem
   implicit val ctx: ExecutionContext = classicSys.dispatcher
 
-  val resStatus = resolveKafkaBootstrapHosts(cfg.kafkaClient.bootstrapHosts)
+  private val resStatus: HostResolver.HostResolutionStatus =
+    resolveKafkaBootstrapHosts(cfg.kafkaClient.bootstrapHosts)
 
   if (!resStatus.hasErrors) {
     info("All Kafka broker hosts were correctly resolved")
@@ -101,10 +106,11 @@ object Server extends App with ServerRoutes with ServerBindings {
       case oidc: OpenIdConnectCfg if oidc.enabled => OpenIdClient(cfg)
     }
 
-  implicit val jmxMngr: Option[JmxManager] = Option(JmxManager())
+  implicit val jmxManager: Option[JmxManager] = Option(JmxManager())
 
   implicit val sessionHandler: SessionHandlerRef = SessionHandler.init
-  val sessionHandlerStream                       = sessionHandler.stream
+  private[this] val sessionHandlerStream: RunnableGraph[Consumer.Control] =
+    sessionHandler.stream
 
   implicit val optRunnableDynCfgHandler
       : Option[RunnableDynamicConfigHandlerRef] = {
@@ -123,9 +129,12 @@ object Server extends App with ServerRoutes with ServerBindings {
   val sessionCtrl = sessionHandlerStream.run()
 
   /** Bind to network interface and port, starting the server */
-  val bindingPlain  = initialisePlainBinding
-  val bindingSecure = initialiseSslBinding
-  val bindingAdmin  = initialiseAdminBinding(adminRoutes)
+  private[this] val bindingPlain: Option[Future[Http.ServerBinding]] =
+    initialisePlainBinding
+  private[this] val bindingSecure: Option[Future[Http.ServerBinding]] =
+    initialiseSslBinding
+  private[this] val bindingAdmin: Option[Future[Http.ServerBinding]] =
+    initialiseAdminBinding(adminRoutes)
 
   private[this] def unbindConnection(
       binding: Future[Http.ServerBinding]
@@ -183,7 +192,9 @@ object Server extends App with ServerRoutes with ServerBindings {
       // Unregister all MBeans properly
       WsProxyJmxRegistrar.unregisterAllWsProxyMBeans()
       // Ensure that the admin client in the JMX Manager is closed.
-      Future.successful(jmxMngr.map(_.close()).map(_ => Done).getOrElse(Done))
+      Future.successful(
+        jmxManager.map(_.close()).map(_ => Done).getOrElse(Done)
+      )
     }
 
     cs

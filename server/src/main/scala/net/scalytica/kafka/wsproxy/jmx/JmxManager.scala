@@ -44,11 +44,13 @@ trait BaseJmxManager {
 
 trait JmxProxyStatusOps { self: BaseJmxManager with WithProxyLogger =>
 
-  protected val proxyStatusActor
+  protected val proxyStatusActorName = "wsproxy-status"
+
+  protected lazy val proxyStatusActor
       : ActorRef[ProxyStatusProtocol.ProxyStatusCommand] = {
     sys.systemActorOf(
       behavior = ProxyStatusMXBeanActor(appCfg),
-      name = "wsproxy-status"
+      name = proxyStatusActorName
     )
   }
 
@@ -80,11 +82,13 @@ trait JmxProxyStatusOps { self: BaseJmxManager with WithProxyLogger =>
 
 trait JmxConnectionStatsOps { self: BaseJmxManager with WithProxyLogger =>
 
-  final protected val connectionStatsActor
+  protected val connectionStatsActorName = "wsproxy-connections"
+
+  protected lazy val connectionStatsActor
       : ActorRef[ConnectionsStatsProtocol.ConnectionsStatsCommand] =
     sys.systemActorOf(
       behavior = ConnectionsStatsMXBeanActor(),
-      name = "wsproxy-connections"
+      name = connectionStatsActorName
     )
 
   def addConsumerConnection(): Unit = try {
@@ -144,10 +148,12 @@ trait JmxConsumerStatsOps { self: BaseJmxManager =>
     )
   }
 
-  final protected val totalConsumerClientStatsActor
+  protected val totalConsumerStatsPrefix = "all"
+
+  protected lazy val totalConsumerClientStatsActor
       : ActorRef[ConsumerClientStatsCommand] =
     initConsumerClientStatsActor(
-      FullConsumerId(WsGroupId("all"), WsClientId("total"))
+      FullConsumerId(WsGroupId(totalConsumerStatsPrefix), WsClientId("total"))
     )
 
   def consumerStatsInboundWireTap(
@@ -190,10 +196,15 @@ trait JmxConsumerStatsOps { self: BaseJmxManager =>
 
 trait JmxProducerStatsOps { self: BaseJmxManager =>
 
-  final protected val totalProducerClientStatsActor
+  protected val totalProducerStatsPrefix = "all"
+
+  protected lazy val totalProducerClientStatsActor
       : ActorRef[ProducerClientStatsCommand] =
     initProducerClientStatsActor(
-      FullProducerId(WsProducerId("all"), Some(WsProducerInstanceId("total")))
+      FullProducerId(
+        WsProducerId(totalProducerStatsPrefix),
+        Some(WsProducerInstanceId("total"))
+      )
     )
 
   def initProducerClientStatsActor(

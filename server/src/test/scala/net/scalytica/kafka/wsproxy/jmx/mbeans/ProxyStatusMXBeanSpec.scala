@@ -1,48 +1,45 @@
 package net.scalytica.kafka.wsproxy.jmx.mbeans
 
-import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
-import org.apache.pekko.actor.typed.scaladsl.adapter._
-import net.scalytica.kafka.wsproxy.jmx.TestJmxQueries
 import net.scalytica.kafka.wsproxy.jmx.mbeans.ProxyStatusProtocol._
 import net.scalytica.kafka.wsproxy.models.BrokerInfo
-import net.scalytica.test.WsProxyKafkaSpec
-import org.scalatest.matchers.must.Matchers
-import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.{BeforeAndAfterAll, OptionValues}
+import org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe
+import org.apache.pekko.actor.typed.ActorRef
 
 import scala.concurrent.duration._
 
 // scalastyle:off magic.number
-class ProxyStatusMXBeanSpec
-    extends AnyWordSpec
-    with Matchers
-    with OptionValues
-    with BeforeAndAfterAll
-    with WsProxyKafkaSpec {
+class ProxyStatusMXBeanSpec extends MXBeanSpecLike {
 
-  val testKit = ActorTestKit(system.toTyped)
+  val beanName = "bean-spec-wsproxy-status-a"
 
-  override protected def afterAll(): Unit = {
-    super.afterAll()
-    testKit.shutdownTestKit()
-  }
-
-  val brokerInfoList = List(
+  val brokerInfoList: List[BrokerInfo] = List(
     BrokerInfo(1, "host1", 1234, None),
     BrokerInfo(2, "host2", 5678, Some("rack2"))
   )
 
+  def jmxContext[T](
+      body: (
+          ActorRef[ProxyStatusCommand],
+          TestProbe[ProxyStatusResponse]
+      ) => T
+  ): T = {
+    val appCfg = plainTestConfig()
+    val ref    = tk.spawn(ProxyStatusMXBeanActor(appCfg), beanName)
+    val probe  = tk.createTestProbe[ProxyStatusResponse]()
+
+    val res = body(ref, probe)
+
+    ref ! Stop
+    probe.expectTerminated(ref)
+
+    jmxq.findByTypeAndName[ProxyStatusMXBean](beanName) mustBe None
+
+    res
+  }
+
   "The ProxyStatusMXBean" should {
 
-    "contain all relevant configuration data" in {
-      val jmxq   = new TestJmxQueries
-      val appCfg = plainTestConfig()
-
-      val beanName = "test-wsproxy-status-a"
-      val psaRef   = testKit.spawn(ProxyStatusMXBeanActor(appCfg), beanName)
-      val probe =
-        testKit.createTestProbe[ProxyStatusResponse]()
-
+    "contain all relevant configuration data" in jmxContext { (psaRef, probe) =>
       psaRef ! UpdateKafkaClusterInfo(brokerInfoList, probe.ref)
 
       // Ensure the actor is up and running and registered in the MBean registry
@@ -72,8 +69,6 @@ class ProxyStatusMXBeanSpec
       b2.host mustBe "host2"
       b2.port mustBe 5678
       b2.rack mustBe "rack2"
-
-      testKit.shutdownTestKit()
     }
 
   }

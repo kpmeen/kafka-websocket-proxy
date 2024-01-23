@@ -49,7 +49,7 @@ case class JwtAuthResult(
       }
   }
 
-  override def maybeBearerToken = Option(bearerToken)
+  override def maybeBearerToken: Option[OAuth2BearerToken] = Option(bearerToken)
 
   def isValid: Boolean = {
     maybeCreds

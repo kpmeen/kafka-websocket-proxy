@@ -73,9 +73,11 @@ object Settings {
       // Set timezone to UTC
       "-Duser.timezone=UTC"
     ),
-    run / fork         := true,
-    Test / fork        := true,
-    Test / logBuffered := true,
+    run / fork                := true,
+    Test / fork               := true,
+    Test / logBuffered        := true,
+    Test / parallelExecution  := false,
+    Test / testForkedParallel := false,
     Test / testOptions ++= Seq(Tests.Argument(ScalaTest, "-oDF")),
     updateOptions := updateOptions.value.withCachedResolution(true),
     // Disable ScalaDoc generation

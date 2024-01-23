@@ -11,7 +11,7 @@ import scala.util.{Failure, Success, Try}
 
 object BlockingRetry {
 
-  implicit val ct = ClassTag(getClass)
+  implicit val ct: ClassTag[_] = ClassTag(getClass)
 
   private[this] val logger = Logger(ct)
 
@@ -52,6 +52,24 @@ object BlockingRetry {
     }
   }
 
+  /**
+   * Handle retries for the provided {{{op}}} function.
+   *
+   * @param timeout
+   *   The duration to wait for completion of the {{{op}}}
+   * @param interval
+   *   The duration to wait between retries
+   * @param numRetries
+   *   The number of retries to attempt
+   * @param op
+   *   The function to attempt to execute
+   * @param err
+   *   Function to handle error situations
+   * @tparam T
+   *   The return type to expect
+   * @return
+   *   Returns an instance of {{{T}}}
+   */
   def retry[T](
       timeout: FiniteDuration,
       interval: FiniteDuration,
@@ -65,6 +83,26 @@ object BlockingRetry {
     retryLoop(numRetries, interval)(op)(err)(timeout.fromNow)
   }
 
+  /**
+   * Handle retries for the provided {{{op}}} function, which in this case is a
+   * {{{Future[T]}}}. The function will block and await a response from the
+   * {{{op}}} before returning, or performing a retry.
+   *
+   * @param timeout
+   *   The duration to wait for completion of the {{{op}}}
+   * @param interval
+   *   The duration to wait between retries
+   * @param numRetries
+   *   The number of retries to attempt
+   * @param op
+   *   The Future based function to attempt to execute
+   * @param err
+   *   A Future function to handle error situations
+   * @tparam T
+   *   The return type to expect
+   * @return
+   *   Returns an instance of {{{T}}}
+   */
   def retryAwaitFuture[T](
       timeout: FiniteDuration,
       interval: FiniteDuration,

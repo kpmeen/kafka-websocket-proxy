@@ -20,10 +20,10 @@ import net.scalytica.kafka.wsproxy.session.{
 
 class SessionSerde extends StringBasedSerde[Session] with WithProxyLogger {
 
-  override def serialize(topic: String, data: Session) =
+  override def serialize(topic: String, data: Session): Array[Byte] =
     Option(data).map(d => ser.serialize(topic, d.asJson.noSpaces)).orNull
 
-  override def deserialize(topic: String, data: Array[Byte]) = {
+  override def deserialize(topic: String, data: Array[Byte]): Session = {
     Option(data).map { d =>
       val str = des.deserialize(topic, d)
 

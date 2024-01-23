@@ -16,8 +16,8 @@ import org.apache.kafka.clients.consumer.OffsetResetStrategy.EARLIEST
 
 /**
  * Consumer for processing all updates to session state topic and transforming
- * them into [[SessionHandlerProtocol.Protocol]] messages that can be sent to
- * the [[SessionHandler]]
+ * them into [[SessionHandlerProtocol.SessionProtocol]] messages that can be
+ * sent to the [[SessionHandler]]
  *
  * @param cfg
  *   the [[AppCfg]] to use

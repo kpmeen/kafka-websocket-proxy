@@ -14,7 +14,7 @@ trait TestAdHocRoute extends RoutesPrereqs with RouteFailureHandlers {
   override val serverId: WsServerId = WsServerId("node-1")
 
   override def cleanupClient(sid: SessionId, fid: FullClientId)(
-      implicit sh: ActorRef[SessionHandlerProtocol.Protocol],
+      implicit sh: ActorRef[SessionHandlerProtocol.SessionProtocol],
       mat: Materializer
   ): Unit = ()
 
@@ -22,7 +22,8 @@ trait TestAdHocRoute extends RoutesPrereqs with RouteFailureHandlers {
       implicit as: ActorSystem,
       mat: Materializer
   ): Route = {
-    implicit val shRef = as.toTyped.ignoreRef[SessionHandlerProtocol.Protocol]
+    implicit val shRef =
+      as.toTyped.ignoreRef[SessionHandlerProtocol.SessionProtocol]
     handleExceptions(wsExceptionHandler)(route)
   }
 }

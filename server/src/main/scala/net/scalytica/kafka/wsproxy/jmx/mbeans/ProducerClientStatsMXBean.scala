@@ -6,6 +6,7 @@ import net.scalytica.kafka.wsproxy.jmx.MXBeanActor
 import net.scalytica.kafka.wsproxy.jmx.mbeans.ProducerClientStatsProtocol._
 import net.scalytica.kafka.wsproxy.models.FullProducerId
 
+import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration._
 
 trait ProducerClientStatsMXBean extends WsProxyJmxBean {
@@ -40,7 +41,7 @@ class ProducerClientStatsMXBeanActor(
       .map(_.value)
       .getOrElse(fullProducerId.uuid.toString)
 
-  override def getFullId = fullProducerId.value
+  override def getFullId: String = fullProducerId.value
 
   @volatile private[this] var numSentTotal: Long   = 0
   @volatile private[this] var numSentHour: Long    = 0
@@ -54,8 +55,8 @@ class ProducerClientStatsMXBeanActor(
   @volatile private[this] var currRecHour: Long   = 0
   @volatile private[this] var currRecMinute: Long = 0
 
-  implicit val ec             = ctx.executionContext
-  private[this] def ignore[T] = ctx.system.ignoreRef[T]
+  implicit val ec: ExecutionContextExecutor = ctx.executionContext
+  private[this] def ignore[T]               = ctx.system.ignoreRef[T]
 
   if (useAutoAggregation) {
     // Schedule minute based updates of the time based counters
@@ -87,14 +88,16 @@ class ProducerClientStatsMXBeanActor(
     currSentMinute = currSentMinute + 1
   }
 
-  override def getNumRecordsReceivedTotal      = numRecTotal
-  override def getNumRecordsReceivedLastHour   = numRecHour
-  override def getNumRecordsReceivedLastMinute = numRecMinute
-  override def getNumAcksSentTotal             = numSentTotal
-  override def getNumAcksSentLastHour          = numSentHour
-  override def getNumAcksSentLastMinute        = numSentMinute
+  override def getNumRecordsReceivedTotal: Long      = numRecTotal
+  override def getNumRecordsReceivedLastHour: Long   = numRecHour
+  override def getNumRecordsReceivedLastMinute: Long = numRecMinute
+  override def getNumAcksSentTotal: Long             = numSentTotal
+  override def getNumAcksSentLastHour: Long          = numSentHour
+  override def getNumAcksSentLastMinute: Long        = numSentMinute
 
-  override def onMessage(msg: ProducerClientStatsCommand) = {
+  override def onMessage(
+      msg: ProducerClientStatsCommand
+  ): Behavior[ProducerClientStatsCommand] = {
     msg match {
       case IncrementRecordsReceived(replyTo) =>
         doAndSame { () =>

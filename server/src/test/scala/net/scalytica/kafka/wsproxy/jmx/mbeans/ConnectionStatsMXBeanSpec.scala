@@ -1,36 +1,24 @@
 package net.scalytica.kafka.wsproxy.jmx.mbeans
 
-import org.apache.pekko.actor.typed.scaladsl.adapter._
-import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
-import net.scalytica.kafka.wsproxy.jmx.TestJmxQueries
 import net.scalytica.kafka.wsproxy.jmx.mbeans.ConnectionsStatsProtocol._
-import net.scalytica.test.WsProxyKafkaSpec
-import org.scalatest.{BeforeAndAfterAll, OptionValues}
-import org.scalatest.matchers.must.Matchers
-import org.scalatest.wordspec.AnyWordSpec
+import org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe
+import org.apache.pekko.actor.typed.ActorRef
 
 import scala.concurrent.duration._
 
-class ConnectionStatsMXBeanSpec
-    extends AnyWordSpec
-    with Matchers
-    with OptionValues
-    with BeforeAndAfterAll
-    with WsProxyKafkaSpec {
+// scalastyle:off magic.number
+class ConnectionStatsMXBeanSpec extends MXBeanSpecLike {
 
-  val testKit: ActorTestKit = ActorTestKit(system.toTyped)
+  val beanName = "bean-spec-wsproxy-connections"
 
-  override protected def afterAll(): Unit = {
-    super.afterAll()
-    testKit.shutdownTestKit()
-  }
+  val ref: ActorRef[ConnectionsStatsCommand] =
+    tk.spawn(ConnectionsStatsMXBeanActor(), beanName)
 
-  val jmxq     = new TestJmxQueries
-  val beanName = "test-wsproxy-connections"
-  val ref      = testKit.spawn(ConnectionsStatsMXBeanActor(), beanName)
-  val probe    = testKit.createTestProbe[ConnectionStatsResponse]("stats-probe")
+  val probe: TestProbe[ConnectionStatsResponse] =
+    tk.createTestProbe[ConnectionStatsResponse]("bean-spec-stats-probe")
 
-  val proxy = jmxq.getMxBean(beanName, classOf[ConnectionsStatsMXBean])
+  val proxy: ConnectionsStatsMXBean =
+    jmxq.getMxBean(beanName, classOf[ConnectionsStatsMXBean])
 
   "The ConnectionStatsMXBean" should {
 
@@ -60,6 +48,12 @@ class ConnectionStatsMXBeanSpec
       probe.expectMessage(1 second, ConsumerRemoved)
       proxy.getOpenWebSocketsConsumers mustBe 0
       proxy.getOpenWebSocketsTotal mustBe 0
+    }
+
+    "stop the MXBean" in {
+      ref ! Stop
+      probe.expectTerminated(ref)
+      jmxq.findByTypeAndName[ConnectionsStatsMXBean](beanName) mustBe None
     }
 
   }

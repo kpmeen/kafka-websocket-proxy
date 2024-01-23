@@ -250,10 +250,11 @@ object WsProducer extends ProducerFlowExtras with WithProxyLogger {
   ): Flow[Message, WsProducerResult, NotUsed] = {
     implicit val ec: ExecutionContext = as.dispatcher
 
-    val keyType                = args.keyType.getOrElse(Formats.AvroType)
-    implicit val keySerializer = keyType.serializer
-    val valType                = args.valType
-    implicit val valSerializer = valType.serializer
+    val keyType = args.keyType.getOrElse(Formats.AvroType)
+    val valType = args.valType
+
+    implicit val keySerializer: Serializer[keyType.Aux] = keyType.serializer
+    implicit val valSerializer: Serializer[valType.Aux] = valType.serializer
 
     val settings = producerSettingsWithKey[keyType.Aux, valType.Aux](args)
 

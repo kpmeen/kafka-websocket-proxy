@@ -131,8 +131,8 @@ case class ProducerKeyValueRecord[K, V](
     headers: Option[Seq[KafkaHeader]],
     clientMessageId: Option[String]
 ) extends WsProducerRecord[K, V] {
-  override val maybeKey = Some(key)
-  override def isEmpty  = false
+  override val maybeKey: Option[InValueDetails[K]] = Some(key)
+  override def isEmpty: Boolean                    = false
 }
 
 /**
@@ -152,14 +152,14 @@ case class ProducerValueRecord[V](
     headers: Option[Seq[KafkaHeader]],
     clientMessageId: Option[String]
 ) extends WsProducerRecord[Nothing, V] {
-  override val maybeKey = None
-  override def isEmpty  = false
+  override val maybeKey: Option[Nothing] = None
+  override def isEmpty: Boolean          = false
 }
 
 case object ProducerEmptyMessage extends WsProducerRecord[Nothing, Nothing] {
-  override val maybeKey        = None
-  override val clientMessageId = None
-  override val headers         = None
+  override val maybeKey: Option[Nothing]        = None
+  override val clientMessageId: Option[Nothing] = None
+  override val headers: Option[Nothing]         = None
 
   override def value =
     throw new NoSuchElementException(

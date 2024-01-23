@@ -48,7 +48,7 @@ class SessionHandlerSpec
   val testTopic = defaultTestAppCfg.sessionHandler.topicName
 
   case class Ctx(
-      sh: ActorRef[SessionHandlerProtocol.Protocol],
+      sh: ActorRef[SessionHandlerProtocol.SessionProtocol],
       wsCfg: AppCfg,
       kcfg: EmbeddedKafkaConfig
   )

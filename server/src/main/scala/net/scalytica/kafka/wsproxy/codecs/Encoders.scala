@@ -50,7 +50,7 @@ trait Encoders {
   // scalastyle:off
   implicit val sessionClientInstanceEncoder: Encoder[ClientInstance] = {
     @nowarn("msg=is never used")
-    implicit val cfg =
+    implicit val cfg: Configuration =
       Configuration.default.withDiscriminator("client_instance_type")
     deriveConfiguredEncoder
   }
@@ -58,7 +58,8 @@ trait Encoders {
 
   implicit val sessionEncoder: Encoder[Session] = {
     @nowarn("msg=is never used")
-    implicit val cfg = Configuration.default.withDiscriminator("session_type")
+    implicit val cfg: Configuration =
+      Configuration.default.withDiscriminator("session_type")
     deriveConfiguredEncoder
   }
 

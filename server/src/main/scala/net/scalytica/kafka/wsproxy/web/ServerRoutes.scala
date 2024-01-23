@@ -90,7 +90,7 @@ trait ServerRoutes
       outbound: OutSocketArgs => Route
   )(
       implicit cfg: AppCfg,
-      sh: ActorRef[SessionHandlerProtocol.Protocol],
+      sh: ActorRef[SessionHandlerProtocol.SessionProtocol],
       maybeOpenIdClient: Option[OpenIdClient]
   ): Route = {
     extractMaterializer { implicit mat =>

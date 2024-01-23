@@ -70,7 +70,8 @@ class ProxyStatusMXBeanActor(
 
   private[this] val started = LocalDateTime.now()
 
-  override def getBrokerInfoListMXView = BrokerInfoListMXView(clusterInfo)
+  override def getBrokerInfoListMXView: BrokerInfoListMXView =
+    BrokerInfoListMXView(clusterInfo)
 
   override def isHttpEnabled: Boolean = appCfg.server.isPlainEnabled
 
@@ -102,19 +103,26 @@ class ProxyStatusMXBeanActor(
     nowMillis - startMillis
   }
 
-  override def onMessage(msg: ProxyStatusCommand) =
+  override def onMessage(
+      msg: ProxyStatusCommand
+  ): Behavior[ProxyStatusCommand] =
     msg match {
       case UpdateKafkaClusterInfo(brokers, replyTo) =>
-        log.trace(s"Adding ${brokers.size} brokers to cluster info")
-        clusterInfo = brokers
-        replyTo ! KafkaClusterInfoUpdated
-        Behaviors.same
+        doAndSame { () =>
+          log.trace(s"Adding ${brokers.size} brokers to cluster info")
+          clusterInfo = brokers
+          replyTo ! KafkaClusterInfoUpdated
+        }
 
       case ClearBrokers(replyTo) =>
-        log.trace("Clearing cluster info because no data was received")
-        clusterInfo = List.empty
-        replyTo ! BrokersCleared
-        Behaviors.same
+        doAndSame { () =>
+          log.trace("Clearing cluster info because no data was received")
+          clusterInfo = List.empty
+          replyTo ! BrokersCleared
+        }
+
+      case Stop =>
+        Behaviors.stopped
     }
 }
 
@@ -136,6 +144,8 @@ object ProxyStatusProtocol {
       brokers: List[BrokerInfo],
       replyTo: ActorRef[ProxyStatusResponse]
   ) extends ProxyStatusCommand
+
+  case object Stop extends ProxyStatusCommand
 
   case object KafkaClusterInfoUpdated extends ProxyStatusResponse
   case object BrokersCleared          extends ProxyStatusResponse

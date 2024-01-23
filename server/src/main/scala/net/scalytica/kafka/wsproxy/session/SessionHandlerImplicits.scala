@@ -30,8 +30,9 @@ import scala.concurrent.duration._
 
 object SessionHandlerImplicits extends WithProxyLogger {
 
-  implicit class SessionHandlerProtocolExtensions(val ref: ActorRef[Protocol])
-      extends ActorWithProtocolExtensions[Protocol, SessionOpResult] {
+  implicit class SessionHandlerProtocolExtensions(
+      val ref: ActorRef[SessionProtocol]
+  ) extends ActorWithProtocolExtensions[SessionProtocol, SessionOpResult] {
 
     private[this] def handleClientError[T](
         sessionId: SessionId,

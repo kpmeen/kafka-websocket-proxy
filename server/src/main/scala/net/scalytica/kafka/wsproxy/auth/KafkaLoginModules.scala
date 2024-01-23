@@ -49,17 +49,17 @@ object KafkaLoginModules extends WithProxyLogger {
   }
 
   case class Plain(loginParams: PlainParameters) extends KafkaLoginModule {
-    override val moduleClassName = classOf[PlainLoginModule].getName
+    override val moduleClassName: String = classOf[PlainLoginModule].getName
 
-    override def buildJaasConfigValue = {
+    override def buildJaasConfigValue: String = {
       s"""$jaasPrefix ${loginParams.asJaasString};"""
     }
   }
 
   case class Scram(loginParams: ScramParameters) extends KafkaLoginModule {
-    override val moduleClassName = classOf[ScramLoginModule].getName
+    override val moduleClassName: String = classOf[ScramLoginModule].getName
 
-    override def buildJaasConfigValue = {
+    override def buildJaasConfigValue: String = {
       s"""$jaasPrefix ${loginParams.asJaasString};"""
     }
   }
@@ -75,7 +75,8 @@ object KafkaLoginModules extends WithProxyLogger {
   }
 
   case class OAuth(loginParams: OAuthParameters) extends KafkaLoginModule {
-    override val moduleClassName = classOf[OAuthBearerLoginModule].getName
+    override val moduleClassName: String =
+      classOf[OAuthBearerLoginModule].getName
 
     override def buildJaasConfigValue =
       throw new NotImplementedError(

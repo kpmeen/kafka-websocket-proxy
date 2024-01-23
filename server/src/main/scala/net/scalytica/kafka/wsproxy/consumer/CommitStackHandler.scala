@@ -25,7 +25,7 @@ object CommitStackHandler {
       implicit cfg: AppCfg,
       mat: Materializer
   ): Behavior[CommitProtocol] = {
-    implicit val cs = CommitterSettings.create(mat.system)
+    implicit val cs: CommitterSettings = CommitterSettings.create(mat.system)
     committableStack()
   }
 

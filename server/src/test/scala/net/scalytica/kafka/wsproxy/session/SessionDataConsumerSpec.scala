@@ -10,9 +10,9 @@ import net.scalytica.kafka.wsproxy.codecs.{
 }
 import net.scalytica.kafka.wsproxy.models.WsGroupId
 import net.scalytica.kafka.wsproxy.session.SessionHandlerProtocol.{
+  ClientSessionProtocol,
   InternalSessionProtocol,
   RemoveSession,
-  SessionProtocol,
   UpdateSession
 }
 import net.scalytica.test.WsProxyKafkaSpec
@@ -106,7 +106,7 @@ class SessionDataConsumerSpec
         val recs = sdc.sessionStateSource.take(5).runWith(Sink.seq).futureValue
 
         forAll(recs) {
-          case csp: SessionProtocol =>
+          case csp: ClientSessionProtocol =>
             fail(s"Got an unexpected message type ${csp.getClass}")
 
           case ip: InternalSessionProtocol =>

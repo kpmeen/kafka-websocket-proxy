@@ -38,17 +38,17 @@ case class FullConsumerId(
     groupId: WsGroupId,
     clientId: WsClientId
 ) extends FullClientId {
-  override lazy val applicationIdentifier = groupId.value
-  override lazy val instanceIdentifier    = clientId.value
+  override lazy val applicationIdentifier: String = groupId.value
+  override lazy val instanceIdentifier: String    = clientId.value
 }
 
 case class FullProducerId(
     producerId: WsProducerId,
     instanceId: Option[WsProducerInstanceId]
 ) extends FullClientId {
-  val uuid: UUID                          = UUID.randomUUID()
-  override lazy val applicationIdentifier = producerId.value
-  override lazy val instanceIdentifier =
+  val uuid: UUID                                  = UUID.randomUUID()
+  override lazy val applicationIdentifier: String = producerId.value
+  override lazy val instanceIdentifier: String =
     instanceId.map(_.value).getOrElse(uuid.toString)
 }
 

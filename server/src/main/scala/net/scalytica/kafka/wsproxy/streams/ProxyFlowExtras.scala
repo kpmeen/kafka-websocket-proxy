@@ -16,6 +16,16 @@ import scala.concurrent.duration._
 
 trait ProxyFlowExtras { self: WithProxyLogger =>
 
+  /**
+   * Helper function to transform a [[TextMessage]] to a String.
+   *
+   * @param mat
+   *   The implicit [[Materializer]] to use
+   * @param ec
+   *   The implicit [[ExecutionContext]] to use
+   * @return
+   *   A [[Flow]] with [[Message]] input and [[String]] output
+   */
   def wsMessageToStringFlow(
       implicit mat: Materializer,
       ec: ExecutionContext
@@ -27,6 +37,16 @@ trait ProxyFlowExtras { self: WithProxyLogger =>
       }
       .mapAsync(1)(_.toStrict(5 seconds).map(_.text))
 
+  /**
+   * Helper function to transform a [[BinaryMessage]] to a [[ByteString]].
+   *
+   * @param mat
+   *   The implicit [[Materializer]] to use
+   * @param ec
+   *   The implicit [[ExecutionContext]] to use
+   * @return
+   *   A [[Flow]] with [[Message]] input and [[ByteString]] output
+   */
   def wsMessageToByteStringFlow(
       implicit mat: Materializer,
       ec: ExecutionContext

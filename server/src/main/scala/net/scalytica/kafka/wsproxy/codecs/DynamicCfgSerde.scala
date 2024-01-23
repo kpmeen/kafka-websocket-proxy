@@ -16,10 +16,10 @@ class DynamicCfgSerde
     extends StringBasedSerde[DynamicCfg]
     with WithProxyLogger {
 
-  override def serialize(topic: String, data: DynamicCfg) =
+  override def serialize(topic: String, data: DynamicCfg): Array[Byte] =
     Option(data).map(d => ser.serialize(topic, d.asHoconString())).orNull
 
-  override def deserialize(topic: String, data: Array[Byte]) = {
+  override def deserialize(topic: String, data: Array[Byte]): DynamicCfg = {
     Option(data).map { d =>
       val str = des.deserialize(topic, d)
 

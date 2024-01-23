@@ -73,7 +73,7 @@ trait OutboundWebSocket
       serverId: WsServerId,
       fullConsumerId: FullConsumerId,
       maxConnections: Int,
-      sh: ActorRef[SessionHandlerProtocol.Protocol]
+      sh: ActorRef[SessionHandlerProtocol.SessionProtocol]
   )(
       implicit ec: ExecutionContext,
       scheduler: Scheduler
@@ -138,7 +138,7 @@ trait OutboundWebSocket
    *   Implicitly provided [[ExecutionContext]]
    * @param sessionHandler
    *   Implicitly provided typed [[ActorRef]] for the
-   *   [[SessionHandlerProtocol.Protocol]]
+   *   [[SessionHandlerProtocol.SessionProtocol]]
    * @param jmxManager
    *   Implicitly provided optional [[JmxManager]]
    * @return
@@ -153,7 +153,7 @@ trait OutboundWebSocket
       as: ActorSystem,
       mat: Materializer,
       ec: ExecutionContext,
-      sessionHandler: ActorRef[SessionHandlerProtocol.Protocol],
+      sessionHandler: ActorRef[SessionHandlerProtocol.SessionProtocol],
       jmxManager: Option[JmxManager]
   ): Route = {
     log.debug(
@@ -184,7 +184,7 @@ trait OutboundWebSocket
       as: ActorSystem,
       mat: Materializer,
       ec: ExecutionContext,
-      sessionHandler: ActorRef[SessionHandlerProtocol.Protocol],
+      sessionHandler: ActorRef[SessionHandlerProtocol.SessionProtocol],
       jmxManager: Option[JmxManager]
   ): Route = {
     implicit val scheduler: Scheduler = as.scheduler.toTyped

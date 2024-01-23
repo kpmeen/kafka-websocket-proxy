@@ -97,7 +97,10 @@ trait ServerBindings {
     }
   }
 
-  private[this] lazy val keyStoreInstance = KeyStore.getInstance("PKCS12")
+  private[this] lazy val keyStoreType: String = "PKCS12"
+  private[this] lazy val keyStoreInstance = KeyStore.getInstance(keyStoreType)
+  private[this] lazy val secFactoryType: String = "SunX509"
+  private[this] lazy val sslContextType: String = "TLS"
 
   private[this] def createHttpsContext()(
       implicit cfg: AppCfg
@@ -147,9 +150,10 @@ trait ServerBindings {
       keyStore: KeyStore,
       sslCfg: ServerSslCfg
   ): SSLContext = {
-    val kmf: KeyManagerFactory   = KeyManagerFactory.getInstance("SunX509")
-    val tmf: TrustManagerFactory = TrustManagerFactory.getInstance("SunX509")
-    val sslCtx: SSLContext       = SSLContext.getInstance("TLS")
+    val kmf: KeyManagerFactory = KeyManagerFactory.getInstance(secFactoryType)
+    val tmf: TrustManagerFactory =
+      TrustManagerFactory.getInstance(secFactoryType)
+    val sslCtx: SSLContext = SSLContext.getInstance(sslContextType)
 
     kmf.init(keyStore, sslCfg.liftKeystorePassword)
     tmf.init(keyStore)

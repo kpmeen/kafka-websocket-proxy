@@ -27,8 +27,11 @@ object Headers {
   final case class XKafkaAuthHeader(credentials: BasicHttpCredentials)
       extends ModeledCustomHeader[XKafkaAuthHeader] {
 
-    override def companion                    = XKafkaAuthHeader
-    override def renderInRequests(): Boolean  = true
+    override def companion: ModeledCustomHeaderCompanion[XKafkaAuthHeader] =
+      XKafkaAuthHeader
+
+    override def renderInRequests(): Boolean = true
+
     override def renderInResponses(): Boolean = false
 
     override def value(): String = credentials.token()

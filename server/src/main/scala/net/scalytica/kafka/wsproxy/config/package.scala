@@ -1,7 +1,5 @@
 package net.scalytica.kafka.wsproxy
 
-import org.apache.pekko.kafka.scaladsl.Consumer
-import org.apache.pekko.stream.scaladsl.Source
 import net.scalytica.kafka.wsproxy.config.Configuration.{
   AppCfg,
   ClientSpecificLimitCfg,
@@ -12,13 +10,6 @@ import net.scalytica.kafka.wsproxy.config.Configuration.{
 import net.scalytica.kafka.wsproxy.models.{WsGroupId, WsProducerId}
 
 package object config {
-
-  /**
-   * The type for the Kafka consumer stream used in the
-   * [[DynamicConfigHandler]].
-   */
-  type DynamicConfigSource =
-    Source[DynamicConfigHandlerProtocol.InternalCommand, Consumer.Control]
 
   private[config] def dynCfgConsumerGroupId(implicit cfg: AppCfg): String = {
     s"ws-proxy-dynamic-config-handler-consumer-${cfg.server.serverId.value}"

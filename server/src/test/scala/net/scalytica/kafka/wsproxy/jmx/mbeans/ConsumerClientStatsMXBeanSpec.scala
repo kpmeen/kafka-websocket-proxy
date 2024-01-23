@@ -1,50 +1,43 @@
 package net.scalytica.kafka.wsproxy.jmx.mbeans
 
-import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
-import org.apache.pekko.actor.typed.scaladsl.adapter._
+import net.scalytica.kafka.wsproxy.jmx.consumerStatsName
 import net.scalytica.kafka.wsproxy.jmx.mbeans.ConsumerClientStatsProtocol._
-import net.scalytica.kafka.wsproxy.jmx.{consumerStatsName, TestJmxQueries}
 import net.scalytica.kafka.wsproxy.models.{
   FullConsumerId,
   WsClientId,
   WsGroupId
 }
-import net.scalytica.test.WsProxyKafkaSpec
-import org.scalatest.matchers.must.Matchers
-import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.{BeforeAndAfterAll, OptionValues}
+import org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe
+import org.apache.pekko.actor.typed.{ActorRef, Behavior}
 
 import scala.concurrent.duration._
 
-class ConsumerClientStatsMXBeanSpec
-    extends AnyWordSpec
-    with Matchers
-    with OptionValues
-    with BeforeAndAfterAll
-    with WsProxyKafkaSpec {
+// scalastyle:off magic.number
+class ConsumerClientStatsMXBeanSpec extends MXBeanSpecLike {
 
-  val testKit = ActorTestKit(system.toTyped)
+  val cid: WsClientId     = WsClientId("bean-spec")
+  val gid: WsGroupId      = WsGroupId("bean-spec")
+  val fid: FullConsumerId = FullConsumerId(gid, cid)
+  val beanName: String    = consumerStatsName(fid)
+
+  val behavior: Behavior[ConsumerClientStatsCommand] =
+    ConsumerClientStatsMXBeanActor(
+      fullConsumerId = fid,
+      useAutoAggregation = false
+    )
+
+  val ref: ActorRef[ConsumerClientStatsCommand] =
+    tk.spawn(behavior, beanName)
+
+  val probe: TestProbe[ConsumerClientStatsResponse] =
+    tk.createTestProbe[ConsumerClientStatsResponse]("bean-spec-ccsr-probe")
+
+  val proxy: ConsumerClientStatsMXBean =
+    jmxq.getMxBean(beanName, classOf[ConsumerClientStatsMXBean])
 
   override protected def afterAll(): Unit = {
     super.afterAll()
-    testKit.shutdownTestKit()
   }
-
-  val jmxq = new TestJmxQueries
-
-  val cid      = WsClientId("test")
-  val gid      = WsGroupId("test")
-  val fid      = FullConsumerId(gid, cid)
-  val beanName = consumerStatsName(fid)
-
-  val behavior = ConsumerClientStatsMXBeanActor(
-    fullConsumerId = fid,
-    useAutoAggregation = false
-  )
-
-  val ref   = testKit.spawn(behavior, beanName)
-  val probe = testKit.createTestProbe[ConsumerClientStatsResponse]("ccsr-probe")
-  val proxy = jmxq.getMxBean(beanName, classOf[ConsumerClientStatsMXBean])
 
   "The ConsumerClientStatsMXBean" should {
 
@@ -86,6 +79,14 @@ class ConsumerClientStatsMXBeanSpec
       ref ! UpdateCommitsPerHour(1, probe.ref)
       probe.expectMessage(1 second, CommitsPerHourUpdated)
       proxy.getNumCommitsReceivedLastHour mustBe 1
+    }
+
+    "stop the MXBean" in {
+      ref ! Stop
+      probe.expectTerminated(ref)
+      jmxq.findByTypeAndName[ConsumerClientStatsMXBean](
+        beanName
+      ) mustBe None
     }
 
   }

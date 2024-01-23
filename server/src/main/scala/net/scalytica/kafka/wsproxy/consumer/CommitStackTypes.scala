@@ -167,7 +167,7 @@ private[consumer] object CommitStackTypes {
 
   object CommitStack {
 
-    lazy val empty = CommitStack()
+    lazy val empty: CommitStack = CommitStack()
 
   }
 }

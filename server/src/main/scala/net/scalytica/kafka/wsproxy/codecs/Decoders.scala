@@ -1,10 +1,11 @@
 package net.scalytica.kafka.wsproxy.codecs
 
+import io.circe.Decoder.Result
 import io.circe._
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.semiauto._
 import net.scalytica.kafka.wsproxy.config.Configuration._
-import net.scalytica.kafka.wsproxy.models.Formats.FormatType
+import net.scalytica.kafka.wsproxy.models.Formats._
 import net.scalytica.kafka.wsproxy.models.ValueDetails.{
   InValueDetails,
   OutValueDetails
@@ -52,7 +53,7 @@ trait Decoders {
   // scalastyle:off
   implicit def deriveClientInstanceDecoder: Decoder[ClientInstance] = {
     @nowarn("msg=is never used")
-    implicit val cfg =
+    implicit val cfg: Configuration =
       Configuration.default.withDiscriminator("client_instance_type")
     deriveConfiguredDecoder
   }
@@ -60,7 +61,8 @@ trait Decoders {
 
   implicit val sessionDecoder: Decoder[Session] = {
     @nowarn("msg=is never used")
-    implicit val cfg = Configuration.default.withDiscriminator("session_type")
+    implicit val cfg: Configuration =
+      Configuration.default.withDiscriminator("session_type")
     deriveConfiguredDecoder
   }
 
@@ -118,10 +120,13 @@ trait Decoders {
     }
   }
 
-  implicit val formatTypeDecoder: Decoder[FormatType] = { c: io.circe.HCursor =>
-    c.value.asString.flatMap(FormatType.fromString).map(Right.apply).getOrElse {
-      Left(DecodingFailure("Bad format type", List.empty))
-    }
+  implicit val formatTypeDecoder: Decoder[FormatType] = { c =>
+    c.value.asString
+      .flatMap(FormatType.fromString)
+      .map[Result[FormatType]](Right.apply)
+      .getOrElse {
+        Left(DecodingFailure("Bad format type", List.empty))
+      }
   }
 
   implicit val prodResDecoder: Decoder[WsProducerResult] =

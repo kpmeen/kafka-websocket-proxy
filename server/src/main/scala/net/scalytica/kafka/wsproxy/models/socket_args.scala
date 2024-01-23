@@ -75,7 +75,7 @@ case class OutSocketArgs(
 
 object OutSocketArgs {
 
-  type TupledQueryParams = (
+  private[this] type TupledQueryParams = (
       WsClientId,
       Option[WsGroupId],
       TopicName,
@@ -179,7 +179,7 @@ case class InSocketArgs(
 
 object InSocketArgs {
 
-  type TupledQueryParams = (
+  private[this] type TupledQueryParams = (
       WsProducerId,
       Option[WsProducerInstanceId],
       TopicName,

@@ -88,7 +88,7 @@ case class ConsumerSession private (
     copy(instances = updated)
   }
 
-  override def addInstance(instance: ClientInstance) = {
+  override def addInstance(instance: ClientInstance): SessionOpResult = {
     log.trace(s"Attempting to add consumer client: $instance")
     instance match {
       case ci: ConsumerInstance =>
@@ -140,7 +140,7 @@ case class ProducerSession(
     copy(instances = updated)
   }
 
-  override def addInstance(instance: ClientInstance) = {
+  override def addInstance(instance: ClientInstance): SessionOpResult = {
     log.trace(s"Attempting to add producer client: $instance")
     instance match {
       case pi: ProducerInstance =>

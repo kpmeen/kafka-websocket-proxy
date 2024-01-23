@@ -55,7 +55,7 @@ case class Jwk(
     e: Option[String]
 ) {
 
-  override def toString = {
+  override def toString: String = {
     // format: off
     // scalastyle:off
     s"""Jwk(

@@ -34,7 +34,7 @@ class JwtValidationTickerFlowSpec
   override lazy val defaultTypesafeConfig = loadConfig("/application-test.conf")
     .withValue(
       "pekko.http.client.connecting-timeout",
-      ConfigValueFactory.fromAnyRef("20ms")
+      ConfigValueFactory.fromAnyRef("200ms")
     )
     .withValue(
       // This is a "hack" to ensure the host will not retry HTTP connections

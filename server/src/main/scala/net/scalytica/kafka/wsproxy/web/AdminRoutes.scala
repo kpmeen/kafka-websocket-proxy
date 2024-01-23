@@ -42,9 +42,13 @@ import net.scalytica.kafka.wsproxy.errors.{ImpossibleError, UnexpectedError}
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models.{WsGroupId, WsProducerId}
 import net.scalytica.kafka.wsproxy.session.{SessionHandlerRef, SessionUpdated}
+// scalastyle:off line.size.limit
+import net.scalytica.kafka.wsproxy.session.SessionHandlerProtocol.SessionProtocol
+// scalastyle:on line.size.limit
 import net.scalytica.kafka.wsproxy.session.SessionHandlerImplicits._
+import org.apache.pekko.actor.typed.{ActorRef, Scheduler}
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.concurrent.duration._
 
 trait AdminRoutesResponses extends WithProxyLogger { self: BaseRoutes =>
@@ -208,9 +212,9 @@ trait AdminRoutes extends AdminRoutesResponses { self: BaseRoutes =>
       maybeDynamicCfgHandlerRef: Option[RunnableDynamicConfigHandlerRef],
       mat: Materializer
   ): Route = {
-    implicit val handlerTimeout: Timeout = 10 seconds
-    implicit val ec                      = mat.executionContext
-    implicit val scheduler               = mat.system.toTyped.scheduler
+    implicit val handlerTimeout: Timeout      = 10 seconds
+    implicit val ec: ExecutionContextExecutor = mat.executionContext
+    implicit val scheduler: Scheduler         = mat.system.toTyped.scheduler
 
     val static = cfg.allClientLimits
 
@@ -263,14 +267,14 @@ trait AdminRoutes extends AdminRoutesResponses { self: BaseRoutes =>
   // scalastyle:on method.length
 
   /** Removes ALL dynamic client configurations */
-  def removeAllClientConfigs()(
+  private[this] def removeAllClientConfigs()(
       implicit
       maybeDynamicCfgHandlerRef: Option[RunnableDynamicConfigHandlerRef],
       mat: Materializer
   ): Route = {
-    implicit val handlerTimeout: Timeout = 10 seconds
-    implicit val ec                      = mat.executionContext
-    implicit val scheduler               = mat.system.toTyped.scheduler
+    implicit val handlerTimeout: Timeout      = 10 seconds
+    implicit val ec: ExecutionContextExecutor = mat.executionContext
+    implicit val scheduler: Scheduler         = mat.system.toTyped.scheduler
 
     maybeDynamicCfgHandlerRef
       .map { handler =>
@@ -332,9 +336,9 @@ trait AdminRoutes extends AdminRoutesResponses { self: BaseRoutes =>
       maybeDynamicCfgHandlerRef: Option[RunnableDynamicConfigHandlerRef],
       mat: Materializer
   ): Route = {
-    implicit val handlerTimeout: Timeout = 10 seconds
-    implicit val ec                      = mat.executionContext
-    implicit val scheduler               = mat.system.toTyped.scheduler
+    implicit val handlerTimeout: Timeout      = 10 seconds
+    implicit val ec: ExecutionContextExecutor = mat.executionContext
+    implicit val scheduler: Scheduler         = mat.system.toTyped.scheduler
 
     val maybeStatic = {
       if (isConsumer) cfg.allClientLimits.findConsumerSpecificLimitCfg(id)
@@ -411,9 +415,9 @@ trait AdminRoutes extends AdminRoutesResponses { self: BaseRoutes =>
       maybeDynamicCfgHandlerRef: Option[RunnableDynamicConfigHandlerRef],
       mat: Materializer
   ): Route = {
-    implicit val handlerTimeout: Timeout = 10 seconds
-    implicit val ec                      = mat.executionContext
-    implicit val scheduler               = mat.system.toTyped.scheduler
+    implicit val handlerTimeout: Timeout      = 10 seconds
+    implicit val ec: ExecutionContextExecutor = mat.executionContext
+    implicit val scheduler: Scheduler         = mat.system.toTyped.scheduler
 
     maybeDynamicCfgHandlerRef
       .map { handler =>
@@ -446,9 +450,9 @@ trait AdminRoutes extends AdminRoutesResponses { self: BaseRoutes =>
       maybeDynamicCfgHandlerRef: Option[RunnableDynamicConfigHandlerRef],
       mat: Materializer
   ): Route = {
-    implicit val handlerTimeout: Timeout = 10 seconds
-    implicit val ec                      = mat.executionContext
-    implicit val scheduler               = mat.system.toTyped.scheduler
+    implicit val handlerTimeout: Timeout      = 10 seconds
+    implicit val ec: ExecutionContextExecutor = mat.executionContext
+    implicit val scheduler: Scheduler         = mat.system.toTyped.scheduler
 
     maybeDynamicCfgHandlerRef
       .map { handler =>
@@ -534,9 +538,9 @@ trait AdminRoutes extends AdminRoutesResponses { self: BaseRoutes =>
       maybeDynamicCfgHandlerRef: Option[RunnableDynamicConfigHandlerRef],
       mat: Materializer
   ): Route = {
-    implicit val handlerTimeout: Timeout = 10 seconds
-    implicit val ec                      = mat.executionContext
-    implicit val scheduler               = mat.system.toTyped.scheduler
+    implicit val handlerTimeout: Timeout      = 10 seconds
+    implicit val ec: ExecutionContextExecutor = mat.executionContext
+    implicit val scheduler: Scheduler         = mat.system.toTyped.scheduler
 
     maybeDynamicCfgHandlerRef
       .map(h => removeClientConfig(WsGroupId(idStr))(h.removeConsumerConfig))
@@ -549,9 +553,9 @@ trait AdminRoutes extends AdminRoutesResponses { self: BaseRoutes =>
       maybeDynamicCfgHandlerRef: Option[RunnableDynamicConfigHandlerRef],
       mat: Materializer
   ): Route = {
-    implicit val handlerTimeout: Timeout = 10 seconds
-    implicit val ec                      = mat.executionContext
-    implicit val scheduler               = mat.system.toTyped.scheduler
+    implicit val handlerTimeout: Timeout      = 10 seconds
+    implicit val ec: ExecutionContextExecutor = mat.executionContext
+    implicit val scheduler: Scheduler         = mat.system.toTyped.scheduler
 
     maybeDynamicCfgHandlerRef
       .map(h => removeClientConfig(WsProducerId(idStr))(h.removeProducerConfig))
@@ -614,7 +618,7 @@ trait AdminRoutes extends AdminRoutesResponses { self: BaseRoutes =>
       maybeOidcClient: Option[OpenIdClient]
   ): Route = {
     extractMaterializer { implicit mat =>
-      implicit val sh = sessionHandlerRef.shRef
+      implicit val sh: ActorRef[SessionProtocol] = sessionHandlerRef.shRef
       handleExceptions(wsExceptionHandler) {
         maybeAuthenticate(cfg, maybeOidcClient, mat) { _ =>
           pathPrefix("admin") {

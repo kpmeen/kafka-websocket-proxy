@@ -13,8 +13,8 @@ import scala.util.Try
 trait WebSocketRoutes { self: BaseRoutes =>
 
   /**
-   * Uses the WsKafkaAdminCient to check if a given [[TopicName]] exists, and
-   * makes sure to close the admin client when done.
+   * Uses the [[WsKafkaAdminClient]] to check if a given [[TopicName]] exists,
+   * and makes sure to close the admin client when done.
    *
    * @param topic
    *   The [[TopicName]] to check for

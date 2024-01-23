@@ -101,13 +101,14 @@ object EmptySerde
     with Serializer[Unit]
     with Deserializer[Unit] {
 
-  override def serializer() = this
+  override def serializer(): Serializer[Unit] = this
 
-  override def deserializer() = this
+  override def deserializer(): Deserializer[Unit] = this
 
   override def configure(configs: JMap[String, _], isKey: Boolean): Unit = {}
 
-  override def serialize(topic: String, data: Unit) = Array.emptyByteArray
+  override def serialize(topic: String, data: Unit): Array[Byte] =
+    Array.emptyByteArray
 
   override def deserialize(topic: String, data: Array[Byte]): Unit = ()
 
@@ -119,12 +120,12 @@ object EmptySerde
  */
 object JsonSerde extends StringBasedSerde[Json] {
 
-  override def serialize(topic: String, data: Json) =
+  override def serialize(topic: String, data: Json): Array[Byte] =
     Option(data)
       .map(d => ser.serialize(topic, d.printWith(Printer.noSpaces)))
       .orNull
 
-  override def deserialize(topic: String, data: Array[Byte]) = {
+  override def deserialize(topic: String, data: Array[Byte]): Json = {
     val str = des.deserialize(topic, data)
     parse(str) match {
       case Right(json) => json

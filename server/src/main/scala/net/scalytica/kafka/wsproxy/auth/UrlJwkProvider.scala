@@ -10,8 +10,9 @@ import net.scalytica.kafka.wsproxy.StringExtensions
 import net.scalytica.kafka.wsproxy.errors.SigningKeyNotFoundError
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.utils.HostResolver
+import org.apache.pekko.actor.ActorSystem
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -37,7 +38,7 @@ class UrlJwkProvider private[auth] (url: String, enforceHttps: Boolean = true)
     )
   }
 
-  val host = url
+  val host: String = url
     .stripPrefix("https://")
     .stripPrefix("http://")
     .takeWhile(c => c != ':' && c != '/')
@@ -47,8 +48,8 @@ class UrlJwkProvider private[auth] (url: String, enforceHttps: Boolean = true)
 
   /** Load the JWK configuration from the provided URL */
   private[auth] def load()(implicit mat: Materializer): Future[List[Jwk]] = {
-    implicit val as = mat.system
-    implicit val ec = mat.executionContext
+    implicit val as: ActorSystem              = mat.system
+    implicit val ec: ExecutionContextExecutor = mat.executionContext
 
     val request = HttpRequest(method = HttpMethods.GET, uri = url)
       .withHeaders(Accept(MediaTypes.`application/json`))
@@ -96,7 +97,7 @@ class UrlJwkProvider private[auth] (url: String, enforceHttps: Boolean = true)
    *   Eventually returns a Try containing the [[Jwk]] that was found
    */
   def get(keyId: String)(implicit mat: Materializer): Future[Try[Jwk]] = {
-    implicit val ec = mat.executionContext
+    implicit val ec: ExecutionContextExecutor = mat.executionContext
 
     load().map { keys =>
       log.trace(

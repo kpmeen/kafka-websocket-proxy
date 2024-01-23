@@ -18,9 +18,4 @@ object SessionId {
       .getOrElse(SessionId(s"${or.value}-consumer-session"))
   }
 
-//  implicit def groupIdToSessionId(groupId: WsGroupId): SessionId =
-//    apply(groupId)
-//
-//  implicit def clientIdToSessionId(clientId: WsClientId): SessionId =
-//    apply(clientId)
 }

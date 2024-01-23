@@ -4,7 +4,7 @@ import net.scalytica.kafka.wsproxy.models.WsGroupId
 
 class WsGroupIdSerde extends StringBasedSerde[WsGroupId] {
 
-  override def serialize(topic: String, data: WsGroupId) =
+  override def serialize(topic: String, data: WsGroupId): Array[Byte] =
     Option(data).map(d => ser.serialize(topic, d.value)).orNull
 
   override def deserialize(topic: String, data: Array[Byte]): WsGroupId = {

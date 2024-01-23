@@ -17,8 +17,6 @@ trait ActorWithProtocolExtensions[Proto, Res] extends WithProxyLogger {
    *
    * @param f
    *   The function that will send the command to the actor.
-   * @param ec
-   *   The [[ExecutionContext]] to use.
    * @param timeout
    *   The [[Timeout]] to use.
    * @param scheduler

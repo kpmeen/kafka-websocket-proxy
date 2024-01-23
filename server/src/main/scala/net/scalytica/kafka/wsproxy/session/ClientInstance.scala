@@ -4,6 +4,10 @@ import net.scalytica.kafka.wsproxy.models.{
   FullClientId,
   FullConsumerId,
   FullProducerId,
+  WsClientId,
+  WsGroupId,
+  WsProducerId,
+  WsProducerInstanceId,
   WsServerId
 }
 
@@ -26,8 +30,8 @@ case class ProducerInstance(
     id: FullProducerId,
     serverId: WsServerId
 ) extends ClientInstance {
-  val producerId = id.producerId
-  val instanceId = id.instanceId
+  val producerId: WsProducerId                 = id.producerId
+  val instanceId: Option[WsProducerInstanceId] = id.instanceId
 }
 
 /**
@@ -43,6 +47,6 @@ case class ConsumerInstance(
     id: FullConsumerId,
     serverId: WsServerId
 ) extends ClientInstance {
-  val clientId = id.clientId
-  val groupId  = id.groupId
+  val clientId: WsClientId = id.clientId
+  val groupId: WsGroupId   = id.groupId
 }

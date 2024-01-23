@@ -20,12 +20,13 @@ import net.scalytica.kafka.wsproxy.errors.{
   ProxyAuthError
 }
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
+import org.apache.pekko.actor.ActorSystem
 import pdi.jwt.exceptions.JwtException
 import pdi.jwt.{JwtBase64, JwtCirce, JwtClaim}
 
 import java.security.PublicKey
 import java.time.Clock
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success, Try}
 
 class OpenIdClient private (
@@ -40,13 +41,13 @@ class OpenIdClient private (
     s"Cannot initialise $getClass without a valid OpenIdConnectCfg"
   )
 
-  implicit private[this] val as = mat.system
-  implicit private[this] val ec = mat.executionContext
+  implicit private[this] val as: ActorSystem              = mat.system
+  implicit private[this] val ec: ExecutionContextExecutor = mat.executionContext
 
   implicit val circeConfig: Configuration =
     Configuration.default.withSnakeCaseMemberNames
 
-  implicit private[this] val clock = Clock.systemUTC()
+  implicit private[this] val clock: Clock = Clock.systemUTC()
 
   // A regex that defines the JWT pattern and allows us to
   // extract the header, claims and signature

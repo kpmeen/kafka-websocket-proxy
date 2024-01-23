@@ -51,23 +51,32 @@ class ConnectionsStatsMXBeanActor(ctx: ActorContext[ConnectionsStatsCommand])
   ): Behavior[ConnectionsStatsCommand] = {
     msg match {
       case AddProducer(replyTo) =>
-        incrementProducers()
-        replyTo ! ProducerAdded
+        doAndSame { () =>
+          incrementProducers()
+          replyTo ! ProducerAdded
+        }
 
       case RemoveProducer(replyTo) =>
-        decrementProducers()
-        replyTo ! ProducerRemoved
+        doAndSame { () =>
+          decrementProducers()
+          replyTo ! ProducerRemoved
+        }
 
       case AddConsumer(replyTo) =>
-        incrementConsumers()
-        replyTo ! ConsumerAdded
+        doAndSame { () =>
+          incrementConsumers()
+          replyTo ! ConsumerAdded
+        }
 
       case RemoveConsumer(replyTo) =>
-        decrementConsumers()
-        replyTo ! ConsumerRemoved
+        doAndSame { () =>
+          decrementConsumers()
+          replyTo ! ConsumerRemoved
+        }
+
+      case Stop =>
+        Behaviors.stopped
     }
-    // We always want the same behaviour after applying the command
-    Behaviors.same
   }
 
   override def getOpenWebSocketsTotal: Int     = total
@@ -98,6 +107,8 @@ object ConnectionsStatsProtocol {
 
   case class RemoveConsumer(replyTo: ActorRef[ConnectionStatsResponse])
       extends ConnectionsStatsCommand
+
+  case object Stop extends ConnectionsStatsCommand
 
   case object ProducerAdded   extends ConnectionStatsResponse
   case object ProducerRemoved extends ConnectionStatsResponse

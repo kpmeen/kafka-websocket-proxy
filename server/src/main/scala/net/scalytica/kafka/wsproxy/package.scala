@@ -24,13 +24,13 @@ package object wsproxy {
 
   val SaslJaasConfig: String = "sasl.jaas.config"
 
-  val ProducerInterceptorClass: String =
+  private[wsproxy] val ProducerInterceptorClass: String =
     classOf[MonitoringProducerInterceptor[_, _]].getName
 
-  val ConsumerInterceptorClass: String =
+  private[wsproxy] val ConsumerInterceptorClass: String =
     classOf[MonitoringConsumerInterceptor[_, _]].getName
 
-  def monitoringProperties(
+  private[this] def monitoringProperties(
       interceptorClassStr: String
   )(implicit cfg: AppCfg): Map[String, String] = {
     if (cfg.kafkaClient.monitoringEnabled) {

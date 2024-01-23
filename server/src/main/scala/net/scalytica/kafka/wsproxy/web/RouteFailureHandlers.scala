@@ -105,7 +105,7 @@ trait RouteFailureHandlers extends QueryParamParsers with WithProxyLogger {
 
   // scalastyle:off method.length
   def wsExceptionHandler(
-      implicit sh: ActorRef[SessionHandlerProtocol.Protocol],
+      implicit sh: ActorRef[SessionHandlerProtocol.SessionProtocol],
       mat: Materializer
   ): ExceptionHandler =
     ExceptionHandler {
@@ -216,7 +216,7 @@ trait RouteFailureHandlers extends QueryParamParsers with WithProxyLogger {
       sid: SessionId,
       fid: FullClientId
   )(
-      implicit sh: ActorRef[SessionHandlerProtocol.Protocol],
+      implicit sh: ActorRef[SessionHandlerProtocol.SessionProtocol],
       mat: Materializer
   ): Unit = {
     implicit val ec        = mat.executionContext
