@@ -1,7 +1,7 @@
 package net.scalytica.kafka.wsproxy.admin
 
 import io.github.embeddedkafka.EmbeddedKafka
-import net.scalytica.test.WsProxyKafkaSpec
+import net.scalytica.test.{WsProxySpec, WsReusableProxyKafkaFixture}
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Minutes, Span}
 import org.scalatest.OptionValues
@@ -11,8 +11,11 @@ class WsKafkaAdminClientSpec
     extends AnyWordSpec
     with OptionValues
     with ScalaFutures
-    with WsProxyKafkaSpec
+    with WsProxySpec
+    with WsReusableProxyKafkaFixture
     with EmbeddedKafka {
+
+  override protected val testTopicPrefix: String = "kafka-admin-test-topic"
 
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(2, Minutes))
@@ -20,23 +23,21 @@ class WsKafkaAdminClientSpec
   "The WsKafkaAdminClient" should {
 
     "return info on brokers in the cluster" in
-      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-        val wsCfg  = plainAppTestConfig(kcfg.kafkaPort)
+      withNoContext() { case (kCfg, wsCfg) =>
         val client = new WsKafkaAdminClient(wsCfg)
 
         val res = client.clusterInfo
         res must have size 1
         res.headOption.value.id mustBe 0
         res.headOption.value.host mustBe "localhost"
-        res.headOption.value.port mustBe kcfg.kafkaPort
+        res.headOption.value.port mustBe kCfg.kafkaPort
         res.headOption.value.rack mustBe None
 
         client.close()
       }
 
     "return number replicas to use for the session topic" in
-      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-        val wsCfg  = plainAppTestConfig(kcfg.kafkaPort)
+      withNoContext() { case (_, wsCfg) =>
         val client = new WsKafkaAdminClient(wsCfg)
 
         client.replicationFactor(
@@ -48,8 +49,7 @@ class WsKafkaAdminClientSpec
       }
 
     "return number replicas to use for the dynamic config topic" in
-      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-        val wsCfg  = plainAppTestConfig(kcfg.kafkaPort)
+      withNoContext() { case (_, wsCfg) =>
         val client = new WsKafkaAdminClient(wsCfg)
 
         client.replicationFactor(
@@ -61,8 +61,7 @@ class WsKafkaAdminClientSpec
       }
 
     "create and find the session state topic" in
-      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-        val wsCfg  = plainAppTestConfig(kcfg.kafkaPort)
+      withNoContext() { case (_, wsCfg) =>
         val client = new WsKafkaAdminClient(wsCfg)
 
         client.initSessionStateTopic()
@@ -75,8 +74,7 @@ class WsKafkaAdminClientSpec
       }
 
     "create and find the dynamic config topic" in
-      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-        val wsCfg  = plainAppTestConfig(kcfg.kafkaPort)
+      withNoContext() { case (_, wsCfg) =>
         val client = new WsKafkaAdminClient(wsCfg)
 
         client.initDynamicConfigTopic()

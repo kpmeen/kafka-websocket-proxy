@@ -10,7 +10,11 @@ import net.scalytica.kafka.wsproxy.codecs.{SessionIdSerde, SessionSerde}
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.models._
 import net.scalytica.kafka.wsproxy.session.SessionHandlerImplicits._
-import net.scalytica.test.{TestDataGenerators, WsProxyKafkaSpec}
+import net.scalytica.test.{
+  TestDataGenerators,
+  WsProxySpec,
+  WsReusableProxyKafkaFixture
+}
 import org.apache.kafka.common.serialization.Deserializer
 import org.scalatest.Inspectors.forAll
 import org.scalatest._
@@ -29,9 +33,12 @@ class SessionHandlerSpec
     with Eventually
     with ScalaFutures
     with OptionValues
-    with WsProxyKafkaSpec
+    with WsProxySpec
+    with WsReusableProxyKafkaFixture
     with TestDataGenerators
     with EmbeddedKafka {
+
+  override protected val testTopicPrefix: String = "session-handler-test-topic"
 
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(1, Minute))
@@ -45,15 +52,13 @@ class SessionHandlerSpec
   implicit val valDes: Deserializer[Session] =
     new SessionSerde().deserializer()
 
-  val testTopic = defaultTestAppCfg.sessionHandler.topicName
-
   case class Ctx(
       sh: ActorRef[SessionHandlerProtocol.SessionProtocol],
       wsCfg: AppCfg,
       kcfg: EmbeddedKafkaConfig
   )
 
-  def consumeSingleMessage()(
+  def consumeSingleMessage(testTopic: TopicName)(
       implicit kcfg: EmbeddedKafkaConfig
   ): (SessionId, Session) =
     consumeFirstKeyedMessageFrom[SessionId, Session](
@@ -62,13 +67,13 @@ class SessionHandlerSpec
     )
 
   def sessionHandlerCtx[T](body: Ctx => T): Assertion =
-    withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-      implicit val wsCfg = plainAppTestConfig(kcfg.kafkaPort)
+    withNoContext(useFreshStateTopics = true) { case (kcfg, appCfg) =>
+      implicit val cfg: AppCfg = appCfg
 
       val shr  = SessionHandler.init
       val ctrl = shr.stream.run()
 
-      body(Ctx(shr.shRef, wsCfg, kcfg))
+      body(Ctx(shr.shRef, cfg, kcfg))
 
       shr.shRef.tell(
         SessionHandlerProtocol.StopSessionHandler(system.toTyped.ignoreRef)
@@ -110,7 +115,7 @@ class SessionHandlerSpec
     "working with consumer sessions" should {
 
       "register a new consumer session" in sessionHandlerCtx { implicit ctx =>
-        implicit val kcfg = ctx.kcfg
+        implicit val kcfg: EmbeddedKafkaConfig = ctx.kcfg
 
         val grpId = WsGroupId("group1")
         val sid   = SessionId(grpId)
@@ -118,14 +123,14 @@ class SessionHandlerSpec
         val res = ctx.sh.initConsumerSession(grpId, 3).futureValue
         validateSession(res.session)(sid, 3)
 
-        val (k, v) = consumeSingleMessage()
+        val (k, v) = consumeSingleMessage(ctx.wsCfg.sessionHandler.topicName)
 
         k mustBe sid
         v mustBe ConsumerSession(sid, grpId, maxConnections = 3)
       }
 
       "add a few new consumer sessions" in sessionHandlerCtx { implicit ctx =>
-        implicit val kcfg = ctx.kcfg
+        implicit val kcfg: EmbeddedKafkaConfig = ctx.kcfg
 
         val grp1 = WsGroupId("group1")
         val grp2 = WsGroupId("group2")
@@ -144,7 +149,7 @@ class SessionHandlerSpec
 
         val kvs =
           consumeNumberKeyedMessagesFrom[SessionId, Session](
-            topic = testTopic.value,
+            topic = ctx.wsCfg.sessionHandler.topicName.value,
             number = 3
           )
 
@@ -157,13 +162,15 @@ class SessionHandlerSpec
 
       "add consumer to a consumer session" in
         sessionHandlerCtx { implicit ctx =>
-          implicit val kcfg = ctx.kcfg
+          implicit val kcfg: EmbeddedKafkaConfig = ctx.kcfg
 
           val grpId = WsGroupId("group1")
 
           val s = ctx.sh.initConsumerSession(grpId, 2).futureValue.session
           validateSession(s)(SessionId(grpId), 2)
-          validateSession(consumeSingleMessage()._2)(SessionId(grpId), 2)
+          validateSession(
+            consumeSingleMessage(ctx.wsCfg.sessionHandler.topicName)._2
+          )(SessionId(grpId), 2)
 
           val r2 = ctx.sh
             .addConsumer(
@@ -171,7 +178,9 @@ class SessionHandlerSpec
               WsServerId("n1")
             )
             .futureValue
-          validateSession(consumeSingleMessage()._2)(
+          validateSession(
+            consumeSingleMessage(ctx.wsCfg.sessionHandler.topicName)._2
+          )(
             expectedSessionId = s.sessionId,
             expectedMaxConnections = s.maxConnections,
             expectedNumClients = 1
@@ -186,13 +195,15 @@ class SessionHandlerSpec
 
       "not allow adding a consumer if the session has reached its limit" in
         sessionHandlerCtx { implicit ctx =>
-          implicit val kcfg = ctx.kcfg
-          val grpId         = WsGroupId("group1")
-          val sid           = SessionId(grpId)
+          implicit val kcfg: EmbeddedKafkaConfig = ctx.kcfg
+          val grpId                              = WsGroupId("group1")
+          val sid                                = SessionId(grpId)
           val s =
             ctx.sh.initConsumerSession(grpId, 2).futureValue.session
           validateSession(s)(sid, 2)
-          validateSession(consumeSingleMessage()._2)(
+          validateSession(
+            consumeSingleMessage(ctx.wsCfg.sessionHandler.topicName)._2
+          )(
             expectedSessionId = SessionId("group1"),
             expectedMaxConnections = 2
           )
@@ -209,7 +220,9 @@ class SessionHandlerSpec
           val ci1 =
             r2.session.instances.headOption.value.asInstanceOf[ConsumerInstance]
           validateConsumer(ci1)(WsClientId("client1"), WsServerId("n1"))
-          validateSession(consumeSingleMessage()._2)(
+          validateSession(
+            consumeSingleMessage(ctx.wsCfg.sessionHandler.topicName)._2
+          )(
             expectedSessionId = s.sessionId,
             expectedMaxConnections = s.maxConnections,
             expectedNumClients = 1
@@ -226,7 +239,9 @@ class SessionHandlerSpec
           val ci2 =
             r3.session.instances.lastOption.value.asInstanceOf[ConsumerInstance]
           validateConsumer(ci2)(WsClientId("client2"), WsServerId("n2"))
-          validateSession(consumeSingleMessage()._2)(
+          validateSession(
+            consumeSingleMessage(ctx.wsCfg.sessionHandler.topicName)._2
+          )(
             expectedSessionId = s.sessionId,
             expectedMaxConnections = s.maxConnections,
             expectedNumClients = 2
@@ -247,7 +262,7 @@ class SessionHandlerSpec
     "working with producer sessions" should {
 
       "register a new producer session" in sessionHandlerCtx { implicit ctx =>
-        implicit val kcfg = ctx.kcfg
+        implicit val kcfg: EmbeddedKafkaConfig = ctx.kcfg
 
         val cid = WsProducerId("clientId1")
         val sid = SessionId(cid)
@@ -255,7 +270,7 @@ class SessionHandlerSpec
         val res = ctx.sh.initProducerSession(cid, 3).futureValue
         validateSession(res.session)(sid, 3)
 
-        val (k, v) = consumeSingleMessage()
+        val (k, v) = consumeSingleMessage(ctx.wsCfg.sessionHandler.topicName)
 
         k mustBe sid
         v mustBe ProducerSession(sid, maxConnections = 3)

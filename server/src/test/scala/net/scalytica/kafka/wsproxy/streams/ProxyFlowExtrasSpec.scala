@@ -1,39 +1,42 @@
 package net.scalytica.kafka.wsproxy.streams
 
-import java.nio.charset.StandardCharsets
-
+import net.scalytica.test.SharedAttributes.defaultTypesafeConfig
+import net.scalytica.test.WsProxySpec
 import org.apache.pekko.actor.testkit.typed.scaladsl._
+import org.apache.pekko.actor.typed.ActorSystem
 import org.apache.pekko.http.scaladsl.model.ws.{BinaryMessage, TextMessage}
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl._
 import org.apache.pekko.util.ByteString
-import net.scalytica.test.WsProxyKafkaSpec
-import org.scalatest.{BeforeAndAfterAll, OptionValues}
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.time.{Minute, Span}
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.{BeforeAndAfterAll, OptionValues}
+
+import java.nio.charset.StandardCharsets
 
 class ProxyFlowExtrasSpec
     extends AnyWordSpec
-    with WsProxyKafkaSpec
+    with ProxyFlowExtras
+    with WsProxySpec
     with BeforeAndAfterAll
     with Matchers
     with OptionValues
     with Eventually
     with ScalaFutures {
 
-  import ProxyFlowExtras._
+  override protected val testTopicPrefix: String =
+    "proxy-flow-extras-test-topic"
 
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(1, Minute))
 
-  val config = defaultTypesafeConfig
+  val atk: ActorTestKit =
+    ActorTestKit("proxy-flow-extras-spec", defaultTypesafeConfig)
 
-  val atk = ActorTestKit("proxy-flow-extras-spec", config)
-
-  implicit val as  = atk.system
-  implicit val mat = Materializer.matFromSystem
+  implicit val as: ActorSystem[Nothing] = atk.system
+  implicit val mat: Materializer        = Materializer.matFromSystem
 
   override def afterAll(): Unit = {
     mat.shutdown()

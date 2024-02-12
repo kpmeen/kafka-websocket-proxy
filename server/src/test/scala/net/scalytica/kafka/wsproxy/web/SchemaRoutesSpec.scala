@@ -25,7 +25,9 @@ class SchemaRoutesSpec
     with EitherValues
     with OptionValues
     with ScalaFutures
-    with WsProxyKafkaSpec {
+    with WsProxySpec {
+
+  override protected val testTopicPrefix: String = "schema-routes-test-topic"
 
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(2, Minutes))

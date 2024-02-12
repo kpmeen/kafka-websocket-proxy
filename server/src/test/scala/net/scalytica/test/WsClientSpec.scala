@@ -29,7 +29,7 @@ trait WsClientSpec
     with Matchers
     with ProtocolSerdes { self: Suite =>
 
-  implicit private[this] val routeTestTimeout =
+  implicit private[this] val routeTestTimeout: RouteTestTimeout =
     RouteTestTimeout((20 seconds).dilated)
 
   protected def wsRouteFrom(
@@ -82,7 +82,7 @@ trait WsClientSpec
   }
 
   /** Check that the websocket behaves */
-  def inspectWebSocket[T, M](
+  def inspectWebSocket[T](
       uri: String,
       routes: Route,
       kafkaCreds: Option[BasicHttpCredentials] = None,

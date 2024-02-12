@@ -9,7 +9,8 @@ import net.scalytica.kafka.wsproxy.consumer.CommitStackHandler._
 import net.scalytica.kafka.wsproxy.consumer.CommitStackTypes._
 import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails
 import net.scalytica.kafka.wsproxy.models._
-import net.scalytica.test.WsProxyKafkaSpec
+import net.scalytica.test.SharedAttributes.defaultTestAppCfg
+import net.scalytica.test.WsProxySpec
 import org.scalatest.concurrent.Eventually
 import org.scalatest.time.{Minute, Span}
 import org.scalatest.BeforeAndAfter
@@ -23,7 +24,9 @@ class CommitStackHandlerSpec
     with Matchers
     with BeforeAndAfter
     with Eventually
-    with WsProxyKafkaSpec {
+    with WsProxySpec {
+
+  override protected val testTopicPrefix: String = "commitstack-test-topic"
 
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(1, Minute))

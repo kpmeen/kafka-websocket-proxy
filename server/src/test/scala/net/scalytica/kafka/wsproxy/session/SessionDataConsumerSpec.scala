@@ -1,21 +1,20 @@
 package net.scalytica.kafka.wsproxy.session
 
-import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
-import org.apache.pekko.stream.scaladsl.Sink
 import io.github.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
-import net.scalytica.kafka.wsproxy.codecs.{
-  BasicSerdes,
-  SessionIdSerde,
-  SessionSerde
-}
-import net.scalytica.kafka.wsproxy.models.WsGroupId
+import net.scalytica.kafka.wsproxy.codecs.{SessionIdSerde, SessionSerde}
+import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.models.{TopicName, WsGroupId}
 import net.scalytica.kafka.wsproxy.session.SessionHandlerProtocol.{
   ClientSessionProtocol,
   InternalSessionProtocol,
   RemoveSession,
   UpdateSession
 }
-import net.scalytica.test.WsProxyKafkaSpec
+import net.scalytica.test.SharedAttributes.defaultTypesafeConfig
+import net.scalytica.test.{WsProxySpec, WsReusableProxyKafkaFixture}
+import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
+import org.apache.pekko.actor.typed.ActorSystem
+import org.apache.pekko.stream.scaladsl.Sink
 import org.scalatest.Inspectors.forAll
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.matchers.must.Matchers
@@ -26,7 +25,8 @@ import org.scalatest.{BeforeAndAfterAll, OptionValues}
 // scalastyle:off magic.number
 class SessionDataConsumerSpec
     extends AnyWordSpec
-    with WsProxyKafkaSpec
+    with WsProxySpec
+    with WsReusableProxyKafkaFixture
     with Matchers
     with OptionValues
     with Eventually
@@ -34,22 +34,19 @@ class SessionDataConsumerSpec
     with EmbeddedKafka
     with BeforeAndAfterAll {
 
+  override protected val testTopicPrefix: String =
+    "sessionhandler-consumer-test-topic"
+
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(1, Minute))
 
-  val config  = defaultTypesafeConfig
-  val testCfg = defaultTestAppCfg
+  private[this] val atk =
+    ActorTestKit("session-data-consumer-test", defaultTypesafeConfig)
 
-  val sessionTopic = testCfg.sessionHandler.topicName
+  implicit private[this] val sys: ActorSystem[_] = atk.system
 
-  val atk = ActorTestKit("session-data-consumer-test", config)
-
-  implicit val sys = atk.system
-
-  implicit val sessionIdSerde = new SessionIdSerde()
-  implicit val sessionSerde   = new SessionSerde()
-  implicit val keyDes         = BasicSerdes.StringDeserializer
-  implicit val keySer         = BasicSerdes.StringSerializer
+  implicit private[this] val sessionIdSerde = new SessionIdSerde()
+  implicit private[this] val sessionSerde   = new SessionSerde()
 
   override def afterAll(): Unit = {
     materializer.shutdown()
@@ -58,16 +55,18 @@ class SessionDataConsumerSpec
   }
 
   private[this] def publish(
-      s: Session
+      sessionTopic: TopicName,
+      session: Session
   )(implicit config: EmbeddedKafkaConfig): Unit = {
     publishToKafka[SessionId, Session](
       topic = sessionTopic.value,
-      key = s.sessionId,
-      message = s
+      key = session.sessionId,
+      message = session
     )
   }
 
   private[this] def publishTombstone(
+      sessionTopic: TopicName,
       sid: SessionId
   )(implicit config: EmbeddedKafkaConfig): Unit = {
     publishToKafka[SessionId, Session](
@@ -82,25 +81,26 @@ class SessionDataConsumerSpec
     ConsumerSession(SessionId(grpStr), WsGroupId(grpStr), maxConnections = i)
   }
 
-  val session1 = testConsumerSession(1)
-  val session2 = testConsumerSession(2)
-  val session3 = testConsumerSession(3)
-  val session4 = testConsumerSession(4)
+  private[this] val session1 = testConsumerSession(1)
+  private[this] val session2 = testConsumerSession(2)
+  private[this] val session3 = testConsumerSession(3)
+  private[this] val session4 = testConsumerSession(4)
 
   "The SessionConsumer" should {
 
     "consume session data from the session state topic" in {
-      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-        implicit val cfg = plainAppTestConfig(kcfg.kafkaPort)
+      withNoContext(useFreshStateTopics = true) { case (kcfg, appCfg) =>
+        implicit val kafkaCfg: EmbeddedKafkaConfig = kcfg
+        implicit val cfg: AppCfg                   = appCfg
 
-        initTopic(cfg.sessionHandler.topicName.value)
+        kafkaContext.createTopics(Map(cfg.sessionHandler.topicName.value -> 1))
 
         val expected = List(session1, session2, session3, session4)
 
         // Prepare the topic with some messages
-        expected.foreach(publish)
+        expected.foreach(s => publish(cfg.sessionHandler.topicName, s))
         // Publish tombstone for session2
-        publishTombstone(session2.sessionId)
+        publishTombstone(cfg.sessionHandler.topicName, session2.sessionId)
 
         val sdc  = new SessionDataConsumer()
         val recs = sdc.sessionStateSource.take(5).runWith(Sink.seq).futureValue

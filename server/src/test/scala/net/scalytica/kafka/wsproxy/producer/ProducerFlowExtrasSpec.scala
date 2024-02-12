@@ -6,7 +6,8 @@ import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl._
 import org.apache.pekko.stream.testkit.scaladsl.{TestSink, TestSource}
 import net.scalytica.kafka.wsproxy.models.WsProducerId
-import net.scalytica.test.{TestDataGenerators, WsProxyKafkaSpec}
+import net.scalytica.test.SharedAttributes.defaultTypesafeConfig
+import net.scalytica.test.{TestDataGenerators, WsProxySpec}
 import org.scalatest.Inspectors.forAll
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.matchers.must.Matchers
@@ -19,21 +20,22 @@ import scala.concurrent.duration._
 // scalastyle:off magic.number
 class ProducerFlowExtrasSpec
     extends AnyWordSpec
-    with WsProxyKafkaSpec
+    with WsProxySpec
     with BeforeAndAfterAll
     with Matchers
     with OptionValues
     with Eventually
     with ScalaFutures {
 
+  override protected val testTopicPrefix: String =
+    "producerflow-extras-test-topic"
+
   import ProducerFlowExtras._
 
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(1, Minute))
 
-  val config = defaultTypesafeConfig
-
-  val atk = ActorTestKit("producer-flow-extras-spec", config)
+  val atk = ActorTestKit("producer-flow-extras-spec", defaultTypesafeConfig)
 
   implicit val as  = atk.system
   implicit val mat = Materializer.matFromSystem

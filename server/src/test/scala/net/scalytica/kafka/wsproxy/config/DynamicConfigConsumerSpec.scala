@@ -11,7 +11,9 @@ import net.scalytica.kafka.wsproxy.config.DynamicConfigHandlerProtocol.{
   RemoveDynamicConfigRecord,
   UpdateDynamicConfigRecord
 }
-import net.scalytica.test.WsProxyKafkaSpec
+import net.scalytica.kafka.wsproxy.models.TopicName
+import net.scalytica.test.SharedAttributes.defaultTypesafeConfig
+import net.scalytica.test.{WsProxySpec, WsReusableProxyKafkaFixture}
 import org.apache.kafka.common.serialization.Serializer
 import org.scalatest.Inspectors.forAll
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
@@ -22,7 +24,8 @@ import org.scalatest.{BeforeAndAfterAll, OptionValues}
 
 class DynamicConfigConsumerSpec
     extends AnyWordSpec
-    with WsProxyKafkaSpec
+    with WsProxySpec
+    with WsReusableProxyKafkaFixture
     with Matchers
     with OptionValues
     with Eventually
@@ -31,15 +34,12 @@ class DynamicConfigConsumerSpec
     with BeforeAndAfterAll
     with DynamicConfigTestDataGenerators {
 
+  override protected val testTopicPrefix: String = "dynamic-consumer-test-topic"
+
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(1, Minute))
 
-  val config  = defaultTypesafeConfig
-  val testCfg = defaultTestAppCfg
-
-  val testTopic = testCfg.dynamicConfigHandler.topicName
-
-  val atk          = ActorTestKit("dyn-cfg-producer-test", config)
+  val atk = ActorTestKit("dyn-cfg-producer-test", defaultTypesafeConfig)
   implicit val sys = atk.system
 
   val dcfgSerde = new DynamicCfgSerde()
@@ -53,6 +53,7 @@ class DynamicConfigConsumerSpec
   }
 
   private[this] def publish(
+      testTopic: TopicName,
       dcfg: DynamicCfg
   )(implicit ekcfg: EmbeddedKafkaConfig): Unit = {
     publishToKafka[String, DynamicCfg](
@@ -63,6 +64,7 @@ class DynamicConfigConsumerSpec
   }
 
   private[this] def publishTombstone(
+      testTopic: TopicName,
       key: String
   )(implicit ekcfg: EmbeddedKafkaConfig): Unit = {
     publishToKafka[String, DynamicCfg](
@@ -74,14 +76,17 @@ class DynamicConfigConsumerSpec
 
   "The DynamicConfigConsumer" should {
     "consume dynamic config data from the Kafka topic" in {
-      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-        implicit val cfg = plainAppTestConfig(kcfg.kafkaPort)
+      withNoContext(useFreshStateTopics = true) { case (ekCfg, wsCfg) =>
+        implicit val kcfg = ekCfg
+        implicit val cfg  = wsCfg
 
-        initTopic(cfg.dynamicConfigHandler.topicName.value)
+        kafkaContext.createTopics(
+          Map(cfg.dynamicConfigHandler.topicName.value -> 1)
+        )
 
         val expected = expectedMap.values
 
-        expected.foreach(publish)
+        expected.foreach(d => publish(cfg.dynamicConfigHandler.topicName, d))
 
         val dcc = new DynamicConfigConsumer()
         val recs =
@@ -102,15 +107,18 @@ class DynamicConfigConsumerSpec
     }
 
     "correctly handle tombstone messages" in {
-      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-        implicit val cfg = plainAppTestConfig(kcfg.kafkaPort)
+      withNoContext(useFreshStateTopics = true) { case (ekCfg, wsCfg) =>
+        implicit val kcfg = ekCfg
+        implicit val cfg  = wsCfg
 
-        initTopic(cfg.dynamicConfigHandler.topicName.value)
+        kafkaContext.createTopics(
+          Map(cfg.dynamicConfigHandler.topicName.value -> 1)
+        )
 
         val theKey = dynamicCfgTopicKey(cfg1).value
 
-        publish(cfg1)
-        publishTombstone(theKey)
+        publish(cfg.dynamicConfigHandler.topicName, cfg1)
+        publishTombstone(cfg.dynamicConfigHandler.topicName, theKey)
 
         val dcc = new DynamicConfigConsumer()
         val recs =

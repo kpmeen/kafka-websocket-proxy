@@ -15,6 +15,9 @@ import scala.concurrent.duration._
 // scalastyle:off magic.number
 class ConsumerClientStatsMXBeanSpec extends MXBeanSpecLike {
 
+  override protected val testTopicPrefix: String =
+    "consumerstats-mxbean-test-topic"
+
   val cid: WsClientId     = WsClientId("bean-spec")
   val gid: WsGroupId      = WsGroupId("bean-spec")
   val fid: FullConsumerId = FullConsumerId(gid, cid)
