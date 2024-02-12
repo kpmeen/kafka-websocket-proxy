@@ -1,6 +1,6 @@
 package net.scalytica.kafka.wsproxy.config
 
-import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.{ActorRef, ActorSystem}
 import org.apache.pekko.kafka.scaladsl.Consumer
 import org.apache.pekko.stream.scaladsl.RunnableGraph
 
@@ -14,7 +14,7 @@ trait DynamicConfigHandlerRef {
 
 /**
  * Keeps a reference to the [[DynamicConfigHandler]] actor, and the Kafka
- * consumer stream that feeds it state changes from Kafka.
+ * consumer stream that feeds its state changes from Kafka.
  *
  * @param stream
  *   The runnable Kafka Consumer stream used by the [[DynamicConfigHandler]].
@@ -29,6 +29,12 @@ final case class RunnableDynamicConfigHandlerRef(
   def asReadOnlyRef: ReadableDynamicConfigHandlerRef =
     ReadableDynamicConfigHandlerRef(dchRef)
 
+  def stop()(implicit system: ActorSystem[_]): Unit = {
+    dchRef.tell(
+      DynamicConfigHandlerProtocol.StopConfigHandler(system.ignoreRef)
+    )
+  }
+
 }
 
 /**
@@ -41,4 +47,11 @@ final case class RunnableDynamicConfigHandlerRef(
  */
 final case class ReadableDynamicConfigHandlerRef(
     dchRef: ActorRef[DynamicConfigHandlerProtocol.DynamicConfigProtocol]
-) extends DynamicConfigHandlerRef
+) extends DynamicConfigHandlerRef {
+
+  def stop()(implicit system: ActorSystem[_]): Unit = {
+    dchRef.tell(
+      DynamicConfigHandlerProtocol.StopConfigHandler(system.ignoreRef)
+    )
+  }
+}

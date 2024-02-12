@@ -7,6 +7,7 @@ import org.apache.pekko.http.scaladsl.model.headers.Upgrade
 import org.apache.pekko.http.scaladsl.model.ws.{Message, WebSocketRequest}
 import org.apache.pekko.stream.scaladsl.{Flow, Keep, Sink, Source}
 import net.scalytica.test._
+import org.apache.pekko.http.scaladsl.testkit.WSProbe
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Minutes, Span}
 import org.scalatest.wordspec.AnyWordSpecLike
@@ -17,7 +18,7 @@ import scala.concurrent.duration._
 trait BaseWebSocketRoutesSpec
     extends AnyWordSpecLike
     with TestServerRoutes
-    with WsProxyConsumerKafkaSpec
+    with WsProxySpec
     with MockOpenIdServer
     with EmbeddedHttpServer
     with OptionValues
@@ -70,11 +71,11 @@ trait BaseWebSocketRoutesSpec
   final protected def assertRejectMissingProducerId()(
       implicit ctx: ProducerContext
   ): Assertion = {
-    implicit val wsClient = ctx.producerProbe
+    implicit val wsClient: WSProbe = ctx.producerProbe
     val uri = buildProducerUri(
       producerId = None,
       instanceId = None,
-      topicName = Some(ctx.topicName)
+      topicName = ctx.topicName
     )
 
     assertProducerWS(wsRouteFromProducerContext, uri) {
@@ -94,7 +95,7 @@ trait BaseWebSocketRoutesSpec
    * @param exactlyOnce
    *   if {{{Some(true)}}} will enable exactly once semantics (aka
    *   transactional), otherwise it will be disabled. If this argument has a
-   *   true value, the [[useSession]] argument _must_ be true also.
+   *   true value, the {{{useSession}}} argument _must_ be true also.
    * @param ctx
    *   The [[ProducerContext]] to use
    * @return
@@ -104,11 +105,11 @@ trait BaseWebSocketRoutesSpec
       useSession: Boolean,
       exactlyOnce: Option[Boolean] = None
   )(implicit ctx: ProducerContext): Assertion = {
-    implicit val wsClient = ctx.producerProbe
+    implicit val wsClient: WSProbe = ctx.producerProbe
     val uri = buildProducerUri(
       producerId = Some(producerId("producer", topicCounter)),
       instanceId = None,
-      topicName = Some(ctx.topicName),
+      topicName = ctx.topicName,
       transactional = exactlyOnce
     )
 
@@ -127,7 +128,7 @@ trait BaseWebSocketRoutesSpec
   final protected def assertRejectMissingTopicName()(
       implicit ctx: ProducerContext
   ): Assertion = {
-    implicit val wsClient = ctx.producerProbe
+    implicit val wsClient: WSProbe = ctx.producerProbe
     val uri = buildProducerUri(
       producerId = Some(producerId("producer", topicCounter)),
       instanceId = None,

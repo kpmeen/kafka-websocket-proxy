@@ -8,7 +8,8 @@ import net.scalytica.kafka.wsproxy.config.Configuration.{
   DynamicCfg,
   ProducerSpecificLimitCfg
 }
-import net.scalytica.test.WsProxyKafkaSpec
+import net.scalytica.test.SharedAttributes.defaultTypesafeConfig
+import net.scalytica.test.{WsProxySpec, WsReusableProxyKafkaFixture}
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.time.{Minute, Span}
@@ -18,7 +19,8 @@ import org.scalatest.{BeforeAndAfterAll, OptionValues}
 // scalastyle:off magic.number
 class DynamicConfigProducerSpec
     extends AnyWordSpec
-    with WsProxyKafkaSpec
+    with WsProxySpec
+    with WsReusableProxyKafkaFixture
     with Matchers
     with OptionValues
     with Eventually
@@ -27,15 +29,12 @@ class DynamicConfigProducerSpec
     with BeforeAndAfterAll
     with DynamicConfigTestDataGenerators {
 
+  override protected val testTopicPrefix: String = "dynamic-producer-test-topic"
+
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(1, Minute))
 
-  val config  = defaultTypesafeConfig
-  val testCfg = defaultTestAppCfg
-
-  val testTopic = testCfg.dynamicConfigHandler.topicName
-
-  val atk          = ActorTestKit("dyn-cfg-producer-test", config)
+  val atk = ActorTestKit("dyn-cfg-producer-test", defaultTypesafeConfig)
   implicit val sys = atk.system
 
   implicit val valDes = new DynamicCfgSerde().deserializer()
@@ -48,17 +47,22 @@ class DynamicConfigProducerSpec
 
   "The DynamicConfigProducer" should {
     "be able to publish a dynamic config record to the topic" in {
-      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-        implicit val cfg = plainAppTestConfig(kcfg.kafkaPort)
+      withNoContext(useFreshStateTopics = true) { case (ekCfg, wsCfg) =>
+        implicit val kcfg = ekCfg
+        implicit val cfg  = wsCfg
 
-        initTopic(testTopic.value)
+        kafkaContext.createTopics(
+          Map(cfg.dynamicConfigHandler.topicName.value -> 1)
+        )
 
         val dcp = new DynamicConfigProducer
 
         dcp.publishConfig(cfg1)
 
         val (key, value) =
-          consumeFirstKeyedMessageFrom[String, DynamicCfg](testTopic.value)
+          consumeFirstKeyedMessageFrom[String, DynamicCfg](
+            cfg.dynamicConfigHandler.topicName.value
+          )
 
         key mustBe dynamicCfgTopicKey(cfg1).value
         value mustBe a[ProducerSpecificLimitCfg]
@@ -68,10 +72,13 @@ class DynamicConfigProducerSpec
     }
 
     "be able to push multiple dynamic config records to the topic" in {
-      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-        implicit val cfg = plainAppTestConfig(kcfg.kafkaPort)
+      withNoContext(useFreshStateTopics = true) { case (ekCfg, wsCfg) =>
+        implicit val kcfg = ekCfg
+        implicit val cfg  = wsCfg
 
-        initTopic(testTopic.value)
+        kafkaContext.createTopics(
+          Map(cfg.dynamicConfigHandler.topicName.value -> 1)
+        )
 
         val dcp = new DynamicConfigProducer
 
@@ -79,7 +86,7 @@ class DynamicConfigProducerSpec
 
         val recs =
           consumeNumberKeyedMessagesFrom[String, DynamicCfg](
-            topic = testTopic.value,
+            topic = cfg.dynamicConfigHandler.topicName.value,
             number = expectedMap.size
           )
 
@@ -88,20 +95,24 @@ class DynamicConfigProducerSpec
     }
 
     "be able to push removal of a dynamic config from the topic" in {
-      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-        implicit val cfg = plainAppTestConfig(kcfg.kafkaPort)
-        val theKey       = dynamicCfgTopicKey(cfg3).value
+      withNoContext(useFreshStateTopics = true) { case (ekCfg, wsCfg) =>
+        implicit val kcfg = ekCfg
+        implicit val cfg  = wsCfg
 
-        initTopic(testTopic.value)
+        kafkaContext.createTopics(
+          Map(cfg.dynamicConfigHandler.topicName.value -> 1)
+        )
 
         val dcp = new DynamicConfigProducer
+
+        val theKey = dynamicCfgTopicKey(cfg3).value
 
         expectedMap.values.foreach(dcp.publishConfig)
         dcp.removeConfig(theKey)
 
         val recs =
           consumeNumberKeyedMessagesFrom[String, DynamicCfg](
-            topic = testTopic.value,
+            topic = cfg.dynamicConfigHandler.topicName.value,
             number = expectedMap.size + 1
           )
 

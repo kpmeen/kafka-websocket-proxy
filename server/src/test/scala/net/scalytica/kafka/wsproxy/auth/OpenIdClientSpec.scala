@@ -5,7 +5,7 @@ import net.scalytica.kafka.wsproxy.errors.{
   AuthenticationError,
   OpenIdConnectError
 }
-import net.scalytica.test.{MockOpenIdServer, WsProxyKafkaSpec}
+import net.scalytica.test.{MockOpenIdServer, WsProxySpec}
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.time.{Minute, Span}
@@ -18,12 +18,14 @@ import scala.concurrent.duration._
 
 class OpenIdClientSpec
     extends AnyWordSpec
-    with WsProxyKafkaSpec
+    with WsProxySpec
     with Matchers
     with ScalaFutures
     with OptionValues
     with TryValues
     with MockOpenIdServer {
+
+  override protected val testTopicPrefix: String = "openid-client-test-topic"
 
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(1, Minute))

@@ -1,13 +1,8 @@
 package net.scalytica.kafka.wsproxy.web
 
-import org.apache.pekko.http.scaladsl.model.ContentTypes._
-import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity}
-import org.apache.pekko.http.scaladsl.model.StatusCodes._
-import org.apache.pekko.http.scaladsl.server._
-import org.apache.pekko.http.scaladsl.testkit.RouteTestTimeout
-import io.circe.{ACursor, HCursor, Json}
 import io.circe.parser._
 import io.circe.syntax._
+import io.circe.{ACursor, HCursor, Json}
 import net.scalytica.kafka.wsproxy.codecs.Decoders.{
   brokerInfoDecoder,
   dynamicCfgDecoder
@@ -19,18 +14,31 @@ import net.scalytica.kafka.wsproxy.config.Configuration.{
   ProducerSpecificLimitCfg
 }
 import net.scalytica.kafka.wsproxy.models.{BrokerInfo, WsGroupId, WsProducerId}
-import net.scalytica.test.SharedAttributes.basicHttpCreds
+import net.scalytica.test.SharedAttributes.{
+  basicAuthRealm,
+  basicHttpCreds,
+  invalidBasicHttpCreds
+}
 import net.scalytica.test._
-import org.scalatest.concurrent.{Eventually, ScalaFutures}
+import org.apache.pekko.http.scaladsl.model.ContentTypes._
+import org.apache.pekko.http.scaladsl.model.StatusCodes._
+import org.apache.pekko.http.scaladsl.model.headers.{
+  `WWW-Authenticate`,
+  HttpChallenge
+}
+import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity}
+import org.apache.pekko.http.scaladsl.server._
+import org.apache.pekko.http.scaladsl.testkit.RouteTestTimeout
 import org.scalatest.Inspectors.forAll
-import org.scalatest.time.{Seconds, Span}
+import org.scalatest.concurrent.{Eventually, ScalaFutures}
+import org.scalatest.time.{Minutes, Span}
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.{Assertion, CustomEitherValues, OptionValues}
 
 import scala.concurrent.duration._
 
 // scalastyle:off magic.number
-class AdminRoutesSpec
+class AdminRoutesBasicAuthSpec
     extends AnyWordSpec
     with TestAdminRoutes
     with CustomEitherValues
@@ -41,10 +49,12 @@ class AdminRoutesSpec
     with MockOpenIdServer
     with WsReusableProxyKafkaFixture {
 
-  override protected val testTopicPrefix: String = "admin-plain-test-topic"
+  override protected val testTopicPrefix: String = "admin-basicauth-test-topic"
+
+  //  override protected lazy val secureKafka: Boolean = false
 
   implicit override val patienceConfig: PatienceConfig =
-    PatienceConfig(timeout = Span(30, Seconds))
+    PatienceConfig(timeout = Span(2, Minutes))
 
   implicit val timeout: RouteTestTimeout = RouteTestTimeout(20 seconds)
 
@@ -210,136 +220,154 @@ class AdminRoutesSpec
     cfgs
   }
 
-  "using the Kafka cluster info routes" when {
+  "Having the proxy configured with basic auth" when {
 
-    "the proxy is not secured" should {
+    "using the Kafka cluster info routes" should {
 
-      "successfully return the result" in withAdminContext() {
-        case (kcfg, cfg, sessionRef, dynCfgRef, _) =>
-          Get("/admin/kafka/info") ~>
-            Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None)) ~>
-            check {
-              status mustBe OK
-              responseEntity.contentType mustBe `application/json`
+      "successfully return the result" in
+        withAdminContext(useServerBasicAuth = true) {
+          case (kcfg, cfg, sessionRef, maybeCfgRef, _) =>
+            Get("/admin/kafka/info") ~> addCredentials(basicHttpCreds) ~>
+              Route.seal(adminRoutes(cfg, sessionRef, maybeCfgRef, None)) ~>
+              check {
+                status mustBe OK
+                responseEntity.contentType mustBe `application/json`
 
-              val ci = parse(responseAs[String])
-                .map(_.as[Seq[BrokerInfo]])
-                .flatMap(identity)
-                .rightValue
+                val ci = parse(responseAs[String])
+                  .map(_.as[Seq[BrokerInfo]])
+                  .flatMap(identity)
+                  .rightValue
 
-              ci must have size 1
-              ci.headOption.value mustBe BrokerInfo(
-                id = 0,
-                host = "localhost",
-                port = kcfg.kafkaPort,
-                rack = None
-              )
-            }
-      }
+                ci must have size 1
+                ci.headOption.value mustBe BrokerInfo(
+                  id = 0,
+                  host = "localhost",
+                  port = kcfg.kafkaPort,
+                  rack = None
+                )
+              }
+        }
 
-      "ignore basic auth header when not enabled" in withAdminContext() {
-        case (_, cfg, sessionRef, dynCfgRef, _) =>
-          Get("/admin/kafka/info") ~>
-            addCredentials(basicHttpCreds) ~>
-            Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None)) ~>
-            check {
-              status mustBe OK
-              responseEntity.contentType mustBe `application/json`
-            }
-      }
+      "return 401 when credentials are invalid" in
+        withAdminContext(useServerBasicAuth = true) {
+          case (_, cfg, sessionRef, dynCfgRef, _) =>
+            Get("/admin/kafka/info") ~>
+              addCredentials(invalidBasicHttpCreds) ~>
+              Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None)) ~>
+              check {
+                status mustBe Unauthorized
+                val authHeader = header[`WWW-Authenticate`].get
+                authHeader.challenges.head mustEqual HttpChallenge(
+                  scheme = "Basic",
+                  realm = Some(basicAuthRealm),
+                  params = Map("charset" -> "UTF-8")
+                )
+              }
+        }
+
     }
 
-    "using client config routes and dynamic configs are not enabled" should {
+    "using client config routes when dynamic configs are not enabled" should {
 
       "only return all static client configs" in
-        withAdminContext() { case (_, cfg, sessionRef, dynCfgRef, _) =>
-          Get("/admin/client/config") ~>
-            Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None)) ~>
-            check {
-              status mustBe OK
-              responseEntity.contentType mustBe `application/json`
-              val resStr = responseAs[String]
-              val json   = parse(resStr).rightValue
-              val cursor = json.hcursor
+        withAdminContext(useServerBasicAuth = true) {
+          case (_, cfg, sessionRef, dynCfgRef, _) =>
+            Get("/admin/client/config") ~> addCredentials(basicHttpCreds) ~>
+              Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None)) ~>
+              check {
+                status mustBe OK
+                responseEntity.contentType mustBe `application/json`
+                val resStr = responseAs[String]
+                val json   = parse(resStr).rightValue
+                val cursor = json.hcursor
 
-              assertAllStaticConfigs(cursor)
-              assertAllDynamicConfigs(
-                expected = Seq.empty,
-                cursor = cursor.downField("consumers").downField("dynamic")
-              )
-              assertAllDynamicConfigs(
-                expected = Seq.empty,
-                cursor = cursor.downField("producers").downField("dynamic")
-              )
-            }
+                assertAllStaticConfigs(cursor)
+                assertAllDynamicConfigs(
+                  expected = Seq.empty,
+                  cursor = cursor.downField("consumers").downField("dynamic")
+                )
+                assertAllDynamicConfigs(
+                  expected = Seq.empty,
+                  cursor = cursor.downField("producers").downField("dynamic")
+                )
+              }
         }
 
       "return the static config for a specific consumer when it exists" in
-        withAdminContext() { case (_, cfg, sessionRef, dynCfgRef, _) =>
-          Get("/admin/client/config/consumer/dummy") ~>
-            Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None)) ~>
-            check {
-              status mustBe OK
-              responseEntity.contentType mustBe `application/json`
-              val resStr = responseAs[String]
-              val res    = parse(resStr).rightValue.as[DynamicCfg].rightValue
-              assertConsumerConfig(expStaticCons2, res)
-            }
+        withAdminContext(useServerBasicAuth = true) {
+          case (_, cfg, sessionRef, dynCfgRef, _) =>
+            Get("/admin/client/config/consumer/dummy") ~>
+              addCredentials(basicHttpCreds) ~>
+              Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None)) ~>
+              check {
+                status mustBe OK
+                responseEntity.contentType mustBe `application/json`
+                val resStr = responseAs[String]
+                val res    = parse(resStr).rightValue.as[DynamicCfg].rightValue
+                assertConsumerConfig(expStaticCons2, res)
+              }
         }
 
       "return the static config for a specific producer when it exists" in
-        withAdminContext() { case (_, cfg, sessionRef, dynCfgRef, _) =>
-          Get("/admin/client/config/producer/limit-test-producer-2") ~>
-            Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None)) ~>
-            check {
-              status mustBe OK
-              responseEntity.contentType mustBe `application/json`
-              val resStr = responseAs[String]
-              val res    = parse(resStr).rightValue.as[DynamicCfg].rightValue
-              assertProducerConfig(expStaticProd3, res)
-            }
+        withAdminContext(useServerBasicAuth = true) {
+          case (_, cfg, sessionRef, dynCfgRef, _) =>
+            Get("/admin/client/config/producer/limit-test-producer-2") ~>
+              addCredentials(basicHttpCreds) ~>
+              Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None)) ~>
+              check {
+                status mustBe OK
+                responseEntity.contentType mustBe `application/json`
+                val resStr = responseAs[String]
+                val res    = parse(resStr).rightValue.as[DynamicCfg].rightValue
+                assertProducerConfig(expStaticProd3, res)
+              }
         }
 
       "return 405 when trying to add new dynamic configs" in
-        withAdminContext() { case (_, cfg, sessionRef, dynCfgRef, _) =>
-          val cconf = createConsumerCfg("my-consumer", Some(10), Some(2))
-          val json  = (cconf: DynamicCfg).asJson.spaces2
+        withAdminContext(useServerBasicAuth = true) {
+          case (_, cfg, sessionRef, dynCfgRef, _) =>
+            val cconf = createConsumerCfg("my-consumer", Some(10), Some(2))
+            val json  = (cconf: DynamicCfg).asJson.spaces2
 
-          val entity = HttpEntity(ContentTypes.`application/json`, json)
+            val entity = HttpEntity(ContentTypes.`application/json`, json)
 
-          Post("/admin/client/config/consumer", entity) ~>
-            Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None)) ~>
-            check {
-              status mustBe MethodNotAllowed
-              responseEntity.contentType mustBe `application/json`
-            }
+            Post("/admin/client/config/consumer", entity) ~>
+              addCredentials(basicHttpCreds) ~>
+              Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None)) ~>
+              check {
+                status mustBe MethodNotAllowed
+                responseEntity.contentType mustBe `application/json`
+              }
         }
 
       "return 405 when trying to remove a dynamic config" in
-        withAdminContext() { case (_, cfg, sessionRef, dynCfgRef, _) =>
-          Delete("/admin/client/config/consumer/my-consumer") ~>
-            Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None)) ~>
-            check {
-              status mustBe MethodNotAllowed
-              responseEntity.contentType mustBe `application/json`
-            }
+        withAdminContext(useServerBasicAuth = true) {
+          case (_, cfg, sessionRef, dynCfgRef, _) =>
+            Delete("/admin/client/config/consumer/my-consumer") ~>
+              addCredentials(basicHttpCreds) ~>
+              Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None)) ~>
+              check {
+                status mustBe MethodNotAllowed
+                responseEntity.contentType mustBe `application/json`
+              }
         }
 
       "return 405 when trying to remove all dynamic configs" in
-        withAdminContext() { case (_, cfg, sessionRef, dynCfgRef, _) =>
-          Delete("/admin/client/config") ~>
-            Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None)) ~>
-            check {
-              status mustBe MethodNotAllowed
-              responseEntity.contentType mustBe `application/json`
-            }
+        withAdminContext(useServerBasicAuth = true) {
+          case (_, cfg, sessionRef, dynCfgRef, _) =>
+            Delete("/admin/client/config") ~> addCredentials(basicHttpCreds) ~>
+              Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None)) ~>
+              check {
+                status mustBe MethodNotAllowed
+                responseEntity.contentType mustBe `application/json`
+              }
         }
     }
 
-    "using client config routes and dynamic configs are enabled" should {
+    "using client config routes when dynamic configs are enabled" should {
 
       "successfully add a new dynamic consumer client config" in
-        withAdminContext(useDynamicConfigs = true) {
+        withAdminContext(useServerBasicAuth = true, useDynamicConfigs = true) {
           case (_, cfg, sessionRef, dynCfgRef, _) =>
             val route =
               Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None))
@@ -348,7 +376,8 @@ class AdminRoutesSpec
             assertPostConsumerConfig(cconf, route)
 
             eventually {
-              Get("/admin/client/config/consumer/my-consumer") ~> route ~>
+              Get("/admin/client/config/consumer/my-consumer") ~>
+                addCredentials(basicHttpCreds) ~> route ~>
                 check {
                   status mustBe OK
                   responseEntity.contentType mustBe `application/json`
@@ -360,7 +389,7 @@ class AdminRoutesSpec
         }
 
       "successfully add a new dynamic producer client config" in
-        withAdminContext(useDynamicConfigs = true) {
+        withAdminContext(useServerBasicAuth = true, useDynamicConfigs = true) {
           case (_, cfg, sessionRef, dynCfgRef, _) =>
             val route =
               Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None))
@@ -369,7 +398,8 @@ class AdminRoutesSpec
             assertPostProducerConfig(pconf, route)
 
             eventually {
-              Get("/admin/client/config/producer/my-producer-1") ~> route ~>
+              Get("/admin/client/config/producer/my-producer-1") ~>
+                addCredentials(basicHttpCreds) ~> route ~>
                 check {
                   status mustBe OK
                   responseEntity.contentType mustBe `application/json`
@@ -382,7 +412,7 @@ class AdminRoutesSpec
         }
 
       "successfully return all static and dynamic client configs" in
-        withAdminContext(useDynamicConfigs = true, useFreshStateTopics = true) {
+        withAdminContext(useServerBasicAuth = true, useDynamicConfigs = true) {
           case (_, cfg, sessionRef, dynCfgRef, _) =>
             val route =
               Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None))
@@ -391,28 +421,30 @@ class AdminRoutesSpec
             val expDynProdCfgs = assertPostNProducerConfigs(4, route)
 
             eventually {
-              Get("/admin/client/config") ~> route ~> check {
-                status mustBe OK
-                responseEntity.contentType mustBe `application/json`
-                val resStr = responseAs[String]
-                val json   = parse(resStr).rightValue
-                val cursor = json.hcursor
+              Get("/admin/client/config") ~>
+                addCredentials(basicHttpCreds) ~> route ~>
+                check {
+                  status mustBe OK
+                  responseEntity.contentType mustBe `application/json`
+                  val resStr = responseAs[String]
+                  val json   = parse(resStr).rightValue
+                  val cursor = json.hcursor
 
-                assertAllStaticConfigs(cursor)
-                assertAllDynamicConfigs(
-                  expected = expDynConsCfgs,
-                  cursor = cursor.downField("consumers").downField("dynamic")
-                )
-                assertAllDynamicConfigs(
-                  expected = expDynProdCfgs,
-                  cursor = cursor.downField("producers").downField("dynamic")
-                )
-              }
+                  assertAllStaticConfigs(cursor)
+                  assertAllDynamicConfigs(
+                    expected = expDynConsCfgs,
+                    cursor = cursor.downField("consumers").downField("dynamic")
+                  )
+                  assertAllDynamicConfigs(
+                    expected = expDynProdCfgs,
+                    cursor = cursor.downField("producers").downField("dynamic")
+                  )
+                }
             }
         }
 
       "successfully return a specific dynamic consumer client config" in
-        withAdminContext(useDynamicConfigs = true) {
+        withAdminContext(useServerBasicAuth = true, useDynamicConfigs = true) {
           case (_, cfg, sessionRef, dynCfgRef, _) =>
             val route =
               Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None))
@@ -423,7 +455,7 @@ class AdminRoutesSpec
             eventually {
               Get(
                 s"/admin/client/config/consumer/${exp.id}"
-              ) ~> route ~> check {
+              ) ~> addCredentials(basicHttpCreds) ~> route ~> check {
                 status mustBe OK
                 responseEntity.contentType mustBe `application/json`
                 val resStr = responseAs[String]
@@ -434,9 +466,10 @@ class AdminRoutesSpec
         }
 
       "successfully return a specific static consumer client config" in
-        withAdminContext(useDynamicConfigs = true) {
+        withAdminContext(useServerBasicAuth = true, useDynamicConfigs = true) {
           case (_, cfg, sessionRef, dynCfgRef, _) =>
             Get("/admin/client/config/consumer/dummy") ~>
+              addCredentials(basicHttpCreds) ~>
               Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None)) ~>
               check {
                 status mustBe OK
@@ -448,7 +481,7 @@ class AdminRoutesSpec
         }
 
       "successfully return a specific dynamic producer client config" in
-        withAdminContext(useDynamicConfigs = true) {
+        withAdminContext(useServerBasicAuth = true, useDynamicConfigs = true) {
           case (_, cfg, sessionRef, dynCfgRef, _) =>
             val route =
               Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None))
@@ -459,7 +492,7 @@ class AdminRoutesSpec
             eventually {
               Get(
                 s"/admin/client/config/producer/${exp.id}"
-              ) ~> route ~> check {
+              ) ~> addCredentials(basicHttpCreds) ~> route ~> check {
                 status mustBe OK
                 responseEntity.contentType mustBe `application/json`
                 val resStr = responseAs[String]
@@ -470,9 +503,10 @@ class AdminRoutesSpec
         }
 
       "successfully return a specific static producer client config" in
-        withAdminContext(useDynamicConfigs = true) {
+        withAdminContext(useServerBasicAuth = true, useDynamicConfigs = true) {
           case (_, cfg, sessionRef, dynCfgRef, _) =>
             Get("/admin/client/config/producer/limit-test-producer-2") ~>
+              addCredentials(basicHttpCreds) ~>
               Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None)) ~>
               check {
                 status mustBe OK
@@ -484,7 +518,7 @@ class AdminRoutesSpec
         }
 
       "successfully update an existing dynamic consumer client config" in
-        withAdminContext(useDynamicConfigs = true) {
+        withAdminContext(useServerBasicAuth = true, useDynamicConfigs = true) {
           case (_, cfg, sessionRef, dynCfgRef, _) =>
             val route =
               Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None))
@@ -494,7 +528,7 @@ class AdminRoutesSpec
 
             eventually {
               Get(s"/admin/client/config/consumer/${exp.id}") ~>
-                route ~> check {
+                addCredentials(basicHttpCreds) ~> route ~> check {
                   status mustBe OK
                   responseEntity.contentType mustBe `application/json`
                   val resStr = responseAs[String]
@@ -507,6 +541,7 @@ class AdminRoutesSpec
             val updJson = (upd: DynamicCfg).asJson.spaces2
 
             Put(s"/admin/client/config/consumer/${exp.id}", updJson) ~>
+              addCredentials(basicHttpCreds) ~>
               route ~>
               check {
                 status mustBe OK
@@ -515,6 +550,7 @@ class AdminRoutesSpec
 
             eventually {
               Get(s"/admin/client/config/consumer/${exp.id}") ~>
+                addCredentials(basicHttpCreds) ~>
                 route ~> check {
                   status mustBe OK
                   responseEntity.contentType mustBe `application/json`
@@ -526,7 +562,7 @@ class AdminRoutesSpec
         }
 
       "successfully update an existing dynamic producer client config" in
-        withAdminContext(useDynamicConfigs = true) {
+        withAdminContext(useServerBasicAuth = true, useDynamicConfigs = true) {
           case (_, cfg, sessionRef, dynCfgRef, _) =>
             val route =
               Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None))
@@ -536,6 +572,7 @@ class AdminRoutesSpec
 
             eventually {
               Get(s"/admin/client/config/producer/${exp.id}") ~>
+                addCredentials(basicHttpCreds) ~>
                 route ~> check {
                   status mustBe OK
                   responseEntity.contentType mustBe `application/json`
@@ -549,6 +586,7 @@ class AdminRoutesSpec
             val updJson = (upd: DynamicCfg).asJson.spaces2
 
             Put(s"/admin/client/config/producer/${exp.id}", updJson) ~>
+              addCredentials(basicHttpCreds) ~>
               route ~>
               check {
                 status mustBe OK
@@ -557,6 +595,7 @@ class AdminRoutesSpec
 
             eventually {
               Get(s"/admin/client/config/producer/${exp.id}") ~>
+                addCredentials(basicHttpCreds) ~>
                 route ~> check {
                   status mustBe OK
                   responseEntity.contentType mustBe `application/json`
@@ -568,7 +607,7 @@ class AdminRoutesSpec
         }
 
       "successfully delete an existing dynamic consumer client config" in
-        withAdminContext(useDynamicConfigs = true) {
+        withAdminContext(useServerBasicAuth = true, useDynamicConfigs = true) {
           case (_, cfg, sessionRef, dynCfgRef, _) =>
             val route =
               Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None))
@@ -578,6 +617,7 @@ class AdminRoutesSpec
 
             eventually {
               Get(s"/admin/client/config/consumer/${exp.id}") ~>
+                addCredentials(basicHttpCreds) ~>
                 route ~> check {
                   status mustBe OK
                   responseEntity.contentType mustBe `application/json`
@@ -588,6 +628,7 @@ class AdminRoutesSpec
             }
 
             Delete(s"/admin/client/config/consumer/${exp.id}") ~>
+              addCredentials(basicHttpCreds) ~>
               route ~> check {
                 status mustBe OK
                 responseEntity.contentType mustBe `application/json`
@@ -595,6 +636,7 @@ class AdminRoutesSpec
 
             eventually {
               Get(s"/admin/client/config/consumer/${exp.id}") ~>
+                addCredentials(basicHttpCreds) ~>
                 route ~> check {
                   status mustBe NotFound
                   responseEntity.contentType mustBe `application/json`
@@ -603,7 +645,7 @@ class AdminRoutesSpec
         }
 
       "successfully delete an existing dynamic producer client config" in
-        withAdminContext(useDynamicConfigs = true) {
+        withAdminContext(useServerBasicAuth = true, useDynamicConfigs = true) {
           case (_, cfg, sessionRef, dynCfgRef, _) =>
             val route =
               Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None))
@@ -613,6 +655,7 @@ class AdminRoutesSpec
 
             eventually {
               Get(s"/admin/client/config/producer/${exp.id}") ~>
+                addCredentials(basicHttpCreds) ~>
                 route ~> check {
                   status mustBe OK
                   responseEntity.contentType mustBe `application/json`
@@ -623,6 +666,7 @@ class AdminRoutesSpec
             }
 
             Delete(s"/admin/client/config/producer/${exp.id}") ~>
+              addCredentials(basicHttpCreds) ~>
               route ~> check {
                 status mustBe OK
                 responseEntity.contentType mustBe `application/json`
@@ -630,6 +674,7 @@ class AdminRoutesSpec
 
             eventually {
               Get(s"/admin/client/config/producer/${exp.id}") ~>
+                addCredentials(basicHttpCreds) ~>
                 route ~> check {
                   status mustBe NotFound
                   responseEntity.contentType mustBe `application/json`
@@ -638,7 +683,7 @@ class AdminRoutesSpec
         }
 
       "successfully delete all existing dynamic client configs" in
-        withAdminContext(useDynamicConfigs = true) {
+        withAdminContext(useServerBasicAuth = true, useDynamicConfigs = true) {
           case (_, cfg, sessionRef, dynCfgRef, _) =>
             val route =
               Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None))
@@ -647,55 +692,60 @@ class AdminRoutesSpec
             val expDynProdCfgs = assertPostNProducerConfigs(4, route)
 
             eventually {
-              Get("/admin/client/config") ~> route ~> check {
+              Get("/admin/client/config") ~>
+                addCredentials(basicHttpCreds) ~>
+                route ~> check {
+                  status mustBe OK
+                  responseEntity.contentType mustBe `application/json`
+                  val resStr = responseAs[String]
+                  val json   = parse(resStr).rightValue
+                  val cursor = json.hcursor
+
+                  assertAllStaticConfigs(cursor)
+                  assertAllDynamicConfigs(
+                    expected = expDynConsCfgs,
+                    cursor = cursor.downField("consumers").downField("dynamic")
+                  )
+                  assertAllDynamicConfigs(
+                    expected = expDynProdCfgs,
+                    cursor = cursor.downField("producers").downField("dynamic")
+                  )
+                }
+            }
+
+            Delete("/admin/client/config") ~>
+              addCredentials(basicHttpCreds) ~> route ~> check {
                 status mustBe OK
                 responseEntity.contentType mustBe `application/json`
-                val resStr = responseAs[String]
-                val json   = parse(resStr).rightValue
-                val cursor = json.hcursor
-
-                assertAllStaticConfigs(cursor)
-                assertAllDynamicConfigs(
-                  expected = expDynConsCfgs,
-                  cursor = cursor.downField("consumers").downField("dynamic")
-                )
-                assertAllDynamicConfigs(
-                  expected = expDynProdCfgs,
-                  cursor = cursor.downField("producers").downField("dynamic")
-                )
               }
-            }
-
-            Delete("/admin/client/config") ~> route ~> check {
-              status mustBe OK
-              responseEntity.contentType mustBe `application/json`
-            }
 
             eventually {
-              Get("/admin/client/config") ~> route ~> check {
-                status mustBe OK
-                responseEntity.contentType mustBe `application/json`
-                val resStr = responseAs[String]
-                val json   = parse(resStr).rightValue
-                val cursor = json.hcursor
+              Get("/admin/client/config") ~>
+                addCredentials(basicHttpCreds) ~> route ~> check {
+                  status mustBe OK
+                  responseEntity.contentType mustBe `application/json`
+                  val resStr = responseAs[String]
+                  val json   = parse(resStr).rightValue
+                  val cursor = json.hcursor
 
-                assertAllStaticConfigs(cursor)
-                assertAllDynamicConfigs(
-                  expected = Seq.empty,
-                  cursor = cursor.downField("consumers").downField("dynamic")
-                )
-                assertAllDynamicConfigs(
-                  expected = Seq.empty,
-                  cursor = cursor.downField("producers").downField("dynamic")
-                )
-              }
+                  assertAllStaticConfigs(cursor)
+                  assertAllDynamicConfigs(
+                    expected = Seq.empty,
+                    cursor = cursor.downField("consumers").downField("dynamic")
+                  )
+                  assertAllDynamicConfigs(
+                    expected = Seq.empty,
+                    cursor = cursor.downField("producers").downField("dynamic")
+                  )
+                }
             }
         }
 
       "return 404 when looking up non-existing consumer client cfg" in
-        withAdminContext(useDynamicConfigs = true) {
+        withAdminContext(useServerBasicAuth = true, useDynamicConfigs = true) {
           case (_, cfg, sessionRef, dynCfgRef, _) =>
             Get("/admin/client/config/consumer/non-existing") ~>
+              addCredentials(basicHttpCreds) ~>
               Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None)) ~>
               check {
                 status mustBe NotFound
@@ -704,9 +754,10 @@ class AdminRoutesSpec
         }
 
       "return 404 when looking up non-existing producer client cfg" in
-        withAdminContext(useDynamicConfigs = true) {
+        withAdminContext(useServerBasicAuth = true, useDynamicConfigs = true) {
           case (_, cfg, sessionRef, dynCfgRef, _) =>
             Get("/admin/client/config/producer/non-existing") ~>
+              addCredentials(basicHttpCreds) ~>
               Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None)) ~>
               check {
                 status mustBe NotFound
@@ -716,7 +767,7 @@ class AdminRoutesSpec
 
       "return 400 when trying to add a new dynamic consumer client config" +
         " using invalid JSON" in
-        withAdminContext(useDynamicConfigs = true) {
+        withAdminContext(useServerBasicAuth = true, useDynamicConfigs = true) {
           case (_, cfg, sessionRef, dynCfgRef, _) =>
             val json =
               """{
@@ -728,6 +779,7 @@ class AdminRoutesSpec
             val entity = HttpEntity(ContentTypes.`application/json`, json)
 
             Post("/admin/client/config/consumer", entity) ~>
+              addCredentials(basicHttpCreds) ~>
               Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None)) ~>
               check {
                 status mustBe BadRequest
@@ -738,7 +790,7 @@ class AdminRoutesSpec
 
       "return 400 when trying to add a new dynamic producer client config" +
         " using invalid JSON" in
-        withAdminContext(useDynamicConfigs = true) {
+        withAdminContext(useServerBasicAuth = true, useDynamicConfigs = true) {
           case (_, cfg, sessionRef, dynCfgRef, _) =>
             val json =
               """{
@@ -750,6 +802,7 @@ class AdminRoutesSpec
             val entity = HttpEntity(ContentTypes.`application/json`, json)
 
             Post("/admin/client/config/producer", entity) ~>
+              addCredentials(basicHttpCreds) ~>
               Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None)) ~>
               check {
                 status mustBe BadRequest
@@ -760,7 +813,7 @@ class AdminRoutesSpec
 
       "return 400 when trying to update an existing dynamic consumer client " +
         "config using invalid JSON" in
-        withAdminContext(useDynamicConfigs = true) {
+        withAdminContext(useServerBasicAuth = true, useDynamicConfigs = true) {
           case (_, cfg, sessionRef, dynCfgRef, _) =>
             val json =
               """{
@@ -772,6 +825,7 @@ class AdminRoutesSpec
             val entity = HttpEntity(ContentTypes.`application/json`, json)
 
             Put("/admin/client/config/consumer/my-consumer", entity) ~>
+              addCredentials(basicHttpCreds) ~>
               Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None)) ~>
               check {
                 status mustBe BadRequest
@@ -782,7 +836,7 @@ class AdminRoutesSpec
 
       "return 400 when trying to update an existing dynamic producer client " +
         "config using invalid JSON" in
-        withAdminContext(useDynamicConfigs = true) {
+        withAdminContext(useServerBasicAuth = true, useDynamicConfigs = true) {
           case (_, cfg, sessionRef, dynCfgRef, _) =>
             val json =
               """{
@@ -794,6 +848,7 @@ class AdminRoutesSpec
             val entity = HttpEntity(ContentTypes.`application/json`, json)
 
             Put("/admin/client/config/producer/my-producer", entity) ~>
+              addCredentials(basicHttpCreds) ~>
               Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None)) ~>
               check {
                 status mustBe BadRequest

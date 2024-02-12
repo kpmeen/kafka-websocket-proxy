@@ -15,6 +15,9 @@ import scala.concurrent.duration._
 // scalastyle:off magic.number
 class ProducerClientStatsMXBeanSpec extends MXBeanSpecLike {
 
+  override protected val testTopicPrefix: String =
+    "producerstats-mxbean-test-topic"
+
   val pid: WsProducerId         = WsProducerId("bean-spec")
   val iid: WsProducerInstanceId = WsProducerInstanceId("bean-spec-instance")
   val fid: FullProducerId       = FullProducerId(pid, Option(iid))

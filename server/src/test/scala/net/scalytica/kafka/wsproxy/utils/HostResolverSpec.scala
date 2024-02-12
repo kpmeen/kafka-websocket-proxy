@@ -3,13 +3,16 @@ package net.scalytica.kafka.wsproxy.utils
 import net.scalytica.kafka.wsproxy.config.Configuration.KafkaBootstrapHosts
 import net.scalytica.kafka.wsproxy.config.Configuration
 import net.scalytica.kafka.wsproxy.utils.HostResolver.resolveKafkaBootstrapHosts
-import net.scalytica.test.WsProxyKafkaSpec
+import net.scalytica.test.SharedAttributes.defaultTestAppCfg
+import net.scalytica.test.WsProxySpec
 
 import scala.concurrent.duration._
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
-class HostResolverSpec extends AnyWordSpec with Matchers with WsProxyKafkaSpec {
+class HostResolverSpec extends AnyWordSpec with Matchers with WsProxySpec {
+
+  override protected val testTopicPrefix: String = "host-resolver-test-topic"
 
   implicit lazy val cfg: Configuration.AppCfg = defaultTestAppCfg.copy(
     kafkaClient = defaultTestAppCfg.kafkaClient.copy(

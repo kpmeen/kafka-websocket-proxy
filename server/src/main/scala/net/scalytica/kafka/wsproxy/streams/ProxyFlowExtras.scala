@@ -65,7 +65,3 @@ trait ProxyFlowExtras { self: WithProxyLogger =>
     .mapAsync(1)(_.toStrict(5 seconds).map(_.data))
 
 }
-
-private[streams] object ProxyFlowExtras
-    extends ProxyFlowExtras
-    with WithProxyLogger

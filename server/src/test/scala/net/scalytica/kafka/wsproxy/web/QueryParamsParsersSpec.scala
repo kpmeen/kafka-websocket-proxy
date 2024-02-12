@@ -1,21 +1,24 @@
 package net.scalytica.kafka.wsproxy.web
 
+import net.scalytica.test.SharedAttributes.defaultTestAppCfg
 import org.apache.pekko.http.scaladsl.model.{
   ContentTypes,
   HttpResponse,
   StatusCodes
 }
 import org.apache.pekko.http.scaladsl.server.{Directives, Route}
-import net.scalytica.test.{TestAdHocRoute, WsProxyKafkaSpec}
+import net.scalytica.test.{TestAdHocRoute, WsProxySpec}
 import org.scalatest.wordspec.AnyWordSpec
 
 // scalastyle:off magic.number
 class QueryParamsParsersSpec
     extends AnyWordSpec
-    with WsProxyKafkaSpec
+    with WsProxySpec
     with TestAdHocRoute
     with Directives
     with QueryParamParsers {
+
+  override protected val testTopicPrefix: String = "queryparam-test-topic"
 
   val Ok         = HttpResponse()
   val completeOk = complete(Ok)

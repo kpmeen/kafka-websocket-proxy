@@ -9,6 +9,9 @@ import scala.concurrent.duration._
 // scalastyle:off magic.number
 class ConnectionStatsMXBeanSpec extends MXBeanSpecLike {
 
+  override protected val testTopicPrefix: String =
+    "connectionstats-mxbean-test-topic"
+
   val beanName = "bean-spec-wsproxy-connections"
 
   val ref: ActorRef[ConnectionsStatsCommand] =

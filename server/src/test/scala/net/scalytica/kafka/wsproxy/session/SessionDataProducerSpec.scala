@@ -2,9 +2,15 @@ package net.scalytica.kafka.wsproxy.session
 
 import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
 import io.github.embeddedkafka._
-import net.scalytica.kafka.wsproxy.codecs.{SessionIdSerde, SessionSerde}
+import net.scalytica.kafka.wsproxy.codecs.{
+  SessionIdSerde,
+  SessionSerde,
+  StringBasedSerde
+}
+import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.models.WsGroupId
-import net.scalytica.test.WsProxyKafkaSpec
+import net.scalytica.test.SharedAttributes.defaultTypesafeConfig
+import net.scalytica.test.{WsProxySpec, WsReusableProxyKafkaFixture}
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.time.{Minute, Span}
@@ -14,7 +20,8 @@ import org.scalatest.{BeforeAndAfterAll, OptionValues}
 // scalastyle:off magic.number
 class SessionDataProducerSpec
     extends AnyWordSpec
-    with WsProxyKafkaSpec
+    with WsProxySpec
+    with WsReusableProxyKafkaFixture
     with Matchers
     with OptionValues
     with Eventually
@@ -22,19 +29,20 @@ class SessionDataProducerSpec
     with EmbeddedKafka
     with BeforeAndAfterAll {
 
+  override protected val testTopicPrefix: String =
+    "sessionhandler-producer-test-topic"
+
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(1, Minute))
 
-  val config  = defaultTypesafeConfig
-  val testCfg = defaultTestAppCfg
+  private[this] val atk =
+    ActorTestKit("session-data-producer-test", defaultTypesafeConfig)
+  implicit private[this] val sys = atk.system
 
-  val testTopic = testCfg.sessionHandler.topicName
-
-  val atk          = ActorTestKit("session-data-producer-test", config)
-  implicit val sys = atk.system
-
-  implicit val keyDes = new SessionIdSerde().deserializer()
-  implicit val valDes = new SessionSerde().deserializer()
+  implicit val keyDes: StringBasedSerde[SessionId] =
+    new SessionIdSerde().deserializer()
+  implicit val valDes: StringBasedSerde[Session] =
+    new SessionSerde().deserializer()
 
   override def afterAll(): Unit = {
     materializer.shutdown()
@@ -47,18 +55,19 @@ class SessionDataProducerSpec
     ConsumerSession(SessionId(grpStr), WsGroupId(grpStr), maxConnections = i)
   }
 
-  val session1 = testConsumerSession(1)
-  val session2 = testConsumerSession(2)
-  val session3 = testConsumerSession(3)
-  val session4 = testConsumerSession(4)
+  private[this] val session1 = testConsumerSession(1)
+  private[this] val session2 = testConsumerSession(2)
+  private[this] val session3 = testConsumerSession(3)
+  private[this] val session4 = testConsumerSession(4)
 
   "The SessionDataProducer" should {
 
     "be able to publish a session record to the session state topic" in
-      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-        implicit val cfg = plainAppTestConfig(kcfg.kafkaPort)
+      withNoContext(useFreshStateTopics = true) { case (kcfg, appCfg) =>
+        implicit val kafkaCfg: EmbeddedKafkaConfig = kcfg
+        implicit val cfg: AppCfg                   = appCfg
 
-        initTopic(testTopic.value)
+        kafkaContext.createTopics(Map(cfg.sessionHandler.topicName.value -> 1))
 
         val sdp = new SessionDataProducer()
         // Write the session data to Kafka
@@ -66,7 +75,7 @@ class SessionDataProducerSpec
         // Verify the data can be consumed
         val (key, value) =
           consumeFirstKeyedMessageFrom[SessionId, Session](
-            testTopic.value
+            cfg.sessionHandler.topicName.value
           )
 
         key mustBe session1.sessionId
@@ -78,10 +87,11 @@ class SessionDataProducerSpec
       }
 
     "be able to publish multiple session records to the session state topic" in
-      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-        implicit val cfg = plainAppTestConfig(kcfg.kafkaPort)
+      withNoContext(useFreshStateTopics = true) { case (kcfg, appCfg) =>
+        implicit val kafkaCfg: EmbeddedKafkaConfig = kcfg
+        implicit val cfg: AppCfg                   = appCfg
 
-        initTopic(testTopic.value)
+        kafkaContext.createTopics(Map(cfg.sessionHandler.topicName.value -> 1))
 
         val sdp = new SessionDataProducer()
 
@@ -91,7 +101,7 @@ class SessionDataProducerSpec
 
         val recs =
           consumeNumberKeyedMessagesFrom[SessionId, Session](
-            topic = testTopic.value,
+            topic = cfg.sessionHandler.topicName.value,
             number = expected.size
           )
 
@@ -103,10 +113,11 @@ class SessionDataProducerSpec
       }
 
     "be able to publish removal of a session from the session state topic" in
-      withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-        implicit val cfg = plainAppTestConfig(kcfg.kafkaPort)
+      withNoContext(useFreshStateTopics = true) { case (kcfg, appCfg) =>
+        implicit val kafkaCfg: EmbeddedKafkaConfig = kcfg
+        implicit val cfg: AppCfg                   = appCfg
 
-        initTopic(testTopic.value)
+        kafkaContext.createTopics(Map(cfg.sessionHandler.topicName.value -> 1))
 
         val sdp = new SessionDataProducer()
 
@@ -119,7 +130,7 @@ class SessionDataProducerSpec
         // Verify the presence of all expected messages
         val r1 =
           consumeNumberKeyedMessagesFrom[SessionId, Session](
-            topic = testTopic.value,
+            topic = cfg.sessionHandler.topicName.value,
             number = in.size + 1
           )
 

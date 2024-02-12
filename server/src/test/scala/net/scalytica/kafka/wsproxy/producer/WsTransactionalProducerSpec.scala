@@ -18,7 +18,12 @@ import net.scalytica.kafka.wsproxy.models.WsProducerRecord.asKafkaProducerRecord
 import net.scalytica.kafka.wsproxy.models.WsProducerResult.fromProducerResult
 import net.scalytica.kafka.wsproxy.models._
 import net.scalytica.kafka.wsproxy.producer.WsTransactionalProducer.flexiFlow
-import net.scalytica.test.{ExtraAssertions, WsProxyKafkaSpec}
+import net.scalytica.test.SharedAttributes.defaultTypesafeConfig
+import net.scalytica.test.{
+  ExtraAssertions,
+  WsProxySpec,
+  WsReusableProxyKafkaFixture
+}
 import org.apache.kafka.clients.producer.ProducerConfig._
 import org.apache.kafka.clients.producer.{KafkaProducer, Producer}
 import org.apache.kafka.common.errors.ProducerFencedException
@@ -33,7 +38,8 @@ import scala.concurrent.duration._
 // scalastyle:off magic.number
 class WsTransactionalProducerSpec
     extends AnyWordSpec
-    with WsProxyKafkaSpec
+    with WsProxySpec
+    with WsReusableProxyKafkaFixture
     with BeforeAndAfterAll
     with Matchers
     with OptionValues
@@ -41,19 +47,17 @@ class WsTransactionalProducerSpec
     with ScalaFutures
     with ExtraAssertions {
 
+  override protected val testTopicPrefix: String =
+    "transactional-producer-test-topic"
+
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(1, Minute))
 
-  private[this] val config = defaultTypesafeConfig
-
-  private[this] val atk = ActorTestKit("ws-transactional-producer-spec", config)
+  private[this] val atk =
+    ActorTestKit("ws-transactional-producer-spec", defaultTypesafeConfig)
 
   implicit private[this] val as  = atk.system
   implicit private[this] val mat = Materializer.matFromSystem
-
-  override def beforeAll(): Unit = {
-    super.beforeAll()
-  }
 
   override def afterAll(): Unit = {
     mat.shutdown()
@@ -126,16 +130,17 @@ class WsTransactionalProducerSpec
 
   "The transactional producer flow" should {
     "successfully create a transactional producer flow" in
-      withRunningKafkaOnFoundPort(
-        embeddedKafkaConfigWithConsumer(ReadCommitted)
-      ) { implicit kcfg =>
+      withNoContext() { case (_, _) =>
+        implicit val kcfg =
+          kafkaContext.configWithReadIsolationLevel(ReadCommitted)
+
         val producerId = WsProducerId("test-producer-1")
         val transId    = "test-producer-1"
         val topic      = TopicName("test-topic-1")
         val settings   = producerSettings(producerId)(Some(transId))(None)
         val msgs       = records(transId, topic, 20)
 
-        initTopic(topic.value)
+        kafkaContext.createTopics(Map(topic.value -> 1))
 
         val result =
           Source(msgs)
@@ -145,7 +150,7 @@ class WsTransactionalProducerSpec
 
         result.size mustBe 20
 
-        val written = consumeNumberKeyedMessagesFrom(
+        val written = consumeNumberKeyedMessagesFrom[String, String](
           topic = topic.value,
           number = msgs.size,
           timeout = 30 seconds
@@ -161,9 +166,10 @@ class WsTransactionalProducerSpec
       }
 
     "not allow creating multiple producers with the same transactional.id" in
-      withRunningKafkaOnFoundPort(
-        embeddedKafkaConfigWithConsumer(ReadCommitted)
-      ) { implicit kcfg =>
+      withNoContext() { case (_, _) =>
+        implicit val kcfg =
+          kafkaContext.configWithReadIsolationLevel(ReadCommitted)
+
         val pid1    = WsProducerId("test-producer-2a")
         val pid2    = WsProducerId("test-producer-2b")
         val transId = "test-producer-2"
@@ -172,7 +178,7 @@ class WsTransactionalProducerSpec
         val s2      = producerSettings(pid2)(Some(transId))(None)
         val msgs    = records(transId, topic, 10)
 
-        initTopic(topic.value)
+        kafkaContext.createTopics(Map(topic.value -> 1))
 
         val src = Source(msgs).take(msgs.size.toLong)
         val (killer, flow1) = src

@@ -5,14 +5,14 @@ import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
 import org.apache.pekko.stream.testkit.scaladsl.{TestSink, TestSource}
 import org.apache.pekko.stream.testkit.{TestPublisher, TestSubscriber}
 import org.apache.pekko.util.Timeout
-import com.typesafe.config.ConfigValueFactory
+import com.typesafe.config.{Config, ConfigValueFactory}
 import net.scalytica.kafka.wsproxy.config.Configuration.{
   AppCfg,
   OpenIdConnectCfg
 }
 import net.scalytica.kafka.wsproxy.errors.OpenIdConnectError
 import net.scalytica.kafka.wsproxy.models.WsClientId
-import net.scalytica.test.{MockOpenIdServer, WsProxyKafkaSpec}
+import net.scalytica.test.{MockOpenIdServer, WsProxySpec}
 import org.scalatest.BeforeAndAfter
 import org.scalatest.RecoverMethods.recoverToExceptionIf
 import org.scalatest.concurrent.ScalaFutures
@@ -28,10 +28,12 @@ class JwtValidationTickerFlowSpec
     with Matchers
     with BeforeAndAfter
     with ScalaFutures
-    with WsProxyKafkaSpec
+    with WsProxySpec
     with MockOpenIdServer {
 
-  override lazy val defaultTypesafeConfig = loadConfig("/application-test.conf")
+  override protected val testTopicPrefix: String = "jwt-test-topic"
+
+  override def testConfig: Config = loadConfig("/application-test.conf")
     .withValue(
       "pekko.http.client.connecting-timeout",
       ConfigValueFactory.fromAnyRef("200ms")

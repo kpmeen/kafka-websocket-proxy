@@ -16,7 +16,7 @@ import net.scalytica.kafka.wsproxy.jmx.mbeans.{
   ProxyStatusMXBean
 }
 import net.scalytica.kafka.wsproxy.models._
-import net.scalytica.test.WsProxyKafkaSpec
+import net.scalytica.test.WsProxySpec
 import org.apache.pekko.actor.testkit.typed.scaladsl.{ActorTestKit, TestProbe}
 import org.apache.pekko.actor.typed.scaladsl.adapter._
 import org.scalatest.matchers.must.Matchers
@@ -33,7 +33,9 @@ class WsProxyJmxRegistrarSpec
     with Matchers
     with OptionValues
     with BeforeAndAfterAll
-    with WsProxyKafkaSpec {
+    with WsProxySpec {
+
+  override protected val testTopicPrefix: String = "jmx-registrar-test-topic"
 
   val testKit: ActorTestKit = ActorTestKit(system.toTyped)
 

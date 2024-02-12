@@ -15,7 +15,8 @@ import net.scalytica.kafka.wsproxy.config.Configuration.{
   ProducerSpecificLimitCfg
 }
 import net.scalytica.kafka.wsproxy.config.DynamicConfigHandlerProtocol._
-import net.scalytica.test.WsProxyKafkaSpec
+import net.scalytica.kafka.wsproxy.models.TopicName
+import net.scalytica.test.{WsProxySpec, WsReusableProxyKafkaFixture}
 import org.apache.kafka.common.serialization.Deserializer
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.Inspectors.forAll
@@ -34,9 +35,14 @@ class DynamicConfigHandlerSpec
     with Eventually
     with ScalaFutures
     with OptionValues
-    with WsProxyKafkaSpec
+    with WsProxySpec
+    with WsReusableProxyKafkaFixture
     with DynamicConfigTestDataGenerators
     with EmbeddedKafka {
+
+  override protected val testTopicPrefix: String =
+    "dynamic-cfghandler-test-topic"
+
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(1, Minute))
 
@@ -46,8 +52,6 @@ class DynamicConfigHandlerSpec
   implicit val valDes: Deserializer[DynamicCfg] =
     new DynamicCfgSerde().deserializer()
 
-  val testTopic = defaultTestAppCfg.dynamicConfigHandler.topicName
-
   val tombstoneValue: DynamicCfg = null // scalastyle:ignore
 
   case class Ctx(
@@ -56,7 +60,7 @@ class DynamicConfigHandlerSpec
       kcfg: EmbeddedKafkaConfig
   )
 
-  def consumeSingleMessage()(
+  def consumeSingleMessage(testTopic: TopicName)(
       implicit kcfg: EmbeddedKafkaConfig
   ): Option[(String, DynamicCfg)] =
     consumeNumberKeyedMessagesFrom[String, DynamicCfg](
@@ -66,20 +70,23 @@ class DynamicConfigHandlerSpec
     ).headOption
 
   def dynamicConfigHandlerCtx[T](body: Ctx => T): Assertion =
-    withRunningKafkaOnFoundPort(embeddedKafkaConfig) { implicit kcfg =>
-      implicit val wsCfg = plainAppTestConfig(
-        kafkaPort = kcfg.kafkaPort,
-        useDynamicConfigs = true
-      )
+    withNoContext(useDynamicConfigs = true, useFreshStateTopics = true) {
+      case (ekCfg, wsCfg) =>
+        implicit val kcfg = ekCfg
+        implicit val cfg  = wsCfg
 
-      val dch  = DynamicConfigHandler.init
-      val ctrl = dch.stream.run()
+        kafkaContext.createTopics(
+          Map(cfg.dynamicConfigHandler.topicName.value -> 1)
+        )
 
-      body(Ctx(dch, wsCfg, kcfg))
+        val dch  = DynamicConfigHandler.init
+        val ctrl = dch.stream.run()
 
-      dch.dynamicConfigHandlerStop()
+        body(Ctx(dch, wsCfg, kcfg))
 
-      ctrl.shutdown().futureValue mustBe Done
+        dch.dynamicConfigHandlerStop()
+
+        ctrl.shutdown().futureValue mustBe Done
     }
 
   def addAndAssert(cfgs: DynamicCfg*)(implicit ctx: Ctx): Assertion = {
@@ -95,13 +102,16 @@ class DynamicConfigHandlerSpec
     addAndAssert(cfg)
 
     val (k, v) =
-      consumeFirstKeyedMessageFrom[String, DynamicCfg](testTopic.value)
+      consumeFirstKeyedMessageFrom[String, DynamicCfg](
+        ctx.wsCfg.dynamicConfigHandler.topicName.value
+      )
 
     k mustBe dynamicCfgTopicKey(cfg).value
     v mustBe cfg
   }
 
   def consumeAndAssert(
+      testTopic: TopicName,
       cfgs: (String, DynamicCfg)*
   )(implicit ctx: Ctx): Assertion = {
     implicit val kcfg = ctx.kcfg
@@ -153,12 +163,15 @@ class DynamicConfigHandlerSpec
         val remRec = remKey -> tombstoneValue
 
         addAndAssert(expectedValues: _*)
-        consumeAndAssert(expectedSeq: _*)
+        consumeAndAssert(
+          ctx.wsCfg.dynamicConfigHandler.topicName,
+          expectedSeq: _*
+        )
 
         val r1 = ctx.ref.removeConfig(remKey).futureValue
         r1 mustBe ConfigRemoved(remKey)
 
-        consumeAndAssert(remRec)
+        consumeAndAssert(ctx.wsCfg.dynamicConfigHandler.topicName, remRec)
       }
 
     "remove all existing dynamic configurations" in
@@ -166,13 +179,16 @@ class DynamicConfigHandlerSpec
         val removed = expectedKeys.map(k => k -> tombstoneValue)
 
         addAndAssert(expectedValues: _*)
-        consumeAndAssert(expectedSeq: _*)
+        consumeAndAssert(
+          ctx.wsCfg.dynamicConfigHandler.topicName,
+          expectedSeq: _*
+        )
         assertGetAll(expectedMap)
 
         val r1 = ctx.ref.removeAllConfigs().futureValue
         r1 mustBe RemovedAllConfigs()
 
-        consumeAndAssert(removed: _*)
+        consumeAndAssert(ctx.wsCfg.dynamicConfigHandler.topicName, removed: _*)
         assertGetAll(Map.empty)
       }
 

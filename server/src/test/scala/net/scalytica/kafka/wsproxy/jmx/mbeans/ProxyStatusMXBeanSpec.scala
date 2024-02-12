@@ -10,6 +10,8 @@ import scala.concurrent.duration._
 // scalastyle:off magic.number
 class ProxyStatusMXBeanSpec extends MXBeanSpecLike {
 
+  override protected val testTopicPrefix: String = "mxbean-test-topic"
+
   val beanName = "bean-spec-wsproxy-status-a"
 
   val brokerInfoList: List[BrokerInfo] = List(

@@ -1,7 +1,7 @@
 package net.scalytica.kafka.wsproxy.auth
 
 import org.apache.pekko.util.Timeout
-import net.scalytica.test.WsProxyKafkaSpec
+import net.scalytica.test.WsProxySpec
 import org.scalatest.Inspectors.forAll
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.must.Matchers
@@ -14,11 +14,13 @@ import scala.concurrent.duration._
 
 class UrlJwkProviderSpec
     extends AnyWordSpec
-    with WsProxyKafkaSpec
+    with WsProxySpec
     with Matchers
     with ScalaFutures
     with OptionValues
     with TryValues {
+
+  override protected val testTopicPrefix: String = "jwk-test-topic"
 
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(1, Minute))

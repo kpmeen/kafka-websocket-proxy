@@ -25,10 +25,12 @@ import org.scalatest.{Assertion, Suite}
 
 trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
 
-  val producerId = (prefix: String, topicNum: Int) =>
-    WsProducerId(s"$prefix-producer-client-$topicNum")
+  val producerId: (String, Int) => WsProducerId =
+    (prefix: String, topicNum: Int) =>
+      WsProducerId(s"$prefix-producer-client-$topicNum")
 
-  val instanceId = (id: String) => WsProducerInstanceId(id)
+  val instanceId: String => WsProducerInstanceId = (id: String) =>
+    WsProducerInstanceId(id)
 
   protected def testTopicPrefix: String
 
@@ -72,26 +74,30 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
   def baseProducerUri(
       producerId: WsProducerId,
       instanceId: Option[WsProducerInstanceId],
-      topicName: TopicName,
+      topicName: Option[TopicName],
       payloadType: SocketPayload = JsonPayload,
       keyType: FormatType = StringType,
       valType: FormatType = StringType,
       exactlyOnce: Boolean = false
   ): String = {
-    val keyTypeArg =
-      if (keyType != NoType) s"&keyType=${keyType.name}" else ""
+    topicName
+      .map { topic =>
+        val keyTypeArg =
+          if (keyType != NoType) s"&keyType=${keyType.name}" else ""
 
-    val transactionalArg =
-      if (exactlyOnce) s"&transactional=$exactlyOnce" else ""
+        val transactionalArg =
+          if (exactlyOnce) s"&transactional=$exactlyOnce" else ""
 
-    "/socket/in?" +
-      s"clientId=${producerId.value}" +
-      instanceId.map(id => s"&instanceId=${id.value}").getOrElse("") +
-      s"&topic=${topicName.value}" +
-      s"&socketPayload=${payloadType.name}" +
-      s"&valType=${valType.name}" +
-      keyTypeArg +
-      transactionalArg
+        "/socket/in?" +
+          s"clientId=${producerId.value}" +
+          instanceId.map(id => s"&instanceId=${id.value}").getOrElse("") +
+          s"&topic=${topic.value}" +
+          s"&socketPayload=${payloadType.name}" +
+          s"&valType=${valType.name}" +
+          keyTypeArg +
+          transactionalArg
+      }
+      .getOrElse(fail("Test requires a TopicName"))
   }
 
   def assertProducerWS[T](
@@ -129,7 +135,7 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
       baseProducerUri(
         producerId = producerId,
         instanceId = instanceId,
-        topicName = topic,
+        topicName = Some(topic),
         keyType = keyType,
         valType = valType,
         exactlyOnce = exactlyOnce
@@ -180,7 +186,7 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
       baseProducerUri(
         producerId = producerId,
         instanceId = instanceId,
-        topicName = topic,
+        topicName = Some(topic),
         payloadType = AvroPayload,
         keyType = keyType.getOrElse(NoType),
         valType = valType

@@ -2,20 +2,17 @@ package net.scalytica.kafka.wsproxy.web
 
 import org.apache.pekko.http.scaladsl.model.ContentTypes
 import org.apache.pekko.http.scaladsl.model.StatusCodes._
-import org.apache.pekko.http.scaladsl.model.headers.BasicHttpCredentials
 import org.apache.pekko.http.scaladsl.server._
 import org.apache.pekko.http.scaladsl.testkit.WSProbe
-import net.scalytica.kafka.wsproxy.auth.AccessToken
-import net.scalytica.kafka.wsproxy.models.Formats.{JsonType, NoType, StringType}
+import net.scalytica.kafka.wsproxy.models.Formats.StringType
 import net.scalytica.kafka.wsproxy.models.{
   TopicName,
   WsProducerId,
   WsProducerInstanceId
 }
 import net.scalytica.kafka.wsproxy.web.SocketProtocol._
-import net.scalytica.test.FlakyTests
+import net.scalytica.test.{FlakyTests, WsReusableProxyKafkaFixture}
 import org.scalatest.Inspectors.forAll
-import org.scalatest.tagobjects.Retryable
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.duration._
@@ -24,6 +21,7 @@ import scala.concurrent.duration._
 class WebSocketRoutesGenericSpec
     extends AnyWordSpec
     with BaseWebSocketRoutesSpec
+    with WsReusableProxyKafkaFixture
     with FlakyTests {
 
   override protected val testTopicPrefix: String = "generic-test-topic"
@@ -48,16 +46,16 @@ class WebSocketRoutesGenericSpec
       useProducerSessions: Boolean,
       useExactlyOnce: Boolean
   ) = {
-    plainProducerContext(
+    withProducerContext(
       nextTopic,
       useProducerSessions = useProducerSessions,
       useExactlyOnce = useExactlyOnce
     ) { implicit ctx =>
-      implicit val wsClient = ctx.producerProbe
+      implicit val wsClient: WSProbe = ctx.producerProbe
       val uri = buildProducerUri(
         producerId = Some(producerId("producer", topicCounter)),
         instanceId = Some(WsProducerInstanceId("producer-a")),
-        topicName = Some(ctx.topicName),
+        topicName = ctx.topicName,
         transactional = Some(true)
       )
 
@@ -77,30 +75,30 @@ class WebSocketRoutesGenericSpec
     "the server routes generic behavior" should {
 
       "reject producer connection when the required clientId is not set" in
-        plainProducerContext(nextTopic) { implicit ctx =>
+        withProducerContext(nextTopic) { implicit ctx =>
           assertRejectMissingProducerId()
         }
 
       "reject producer connection when sessions are enabled and instanceId " +
         "is not set" in
-        plainProducerContext(nextTopic, useProducerSessions = true) {
+        withProducerContext(nextTopic, useProducerSessions = true) {
           implicit ctx =>
             assertNoInstanceId(useSession = true)
         }
 
       "allow producer connection when sessions are enabled and instanceId " +
         "is not set" in
-        plainProducerContext(nextTopic) { implicit ctx =>
+        withProducerContext(nextTopic) { implicit ctx =>
           assertNoInstanceId(useSession = false)
         }
 
       "reject producer connection when the required topic is not set" in
-        plainProducerContext(nextTopic) { implicit ctx =>
+        withProducerContext(nextTopic) { implicit ctx =>
           assertRejectMissingTopicName()
         }
 
       "allow a producer to reconnect when sessions are not enabled" in
-        plainProducerContext(nextTopic) { implicit ctx =>
+        withProducerContext(nextTopic) { implicit ctx =>
           val in = shortProducerUri(s"json-test-$topicCounter", None)
 
           withEmbeddedServer(
@@ -115,7 +113,7 @@ class WebSocketRoutesGenericSpec
         }
 
       "allow producer to reconnect when sessions are enabled and limit is 1" in
-        plainProducerContext(nextTopic, useProducerSessions = true) {
+        withProducerContext(nextTopic, useProducerSessions = true) {
           implicit ctx =>
             val in =
               shortProducerUri("limit-test-producer-2", Some("instance-1"))
@@ -132,7 +130,7 @@ class WebSocketRoutesGenericSpec
         }
 
       "allow producer to reconnect when sessions are enabled and limit is 2" in
-        plainProducerContext(nextTopic, useProducerSessions = true) {
+        withProducerContext(nextTopic, useProducerSessions = true) {
           implicit ctx =>
             val wsClient = ctx.producerProbe
 
@@ -160,7 +158,7 @@ class WebSocketRoutesGenericSpec
         }
 
       "not enforce producer session limits when max-connections limit is 0" in
-        plainProducerContext(nextTopic, useProducerSessions = true) {
+        withProducerContext(nextTopic, useProducerSessions = true) {
           implicit ctx =>
             val wsClient1 = ctx.producerProbe
             val wsClient2 = WSProbe()
@@ -188,7 +186,7 @@ class WebSocketRoutesGenericSpec
         }
 
       "reject a new connection if the producer limit has been reached" in
-        plainProducerContext(nextTopic, useProducerSessions = true) {
+        withProducerContext(nextTopic, useProducerSessions = true) {
           implicit ctx =>
             val wsClient1 = ctx.producerProbe
             val wsClient2 = WSProbe()
@@ -219,7 +217,7 @@ class WebSocketRoutesGenericSpec
       // TODO: Implement test cases for exactly once producer semantics
 
       "reject exactly once producer connection when no instanceId" in
-        plainProducerContext(
+        withProducerContext(
           nextTopic,
           useProducerSessions = true,
           useExactlyOnce = true
@@ -245,13 +243,13 @@ class WebSocketRoutesGenericSpec
       }
 
       "return HTTP 400 when attempting to produce to a non-existing topic" in
-        plainProducerContext(nextTopic) { implicit ctx =>
+        withProducerContext(nextTopic) { implicit ctx =>
           val topicName = TopicName("non-existing-topic")
 
           val uri = baseProducerUri(
             producerId = producerId("json", topicCounter),
             instanceId = None,
-            topicName = topicName
+            topicName = Some(topicName)
           )
 
           WS(uri, ctx.producerProbe.flow) ~>
@@ -262,8 +260,8 @@ class WebSocketRoutesGenericSpec
             }
         }
 
-      "reject a new connection if the consumer already exists" taggedAs
-        Retryable in plainJsonConsumerContext(
+      "reject a new connection if the consumer already exists" in
+        withConsumerContext(
           topic = nextTopic,
           keyType = None,
           valType = StringType,
@@ -279,7 +277,7 @@ class WebSocketRoutesGenericSpec
           val out = "/socket/out?" +
             s"clientId=json-test-$topicCounter" +
             s"&groupId=json-test-group-$topicCounter" +
-            s"&topic=${ctx.topicName.value}" +
+            s"&topic=${ctx.topicName.value.value}" +
             s"&valType=${StringType.name}" +
             "&autoCommit=false"
 
@@ -303,7 +301,7 @@ class WebSocketRoutesGenericSpec
         }
 
       "allow a consumer to reconnect if a connection is terminated" in
-        plainJsonConsumerContext(
+        withConsumerContext(
           topic = nextTopic,
           keyType = None,
           valType = StringType,
@@ -312,7 +310,7 @@ class WebSocketRoutesGenericSpec
           val out = "/socket/out?" +
             s"clientId=json-test-$topicCounter" +
             s"&groupId=json-test-group-$topicCounter" +
-            s"&topic=${ctx.topicName.value}" +
+            s"&topic=${ctx.topicName.value.value}" +
             s"&valType=${StringType.name}" +
             "&autoCommit=false"
 
@@ -329,8 +327,8 @@ class WebSocketRoutesGenericSpec
           }
         }
 
-      "reject new consumer connection if the client limit has been reached" in
-        plainJsonConsumerContext(
+      "reject consumer connection if the client limit has been reached" in
+        withConsumerContext(
           topic = nextTopic,
           keyType = None,
           valType = StringType,
@@ -345,7 +343,7 @@ class WebSocketRoutesGenericSpec
             "/socket/out?" +
               s"clientId=json-test-$topicCounter$cid" +
               s"&groupId=dummy" +
-              s"&topic=${ctx.topicName.value}" +
+              s"&topic=${ctx.topicName.value.value}" +
               s"&valType=${StringType.name}" +
               "&autoCommit=false"
 
@@ -364,159 +362,6 @@ class WebSocketRoutesGenericSpec
               contentType mustBe ContentTypes.`application/json`
             }
           }
-        }
-    }
-
-    "kafka is secure and the server is unsecured" should {
-
-      "return a HTTP 401 when using wrong credentials to establish an" +
-        " outbound connection to a secured cluster" in
-        secureKafkaAvroConsumerContext(
-          topic = nextTopic,
-          keyType = Some(StringType),
-          valType = StringType,
-          numMessages = 0,
-          prePopulate = false
-        ) { implicit ctx =>
-          val out = "/socket/out?" +
-            s"clientId=json-test-$topicCounter" +
-            s"&groupId=json-test-group-$topicCounter" +
-            s"&topic=${ctx.topicName.value}" +
-            s"&socketPayload=${JsonPayload.name}" +
-            s"&keyType=${JsonType.name}" +
-            s"&valType=${JsonType.name}" +
-            "&autoCommit=false"
-
-          val wrongCreds = addKafkaCreds(BasicHttpCredentials("bad", "user"))
-
-          WS(out, ctx.consumerProbe.flow) ~>
-            wrongCreds ~>
-            Route.seal(wsRouteFromConsumerContext) ~>
-            check {
-              status mustBe Unauthorized
-              contentType mustBe ContentTypes.`application/json`
-            }
-        }
-
-      "return a HTTP 401 when using wrong credentials to establish an inbound" +
-        " connection to a secured cluster" in
-        secureKafkaClusterProducerContext(topic = nextTopic) { implicit ctx =>
-          implicit val wsClient = ctx.producerProbe
-          val baseUri = baseProducerUri(
-            producerId = producerId("json", topicCounter),
-            instanceId = None,
-            topicName = ctx.topicName,
-            payloadType = JsonPayload,
-            keyType = NoType,
-            valType = StringType
-          )
-
-          val wrongCreds = BasicHttpCredentials("bad", "user")
-
-          inspectWebSocket(
-            uri = baseUri,
-            routes = Route.seal(wsRouteFromProducerContext),
-            kafkaCreds = Some(wrongCreds)
-          ) {
-            status mustBe Unauthorized
-            contentType mustBe ContentTypes.`application/json`
-          }
-        }
-    }
-
-    "kafka is secured and the proxy is secured using OpenID Connect" should {
-
-      "return HTTP 401 when JWT token is invalid with OpenID enabled" in
-        withOpenIdConnectServerAndClient(useJwtCreds = false) {
-          case (_, _, _, cfg) =>
-            secureServerProducerContext(
-              topic = nextTopic,
-              serverOpenIdCfg = Option(cfg)
-            ) { implicit ctx =>
-              implicit val wsClient = ctx.producerProbe
-
-              val token = AccessToken("Bearer", "foo.bar.baz", 3600L, None)
-
-              val baseUri = baseProducerUri(
-                producerId = producerId("avro", topicCounter),
-                instanceId = None,
-                topicName = ctx.topicName,
-                payloadType = AvroPayload,
-                keyType = NoType,
-                valType = StringType
-              )
-
-              inspectWebSocket(
-                uri = baseUri,
-                routes = Route.seal(wsRouteFromProducerContext),
-                creds = Some(token.bearerToken),
-                kafkaCreds = Some(creds)
-              ) {
-                status mustBe Unauthorized
-                contentType mustBe ContentTypes.`application/json`
-              }
-            }
-        }
-
-      "return HTTP 401 when JWT token is valid but Kafka creds are invalid" in
-        withOpenIdConnectServerAndClient(useJwtCreds = true) {
-          case (oidcHost, oidcPort, _, cfg) =>
-            secureServerProducerContext(
-              topic = nextTopic,
-              serverOpenIdCfg = Option(cfg)
-            ) { implicit ctx =>
-              implicit val wsClient = ctx.producerProbe
-
-              val token = invalidAccessToken(oidcHost, oidcPort)
-
-              val baseUri = baseProducerUri(
-                producerId = producerId("avro", topicCounter),
-                instanceId = None,
-                topicName = ctx.topicName,
-                payloadType = AvroPayload,
-                keyType = NoType,
-                valType = StringType
-              )
-
-              inspectWebSocket(
-                uri = baseUri,
-                routes = Route.seal(wsRouteFromProducerContext),
-                creds = Some(token.bearerToken)
-              ) {
-                status mustBe Unauthorized
-                contentType mustBe ContentTypes.`application/json`
-              }
-            }
-        }
-
-      "return HTTP 503 when OpenID server is unavailable" in
-        withUnavailableOpenIdConnectServerAndToken(useJwtCreds = false) {
-          case (_, cfg, token) =>
-            secureServerProducerContext(
-              topic = nextTopic,
-              serverOpenIdCfg = Option(cfg)
-            ) { implicit ctx =>
-              implicit val wsClient = ctx.producerProbe
-
-              val baseUri = baseProducerUri(
-                producerId = producerId("avro", topicCounter),
-                instanceId = None,
-                topicName = ctx.topicName,
-                payloadType = AvroPayload,
-                keyType = NoType,
-                valType = StringType
-              )
-
-              inspectWebSocket(
-                uri = baseUri,
-                routes = Route.seal(wsRouteFromProducerContext),
-                creds = Some(token.bearerToken),
-                kafkaCreds = Some(creds)
-              ) {
-                status mustBe ServiceUnavailable
-                contentType mustBe ContentTypes.`application/json`
-              }
-            }
         }
     }
 
