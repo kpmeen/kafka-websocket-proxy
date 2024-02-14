@@ -31,7 +31,6 @@
     <!--  <logger name="net.scalytica.kafka.wsproxy.auth.OpenIdClient" level="TRACE"/>-->
     <!--  <logger name="net.scalytica.kafka.wsproxy.auth.UrlJwkProvider" level="TRACE"/>-->
     <!--  <logger name="net.scalytica.kafka.wsproxy.codecs" level="INFO"/>-->
-    <!--  <logger name="net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde" level="TRACE"/>-->
     <!--  <logger name="net.scalytica.kafka.wsproxy.config" level="TRACE" />-->
     <!--  <logger name="net.scalytica.kafka.wsproxy.config.DynamicConfigHandler" level="TRACE" />-->
     <!--  <logger name="net.scalytica.kafka.wsproxy.consumer" level="TRACE"/>-->

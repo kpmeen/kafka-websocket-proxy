@@ -1,7 +1,5 @@
 package net.scalytica.kafka.wsproxy.models
 
-import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroProducerRecord
-import net.scalytica.kafka.wsproxy.models.Formats.FormatType
 import net.scalytica.kafka.wsproxy.models.ValueDetails.InValueDetails
 import net.scalytica.kafka.wsproxy.producer.ExtendedProducerRecord
 import org.apache.kafka.clients.producer.ProducerRecord
@@ -34,32 +32,6 @@ sealed trait WsProducerRecord[+K, +V] {
 }
 
 object WsProducerRecord {
-
-  def fromAvro[K, V](
-      avro: AvroProducerRecord
-  )(
-      keyFormatType: FormatType,
-      valueFormatType: FormatType
-  ): WsProducerRecord[K, V] = {
-    val v: V = valueFormatType.unsafeFromCoproduct[V](avro.value)
-    avro.key
-      .map { key =>
-        val k: K = keyFormatType.unsafeFromCoproduct[K](key)
-        ProducerKeyValueRecord[K, V](
-          key = InValueDetails(k, keyFormatType),
-          value = InValueDetails(v, valueFormatType),
-          headers = avro.headers.map(_.map(KafkaHeader.fromAvro)),
-          clientMessageId = avro.clientMessageId
-        )
-      }
-      .getOrElse {
-        ProducerValueRecord[V](
-          value = InValueDetails(v, valueFormatType),
-          headers = avro.headers.map(_.map(KafkaHeader.fromAvro)),
-          clientMessageId = avro.clientMessageId
-        )
-      }
-  }
 
   /**
    * Converts a [[WsProducerRecord]] into a Kafka [[ProducerRecord]].
@@ -161,7 +133,7 @@ case object ProducerEmptyMessage extends WsProducerRecord[Nothing, Nothing] {
   override val clientMessageId: Option[Nothing] = None
   override val headers: Option[Nothing]         = None
 
-  override def value =
+  override def value: InValueDetails[_ <: Nothing] =
     throw new NoSuchElementException(
       "Trying to access value of empty message."
     )

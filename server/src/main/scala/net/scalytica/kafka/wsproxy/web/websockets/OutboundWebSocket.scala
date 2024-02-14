@@ -3,18 +3,14 @@ package net.scalytica.kafka.wsproxy.web.websockets
 import org.apache.pekko.actor.{typed, ActorSystem}
 import org.apache.pekko.actor.typed.scaladsl.adapter._
 import org.apache.pekko.actor.typed.{ActorRef, Scheduler}
-import org.apache.pekko.http.scaladsl.model.ws.{
-  BinaryMessage,
-  Message,
-  TextMessage
-}
+import org.apache.pekko.http.scaladsl.model.ws.{Message, TextMessage}
 import org.apache.pekko.http.scaladsl.server.Directives._
 import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.kafka.scaladsl.Consumer
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.{Flow, Keep, Sink, Source}
 import org.apache.pekko.stream.typed.scaladsl.ActorSink
-import org.apache.pekko.util.{ByteString, Timeout}
+import org.apache.pekko.util.Timeout
 import org.apache.pekko.{Done, NotUsed}
 import io.circe.Encoder
 import io.circe.Printer.noSpaces
@@ -25,10 +21,6 @@ import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
 import net.scalytica.kafka.wsproxy.auth.{JwtValidationTickerFlow, OpenIdClient}
 import net.scalytica.kafka.wsproxy.codecs.Decoders._
 import net.scalytica.kafka.wsproxy.codecs.Encoders._
-import net.scalytica.kafka.wsproxy.codecs.ProtocolSerdes.{
-  avroCommitSerde,
-  avroConsumerRecordSerde
-}
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.config.ReadableDynamicConfigHandlerRef
 import net.scalytica.kafka.wsproxy.consumer.{CommitStackHandler, WsConsumer}
@@ -49,7 +41,7 @@ import net.scalytica.kafka.wsproxy.session.{
   SessionNotFound
 }
 import net.scalytica.kafka.wsproxy.streams.ProxyFlowExtras
-import net.scalytica.kafka.wsproxy.web.SocketProtocol.{AvroPayload, JsonPayload}
+import net.scalytica.kafka.wsproxy.web.SocketProtocol.JsonPayload
 import org.apache.kafka.common.serialization.Deserializer
 
 import scala.concurrent.duration._
@@ -63,7 +55,7 @@ trait OutboundWebSocket
   implicit private[this] val timeout: Timeout = 10 seconds
 
   /** Convenience function for logging and throwing an error in a Flow */
-  def logAndThrow[T](message: String, t: Throwable): T = {
+  private[this] def logAndThrow[T](message: String, t: Throwable): T = {
     log.error(message, t)
     throw t
   }
@@ -174,7 +166,7 @@ trait OutboundWebSocket
     }
   }
 
-  def outboundWebSocketRoute(
+  private[this] def outboundWebSocketRoute(
       args: OutSocketArgs
   )(
       appCfg: AppCfg
@@ -300,7 +292,6 @@ trait OutboundWebSocket
 
     val messageParser = args.socketPayload match {
       case JsonPayload => jsonMessageToWsCommit via jmxInFlow
-      case AvroPayload => avroMessageToWsCommit via jmxInFlow
     }
 
     val sink   = prepareSink(args, messageParser, commitHandlerRef)
@@ -415,31 +406,6 @@ trait OutboundWebSocket
       .collect { case Right(res) => res }
 
   /**
-   * Converts a WebSocket [[Message]] with an Avro payload into a [[WsCommit]]
-   * for down-stream processing.
-   *
-   * @param mat
-   *   the [[Materializer]] to use
-   * @param ec
-   *   the [[ExecutionContext]] to use
-   * @return
-   *   a [[Flow]] converting [[Message]] to String
-   */
-  private[this] def avroMessageToWsCommit(
-      implicit mat: Materializer,
-      ec: ExecutionContext
-  ): Flow[Message, WsCommit, NotUsed] =
-    wsMessageToByteStringFlow
-      .recover { case t: Throwable =>
-        logAndThrow("There was an error processing an Avro message", t)
-      }
-      .map(msg => avroCommitSerde.deserialize(msg.toArray[Byte]))
-      .recover { case t: Throwable =>
-        logAndThrow(s"Avro message could not be deserialised", t)
-      }
-      .map(WsCommit.fromAvro)
-
-  /**
    * The Kafka [[Source]] where messages are consumed from the topic.
    *
    * @param args
@@ -540,13 +506,6 @@ trait OutboundWebSocket
       implicit recEnc: Encoder[WsConsumerRecord[K, V]]
   ): WsConsumerRecord[K, V] => Message =
     args.socketPayload match {
-      case AvroPayload =>
-        cr =>
-          val byteString = ByteString(
-            avroConsumerRecordSerde
-              .serialize(args.topic.value, cr.toAvroRecord[K, V])
-          )
-          BinaryMessage(byteString)
       case JsonPayload =>
         cr => TextMessage(cr.asJson.printWith(noSpaces))
     }

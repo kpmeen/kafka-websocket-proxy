@@ -7,7 +7,10 @@ import net.scalytica.kafka.wsproxy.web.SocketProtocol.JsonPayload
 import net.scalytica.test.SharedAttributes.creds
 import net.scalytica.test._
 import org.apache.pekko.http.scaladsl.model.ContentTypes
-import org.apache.pekko.http.scaladsl.model.StatusCodes.{ServiceUnavailable, Unauthorized}
+import org.apache.pekko.http.scaladsl.model.StatusCodes.{
+  ServiceUnavailable,
+  Unauthorized
+}
 import org.apache.pekko.http.scaladsl.server._
 import org.apache.pekko.http.scaladsl.testkit.WSProbe
 import org.scalatest.wordspec.AnyWordSpec

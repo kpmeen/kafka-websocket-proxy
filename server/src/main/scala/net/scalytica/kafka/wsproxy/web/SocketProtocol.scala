@@ -17,7 +17,6 @@ object SocketProtocol {
     def fromString(string: String): Option[SocketPayload] =
       Option(string).flatMap {
         case s: String if JsonPayload.isSameName(s) => Some(JsonPayload)
-        case s: String if AvroPayload.isSameName(s) => Some(AvroPayload)
         case _                                      => None
       }
 
@@ -30,6 +29,5 @@ object SocketProtocol {
   }
 
   case object JsonPayload extends SocketPayload
-  case object AvroPayload extends SocketPayload
 
 }

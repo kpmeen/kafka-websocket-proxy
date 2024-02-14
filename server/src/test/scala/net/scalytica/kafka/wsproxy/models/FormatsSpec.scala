@@ -14,14 +14,6 @@ class FormatsSpec extends AnyWordSpec with Matchers with OptionValues {
       fromString("json").value mustBe JsonType
     }
 
-    "be possible to initialise a AvroType using a string value" in {
-      fromString("avro").value mustBe AvroType
-    }
-
-    "be possible to initialise a ByteArrayType using a string value" in {
-      fromString("byte_array").value mustBe ByteArrayType
-    }
-
     "be possible to initialise a StringType using a string value" in {
       fromString("string").value mustBe StringType
     }
@@ -55,9 +47,9 @@ class FormatsSpec extends AnyWordSpec with Matchers with OptionValues {
       an[IllegalArgumentException] must be thrownBy unsafeFromString("foobar")
     }
 
-    "use snake_case for the name string" in {
-      ByteArrayType.name mustBe "byte_array"
-    }
+//    "use snake_case for the name string" in {
+//      ByteArrayType.name mustBe "byte_array"
+//    }
 
   }
 

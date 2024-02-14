@@ -4,16 +4,12 @@ import org.apache.pekko.NotUsed
 import org.apache.pekko.http.scaladsl.model.ws.Message
 import org.apache.pekko.stream.scaladsl.Flow
 import org.apache.pekko.stream.{Materializer, OverflowStrategy}
-import org.apache.pekko.util.ByteString
 import io.circe.Decoder
-import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroProducerRecord
-import net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde
 import net.scalytica.kafka.wsproxy.config.Configuration.{
   AppCfg,
   ClientSpecificLimitCfg
 }
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
-import net.scalytica.kafka.wsproxy.models.Formats.FormatType
 import net.scalytica.kafka.wsproxy.models.{
   InSocketArgs,
   ProducerEmptyMessage,
@@ -56,38 +52,6 @@ private[producer] trait ProducerFlowExtras
         )
       }
       .filter(_.nonEmpty)
-
-  def rateLimitedAvroToWsProducerRecordFlow[K, V](
-      args: InSocketArgs,
-      keyType: FormatType,
-      valType: FormatType
-  )(
-      implicit cfg: AppCfg,
-      serde: WsProxyAvroSerde[AvroProducerRecord],
-      ec: ExecutionContext,
-      mat: Materializer
-  ): Flow[Message, WsProducerRecord[K, V], NotUsed] =
-    (rateLimiter(args) via wsMessageToByteStringFlow)
-      .recover { case t: Exception =>
-        logAndEmpty("There was an error processing an Avro message", t)(
-          ByteString.empty
-        )
-      }
-      .log("avroProducerFlow", m => s"Trying to deserialize bytes: $m")
-      .map(bs => serde.deserialize(bs.toArray))
-      .log("avroProducerFlow", m => s"Deserialized bytes into: $m")
-      .recover { case t: Exception =>
-        logAndEmpty(s"Avro message could not be deserialized", t)(
-          AvroProducerRecord.Empty
-        )
-      }
-      .filterNot(_.isEmpty)
-      .map { apr =>
-        WsProducerRecord.fromAvro[K, V](apr)(
-          keyFormatType = keyType,
-          valueFormatType = valType
-        )
-      }
 
   def rateLimiter(args: InSocketArgs)(
       implicit cfg: AppCfg
