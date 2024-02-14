@@ -1,6 +1,6 @@
 package net.scalytica
 
-import org.apache.pekko.http.scaladsl.model.ws.{BinaryMessage, TextMessage}
+import org.apache.pekko.http.scaladsl.model.ws.TextMessage
 import org.apache.pekko.http.scaladsl.testkit.WSProbe
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.Sink
@@ -13,15 +13,8 @@ import io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig.{
 import io.confluent.kafka.serializers.subject.TopicNameStrategy
 import io.confluent.kafka.serializers.subject.strategy.SubjectNameStrategy
 import io.github.embeddedkafka.{EmbeddedKafkaConfig, EmbeddedKafkaConfigImpl}
-import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
-  AvroConsumerRecord,
-  AvroProducerResult
-}
 import net.scalytica.kafka.wsproxy.codecs.Decoders._
-import net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde
-import net.scalytica.kafka.wsproxy.models.Formats.{AvroType, FormatType}
 import net.scalytica.kafka.wsproxy.models._
-import net.scalytica.test.TestTypes.{Album, TestKey}
 import org.apache.kafka.clients.consumer.ConsumerConfig.ISOLATION_LEVEL_CONFIG
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.{Assertion, OptionValues}
@@ -133,33 +126,6 @@ package object test {
       }
     }
 
-    def expectWsProducerResultAvro(
-        expectedTopic: TopicName,
-        validateMessageId: Boolean
-    )(
-        implicit mat: Materializer,
-        resultSerde: WsProxyAvroSerde[AvroProducerResult]
-    ): Assertion = {
-      probe.expectMessage() match {
-        case bm: BinaryMessage =>
-          val collected = bm.dataStream
-            .grouped(1000) // scalastyle:ignore
-            .runWith(Sink.head)
-            .awaitResult(5 seconds)
-            .reduce(_ ++ _)
-
-          val actual = resultSerde.deserialize(collected.toArray)
-
-          if (validateMessageId) actual.clientMessageId must not be None
-          actual.topic mustBe expectedTopic.value
-          actual.offset mustBe >=(0L)
-          actual.partition mustBe >=(0)
-
-        case _ =>
-          throw new AssertionError("Expected BinaryMessage but got TextMessage")
-      }
-    }
-
     // scalastyle:off method.length
     def expectWsConsumerKeyValueResultJson[K, V](
         expectedTopic: TopicName,
@@ -220,85 +186,6 @@ package object test {
       }
     }
 
-    def expectWsConsumerResultAvro[K, V](
-        expectedTopic: TopicName,
-        expectHeaders: Boolean = false,
-        keyFormat: FormatType,
-        valFormat: FormatType
-    )(
-        assertion: WsConsumerRecord[K, V] => Assertion
-    )(
-        implicit mat: Materializer,
-        crSerde: WsProxyAvroSerde[AvroConsumerRecord]
-    ): Assertion = {
-      probe.inProbe.requestNext(20 seconds) match {
-        case bm: BinaryMessage =>
-          val collected = bm.dataStream
-            .grouped(1000) // scalastyle:ignore
-            .runWith(Sink.head)
-            .awaitResult(5 seconds)
-            .reduce(_ ++ _)
-
-          val actual: WsConsumerRecord[K, V] =
-            WsConsumerRecord.fromAvro[K, V](
-              crSerde.deserialize(collected.toArray)
-            )(keyFormat, valFormat)
-
-          actual.topic.value mustBe expectedTopic.value
-          actual.offset.value mustBe >=(0L)
-          actual.partition.value mustBe >=(0)
-
-          if (expectHeaders) {
-            actual.headers must not be None
-            actual.headers.value must have size 1
-            actual.headers.value.headOption.value.key must startWith("key")
-            actual.headers.value.headOption.value.value must startWith("value")
-          } else {
-            actual.headers mustBe None
-          }
-
-          assertion(actual)
-
-        case _ =>
-          throw new AssertionError(
-            s"""Expected BinaryMessage but got TextMessage"""
-          )
-      }
-    }
-
-    def expectWsConsumerKeyValueResultAvro(
-        expectedTopic: TopicName,
-        expectedKey: Option[TestKey],
-        expectedValue: Album,
-        expectHeaders: Boolean = false
-    )(
-        implicit mat: Materializer,
-        crSerde: WsProxyAvroSerde[AvroConsumerRecord]
-    ): Assertion = {
-      val keySerdes = TestTypes.TestSerdes.keySerdes
-      val valSerdes = TestTypes.TestSerdes.valueSerdes
-
-      expectWsConsumerResultAvro[Array[Byte], Array[Byte]](
-        expectedTopic = expectedTopic,
-        expectHeaders = expectHeaders,
-        keyFormat = AvroType,
-        valFormat = AvroType
-      ) {
-        case ConsumerKeyValueRecord(_, _, _, _, _, key, value, _) =>
-          val k = keySerdes.deserialize(expectedTopic.value, key.value)
-          val v = valSerdes.deserialize(expectedTopic.value, value.value)
-          k.username mustBe expectedKey.get.username
-          v.title mustBe expectedValue.title
-          v.artist mustBe expectedValue.artist
-          v.tracks must have size expectedValue.tracks.size.toLong
-          v.tracks must contain allElementsOf expectedValue.tracks
-
-        case ConsumerValueRecord(_, _, _, _, _, value, _) =>
-          val v = valSerdes.deserialize(expectedTopic.value, value.value)
-          v mustBe expectedValue
-      }
-    }
-
     def expectWsConsumerValueResultJson[V](
         expectedTopic: TopicName,
         expectedValue: V
@@ -309,20 +196,6 @@ package object test {
       expectWsConsumerKeyValueResultJson[Unit, V](
         expectedTopic = expectedTopic,
         expectedKey = (),
-        expectedValue = expectedValue
-      )
-    }
-
-    def expectWsConsumerValueResultAvro(
-        expectedTopic: TopicName,
-        expectedValue: Album
-    )(
-        implicit mat: Materializer,
-        crSerde: WsProxyAvroSerde[AvroConsumerRecord]
-    ): Assertion = {
-      expectWsConsumerKeyValueResultAvro(
-        expectedTopic = expectedTopic,
-        expectedKey = None,
         expectedValue = expectedValue
       )
     }

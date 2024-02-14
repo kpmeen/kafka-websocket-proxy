@@ -9,8 +9,6 @@ import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl._
 import io.circe.Decoder
 import net.scalytica.kafka.wsproxy.auth.KafkaLoginModules
-import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroProducerRecord
-import net.scalytica.kafka.wsproxy.codecs.WsProxyAvroSerde
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.errors.{
   AuthenticationError,
@@ -220,62 +218,6 @@ object WsProducer extends ProducerFlowExtras with WithProxyLogger {
       .flatMapConcat(seqToSource)
 
     rateLimitedJsonToWsProducerRecordFlow[K, V](args).via(pflow)
-  }
-
-  /**
-   * @param args
-   *   input arguments defining the base configs for the producer.
-   * @param cfg
-   *   the [[AppCfg]] containing application configurations.
-   * @param as
-   *   actor system to use
-   * @param mat
-   *   actor materializer to use
-   * @param serde
-   *   the Avro SerDes to use for serializing the message.
-   * @tparam K
-   *   the message key type
-   * @tparam V
-   *   the message value type
-   * @return
-   *   a [[Flow]] that sends messages to Kafka and passes on the result
-   *   down-stream for further processing. For example sending the metadata to
-   *   the external web client for it to process locally.
-   */
-  def produceAvro[K, V](args: InSocketArgs)(
-      implicit cfg: AppCfg,
-      as: ActorSystem,
-      mat: Materializer,
-      serde: WsProxyAvroSerde[AvroProducerRecord]
-  ): Flow[Message, WsProducerResult, NotUsed] = {
-    implicit val ec: ExecutionContext = as.dispatcher
-
-    val keyType = args.keyType.getOrElse(Formats.AvroType)
-    val valType = args.valType
-
-    implicit val keySerializer: Serializer[keyType.Aux] = keyType.serializer
-    implicit val valSerializer: Serializer[valType.Aux] = valType.serializer
-
-    val settings = producerSettingsWithKey[keyType.Aux, valType.Aux](args)
-
-    log.trace(s"Using serde $serde")
-
-    checkClient(args.topic, settings)
-
-    val producer = producerFlow[keyType.Aux, valType.Aux](args, cfg, settings)
-
-    rateLimitedAvroToWsProducerRecordFlow[keyType.Aux, valType.Aux](
-      args = args,
-      keyType = keyType,
-      valType = valType
-    ).map { r =>
-      ProducerMessage.single(
-        record = WsProducerRecord.asKafkaProducerRecord(args.topic, r),
-        passThrough = r
-      )
-    }.via(producer)
-      .map(r => WsProducerResult.fromProducerResult(r))
-      .flatMapConcat(seqToSource)
   }
 
 }

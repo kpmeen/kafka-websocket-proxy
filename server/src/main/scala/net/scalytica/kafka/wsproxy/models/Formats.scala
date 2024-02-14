@@ -1,20 +1,9 @@
 package net.scalytica.kafka.wsproxy.models
 
-import io.circe.{Decoder, Encoder}
-import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroValueTypesCoproduct
-import net.scalytica.kafka.wsproxy.codecs.{BasicSerdes, Decoders, Encoders}
-import net.scalytica.kafka.wsproxy.errors.IllegalFormatTypeError
-import net.scalytica.kafka.wsproxy.logging.DefaultProxyLogger
-import net.scalytica.kafka.wsproxy.{
-  NiceClassNameExtensions,
-  OptionExtensions,
-  StringExtensions
-}
+import io.circe.{Decoder, Encoder, Json}
+import net.scalytica.kafka.wsproxy.codecs.BasicSerdes
+import net.scalytica.kafka.wsproxy.{NiceClassNameExtensions, StringExtensions}
 import org.apache.kafka.common.serialization.{Deserializer, Serializer}
-import shapeless.Coproduct
-
-import scala.util.Try
-import scala.util.control.NonFatal
 
 object Formats {
 
@@ -22,34 +11,6 @@ object Formats {
 
     type Aux
     type Tpe
-
-    def fromCoproduct[T](co: AvroValueTypesCoproduct): Option[T]
-
-    def unsafeFromCoproduct[T](co: AvroValueTypesCoproduct): T =
-      fromCoproduct[T](co).getOrElse(
-        throw new IllegalArgumentException(s"Wrong type for $co")
-      )
-
-    def toCoproduct(v: Tpe): Option[AvroValueTypesCoproduct]
-
-    def typeToCoproduct(v: Tpe): AvroValueTypesCoproduct
-
-    def anyToCoproduct(v: Any): AvroValueTypesCoproduct =
-      Try(v.asInstanceOf[Tpe])
-        .recover { case NonFatal(e) =>
-          DefaultProxyLogger.warn(
-            s"Could not cast ${v.getClass} to ${self.getClass}",
-            e
-          )
-          throw e
-        }
-        .toOption
-        .map(typeToCoproduct)
-        .orThrow(
-          IllegalFormatTypeError(
-            s"The Type ${v.getClass} is not a valid String."
-          )
-        )
 
     lazy val name: String =
       self.niceClassSimpleName.stripSuffix("Type").toSnakeCase
@@ -71,19 +32,12 @@ object Formats {
     type Aux = Unit
     type Tpe = Unit
 
-    def fromCoproduct[T](co: AvroValueTypesCoproduct): Option[T] = None
-    def toCoproduct(v: Tpe): Option[AvroValueTypesCoproduct]     = None
+    override val serializer: Serializer[Unit] = BasicSerdes.EmptySerializer
+    override val deserializer: Deserializer[Unit] =
+      BasicSerdes.EmptyDeserializer
 
-    def typeToCoproduct(v: Tpe): AvroValueTypesCoproduct =
-      throw new IllegalAccessError(
-        s"$getClass cannot be converted to Coproduct."
-      )
-
-    override val serializer   = BasicSerdes.EmptySerializer
-    override val deserializer = BasicSerdes.EmptyDeserializer
-
-    override val encoder = Encoder.encodeUnit
-    override val decoder = Decoder.decodeUnit
+    override val encoder: Encoder[Unit] = Encoder.encodeUnit
+    override val decoder: Decoder[Unit] = Decoder.decodeUnit
   }
 
   // Complex types
@@ -91,153 +45,75 @@ object Formats {
     type Aux = io.circe.Json
     type Tpe = String
 
-    def fromCoproduct[T](co: AvroValueTypesCoproduct): Option[T] =
-      co.select[Tpe].map(_.asInstanceOf[T])
+    override val serializer: Serializer[Json]     = BasicSerdes.JsonSerializer
+    override val deserializer: Deserializer[Json] = BasicSerdes.JsonDeserializer
 
-    def toCoproduct(v: Tpe): Option[AvroValueTypesCoproduct] =
-      Some(Coproduct[AvroValueTypesCoproduct](v))
-
-    def typeToCoproduct(v: Tpe): AvroValueTypesCoproduct =
-      Coproduct[AvroValueTypesCoproduct](v)
-
-    override val serializer   = BasicSerdes.JsonSerializer
-    override val deserializer = BasicSerdes.JsonDeserializer
-
-    override val encoder = Encoder.encodeJson
-    override val decoder = Decoder.decodeJson
+    override val encoder: Encoder[Json] = Encoder.encodeJson
+    override val decoder: Decoder[Json] = Decoder.decodeJson
   }
-
-  sealed trait BaseBinaryType extends FormatType {
-    type Aux = Array[Byte]
-    type Tpe = Array[Byte]
-
-    def fromCoproduct[T](co: AvroValueTypesCoproduct): Option[T] =
-      co.select[Tpe].map(_.asInstanceOf[T])
-
-    def toCoproduct(v: Tpe): Option[AvroValueTypesCoproduct] =
-      Some(Coproduct[AvroValueTypesCoproduct](v))
-
-    def typeToCoproduct(v: Tpe): AvroValueTypesCoproduct =
-      Coproduct[AvroValueTypesCoproduct](v)
-
-    override val serializer   = BasicSerdes.ByteArrSerializer
-    override val deserializer = BasicSerdes.ByteArrDeserializer
-
-    override val encoder = Encoders.byteArrEncoder
-    override val decoder = Decoders.byteArrDecoder
-  }
-
-  case object AvroType extends BaseBinaryType
-
-  // "Primitives"
-  case object ByteArrayType extends BaseBinaryType
 
   case object StringType extends FormatType {
     type Aux = String
     type Tpe = String
 
-    def fromCoproduct[T](co: AvroValueTypesCoproduct): Option[T] =
-      co.select[Tpe].map(_.asInstanceOf[T])
+    override val serializer: Serializer[String] = BasicSerdes.StringSerializer
+    override val deserializer: Deserializer[String] =
+      BasicSerdes.StringDeserializer
 
-    def toCoproduct(v: Tpe): Option[AvroValueTypesCoproduct] =
-      Some(Coproduct[AvroValueTypesCoproduct](v))
-
-    def typeToCoproduct(v: Tpe): AvroValueTypesCoproduct =
-      Coproduct[AvroValueTypesCoproduct](v)
-
-    override val serializer   = BasicSerdes.StringSerializer
-    override val deserializer = BasicSerdes.StringDeserializer
-
-    override val encoder = Encoder.encodeString
-    override val decoder = Decoder.decodeString
+    override val encoder: Encoder[String] = Encoder.encodeString
+    override val decoder: Decoder[String] = Decoder.decodeString
   }
 
   case object IntType extends FormatType {
     type Aux = Int
     type Tpe = Int
 
-    def fromCoproduct[T](co: AvroValueTypesCoproduct): Option[T] =
-      co.select[Tpe].map(_.asInstanceOf[T])
+    override val serializer: Serializer[Int]     = BasicSerdes.IntSerializer
+    override val deserializer: Deserializer[Int] = BasicSerdes.IntDeserializer
 
-    def toCoproduct(v: Tpe): Option[AvroValueTypesCoproduct] =
-      Some(Coproduct[AvroValueTypesCoproduct](v))
-
-    def typeToCoproduct(v: Tpe): AvroValueTypesCoproduct =
-      Coproduct[AvroValueTypesCoproduct](v)
-
-    override val serializer   = BasicSerdes.IntSerializer
-    override val deserializer = BasicSerdes.IntDeserializer
-
-    override val encoder = Encoder.encodeInt
-    override val decoder = Decoder.decodeInt
+    override val encoder: Encoder[Int] = Encoder.encodeInt
+    override val decoder: Decoder[Int] = Decoder.decodeInt
   }
 
   case object LongType extends FormatType {
     type Aux = Long
     type Tpe = Long
 
-    def fromCoproduct[T](co: AvroValueTypesCoproduct): Option[T] =
-      co.select[Tpe].map(_.asInstanceOf[T])
+    override val serializer: Serializer[Long]     = BasicSerdes.LongSerializer
+    override val deserializer: Deserializer[Long] = BasicSerdes.LongDeserializer
 
-    def toCoproduct(v: Tpe): Option[AvroValueTypesCoproduct] =
-      Some(Coproduct[AvroValueTypesCoproduct](v))
-
-    def typeToCoproduct(v: Tpe): AvroValueTypesCoproduct =
-      Coproduct[AvroValueTypesCoproduct](v)
-
-    override val serializer   = BasicSerdes.LongSerializer
-    override val deserializer = BasicSerdes.LongDeserializer
-
-    override val encoder = Encoder.encodeLong
-    override val decoder = Decoder.decodeLong
+    override val encoder: Encoder[Long] = Encoder.encodeLong
+    override val decoder: Decoder[Long] = Decoder.decodeLong
   }
 
   case object DoubleType extends FormatType {
     type Aux = Double
     type Tpe = Double
 
-    def fromCoproduct[T](co: AvroValueTypesCoproduct): Option[T] =
-      co.select[Tpe].map(_.asInstanceOf[T])
+    override val serializer: Serializer[Double] = BasicSerdes.DoubleSerializer
+    override val deserializer: Deserializer[Double] =
+      BasicSerdes.DoubleDeserializer
 
-    def toCoproduct(v: Tpe): Option[AvroValueTypesCoproduct] =
-      Some(Coproduct[AvroValueTypesCoproduct](v))
-
-    def typeToCoproduct(v: Tpe): AvroValueTypesCoproduct =
-      Coproduct[AvroValueTypesCoproduct](v)
-
-    override val serializer   = BasicSerdes.DoubleSerializer
-    override val deserializer = BasicSerdes.DoubleDeserializer
-
-    override val encoder = Encoder.encodeDouble
-    override val decoder = Decoder.decodeDouble
+    override val encoder: Encoder[Double] = Encoder.encodeDouble
+    override val decoder: Decoder[Double] = Decoder.decodeDouble
   }
 
   case object FloatType extends FormatType {
     type Aux = Float
     type Tpe = Float
 
-    def fromCoproduct[T](co: AvroValueTypesCoproduct): Option[T] =
-      co.select[Tpe].map(_.asInstanceOf[T])
+    override val serializer: Serializer[Float] = BasicSerdes.FloatSerializer
+    override val deserializer: Deserializer[Float] =
+      BasicSerdes.FloatDeserializer
 
-    def toCoproduct(v: Tpe): Option[AvroValueTypesCoproduct] =
-      Some(Coproduct[AvroValueTypesCoproduct](v))
-
-    def typeToCoproduct(v: Tpe): AvroValueTypesCoproduct =
-      Coproduct[AvroValueTypesCoproduct](v)
-
-    override val serializer   = BasicSerdes.FloatSerializer
-    override val deserializer = BasicSerdes.FloatDeserializer
-
-    override val encoder = Encoder.encodeFloat
-    override val decoder = Decoder.decodeFloat
+    override val encoder: Encoder[Float] = Encoder.encodeFloat
+    override val decoder: Decoder[Float] = Decoder.decodeFloat
   }
 
   object FormatType {
 
     val All = List(
       JsonType,
-      AvroType,
-      ByteArrayType,
       StringType,
       IntType,
       LongType,
@@ -248,15 +124,13 @@ object Formats {
     // scalastyle:off cyclomatic.complexity
     def fromString(string: String): Option[FormatType] =
       Option(string).flatMap {
-        case s: String if JsonType.isSameName(s)      => Some(JsonType)
-        case s: String if AvroType.isSameName(s)      => Some(AvroType)
-        case s: String if ByteArrayType.isSameName(s) => Some(ByteArrayType)
-        case s: String if StringType.isSameName(s)    => Some(StringType)
-        case s: String if IntType.isSameName(s)       => Some(IntType)
-        case s: String if LongType.isSameName(s)      => Some(LongType)
-        case s: String if DoubleType.isSameName(s)    => Some(DoubleType)
-        case s: String if FloatType.isSameName(s)     => Some(FloatType)
-        case _                                        => None
+        case s: String if JsonType.isSameName(s)   => Some(JsonType)
+        case s: String if StringType.isSameName(s) => Some(StringType)
+        case s: String if IntType.isSameName(s)    => Some(IntType)
+        case s: String if LongType.isSameName(s)   => Some(LongType)
+        case s: String if DoubleType.isSameName(s) => Some(DoubleType)
+        case s: String if FloatType.isSameName(s)  => Some(FloatType)
+        case _                                     => None
       }
     // scalastyle:on cyclomatic.complexity
 

@@ -13,7 +13,6 @@ import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models.{WsProducerId, WsProducerInstanceId}
 import net.scalytica.kafka.wsproxy.session.SessionHandlerRef
 import net.scalytica.kafka.wsproxy.auth.OpenIdClient
-import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroProducerRecord
 import net.scalytica.kafka.wsproxy.config.Configuration
 import net.scalytica.kafka.wsproxy.config.Configuration.{
   AdminClientCfg,
@@ -281,39 +280,6 @@ trait WsProxySpec
     )
   }
 
-  private[this] def createAvroMessagesForTypes(
-      keyType: Option[FormatType],
-      valType: FormatType,
-      numMessages: Int,
-      withHeaders: Boolean
-  ): Seq[AvroProducerRecord] = {
-    (keyType, valType) match {
-      case (None, AvroType) =>
-        createAvroProducerRecordNoneAvro(numMessages, withHeaders)
-
-      case (Some(AvroType), AvroType) =>
-        createAvroProducerRecordAvroAvro(numMessages, withHeaders)
-
-      case (Some(LongType), StringType) =>
-        createAvroProducerRecordLongString(numMessages, withHeaders)
-
-      case (None, StringType) =>
-        createAvroProducerRecordNoneString(numMessages, withHeaders)
-
-      case (Some(StringType), ByteArrayType) =>
-        createAvroProducerRecordStringBytes(numMessages, withHeaders)
-
-      case (Some(StringType), StringType) =>
-        createAvroProducerRecordStringString(numMessages, withHeaders)
-
-      case (kt, vt) =>
-        throw new NotImplementedError(
-          s"Test producer messages for key/value kombo" +
-            s" ${kt.getOrElse(NoType).name}/${vt.name} is not implemented."
-        )
-    }
-  }
-
   private[this] def createJsonMessages(
       withKey: Boolean,
       withHeaders: Boolean,
@@ -339,27 +305,6 @@ trait WsProxySpec
       .map { topicName =>
         if (prePopulate) {
           messageType match {
-            case AvroType =>
-              val msgs = createAvroMessagesForTypes(
-                keyType,
-                valType,
-                numMessages,
-                withHeaders
-              )
-              val _ = produceAndAssertAvro(
-                producerId = producerId,
-                instanceId = instanceId,
-                topic = topicName,
-                routes = wsRouteFromProducerContext,
-                keyType = keyType,
-                valType = valType,
-                messages = msgs,
-                kafkaCreds =
-                  if (secureKafka)
-                    Some(BasicHttpCredentials(kafkaUser, kafkaPass))
-                  else None
-              )(pctx.producerProbe)
-
             case JsonType =>
               val messages = createJsonMessages(
                 withKey = keyType.isDefined,
@@ -380,7 +325,7 @@ trait WsProxySpec
                   else None
               )(pctx.producerProbe)
 
-            case _ => fail("messageType must be one of JsonType or AvroType")
+            case _ => fail("messageType must be JsonType")
           }
         }
       }

@@ -13,7 +13,6 @@ import org.apache.pekko.http.scaladsl.testkit.{
 }
 import org.apache.pekko.testkit.TestDuration
 import net.scalytica.kafka.wsproxy.auth.OpenIdClient
-import net.scalytica.kafka.wsproxy.codecs.ProtocolSerdes
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.config.ReadableDynamicConfigHandlerRef
 import net.scalytica.kafka.wsproxy.session.SessionHandlerRef
@@ -26,8 +25,7 @@ import scala.concurrent.duration._
 trait WsClientSpec
     extends ScalatestRouteTest
     with TestServerRoutes
-    with Matchers
-    with ProtocolSerdes { self: Suite =>
+    with Matchers { self: Suite =>
 
   implicit private[this] val routeTestTimeout: RouteTestTimeout =
     RouteTestTimeout((20 seconds).dilated)

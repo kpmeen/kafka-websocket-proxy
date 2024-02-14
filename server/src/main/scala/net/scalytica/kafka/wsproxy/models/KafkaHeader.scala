@@ -2,7 +2,6 @@ package net.scalytica.kafka.wsproxy.models
 
 import java.nio.charset.StandardCharsets
 
-import net.scalytica.kafka.wsproxy.avro.SchemaTypes.KafkaMessageHeader
 import org.apache.kafka.common.header.Headers
 import org.apache.kafka.common.header.internals.RecordHeader
 
@@ -17,8 +16,6 @@ case class KafkaHeader(key: String, value: String) {
 }
 
 object KafkaHeader {
-
-  def fromAvro(h: KafkaMessageHeader): KafkaHeader = KafkaHeader(h.key, h.value)
 
   def fromKafkaRecordHeaders(headers: Headers): Option[Seq[KafkaHeader]] =
     Option(headers).map(_.iterator().asScala.toSeq).flatMap {

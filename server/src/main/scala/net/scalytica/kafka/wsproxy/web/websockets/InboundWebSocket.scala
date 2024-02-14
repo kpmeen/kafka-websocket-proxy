@@ -1,28 +1,21 @@
 package net.scalytica.kafka.wsproxy.web.websockets
 
+import io.circe.Decoder
 import org.apache.pekko.Done
-import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.{typed, ActorSystem}
 import org.apache.pekko.actor.typed.scaladsl.adapter._
 import org.apache.pekko.actor.typed.{ActorRef, Scheduler}
-import org.apache.pekko.http.scaladsl.model.ws.{
-  BinaryMessage,
-  Message,
-  TextMessage
-}
+import org.apache.pekko.http.scaladsl.model.ws.{Message, TextMessage}
 import org.apache.pekko.http.scaladsl.server.Directives._
 import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.Flow
-import org.apache.pekko.util.{ByteString, Timeout}
+import org.apache.pekko.util.Timeout
 import io.circe.Printer.noSpaces
 import io.circe.syntax._
 import net.scalytica.kafka.wsproxy._
 import net.scalytica.kafka.wsproxy.auth.{JwtValidationTickerFlow, OpenIdClient}
 import net.scalytica.kafka.wsproxy.codecs.Encoders._
-import net.scalytica.kafka.wsproxy.codecs.ProtocolSerdes.{
-  avroProducerRecordSerde,
-  avroProducerResultSerde
-}
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.config.ReadableDynamicConfigHandlerRef
 import net.scalytica.kafka.wsproxy.errors.{
@@ -36,7 +29,8 @@ import net.scalytica.kafka.wsproxy.models._
 import net.scalytica.kafka.wsproxy.producer.WsProducer
 import net.scalytica.kafka.wsproxy.session.SessionHandlerImplicits._
 import net.scalytica.kafka.wsproxy.session._
-import net.scalytica.kafka.wsproxy.web.SocketProtocol.{AvroPayload, JsonPayload}
+import net.scalytica.kafka.wsproxy.web.SocketProtocol.JsonPayload
+import org.apache.kafka.common.serialization.Serializer
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
@@ -83,7 +77,7 @@ trait InboundWebSocket extends ClientSpecificCfgLoader with WithProxyLogger {
       j.initProducerClientStatsActor(fullProducerId)
     }
     .getOrElse {
-      implicit val tas = as.toTyped
+      implicit val tas: typed.ActorSystem[_] = as.toTyped
       tas.ignoreRef[ProducerClientStatsCommand]
     }
 
@@ -142,8 +136,8 @@ trait InboundWebSocket extends ClientSpecificCfgLoader with WithProxyLogger {
       sessionHandler: ActorRef[SessionHandlerProtocol.SessionProtocol],
       jmxManager: Option[JmxManager]
   ): Route = {
-    implicit val scheduler   = as.toTyped.scheduler
-    implicit val cfg: AppCfg = applyDynamicConfigs(args)(appCfg)
+    implicit val scheduler: Scheduler = as.toTyped.scheduler
+    implicit val cfg: AppCfg          = applyDynamicConfigs(args)(appCfg)
 
     val serverId       = cfg.server.serverId
     val producerId     = args.producerId
@@ -224,7 +218,7 @@ trait InboundWebSocket extends ClientSpecificCfgLoader with WithProxyLogger {
   // scalastyle:on method.length
 
   // scalastyle:off method.length
-  def prepareInboundWebSocket(
+  private[this] def prepareInboundWebSocket(
       fullProducerId: FullProducerId,
       args: InSocketArgs
   )(terminateProducer: () => Future[Done])(
@@ -235,16 +229,18 @@ trait InboundWebSocket extends ClientSpecificCfgLoader with WithProxyLogger {
       maybeOpenIdClient: Option[OpenIdClient],
       jmxManager: Option[JmxManager]
   ): Route = {
-    val topicStr = args.topic.value
-    val keyTpe   = args.keyType.getOrElse(Formats.NoType)
-    val valTpe   = args.valType
+    val topicStr   = args.topic.value
+    val producerId = args.producerId
+    val keyTpe     = args.keyType.getOrElse(Formats.NoType)
+    val valTpe     = args.valType
 
-    implicit val keySer = keyTpe.serializer
-    implicit val valSer = valTpe.serializer
-    implicit val keyDec = keyTpe.decoder
-    implicit val valDec = valTpe.decoder
+    implicit val keySer: Serializer[keyTpe.Aux] = keyTpe.serializer
+    implicit val valSer: Serializer[valTpe.Aux] = valTpe.serializer
+    implicit val keyDec: Decoder[keyTpe.Aux]    = keyTpe.decoder
+    implicit val valDec: Decoder[valTpe.Aux]    = valTpe.decoder
 
-    implicit val statsActorRef = prepareJmx(fullProducerId)
+    implicit val statsActorRef: ActorRef[ProducerClientStatsCommand] =
+      prepareJmx(fullProducerId)
 
     // Init  monitoring flows
     val (jmxInFlow, jmxOutFlow) = jmxManager
@@ -257,18 +253,10 @@ trait InboundWebSocket extends ClientSpecificCfgLoader with WithProxyLogger {
           .produceJson[keyTpe.Aux, valTpe.Aux](args)
           .map(_.asJson.printWith(noSpaces))
           .map[Message](TextMessage.apply)
-
-      case AvroPayload =>
-        WsProducer
-          .produceAvro[keyTpe.Aux, valTpe.Aux](args)
-          .map(_.toAvro)
-          .map(avro => avroProducerResultSerde.serialize(topicStr, avro))
-          .map(ByteString.fromArray)
-          .map[Message](BinaryMessage.apply)
     }
 
     val jwtValidationFlow =
-      JwtValidationTickerFlow.flow[Message](args.producerId, args.bearerToken)
+      JwtValidationTickerFlow.flow[Message](producerId, args.bearerToken)
 
     handleWebSocketMessages {
       val flow = jwtValidationFlow via jmxInFlow via kafkaFlow via jmxOutFlow
@@ -280,8 +268,7 @@ trait InboundWebSocket extends ClientSpecificCfgLoader with WithProxyLogger {
           jmxManager.foreach(_.removeProducerConnection())
           log.debug(
             "Inbound WebSocket connection with clientId " +
-              s"${args.producerId.value} for topic ${args.topic.value} is " +
-              "terminated."
+              s"${producerId.value} for topic $topicStr is terminated."
           )
           done
         }

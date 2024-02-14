@@ -1,21 +1,17 @@
 package net.scalytica.kafka.wsproxy.codecs
 
-import java.util.{Map => JMap}
-
+import java.util.{Map => JMap, UUID}
 import io.circe.parser._
 import io.circe.{Json, Printer}
-import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
-  AvroCommit,
-  AvroConsumerRecord,
-  AvroProducerRecord,
-  AvroProducerResult
-}
 import org.apache.kafka.common.serialization.{
   Deserializer,
   Serde,
   Serdes => KSerdes,
   Serializer
 }
+import org.apache.kafka.common.utils.Bytes
+
+import java.nio.ByteBuffer
 
 /**
  * Definitions of most common primitive serializers and deserializers, plus a
@@ -23,74 +19,66 @@ import org.apache.kafka.common.serialization.{
  */
 object BasicSerdes {
 
-  implicit val EmptySerializer   = EmptySerde.serializer()
-  implicit val EmptyDeserializer = EmptySerde.deserializer()
+  implicit val EmptySerializer: Serializer[Unit]     = EmptySerde.serializer()
+  implicit val EmptyDeserializer: Deserializer[Unit] = EmptySerde.deserializer()
 
-  implicit val StringSerializer   = KSerdes.String().serializer()
-  implicit val StringDeserializer = KSerdes.String().deserializer()
+  implicit val StringSerializer: Serializer[String] =
+    KSerdes.String().serializer()
+  implicit val StringDeserializer: Deserializer[String] =
+    KSerdes.String().deserializer()
 
-  implicit val BytesSerializer   = KSerdes.Bytes().serializer()
-  implicit val BytesDeserializer = KSerdes.Bytes().deserializer()
+  implicit val BytesSerializer: Serializer[Bytes] = KSerdes.Bytes().serializer()
+  implicit val BytesDeserializer: Deserializer[Bytes] =
+    KSerdes.Bytes().deserializer()
 
-  implicit val ByteArrSerializer   = KSerdes.ByteArray().serializer()
-  implicit val ByteArrDeserializer = KSerdes.ByteArray().deserializer()
+  implicit val ByteArrSerializer: Serializer[Array[Byte]] =
+    KSerdes.ByteArray().serializer()
+  implicit val ByteArrDeserializer: Deserializer[Array[Byte]] =
+    KSerdes.ByteArray().deserializer()
 
-  implicit val ByteBufferSerializer   = KSerdes.ByteBuffer().serializer()
-  implicit val ByteBufferDeserializer = KSerdes.ByteBuffer().deserializer()
+  implicit val ByteBufferSerializer: Serializer[ByteBuffer] =
+    KSerdes.ByteBuffer().serializer()
+  implicit val ByteBufferDeserializer: Deserializer[ByteBuffer] =
+    KSerdes.ByteBuffer().deserializer()
 
-  implicit val UuidSerializer   = KSerdes.UUID().serializer()
-  implicit val UuidDeserializer = KSerdes.UUID().deserializer()
+  implicit val UuidSerializer: Serializer[UUID] = KSerdes.UUID().serializer()
+  implicit val UuidDeserializer: Deserializer[UUID] =
+    KSerdes.UUID().deserializer()
 
-  implicit val IntSerializer =
+  implicit val IntSerializer: Serializer[Int] =
     KSerdes.Integer().serializer().asInstanceOf[Serializer[Int]]
 
-  implicit val IntDeserializer =
+  implicit val IntDeserializer: Deserializer[Int] =
     KSerdes.Integer().deserializer().asInstanceOf[Deserializer[Int]]
 
-  implicit val ShortSerializer =
+  implicit val ShortSerializer: Serializer[Short] =
     KSerdes.Short().serializer().asInstanceOf[Serializer[Short]]
 
-  implicit val ShortDeserializer =
+  implicit val ShortDeserializer: Deserializer[Short] =
     KSerdes.Short().deserializer().asInstanceOf[Deserializer[Short]]
 
-  implicit val LongSerializer =
+  implicit val LongSerializer: Serializer[Long] =
     KSerdes.Long().serializer().asInstanceOf[Serializer[Long]]
 
-  implicit val LongDeserializer =
+  implicit val LongDeserializer: Deserializer[Long] =
     KSerdes.Long().deserializer().asInstanceOf[Deserializer[Long]]
 
-  implicit val DoubleSerializer =
+  implicit val DoubleSerializer: Serializer[Double] =
     KSerdes.Double().serializer().asInstanceOf[Serializer[Double]]
 
-  implicit val DoubleDeserializer =
+  implicit val DoubleDeserializer: Deserializer[Double] =
     KSerdes.Double().deserializer().asInstanceOf[Deserializer[Double]]
 
-  implicit val FloatSerializer =
+  implicit val FloatSerializer: Serializer[Float] =
     KSerdes.Float().serializer().asInstanceOf[Serializer[Float]]
 
-  implicit val FloatDeserializer =
+  implicit val FloatDeserializer: Deserializer[Float] =
     KSerdes.Float().deserializer().asInstanceOf[Deserializer[Float]]
 
-  implicit val JsonSerializer   = JsonSerde.serializer()
-  implicit val JsonDeserializer = JsonSerde.deserializer()
+  implicit val JsonSerializer: StringBasedSerde[Json] = JsonSerde.serializer()
+  implicit val JsonDeserializer: StringBasedSerde[Json] =
+    JsonSerde.deserializer()
 }
-
-trait ProtocolSerdes {
-
-  implicit val avroProducerRecordSerde: WsProxyAvroSerde[AvroProducerRecord] =
-    WsProxyAvroSerde[AvroProducerRecord]()
-
-  implicit val avroProducerResultSerde: WsProxyAvroSerde[AvroProducerResult] =
-    WsProxyAvroSerde[AvroProducerResult]()
-
-  implicit val avroConsumerRecordSerde: WsProxyAvroSerde[AvroConsumerRecord] =
-    WsProxyAvroSerde[AvroConsumerRecord]()
-
-  implicit val avroCommitSerde: WsProxyAvroSerde[AvroCommit] =
-    WsProxyAvroSerde[AvroCommit]()
-}
-
-object ProtocolSerdes extends ProtocolSerdes
 
 /**
  * Serde definition for cases where the incoming type is not defined. For

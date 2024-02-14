@@ -37,21 +37,7 @@ lazy val root = (project in file("."))
   .enablePlugins(DockerTasksPlugin)
   .settings(BaseSettings: _*)
   .settings(NoPublish)
-  .aggregate(avro, server)
-
-lazy val avro = (project in file("avro"))
-  .settings(BaseSettings: _*)
-  .settings(NoPublish)
-  .settings(resolvers ++= Dependencies.Resolvers)
-  .settings(scalastyleFailOnWarning := true)
-  .settings(
-    coverageExcludedPackages :=
-      """<empty>;net\.scalytica\.kafka\.wsproxy\.avro.*"""
-  )
-  .settings(libraryDependencies ++= Avro.All)
-  .settings(libraryDependencies += Testing.ScalaTest % Test)
-  .settings(libraryDependencies += Logging.Slf4jNop % Test)
-  .settings(dependencyOverrides ++= Overrides.Deps: _*)
+  .aggregate(server)
 
 lazy val server = (project in file("server"))
   .enablePlugins(
@@ -105,7 +91,6 @@ lazy val server = (project in file("server"))
     )
   )
   .settings(dependencyOverrides ++= Overrides.Deps: _*)
-  .dependsOn(avro)
 
 lazy val docs = (project in file("kafka-websocket-proxy-docs"))
   .enablePlugins(MdocPlugin, DocusaurusPlugin)

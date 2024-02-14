@@ -1,7 +1,6 @@
 package net.scalytica.kafka.wsproxy.models
 
 import org.apache.pekko.kafka.ProducerMessage
-import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroProducerResult
 import net.scalytica.kafka.wsproxy.errors.ImpossibleError
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 
@@ -25,24 +24,7 @@ case class WsProducerResult(
     offset: Long = 0,
     timestamp: Long = 0,
     clientMessageId: Option[String] = None
-) {
-
-  /**
-   * Converts this WsProducerResult into an [[AvroProducerResult]]
-   *
-   * @return
-   *   an instance of [[AvroProducerResult]]
-   */
-  def toAvro: AvroProducerResult = {
-    AvroProducerResult(
-      topic = topic,
-      partition = partition,
-      offset = offset,
-      timestamp = timestamp,
-      clientMessageId = clientMessageId
-    )
-  }
-}
+)
 
 object WsProducerResult extends WithProxyLogger {
 

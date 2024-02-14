@@ -7,8 +7,6 @@ import org.apache.pekko.http.scaladsl.model.headers.{
 }
 import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.http.scaladsl.testkit.WSProbe
-import org.apache.pekko.util.ByteString
-import net.scalytica.kafka.wsproxy.avro.SchemaTypes.AvroProducerRecord
 import net.scalytica.kafka.wsproxy.models.Formats._
 import net.scalytica.kafka.wsproxy.models.{
   TopicName,
@@ -16,7 +14,6 @@ import net.scalytica.kafka.wsproxy.models.{
   WsProducerInstanceId
 }
 import net.scalytica.kafka.wsproxy.web.SocketProtocol.{
-  AvroPayload,
   JsonPayload,
   SocketPayload
 }
@@ -159,56 +156,6 @@ trait WsProducerClientSpec extends WsClientSpec { self: Suite =>
           wsClient.expectCompletion()
         }
 
-        wsClient.succeed
-      } else {
-        isWebSocketUpgrade mustBe false
-        status mustBe StatusCodes.BadRequest
-      }
-    }
-  }
-
-  def produceAndAssertAvro(
-      producerId: WsProducerId,
-      instanceId: Option[WsProducerInstanceId],
-      topic: TopicName,
-      routes: Route,
-      keyType: Option[FormatType],
-      valType: FormatType,
-      messages: Seq[AvroProducerRecord],
-      validateMessageId: Boolean = false,
-      kafkaCreds: Option[BasicHttpCredentials] = None,
-      creds: Option[HttpCredentials] = None,
-      producerUri: Option[String] = None
-  )(
-      implicit wsClient: WSProbe
-  ): Assertion = {
-    val uri = producerUri.getOrElse {
-      baseProducerUri(
-        producerId = producerId,
-        instanceId = instanceId,
-        topicName = Some(topic),
-        payloadType = AvroPayload,
-        keyType = keyType.getOrElse(NoType),
-        valType = valType
-      )
-    }
-
-    inspectWebSocket(
-      uri = uri,
-      routes = routes,
-      kafkaCreds = kafkaCreds,
-      creds = creds
-    ) {
-      if (isProducerUrlValid(uri)) {
-        isWebSocketUpgrade mustBe true
-
-        forAll(messages) { msg =>
-          val bytes = avroProducerRecordSerde.serialize(msg)
-          wsClient.sendMessage(ByteString(bytes))
-          wsClient.expectWsProducerResultAvro(topic, validateMessageId)
-        }
-        wsClient.sendCompletion()
-        wsClient.expectCompletion()
         wsClient.succeed
       } else {
         isWebSocketUpgrade mustBe false

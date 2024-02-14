@@ -1,12 +1,6 @@
 package net.scalytica.kafka.wsproxy.models
 
 import org.apache.pekko.kafka.ConsumerMessage
-import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
-  AvroConsumerRecord,
-  AvroValueTypesCoproduct,
-  KafkaMessageHeader
-}
-import net.scalytica.kafka.wsproxy.models.Formats.{ByteArrayType, FormatType}
 import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails
 
 /**
@@ -15,7 +9,7 @@ import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails
  * defined key of type {{{K}}} _and_ a value of type {{{V}}}. And records that
  * only contain a value of type {{{V}}}.
  *
- * @param key
+ * @param maybeKey
  *   The [[OutValueDetails]] describing the message key
  * @param value
  *   The [[OutValueDetails]] describing the message value
@@ -25,7 +19,7 @@ import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails
  *   the type of the value
  */
 sealed abstract class WsConsumerRecord[+K, +V](
-    key: Option[OutValueDetails[K]],
+    maybeKey: Option[OutValueDetails[K]],
     value: OutValueDetails[V]
 ) {
 
@@ -39,73 +33,20 @@ sealed abstract class WsConsumerRecord[+K, +V](
   lazy val wsProxyMessageId: WsMessageId =
     WsMessageId(topic, partition, offset, timestamp)
 
-  private[this] def asCoproduct[T](
-      d: OutValueDetails[T]
-  ): Option[AvroValueTypesCoproduct] = {
-    d.format.flatMap { fmt =>
-      val x = d.value.asInstanceOf[fmt.Tpe]
-      fmt.toCoproduct(x)
-    }
-  }
-
-  def toAvroRecord[Key >: K, Value >: V]: AvroConsumerRecord = {
-    val k = key.flatMap(asCoproduct)
-    val v = asCoproduct(value).getOrElse {
-      ByteArrayType.anyToCoproduct(value.value)
-    }
-
-    AvroConsumerRecord(
-      wsProxyMessageId = wsProxyMessageId.value,
-      topic = topic.value,
-      partition = partition.value,
-      offset = offset.value,
-      timestamp = timestamp.value,
-      headers = headers.map(_.map(h => KafkaMessageHeader(h.key, h.value))),
-      key = k,
-      value = v
-    )
-  }
-
   def withKeyFormatType(keyType: Formats.FormatType): WsConsumerRecord[K, V]
   def withValueFormatType(valType: Formats.FormatType): WsConsumerRecord[K, V]
-}
 
-object WsConsumerRecord {
-
-  def fromAvro[K, V](
-      avro: AvroConsumerRecord
-  )(
-      keyFormatType: FormatType,
-      valFormatType: FormatType
-  ): WsConsumerRecord[K, V] = {
-    val v: V = valFormatType.unsafeFromCoproduct[V](avro.value)
-    avro.key match {
-      case Some(key) =>
-        val k: K = keyFormatType.unsafeFromCoproduct[K](key)
-        ConsumerKeyValueRecord[K, V](
-          topic = TopicName(avro.topic),
-          partition = Partition(avro.partition),
-          offset = Offset(avro.offset),
-          timestamp = Timestamp(avro.timestamp),
-          headers = avro.headers.map(_.map(KafkaHeader.fromAvro)),
-          key = OutValueDetails(k, Option(keyFormatType)),
-          value = OutValueDetails(v, Option(valFormatType)),
-          committableOffset = None
-        )
-
-      case None =>
-        ConsumerValueRecord[V](
-          topic = TopicName(avro.topic),
-          partition = Partition(avro.partition),
-          offset = Offset(avro.offset),
-          timestamp = Timestamp(avro.timestamp),
-          value = OutValueDetails(v, Option(valFormatType)),
-          headers = avro.headers.map(_.map(KafkaHeader.fromAvro)),
-          committableOffset = None
-        )
-    }
-  }
-
+  override def toString: String =
+    "WsConsumerRecord(" +
+      s"  maybeKey=${maybeKey.map(_.toString).getOrElse("")}" +
+      s"  value=${value.toString}" +
+      s"  topic=${topic.value}," +
+      s"  partition=${partition.value}," +
+      s"  timestamp=${timestamp.value}," +
+      s"  headers=[${headers.map(_.mkString(", ")).getOrElse("")}]," +
+      s"  committableOffset=${committableOffset.getOrElse("")}," +
+      s"  wsProxyMessageId=$wsProxyMessageId" +
+      ")"
 }
 
 /**
@@ -121,7 +62,7 @@ object WsConsumerRecord {
  *   The timestamp for when Kafka received the record
  * @param headers
  *   The [[KafkaHeader]] s found on the message.
- * @param key
+ * @param maybeKey
  *   The [[OutValueDetails]] for the message key
  * @param value
  *   The [[OutValueDetails]] for the message value

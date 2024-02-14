@@ -5,21 +5,15 @@ import org.apache.pekko.http.scaladsl.model._
 import org.apache.pekko.http.scaladsl.server.Directives._
 import org.apache.pekko.http.scaladsl.server._
 import net.scalytica.kafka.wsproxy.auth.OpenIdClient
-import net.scalytica.kafka.wsproxy.avro.SchemaTypes.{
-  AvroCommit,
-  AvroConsumerRecord,
-  AvroProducerRecord,
-  AvroProducerResult
-}
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
-import org.apache.avro.Schema
 
 trait SchemaRoutes { self: BaseRoutes =>
 
-  private[this] def avroSchemaString(schema: Schema): ToResponseMarshallable = {
+  private[this] def avroNotAvailable(): ToResponseMarshallable = {
     HttpEntity(
       contentType = ContentTypes.`application/json`,
-      string = schema.toString(true)
+      string =
+        "Kafka WebSocket Proxy does not implement an Avro protocol any more."
     )
   }
 
@@ -34,21 +28,21 @@ trait SchemaRoutes { self: BaseRoutes =>
             pathPrefix("producer") {
               path("record") {
                 get {
-                  complete(avroSchemaString(AvroProducerRecord.schema))
+                  complete(avroNotAvailable())
                 }
               } ~ path("result") {
                 get {
-                  complete(avroSchemaString(AvroProducerResult.schema))
+                  complete(avroNotAvailable())
                 }
               }
             } ~ pathPrefix("consumer") {
               path("record") {
                 get {
-                  complete(avroSchemaString(AvroConsumerRecord.schema))
+                  complete(avroNotAvailable())
                 }
               } ~ path("commit") {
                 get {
-                  complete(avroSchemaString(AvroCommit.schema))
+                  complete(avroNotAvailable())
                 }
               }
             }
