@@ -122,7 +122,9 @@ trait WsReusableProxyKafkaFixture {
       proxyContext.stop()
 
       res
-    }(kafkaContext.kafkaConfig)
+    }(kafkaContext.kafkaConfig).recover { case t: Throwable =>
+      fail(t)
+    }
   }
 
   def withProducerContext[T](

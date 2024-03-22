@@ -63,7 +63,7 @@ they are enabled, will be exposed on a separate port number.
 
 ## Internal Dynamic Configuration Handler
 
-The `kafka-websocket-proxy` can be configured to enable dynamically set client
+The `kafka-websocket-proxy` can be configured to allow dynamically setting client
 specific configurations. To ensure that the configurations are distributed to
 all instances in a multi-node deployment, the dynamic configurations are written
 to a dedicated compacted topic in Kafka. Each instance keeps track of the

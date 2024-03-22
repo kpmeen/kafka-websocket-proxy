@@ -175,7 +175,22 @@ All HTTP endpoints support the following headers:
 > is configured to use SSL/TLS. This is because header credentials are
 > transferred in plain text, as for regular HTTP basic authentication.
 
-### `/kafka/cluster/info`
+
+### GET `/healthcheck`
+
+Simple endpoint to see if the service is up and running. It _does not_ verify
+connectivity with the Kafka brokers. If this is necessary, use the
+`/kafka/cluster/info` endpoint.
+
+##### Output
+
+```json
+{ "response": "I'm healthy" }
+```
+
+## Admin Server HTTP API
+
+### GET `/admin/kafka/info`
 
 This is a convenience endpoint to verify that the service can access the brokers
 in the cluster.
@@ -206,14 +221,216 @@ in the cluster.
 
 ```
 
-### `/healthcheck`
+### GET `/admin/client/config`
 
-Simple endpoint to see if the service is up and running. It _does not_ verify
-connectivity with the Kafka brokers. If this is necessary, use the
-`/kafka/cluster/info` endpoint.
+By default, this endpoint will return all static client configurations for all known clients. Static
+configurations are defined in the config file when starting the Kafka WebSocket Proxy.
+
+When `kafka.ws.proxy.dynamic-config-handler.enabled` is set to `true`, this endpoint will also include
+any client configurations that are dynamically set through the `PUT /admin/client/config/consumer/<consumer groupId>`
+or `PUT /admin/client/config/producer/<producer clientId>`.
 
 ##### Output
 
 ```json
-{ "response": "I'm healthy" }
+{
+  "consumers" : {
+    "static" : [
+      {
+        "batch-size" : 0,
+        "group-id" : "__DEFAULT__",
+        "max-connections" : 0,
+        "messages-per-second" : 0
+      },
+      {
+        "group-id" : "consumer-group-2",
+        "max-connections" : 2,
+        "messages-per-second" : 10
+      }
+    ],
+    "dynamic" : [
+      {
+        "group-id" : "consumer-group-1",
+        "max-connections" : 4,
+        "messages-per-second" : 400
+      }
+    ]
+  },
+  "producers" : {
+    "static" : [
+      {
+        "max-connections" : 0,
+        "messages-per-second" : 0,
+        "producer-id" : "__DEFAULT__"
+      },
+      {
+        "max-connections" : 1,
+        "messages-per-second" : 10,
+        "producer-id" : "producer-1"
+      }
+    ],
+    "dynamic" : [
+      {
+        "max-connections" : 4,
+        "messages-per-second" : 400,
+        "producer-id" : "producer-2"
+      }
+    ]
+  }
+}
 ```
+
+### DELETE `/admin/client/config`
+
+WARNING: With great power comes great responsibility! This endpoint will delete _ALL_ dynamic configurations that
+have been added through the endpoints below.
+
+Any statically defined configurations will remain untouched.
+
+##### Output
+
+* Returns HTTP `200` when successfully deleted.
+
+
+### GET `/admin/client/config/consumer/<consumer groupId>`
+
+Retrieves the proxy specific configuration that is being used for a given consumer group.
+
+##### Output
+
+```json
+{
+  "group-id": "test-consumer-2",
+  "max-connections": 3,
+  "messages-per-second": 300,
+  "batch-size" : 100
+}
+```
+
+### POST `/admin/client/config/consumer/<consumer groupId>`
+
+Adds a proxy specific configuration to the given consumer group.
+Note that the JSON structure to send as input must match the JSON being returned
+from the `GET` endpoint described above.
+
+##### Input
+
+```json
+{
+  "group-id" : "test-consumer-2",
+  "max-connections" : 5,
+  "messages-per-second" : 300,
+  "batch-size" : 100
+}
+```
+
+##### Output
+
+* Returns HTTP `200` when successfully added.
+* Returns HTTP `404` if there is no such dynamic consumer group configuration.
+
+
+
+### PUT `/admin/client/config/consumer/<consumer groupId>`
+
+Updates the proxy specific configuration that is being used for a given consumer group.
+Note that the JSON structure to send as input must match the JSON being returned
+from the `GET` endpoint described above.
+
+##### Input
+
+```json
+{
+  "group-id" : "test-consumer-2",
+  "max-connections" : 5,
+  "messages-per-second" : 300,
+  "batch-size" : 100
+}
+```
+
+##### Output
+
+* Returns HTTP `200` when successfully updated.
+* Returns HTTP `404` if there is no such dynamic consumer group configuration.
+
+
+### DELETE `/admin/client/config/consumer/<consumer groupId>`
+
+Deletes the proxy specific _dynamic_ configuration that is being used for a given consumer group. If there is no
+dynamic configuration set for the consumer group, nothing is deleted.
+
+##### Output
+
+* Returns HTTP `200` when successfully deleted.
+* Returns HTTP `404` if there is no such dynamic consumer group configuration.
+
+
+### GET `/admin/client/config/producer/<producer clientId>`
+
+Retrieves the proxy specific configuration that is being used for producer instances with the given id.
+
+##### Output
+
+```json
+{
+  "max-connections" : 3,
+  "messages-per-second" : 300,
+  "producer-id" : "test-producer-2"
+}
+```
+
+
+### POST `/admin/client/config/producer/<producer clientId>`
+
+Adds a proxy specific configuration to all producer instances with the given producer client id.
+Note that the JSON structure to send as input must match the JSON being returned
+from the `GET` endpoint described above.
+
+##### Input
+
+```json
+{
+  "max-connections" : 3,
+  "messages-per-second" : 300,
+  "producer-id" : "test-producer-2"
+}
+```
+
+##### Output
+
+* Returns HTTP `200` when successfully deleted.
+* Returns HTTP `404` if there is no such dynamic producer configuration.
+
+
+### PUT `/admin/client/config/producer/<producer clientId>`
+
+Updates the proxy specific configuration that is being used for producer instances with the given id.
+Note that the JSON structure to send as input must match the JSON being returned
+from the `GET` endpoint described above.
+
+##### Input
+
+```json
+{
+  "max-connections" : 3,
+  "messages-per-second" : 300,
+  "producer-id" : "test-producer-2"
+}
+```
+
+##### Output
+
+* Returns HTTP `200` when successfully deleted.
+* Returns HTTP `404` if there is no such dynamic producer configuration.
+
+
+### DELETE `/admin/client/config/producer/<producer clientId>`
+
+Deletes the proxy specific _dynamic_ configuration that is being used for producer instances with the given id.
+If there is no dynamic configuration set for the producer, nothing is deleted.
+
+##### Output
+
+* Returns HTTP `200` when successfully deleted.
+* Returns HTTP `404` if there is no such dynamic producer configuration.
+

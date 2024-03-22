@@ -3,6 +3,7 @@ package net.scalytica.kafka.wsproxy.web
 import io.circe.parser._
 import io.circe.syntax._
 import io.circe.{ACursor, HCursor, Json}
+import net.scalytica.kafka.wsproxy.auth.AccessToken
 import net.scalytica.kafka.wsproxy.codecs.Decoders.{
   brokerInfoDecoder,
   dynamicCfgDecoder
@@ -43,10 +44,8 @@ class AdminRoutesOpenIdSpec
 
   override protected val testTopicPrefix: String = "admin-openid-test-topic"
 
-//  override protected lazy val secureKafka: Boolean = false
-
   implicit override val patienceConfig: PatienceConfig =
-    PatienceConfig(timeout = Span(2, Minutes))
+    PatienceConfig(timeout = Span(3, Minutes))
 
   implicit val timeout: RouteTestTimeout = RouteTestTimeout(20 seconds)
 
@@ -167,48 +166,56 @@ class AdminRoutesOpenIdSpec
 
   private[this] def postConfig(
       uri: String,
+      token: AccessToken,
       conf: DynamicCfg,
       route: Route
   ): Assertion = {
     val json   = (conf: DynamicCfg).asJson.spaces2
     val entity = HttpEntity(ContentTypes.`application/json`, json)
 
-    Post(uri, entity) ~> route ~> check {
+    Post(uri, entity) ~> addCredentials(token.bearerToken) ~> route ~> check {
       status mustBe OK
       responseEntity.contentType mustBe `application/json`
     }
   }
 
-  private[this] def assertPostConsumerConfig(conf: DynamicCfg, route: Route) = {
-    postConfig("/admin/client/config/consumer", conf, route)
-  }
-
-  private[this] def assertPostProducerConfig(
+  private[this] def assertPostConsumerConfig(
+      token: AccessToken,
       conf: DynamicCfg,
       route: Route
   ) = {
-    postConfig("/admin/client/config/producer", conf, route)
+    postConfig("/admin/client/config/consumer", token, conf, route)
+  }
+
+  private[this] def assertPostProducerConfig(
+      token: AccessToken,
+      conf: DynamicCfg,
+      route: Route
+  ) = {
+    postConfig("/admin/client/config/producer", token, conf, route)
   }
 
   private[this] def assertPostNConsumerConfigs(
       num: Int,
+      token: AccessToken,
       route: Route
   ): Seq[DynamicCfg] = {
     val cfgs = (1 to num).map { i =>
       createConsumerCfg(s"test-consumer-$i", Some(num * 100), Some(num))
     }
-    forAll(cfgs)(c => assertPostConsumerConfig(c, route))
+    forAll(cfgs)(c => assertPostConsumerConfig(token, c, route))
     cfgs
   }
 
   private[this] def assertPostNProducerConfigs(
       num: Int,
+      token: AccessToken,
       route: Route
   ): Seq[DynamicCfg] = {
     val cfgs = (1 to 10).map { i =>
       createProducerCfg(s"test-producer-$i", Some(num * 100), Some(num))
     }
-    forAll(cfgs)(c => assertPostProducerConfig(c, route))
+    forAll(cfgs)(c => assertPostProducerConfig(token, c, route))
     cfgs
   }
 
@@ -399,59 +406,63 @@ class AdminRoutesOpenIdSpec
       "successfully add a new dynamic consumer client config" in
         withOpenIdConnectServerAndToken(useJwtCreds = false) {
           case (_, _, oidcClient, oidcCfg, token) =>
-            withAdminContext(optOpenIdCfg = Option(oidcCfg)) {
-              case (_, cfg, sessionRef, dynCfgRef, _) =>
-                val route =
-                  Route.seal(
-                    adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
-                  )
-                val cconf = createConsumerCfg("my-consumer", Some(10), Some(2))
+            withAdminContext(
+              useDynamicConfigs = true,
+              optOpenIdCfg = Option(oidcCfg)
+            ) { case (_, cfg, sessionRef, dynCfgRef, _) =>
+              val route =
+                Route.seal(
+                  adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
+                )
+              val cconf = createConsumerCfg("my-consumer", Some(10), Some(2))
 
-                assertPostConsumerConfig(cconf, route)
+              assertPostConsumerConfig(token, cconf, route)
 
-                eventually {
-                  Get("/admin/client/config/consumer/my-consumer") ~>
-                    addCredentials(token.bearerToken) ~>
-                    route ~>
-                    check {
-                      status mustBe OK
-                      responseEntity.contentType mustBe `application/json`
-                      val resStr = responseAs[String]
-                      val res =
-                        parse(resStr).rightValue.as[DynamicCfg].rightValue
-                      assertConsumerConfig(cconf, res)
-                    }
-                }
+              eventually {
+                Get("/admin/client/config/consumer/my-consumer") ~>
+                  addCredentials(token.bearerToken) ~>
+                  route ~>
+                  check {
+                    status mustBe OK
+                    responseEntity.contentType mustBe `application/json`
+                    val resStr = responseAs[String]
+                    val res =
+                      parse(resStr).rightValue.as[DynamicCfg].rightValue
+                    assertConsumerConfig(cconf, res)
+                  }
+              }
             }
         }
 
       "successfully add a new dynamic producer client config" in
         withOpenIdConnectServerAndToken(useJwtCreds = false) {
           case (_, _, oidcClient, oidcCfg, token) =>
-            withAdminContext(optOpenIdCfg = Option(oidcCfg)) {
-              case (_, cfg, sessionRef, dynCfgRef, _) =>
-                val route =
-                  Route.seal(
-                    adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
-                  )
-                val pconf =
-                  createProducerCfg("my-producer-1", Some(10), Some(2))
+            withAdminContext(
+              useDynamicConfigs = true,
+              optOpenIdCfg = Option(oidcCfg)
+            ) { case (_, cfg, sessionRef, dynCfgRef, _) =>
+              val route =
+                Route.seal(
+                  adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
+                )
+              val pconf =
+                createProducerCfg("my-producer-1", Some(10), Some(2))
 
-                assertPostProducerConfig(pconf, route)
+              assertPostProducerConfig(token, pconf, route)
 
-                eventually {
-                  Get("/admin/client/config/producer/my-producer-1") ~>
-                    addCredentials(token.bearerToken) ~>
-                    route ~>
-                    check {
-                      status mustBe OK
-                      responseEntity.contentType mustBe `application/json`
-                      val resStr = responseAs[String]
-                      val res =
-                        parse(resStr).rightValue.as[DynamicCfg].rightValue
-                      assertProducerConfig(pconf, res)
-                    }
-                }
+              eventually {
+                Get("/admin/client/config/producer/my-producer-1") ~>
+                  addCredentials(token.bearerToken) ~>
+                  route ~>
+                  check {
+                    status mustBe OK
+                    responseEntity.contentType mustBe `application/json`
+                    val resStr = responseAs[String]
+                    val res =
+                      parse(resStr).rightValue.as[DynamicCfg].rightValue
+                    assertProducerConfig(pconf, res)
+                  }
+              }
             }
 
         }
@@ -459,452 +470,470 @@ class AdminRoutesOpenIdSpec
       "successfully return all static and dynamic client configs" in
         withOpenIdConnectServerAndToken(useJwtCreds = false) {
           case (_, _, oidcClient, oidcCfg, token) =>
-            withAdminContext(optOpenIdCfg = Option(oidcCfg)) {
-              case (_, cfg, sessionRef, dynCfgRef, _) =>
-                val route =
-                  Route.seal(
-                    adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
-                  )
+            withAdminContext(
+              useDynamicConfigs = true,
+              optOpenIdCfg = Option(oidcCfg)
+            ) { case (_, cfg, sessionRef, dynCfgRef, _) =>
+              val route =
+                Route.seal(
+                  adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
+                )
 
-                val expDynConsCfgs = assertPostNConsumerConfigs(4, route)
-                val expDynProdCfgs = assertPostNProducerConfigs(4, route)
+              val expDynConsCfgs = assertPostNConsumerConfigs(4, token, route)
+              val expDynProdCfgs = assertPostNProducerConfigs(4, token, route)
 
-                eventually {
-                  Get("/admin/client/config") ~>
-                    addCredentials(token.bearerToken) ~>
-                    route ~> check {
-                      status mustBe OK
-                      responseEntity.contentType mustBe `application/json`
-                      val resStr = responseAs[String]
-                      val json   = parse(resStr).rightValue
-                      val cursor = json.hcursor
+              eventually {
+                Get("/admin/client/config") ~>
+                  addCredentials(token.bearerToken) ~>
+                  route ~> check {
+                    status mustBe OK
+                    responseEntity.contentType mustBe `application/json`
+                    val resStr = responseAs[String]
+                    val json   = parse(resStr).rightValue
+                    val cursor = json.hcursor
 
-                      assertAllStaticConfigs(cursor)
-                      assertAllDynamicConfigs(
-                        expected = expDynConsCfgs,
-                        cursor =
-                          cursor.downField("consumers").downField("dynamic")
-                      )
-                      assertAllDynamicConfigs(
-                        expected = expDynProdCfgs,
-                        cursor =
-                          cursor.downField("producers").downField("dynamic")
-                      )
-                    }
-                }
+                    assertAllStaticConfigs(cursor)
+                    assertAllDynamicConfigs(
+                      expected = expDynConsCfgs,
+                      cursor =
+                        cursor.downField("consumers").downField("dynamic")
+                    )
+                    assertAllDynamicConfigs(
+                      expected = expDynProdCfgs,
+                      cursor =
+                        cursor.downField("producers").downField("dynamic")
+                    )
+                  }
+              }
             }
         }
 
       "successfully return a specific dynamic consumer client config" in
         withOpenIdConnectServerAndToken(useJwtCreds = false) {
           case (_, _, oidcClient, oidcCfg, token) =>
-            withAdminContext(optOpenIdCfg = Option(oidcCfg)) {
-              case (_, cfg, sessionRef, dynCfgRef, _) =>
-                val route =
-                  Route.seal(
-                    adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
-                  )
-                val expDynConsCfgs = assertPostNConsumerConfigs(3, route)
-                val exp =
-                  expDynConsCfgs.tail.head
-                    .asInstanceOf[ConsumerSpecificLimitCfg]
+            withAdminContext(
+              useDynamicConfigs = true,
+              optOpenIdCfg = Option(oidcCfg)
+            ) { case (_, cfg, sessionRef, dynCfgRef, _) =>
+              val route =
+                Route.seal(
+                  adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
+                )
+              val expDynConsCfgs = assertPostNConsumerConfigs(3, token, route)
+              val exp =
+                expDynConsCfgs.tail.head.asInstanceOf[ConsumerSpecificLimitCfg]
 
-                eventually {
-                  Get(s"/admin/client/config/consumer/${exp.id}") ~>
-                    addCredentials(token.bearerToken) ~>
-                    route ~>
-                    check {
-                      status mustBe OK
-                      responseEntity.contentType mustBe `application/json`
-                      val resStr = responseAs[String]
-                      val res =
-                        parse(resStr).rightValue.as[DynamicCfg].rightValue
-                      assertConsumerConfig(exp, res)
-                    }
-                }
+              eventually {
+                Get(s"/admin/client/config/consumer/${exp.id}") ~>
+                  addCredentials(token.bearerToken) ~>
+                  route ~>
+                  check {
+                    status mustBe OK
+                    responseEntity.contentType mustBe `application/json`
+                    val resStr = responseAs[String]
+                    val res =
+                      parse(resStr).rightValue.as[DynamicCfg].rightValue
+                    assertConsumerConfig(exp, res)
+                  }
+              }
             }
         }
 
       "successfully return a specific static consumer client config" in
         withOpenIdConnectServerAndToken(useJwtCreds = false) {
           case (_, _, oidcClient, oidcCfg, token) =>
-            withAdminContext(optOpenIdCfg = Option(oidcCfg)) {
-              case (_, cfg, sessionRef, dynCfgRef, _) =>
-                Get("/admin/client/config/consumer/dummy") ~>
-                  addCredentials(token.bearerToken) ~>
-                  Route.seal(
-                    adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
-                  ) ~>
-                  check {
-                    status mustBe OK
-                    responseEntity.contentType mustBe `application/json`
-                    val resStr = responseAs[String]
-                    val res = parse(resStr).rightValue.as[DynamicCfg].rightValue
-                    assertConsumerConfig(expStaticCons2, res)
-                  }
+            withAdminContext(
+              useDynamicConfigs = true,
+              optOpenIdCfg = Option(oidcCfg)
+            ) { case (_, cfg, sessionRef, dynCfgRef, _) =>
+              Get("/admin/client/config/consumer/dummy") ~>
+                addCredentials(token.bearerToken) ~>
+                Route.seal(
+                  adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
+                ) ~>
+                check {
+                  status mustBe OK
+                  responseEntity.contentType mustBe `application/json`
+                  val resStr = responseAs[String]
+                  val res = parse(resStr).rightValue.as[DynamicCfg].rightValue
+                  assertConsumerConfig(expStaticCons2, res)
+                }
             }
         }
 
       "successfully return a specific dynamic producer client config" in
         withOpenIdConnectServerAndToken(useJwtCreds = false) {
           case (_, _, oidcClient, oidcCfg, token) =>
-            withAdminContext(optOpenIdCfg = Option(oidcCfg)) {
-              case (_, cfg, sessionRef, dynCfgRef, _) =>
-                val route =
-                  Route.seal(
-                    adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
-                  )
-                val expDynProdCfgs = assertPostNProducerConfigs(3, route)
-                val exp =
-                  expDynProdCfgs.tail.head
-                    .asInstanceOf[ProducerSpecificLimitCfg]
+            withAdminContext(
+              useDynamicConfigs = true,
+              optOpenIdCfg = Option(oidcCfg)
+            ) { case (_, cfg, sessionRef, dynCfgRef, _) =>
+              val route =
+                Route.seal(
+                  adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
+                )
+              val expDynProdCfgs = assertPostNProducerConfigs(3, token, route)
+              val exp =
+                expDynProdCfgs.tail.head.asInstanceOf[ProducerSpecificLimitCfg]
 
-                eventually {
-                  Get(s"/admin/client/config/producer/${exp.id}") ~>
-                    addCredentials(token.bearerToken) ~>
-                    route ~>
-                    check {
-                      status mustBe OK
-                      responseEntity.contentType mustBe `application/json`
-                      val resStr = responseAs[String]
-                      val res =
-                        parse(resStr).rightValue.as[DynamicCfg].rightValue
-                      assertProducerConfig(exp, res)
-                    }
-                }
+              eventually {
+                Get(s"/admin/client/config/producer/${exp.id}") ~>
+                  addCredentials(token.bearerToken) ~>
+                  route ~>
+                  check {
+                    status mustBe OK
+                    responseEntity.contentType mustBe `application/json`
+                    val resStr = responseAs[String]
+                    val res =
+                      parse(resStr).rightValue.as[DynamicCfg].rightValue
+                    assertProducerConfig(exp, res)
+                  }
+              }
             }
         }
 
       "successfully return a specific static producer client config" in
         withOpenIdConnectServerAndToken(useJwtCreds = false) {
           case (_, _, oidcClient, oidcCfg, token) =>
-            withAdminContext(optOpenIdCfg = Option(oidcCfg)) {
-              case (_, cfg, sessionRef, dynCfgRef, _) =>
-                Get("/admin/client/config/producer/limit-test-producer-2") ~>
-                  addCredentials(token.bearerToken) ~>
-                  Route.seal(
-                    adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
-                  ) ~>
-                  check {
-                    status mustBe OK
-                    responseEntity.contentType mustBe `application/json`
-                    val resStr = responseAs[String]
-                    val res = parse(resStr).rightValue.as[DynamicCfg].rightValue
-                    assertProducerConfig(expStaticProd3, res)
-                  }
+            withAdminContext(
+              useDynamicConfigs = true,
+              optOpenIdCfg = Option(oidcCfg)
+            ) { case (_, cfg, sessionRef, dynCfgRef, _) =>
+              Get("/admin/client/config/producer/limit-test-producer-2") ~>
+                addCredentials(token.bearerToken) ~>
+                Route.seal(
+                  adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
+                ) ~>
+                check {
+                  status mustBe OK
+                  responseEntity.contentType mustBe `application/json`
+                  val resStr = responseAs[String]
+                  val res = parse(resStr).rightValue.as[DynamicCfg].rightValue
+                  assertProducerConfig(expStaticProd3, res)
+                }
             }
         }
 
       "successfully update an existing dynamic consumer client config" in
         withOpenIdConnectServerAndToken(useJwtCreds = false) {
           case (_, _, oidcClient, oidcCfg, token) =>
-            withAdminContext(optOpenIdCfg = Option(oidcCfg)) {
-              case (_, cfg, sessionRef, dynCfgRef, _) =>
-                val route =
-                  Route.seal(
-                    adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
-                  )
-                val expDynConsCfgs = assertPostNConsumerConfigs(3, route)
-                val exp =
-                  expDynConsCfgs.tail.head
-                    .asInstanceOf[ConsumerSpecificLimitCfg]
+            withAdminContext(
+              useDynamicConfigs = true,
+              optOpenIdCfg = Option(oidcCfg)
+            ) { case (_, cfg, sessionRef, dynCfgRef, _) =>
+              val route =
+                Route.seal(
+                  adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
+                )
+              val expDynConsCfgs = assertPostNConsumerConfigs(3, token, route)
+              val exp =
+                expDynConsCfgs.tail.head.asInstanceOf[ConsumerSpecificLimitCfg]
 
-                eventually {
-                  Get(s"/admin/client/config/consumer/${exp.id}") ~>
-                    addCredentials(token.bearerToken) ~>
-                    route ~>
-                    check {
-                      status mustBe OK
-                      responseEntity.contentType mustBe `application/json`
-                      val resStr = responseAs[String]
-                      val res =
-                        parse(resStr).rightValue.as[DynamicCfg].rightValue
-                      assertConsumerConfig(exp, res)
-                    }
-                }
-
-                val upd     = exp.copy(maxConnections = Some(5))
-                val updJson = (upd: DynamicCfg).asJson.spaces2
-
-                Put(s"/admin/client/config/consumer/${exp.id}", updJson) ~>
+              eventually {
+                Get(s"/admin/client/config/consumer/${exp.id}") ~>
                   addCredentials(token.bearerToken) ~>
                   route ~>
                   check {
                     status mustBe OK
                     responseEntity.contentType mustBe `application/json`
+                    val resStr = responseAs[String]
+                    val res =
+                      parse(resStr).rightValue.as[DynamicCfg].rightValue
+                    assertConsumerConfig(exp, res)
                   }
+              }
 
-                eventually {
-                  Get(s"/admin/client/config/consumer/${exp.id}") ~>
-                    addCredentials(token.bearerToken) ~>
-                    route ~>
-                    check {
-                      status mustBe OK
-                      responseEntity.contentType mustBe `application/json`
-                      val resStr = responseAs[String]
-                      val res =
-                        parse(resStr).rightValue.as[DynamicCfg].rightValue
-                      assertConsumerConfig(upd, res)
-                    }
+              val upd     = exp.copy(maxConnections = Some(5))
+              val updJson = (upd: DynamicCfg).asJson.spaces2
+
+              Put(s"/admin/client/config/consumer/${exp.id}", updJson) ~>
+                addCredentials(token.bearerToken) ~>
+                route ~>
+                check {
+                  status mustBe OK
+                  responseEntity.contentType mustBe `application/json`
                 }
+
+              eventually {
+                Get(s"/admin/client/config/consumer/${exp.id}") ~>
+                  addCredentials(token.bearerToken) ~>
+                  route ~>
+                  check {
+                    status mustBe OK
+                    responseEntity.contentType mustBe `application/json`
+                    val resStr = responseAs[String]
+                    val res =
+                      parse(resStr).rightValue.as[DynamicCfg].rightValue
+                    assertConsumerConfig(upd, res)
+                  }
+              }
             }
         }
 
       "successfully update an existing dynamic producer client config" in
         withOpenIdConnectServerAndToken(useJwtCreds = false) {
           case (_, _, oidcClient, oidcCfg, token) =>
-            withAdminContext(optOpenIdCfg = Option(oidcCfg)) {
-              case (_, cfg, sessionRef, dynCfgRef, _) =>
-                val route =
-                  Route.seal(
-                    adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
-                  )
-                val expDynProdCfgs = assertPostNProducerConfigs(3, route)
-                val exp =
-                  expDynProdCfgs.tail.head
-                    .asInstanceOf[ProducerSpecificLimitCfg]
+            withAdminContext(
+              useDynamicConfigs = true,
+              optOpenIdCfg = Option(oidcCfg)
+            ) { case (_, cfg, sessionRef, dynCfgRef, _) =>
+              val route =
+                Route.seal(
+                  adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
+                )
+              val expDynProdCfgs = assertPostNProducerConfigs(3, token, route)
+              val exp =
+                expDynProdCfgs.tail.head.asInstanceOf[ProducerSpecificLimitCfg]
 
-                eventually {
-                  Get(s"/admin/client/config/producer/${exp.id}") ~>
-                    addCredentials(token.bearerToken) ~>
-                    route ~>
-                    check {
-                      status mustBe OK
-                      responseEntity.contentType mustBe `application/json`
-                      val resStr = responseAs[String]
-                      val res =
-                        parse(resStr).rightValue.as[DynamicCfg].rightValue
-                      assertProducerConfig(exp, res)
-                    }
-                }
-
-                val upd     = exp.copy(maxConnections = Some(5))
-                val updJson = (upd: DynamicCfg).asJson.spaces2
-
-                Put(s"/admin/client/config/producer/${exp.id}", updJson) ~>
+              eventually {
+                Get(s"/admin/client/config/producer/${exp.id}") ~>
                   addCredentials(token.bearerToken) ~>
                   route ~>
                   check {
                     status mustBe OK
                     responseEntity.contentType mustBe `application/json`
+                    val resStr = responseAs[String]
+                    val res =
+                      parse(resStr).rightValue.as[DynamicCfg].rightValue
+                    assertProducerConfig(exp, res)
                   }
+              }
 
-                eventually {
-                  Get(s"/admin/client/config/producer/${exp.id}") ~>
-                    addCredentials(token.bearerToken) ~>
-                    route ~>
-                    check {
-                      status mustBe OK
-                      responseEntity.contentType mustBe `application/json`
-                      val resStr = responseAs[String]
-                      val res =
-                        parse(resStr).rightValue.as[DynamicCfg].rightValue
-                      assertProducerConfig(upd, res)
-                    }
+              val upd     = exp.copy(maxConnections = Some(5))
+              val updJson = (upd: DynamicCfg).asJson.spaces2
+
+              Put(s"/admin/client/config/producer/${exp.id}", updJson) ~>
+                addCredentials(token.bearerToken) ~>
+                route ~>
+                check {
+                  status mustBe OK
+                  responseEntity.contentType mustBe `application/json`
                 }
+
+              eventually {
+                Get(s"/admin/client/config/producer/${exp.id}") ~>
+                  addCredentials(token.bearerToken) ~>
+                  route ~>
+                  check {
+                    status mustBe OK
+                    responseEntity.contentType mustBe `application/json`
+                    val resStr = responseAs[String]
+                    val res =
+                      parse(resStr).rightValue.as[DynamicCfg].rightValue
+                    assertProducerConfig(upd, res)
+                  }
+              }
             }
         }
 
       "successfully delete an existing dynamic consumer client config" in
         withOpenIdConnectServerAndToken(useJwtCreds = false) {
           case (_, _, oidcClient, oidcCfg, token) =>
-            withAdminContext(optOpenIdCfg = Option(oidcCfg)) {
-              case (_, cfg, sessionRef, dynCfgRef, _) =>
-                val route =
-                  Route.seal(
-                    adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
-                  )
-                val expDynConsCfgs = assertPostNConsumerConfigs(3, route)
-                val exp =
-                  expDynConsCfgs.tail.head
-                    .asInstanceOf[ConsumerSpecificLimitCfg]
+            withAdminContext(
+              useDynamicConfigs = true,
+              optOpenIdCfg = Option(oidcCfg)
+            ) { case (_, cfg, sessionRef, dynCfgRef, _) =>
+              val route =
+                Route.seal(
+                  adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
+                )
+              val expDynConsCfgs = assertPostNConsumerConfigs(3, token, route)
+              val exp =
+                expDynConsCfgs.tail.head.asInstanceOf[ConsumerSpecificLimitCfg]
 
-                eventually {
-                  Get(s"/admin/client/config/consumer/${exp.id}") ~>
-                    addCredentials(token.bearerToken) ~>
-                    route ~>
-                    check {
-                      status mustBe OK
-                      responseEntity.contentType mustBe `application/json`
-                      val resStr = responseAs[String]
-                      val res =
-                        parse(resStr).rightValue.as[DynamicCfg].rightValue
-                      assertConsumerConfig(exp, res)
-                    }
-                }
-
-                Delete(s"/admin/client/config/consumer/${exp.id}") ~>
+              eventually {
+                Get(s"/admin/client/config/consumer/${exp.id}") ~>
                   addCredentials(token.bearerToken) ~>
                   route ~>
                   check {
                     status mustBe OK
                     responseEntity.contentType mustBe `application/json`
+                    val resStr = responseAs[String]
+                    val res =
+                      parse(resStr).rightValue.as[DynamicCfg].rightValue
+                    assertConsumerConfig(exp, res)
                   }
+              }
 
-                eventually {
-                  Get(s"/admin/client/config/consumer/${exp.id}") ~>
-                    addCredentials(token.bearerToken) ~>
-                    route ~>
-                    check {
-                      status mustBe NotFound
-                      responseEntity.contentType mustBe `application/json`
-                    }
+              Delete(s"/admin/client/config/consumer/${exp.id}") ~>
+                addCredentials(token.bearerToken) ~>
+                route ~>
+                check {
+                  status mustBe OK
+                  responseEntity.contentType mustBe `application/json`
                 }
+
+              eventually {
+                Get(s"/admin/client/config/consumer/${exp.id}") ~>
+                  addCredentials(token.bearerToken) ~>
+                  route ~>
+                  check {
+                    status mustBe NotFound
+                    responseEntity.contentType mustBe `application/json`
+                  }
+              }
             }
         }
 
       "successfully delete an existing dynamic producer client config" in
         withOpenIdConnectServerAndToken(useJwtCreds = false) {
           case (_, _, oidcClient, oidcCfg, token) =>
-            withAdminContext(optOpenIdCfg = Option(oidcCfg)) {
-              case (_, cfg, sessionRef, dynCfgRef, _) =>
-                val route =
-                  Route.seal(
-                    adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
-                  )
-                val expDynProdCfgs = assertPostNProducerConfigs(3, route)
-                val exp =
-                  expDynProdCfgs.tail.head
-                    .asInstanceOf[ProducerSpecificLimitCfg]
+            withAdminContext(
+              useDynamicConfigs = true,
+              optOpenIdCfg = Option(oidcCfg)
+            ) { case (_, cfg, sessionRef, dynCfgRef, _) =>
+              val route =
+                Route.seal(
+                  adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
+                )
+              val expDynProdCfgs = assertPostNProducerConfigs(3, token, route)
+              val exp =
+                expDynProdCfgs.tail.head.asInstanceOf[ProducerSpecificLimitCfg]
 
-                eventually {
-                  Get(s"/admin/client/config/producer/${exp.id}") ~>
-                    addCredentials(token.bearerToken) ~>
-                    route ~>
-                    check {
-                      status mustBe OK
-                      responseEntity.contentType mustBe `application/json`
-                      val resStr = responseAs[String]
-                      val res =
-                        parse(resStr).rightValue.as[DynamicCfg].rightValue
-                      assertProducerConfig(exp, res)
-                    }
-                }
-
-                Delete(s"/admin/client/config/producer/${exp.id}") ~>
+              eventually {
+                Get(s"/admin/client/config/producer/${exp.id}") ~>
                   addCredentials(token.bearerToken) ~>
                   route ~>
                   check {
                     status mustBe OK
                     responseEntity.contentType mustBe `application/json`
+                    val resStr = responseAs[String]
+                    val res =
+                      parse(resStr).rightValue.as[DynamicCfg].rightValue
+                    assertProducerConfig(exp, res)
                   }
+              }
 
-                eventually {
-                  Get(s"/admin/client/config/producer/${exp.id}") ~>
-                    addCredentials(token.bearerToken) ~>
-                    route ~>
-                    check {
-                      status mustBe NotFound
-                      responseEntity.contentType mustBe `application/json`
-                    }
+              Delete(s"/admin/client/config/producer/${exp.id}") ~>
+                addCredentials(token.bearerToken) ~>
+                route ~>
+                check {
+                  status mustBe OK
+                  responseEntity.contentType mustBe `application/json`
                 }
+
+              eventually {
+                Get(s"/admin/client/config/producer/${exp.id}") ~>
+                  addCredentials(token.bearerToken) ~>
+                  route ~>
+                  check {
+                    status mustBe NotFound
+                    responseEntity.contentType mustBe `application/json`
+                  }
+              }
             }
         }
 
       "successfully delete all existing dynamic client configs" in
         withOpenIdConnectServerAndToken(useJwtCreds = false) {
           case (_, _, oidcClient, oidcCfg, token) =>
-            withAdminContext(optOpenIdCfg = Option(oidcCfg)) {
-              case (_, cfg, sessionRef, dynCfgRef, _) =>
-                val route =
-                  Route.seal(
-                    adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
-                  )
+            withAdminContext(
+              useDynamicConfigs = true,
+              optOpenIdCfg = Option(oidcCfg)
+            ) { case (_, cfg, sessionRef, dynCfgRef, _) =>
+              val route =
+                Route.seal(
+                  adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
+                )
 
-                val expDynConsCfgs = assertPostNConsumerConfigs(4, route)
-                val expDynProdCfgs = assertPostNProducerConfigs(4, route)
+              val expDynConsCfgs = assertPostNConsumerConfigs(4, token, route)
+              val expDynProdCfgs = assertPostNProducerConfigs(4, token, route)
 
-                eventually {
-                  Get("/admin/client/config") ~>
-                    addCredentials(token.bearerToken) ~>
-                    route ~>
-                    check {
-                      status mustBe OK
-                      responseEntity.contentType mustBe `application/json`
-                      val resStr = responseAs[String]
-                      val json   = parse(resStr).rightValue
-                      val cursor = json.hcursor
-
-                      assertAllStaticConfigs(cursor)
-                      assertAllDynamicConfigs(
-                        expected = expDynConsCfgs,
-                        cursor =
-                          cursor.downField("consumers").downField("dynamic")
-                      )
-                      assertAllDynamicConfigs(
-                        expected = expDynProdCfgs,
-                        cursor =
-                          cursor.downField("producers").downField("dynamic")
-                      )
-                    }
-                }
-
-                Delete("/admin/client/config") ~>
+              eventually {
+                Get("/admin/client/config") ~>
                   addCredentials(token.bearerToken) ~>
                   route ~>
                   check {
                     status mustBe OK
                     responseEntity.contentType mustBe `application/json`
+                    val resStr = responseAs[String]
+                    val json   = parse(resStr).rightValue
+                    val cursor = json.hcursor
+
+                    assertAllStaticConfigs(cursor)
+                    assertAllDynamicConfigs(
+                      expected = expDynConsCfgs,
+                      cursor =
+                        cursor.downField("consumers").downField("dynamic")
+                    )
+                    assertAllDynamicConfigs(
+                      expected = expDynProdCfgs,
+                      cursor =
+                        cursor.downField("producers").downField("dynamic")
+                    )
                   }
+              }
 
-                eventually {
-                  Get("/admin/client/config") ~>
-                    addCredentials(token.bearerToken) ~>
-                    route ~>
-                    check {
-                      status mustBe OK
-                      responseEntity.contentType mustBe `application/json`
-                      val resStr = responseAs[String]
-                      val json   = parse(resStr).rightValue
-                      val cursor = json.hcursor
-
-                      assertAllStaticConfigs(cursor)
-                      assertAllDynamicConfigs(
-                        expected = Seq.empty,
-                        cursor =
-                          cursor.downField("consumers").downField("dynamic")
-                      )
-                      assertAllDynamicConfigs(
-                        expected = Seq.empty,
-                        cursor =
-                          cursor.downField("producers").downField("dynamic")
-                      )
-                    }
+              Delete("/admin/client/config") ~>
+                addCredentials(token.bearerToken) ~>
+                route ~>
+                check {
+                  status mustBe OK
+                  responseEntity.contentType mustBe `application/json`
                 }
+
+              eventually {
+                Get("/admin/client/config") ~>
+                  addCredentials(token.bearerToken) ~>
+                  route ~>
+                  check {
+                    status mustBe OK
+                    responseEntity.contentType mustBe `application/json`
+                    val resStr = responseAs[String]
+                    val json   = parse(resStr).rightValue
+                    val cursor = json.hcursor
+
+                    assertAllStaticConfigs(cursor)
+                    assertAllDynamicConfigs(
+                      expected = Seq.empty,
+                      cursor =
+                        cursor.downField("consumers").downField("dynamic")
+                    )
+                    assertAllDynamicConfigs(
+                      expected = Seq.empty,
+                      cursor =
+                        cursor.downField("producers").downField("dynamic")
+                    )
+                  }
+              }
             }
         }
 
       "return 404 when looking up non-existing consumer client cfg" in
         withOpenIdConnectServerAndToken(useJwtCreds = false) {
           case (_, _, oidcClient, oidcCfg, token) =>
-            withAdminContext(optOpenIdCfg = Option(oidcCfg)) {
-              case (_, cfg, sessionRef, dynCfgRef, _) =>
-                Get("/admin/client/config/consumer/non-existing") ~>
-                  addCredentials(token.bearerToken) ~>
-                  Route.seal(
-                    adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
-                  ) ~>
-                  check {
-                    status mustBe NotFound
-                    responseEntity.contentType mustBe `application/json`
-                  }
+            withAdminContext(
+              useDynamicConfigs = true,
+              optOpenIdCfg = Option(oidcCfg)
+            ) { case (_, cfg, sessionRef, dynCfgRef, _) =>
+              Get("/admin/client/config/consumer/non-existing") ~>
+                addCredentials(token.bearerToken) ~>
+                Route.seal(
+                  adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
+                ) ~>
+                check {
+                  status mustBe NotFound
+                  responseEntity.contentType mustBe `application/json`
+                }
             }
         }
 
       "return 404 when looking up non-existing producer client cfg" in
         withOpenIdConnectServerAndToken(useJwtCreds = false) {
           case (_, _, oidcClient, oidcCfg, token) =>
-            withAdminContext(optOpenIdCfg = Option(oidcCfg)) {
-              case (_, cfg, sessionRef, dynCfgRef, _) =>
-                Get("/admin/client/config/producer/non-existing") ~>
-                  addCredentials(token.bearerToken) ~>
-                  Route.seal(
-                    adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
-                  ) ~>
-                  check {
-                    status mustBe NotFound
-                    responseEntity.contentType mustBe `application/json`
-                  }
+            withAdminContext(
+              useDynamicConfigs = true,
+              optOpenIdCfg = Option(oidcCfg)
+            ) { case (_, cfg, sessionRef, dynCfgRef, _) =>
+              Get("/admin/client/config/producer/non-existing") ~>
+                addCredentials(token.bearerToken) ~>
+                Route.seal(
+                  adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
+                ) ~>
+                check {
+                  status mustBe NotFound
+                  responseEntity.contentType mustBe `application/json`
+                }
             }
         }
 
@@ -912,27 +941,29 @@ class AdminRoutesOpenIdSpec
         " using invalid JSON" in
         withOpenIdConnectServerAndToken(useJwtCreds = false) {
           case (_, _, oidcClient, oidcCfg, token) =>
-            withAdminContext(optOpenIdCfg = Option(oidcCfg)) {
-              case (_, cfg, sessionRef, dynCfgRef, _) =>
-                val json =
-                  """{
+            withAdminContext(
+              useDynamicConfigs = true,
+              optOpenIdCfg = Option(oidcCfg)
+            ) { case (_, cfg, sessionRef, dynCfgRef, _) =>
+              val json =
+                """{
                     |  "max-connections":2,
                     |  "messages-per-second":10,
                     |  "grop-id":"my-consumer"
                     |}""".stripMargin
 
-                val entity = HttpEntity(ContentTypes.`application/json`, json)
+              val entity = HttpEntity(ContentTypes.`application/json`, json)
 
-                Post("/admin/client/config/consumer", entity) ~>
-                  addCredentials(token.bearerToken) ~>
-                  Route.seal(
-                    adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
-                  ) ~>
-                  check {
-                    status mustBe BadRequest
-                    responseEntity.contentType mustBe `application/json`
-                    responseAs[String] mustBe expectedInvalidJson()
-                  }
+              Post("/admin/client/config/consumer", entity) ~>
+                addCredentials(token.bearerToken) ~>
+                Route.seal(
+                  adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
+                ) ~>
+                check {
+                  status mustBe BadRequest
+                  responseEntity.contentType mustBe `application/json`
+                  responseAs[String] mustBe expectedInvalidJson()
+                }
             }
         }
 
@@ -940,27 +971,29 @@ class AdminRoutesOpenIdSpec
         " using invalid JSON" in
         withOpenIdConnectServerAndToken(useJwtCreds = false) {
           case (_, _, oidcClient, oidcCfg, token) =>
-            withAdminContext(optOpenIdCfg = Option(oidcCfg)) {
-              case (_, cfg, sessionRef, dynCfgRef, _) =>
-                val json =
-                  """{
+            withAdminContext(
+              useDynamicConfigs = true,
+              optOpenIdCfg = Option(oidcCfg)
+            ) { case (_, cfg, sessionRef, dynCfgRef, _) =>
+              val json =
+                """{
                     |  "max-connections":2,
                     |  "messages-per-second":10,
                     |  "prod-id":"my-producer"
                     |}""".stripMargin
 
-                val entity = HttpEntity(ContentTypes.`application/json`, json)
+              val entity = HttpEntity(ContentTypes.`application/json`, json)
 
-                Post("/admin/client/config/producer", entity) ~>
-                  addCredentials(token.bearerToken) ~>
-                  Route.seal(
-                    adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
-                  ) ~>
-                  check {
-                    status mustBe BadRequest
-                    responseEntity.contentType mustBe `application/json`
-                    responseAs[String] mustBe expectedInvalidJson(false)
-                  }
+              Post("/admin/client/config/producer", entity) ~>
+                addCredentials(token.bearerToken) ~>
+                Route.seal(
+                  adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
+                ) ~>
+                check {
+                  status mustBe BadRequest
+                  responseEntity.contentType mustBe `application/json`
+                  responseAs[String] mustBe expectedInvalidJson(false)
+                }
             }
         }
 
@@ -968,27 +1001,29 @@ class AdminRoutesOpenIdSpec
         "config using invalid JSON" in
         withOpenIdConnectServerAndToken(useJwtCreds = false) {
           case (_, _, oidcClient, oidcCfg, token) =>
-            withAdminContext(optOpenIdCfg = Option(oidcCfg)) {
-              case (_, cfg, sessionRef, dynCfgRef, _) =>
-                val json =
-                  """{
+            withAdminContext(
+              useDynamicConfigs = true,
+              optOpenIdCfg = Option(oidcCfg)
+            ) { case (_, cfg, sessionRef, dynCfgRef, _) =>
+              val json =
+                """{
                     |  "max-connections":2,
                     |  "messages-per-second":10,
                     |  "grop-id":"my-consumer"
                     |}""".stripMargin
 
-                val entity = HttpEntity(ContentTypes.`application/json`, json)
+              val entity = HttpEntity(ContentTypes.`application/json`, json)
 
-                Put("/admin/client/config/consumer/my-consumer", entity) ~>
-                  addCredentials(token.bearerToken) ~>
-                  Route.seal(
-                    adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
-                  ) ~>
-                  check {
-                    status mustBe BadRequest
-                    responseEntity.contentType mustBe `application/json`
-                    responseAs[String] mustBe expectedInvalidJson()
-                  }
+              Put("/admin/client/config/consumer/my-consumer", entity) ~>
+                addCredentials(token.bearerToken) ~>
+                Route.seal(
+                  adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
+                ) ~>
+                check {
+                  status mustBe BadRequest
+                  responseEntity.contentType mustBe `application/json`
+                  responseAs[String] mustBe expectedInvalidJson()
+                }
             }
         }
 
@@ -996,27 +1031,126 @@ class AdminRoutesOpenIdSpec
         "config using invalid JSON" in
         withOpenIdConnectServerAndToken(useJwtCreds = false) {
           case (_, _, oidcClient, oidcCfg, token) =>
-            withAdminContext(optOpenIdCfg = Option(oidcCfg)) {
-              case (_, cfg, sessionRef, dynCfgRef, _) =>
-                val json =
-                  """{
+            withAdminContext(
+              useDynamicConfigs = true,
+              optOpenIdCfg = Option(oidcCfg)
+            ) { case (_, cfg, sessionRef, dynCfgRef, _) =>
+              val json =
+                """{
                     |  "max-connections":2,
                     |  "messages-per-second":10,
                     |  "prod-id":"my-producer"
                     |}""".stripMargin
 
-                val entity = HttpEntity(ContentTypes.`application/json`, json)
+              val entity = HttpEntity(ContentTypes.`application/json`, json)
 
-                Put("/admin/client/config/producer/my-producer", entity) ~>
-                  addCredentials(token.bearerToken) ~>
-                  Route.seal(
-                    adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
-                  ) ~>
-                  check {
-                    status mustBe BadRequest
-                    responseEntity.contentType mustBe `application/json`
-                    responseAs[String] mustBe expectedInvalidJson(false)
-                  }
+              Put("/admin/client/config/producer/my-producer", entity) ~>
+                addCredentials(token.bearerToken) ~>
+                Route.seal(
+                  adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
+                ) ~>
+                check {
+                  status mustBe BadRequest
+                  responseEntity.contentType mustBe `application/json`
+                  responseAs[String] mustBe expectedInvalidJson(false)
+                }
+            }
+        }
+
+      "return 404 when updating a non-existing dynamic consumer config" in
+        withOpenIdConnectServerAndToken(useJwtCreds = false) {
+          case (_, _, oidcClient, oidcCfg, token) =>
+            withAdminContext(
+              useDynamicConfigs = true,
+              optOpenIdCfg = Option(oidcCfg)
+            ) { case (_, cfg, sessionRef, dynCfgRef, _) =>
+              val route =
+                Route.seal(
+                  adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
+                )
+
+              val updJson = createConsumerCfg(
+                s"no-such-consumer",
+                Some(100),
+                Some(100),
+                Some(100)
+              ).asInstanceOf[DynamicCfg].asJson.spaces2
+
+              Put(s"/admin/client/config/consumer/no-such-config", updJson) ~>
+                addCredentials(token.bearerToken) ~>
+                route ~> check {
+                  status mustBe NotFound
+                  responseEntity.contentType mustBe `application/json`
+                }
+            }
+        }
+
+      "return 404 when updating a non-existing dynamic producer config" in
+        withOpenIdConnectServerAndToken(useJwtCreds = false) {
+          case (_, _, oidcClient, oidcCfg, token) =>
+            withAdminContext(
+              useDynamicConfigs = true,
+              optOpenIdCfg = Option(oidcCfg)
+            ) { case (_, cfg, sessionRef, dynCfgRef, _) =>
+              val route =
+                Route.seal(
+                  adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
+                )
+
+              val updJson = createProducerCfg(
+                s"no-such-producer",
+                Some(100),
+                Some(100)
+              ).asInstanceOf[DynamicCfg].asJson.spaces2
+
+              Put(s"/admin/client/config/producer/no-such-config", updJson) ~>
+                addCredentials(token.bearerToken) ~>
+                route ~> check {
+                  status mustBe NotFound
+                  responseEntity.contentType mustBe `application/json`
+                }
+            }
+        }
+
+      "return 404 when deleting a non-existing dynamic consumer config" in
+        withOpenIdConnectServerAndToken(useJwtCreds = false) {
+          case (_, _, oidcClient, oidcCfg, token) =>
+            withAdminContext(
+              useDynamicConfigs = true,
+              optOpenIdCfg = Option(oidcCfg)
+            ) { case (_, cfg, sessionRef, dynCfgRef, _) =>
+              val route =
+                Route.seal(
+                  adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
+                )
+
+              Delete(s"/admin/client/config/consumer/no-such-config") ~>
+                addCredentials(token.bearerToken) ~>
+                route ~> check {
+                  status mustBe NotFound
+                  responseEntity.contentType mustBe `application/json`
+                }
+            }
+        }
+
+      "return 404 when deleting a non-existing dynamic producer config" in
+        withOpenIdConnectServerAndToken(useJwtCreds = false) {
+          case (_, _, oidcClient, oidcCfg, token) =>
+            withAdminContext(
+              useDynamicConfigs = true,
+              optOpenIdCfg = Option(oidcCfg)
+            ) { case (_, cfg, sessionRef, dynCfgRef, _) =>
+              val route =
+                Route.seal(
+                  adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
+                )
+
+              Delete(s"/admin/client/config/producer/no-such-config") ~>
+                addCredentials(token.bearerToken) ~>
+                route ~> check {
+                  status mustBe NotFound
+                  responseEntity.contentType mustBe `application/json`
+                }
             }
         }
 

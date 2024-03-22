@@ -802,6 +802,71 @@ class AdminRoutesSpec
               }
         }
 
+      "return 404 when updating a non-existing dynamic consumer config" in
+        withAdminContext(useDynamicConfigs = true) {
+          case (_, cfg, sessionRef, dynCfgRef, _) =>
+            val route =
+              Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None))
+
+            val updJson = createConsumerCfg(
+              s"no-such-consumer",
+              Some(100),
+              Some(100),
+              Some(100)
+            ).asInstanceOf[DynamicCfg].asJson.spaces2
+
+            Put(s"/admin/client/config/consumer/no-such-config", updJson) ~>
+              route ~> check {
+                status mustBe NotFound
+                responseEntity.contentType mustBe `application/json`
+              }
+        }
+
+      "return 404 when updating a non-existing dynamic producer config" in
+        withAdminContext(useDynamicConfigs = true) {
+          case (_, cfg, sessionRef, dynCfgRef, _) =>
+            val route =
+              Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None))
+
+            val updJson = createProducerCfg(
+              s"no-such-producer",
+              Some(100),
+              Some(100)
+            ).asInstanceOf[DynamicCfg].asJson.spaces2
+
+            Put(s"/admin/client/config/producer/no-such-config", updJson) ~>
+              route ~> check {
+                status mustBe NotFound
+                responseEntity.contentType mustBe `application/json`
+              }
+        }
+
+      "return 404 when deleting a non-existing dynamic consumer config" in
+        withAdminContext(useDynamicConfigs = true) {
+          case (_, cfg, sessionRef, dynCfgRef, _) =>
+            val route =
+              Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None))
+
+            Delete(s"/admin/client/config/consumer/no-such-config") ~>
+              route ~> check {
+                status mustBe NotFound
+                responseEntity.contentType mustBe `application/json`
+              }
+        }
+
+      "return 404 when deleting a non-existing dynamic producer config" in
+        withAdminContext(useDynamicConfigs = true) {
+          case (_, cfg, sessionRef, dynCfgRef, _) =>
+            val route =
+              Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None))
+
+            Delete(s"/admin/client/config/producer/no-such-config") ~>
+              route ~> check {
+                status mustBe NotFound
+                responseEntity.contentType mustBe `application/json`
+              }
+        }
+
     }
   }
 }
