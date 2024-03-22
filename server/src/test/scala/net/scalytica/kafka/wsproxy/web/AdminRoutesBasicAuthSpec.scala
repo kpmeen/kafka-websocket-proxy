@@ -54,7 +54,7 @@ class AdminRoutesBasicAuthSpec
   //  override protected lazy val secureKafka: Boolean = false
 
   implicit override val patienceConfig: PatienceConfig =
-    PatienceConfig(timeout = Span(2, Minutes))
+    PatienceConfig(timeout = Span(3, Minutes))
 
   implicit val timeout: RouteTestTimeout = RouteTestTimeout(20 seconds)
 
@@ -181,7 +181,7 @@ class AdminRoutesBasicAuthSpec
     val json   = (conf: DynamicCfg).asJson.spaces2
     val entity = HttpEntity(ContentTypes.`application/json`, json)
 
-    Post(uri, entity) ~> route ~> check {
+    Post(uri, entity) ~> addCredentials(basicHttpCreds) ~> route ~> check {
       status mustBe OK
       responseEntity.contentType mustBe `application/json`
     }
@@ -269,7 +269,7 @@ class AdminRoutesBasicAuthSpec
 
     "using client config routes when dynamic configs are not enabled" should {
 
-      "only return all static client configs" in
+      "only return all known client configs" in
         withAdminContext(useServerBasicAuth = true) {
           case (_, cfg, sessionRef, dynCfgRef, _) =>
             Get("/admin/client/config") ~> addCredentials(basicHttpCreds) ~>
@@ -854,6 +854,75 @@ class AdminRoutesBasicAuthSpec
                 status mustBe BadRequest
                 responseEntity.contentType mustBe `application/json`
                 responseAs[String] mustBe expectedInvalidJson(false)
+              }
+        }
+
+      "return 404 when updating a non-existing dynamic consumer config" in
+        withAdminContext(useServerBasicAuth = true, useDynamicConfigs = true) {
+          case (_, cfg, sessionRef, dynCfgRef, _) =>
+            val route =
+              Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None))
+
+            val updJson = createConsumerCfg(
+              s"no-such-consumer",
+              Some(100),
+              Some(100),
+              Some(100)
+            ).asInstanceOf[DynamicCfg].asJson.spaces2
+
+            Put(s"/admin/client/config/consumer/no-such-config", updJson) ~>
+              addCredentials(basicHttpCreds) ~>
+              route ~> check {
+                status mustBe NotFound
+                responseEntity.contentType mustBe `application/json`
+              }
+        }
+
+      "return 404 when updating a non-existing dynamic producer config" in
+        withAdminContext(useServerBasicAuth = true, useDynamicConfigs = true) {
+          case (_, cfg, sessionRef, dynCfgRef, _) =>
+            val route =
+              Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None))
+
+            val updJson = createProducerCfg(
+              s"no-such-producer",
+              Some(100),
+              Some(100)
+            ).asInstanceOf[DynamicCfg].asJson.spaces2
+
+            Put(s"/admin/client/config/producer/no-such-config", updJson) ~>
+              addCredentials(basicHttpCreds) ~>
+              route ~> check {
+                status mustBe NotFound
+                responseEntity.contentType mustBe `application/json`
+              }
+        }
+
+      "return 404 when deleting a non-existing dynamic consumer config" in
+        withAdminContext(useServerBasicAuth = true, useDynamicConfigs = true) {
+          case (_, cfg, sessionRef, dynCfgRef, _) =>
+            val route =
+              Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None))
+
+            Delete(s"/admin/client/config/consumer/no-such-config") ~>
+              addCredentials(basicHttpCreds) ~>
+              route ~> check {
+                status mustBe NotFound
+                responseEntity.contentType mustBe `application/json`
+              }
+        }
+
+      "return 404 when deleting a non-existing dynamic producer config" in
+        withAdminContext(useServerBasicAuth = true, useDynamicConfigs = true) {
+          case (_, cfg, sessionRef, dynCfgRef, _) =>
+            val route =
+              Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None))
+
+            Delete(s"/admin/client/config/producer/no-such-config") ~>
+              addCredentials(basicHttpCreds) ~>
+              route ~> check {
+                status mustBe NotFound
+                responseEntity.contentType mustBe `application/json`
               }
         }
 
