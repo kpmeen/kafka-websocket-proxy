@@ -12,6 +12,7 @@ import net.scalytica.kafka.wsproxy.session.SessionHandlerProtocol.{
 }
 import net.scalytica.test.SharedAttributes.defaultTypesafeConfig
 import net.scalytica.test.{WsProxySpec, WsReusableProxyKafkaFixture}
+import org.apache.kafka.common.serialization.Serializer
 import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
 import org.apache.pekko.actor.typed.ActorSystem
 import org.apache.pekko.stream.scaladsl.Sink
@@ -45,8 +46,10 @@ class SessionDataConsumerSpec
 
   implicit private[this] val sys: ActorSystem[_] = atk.system
 
-  implicit private[this] val sessionIdSerde = new SessionIdSerde()
-  implicit private[this] val sessionSerde   = new SessionSerde()
+  implicit private[this] val sessionIdSerde: Serializer[SessionId] =
+    new SessionIdSerde()
+  implicit private[this] val sessionSerde: Serializer[Session] =
+    new SessionSerde()
 
   override def afterAll(): Unit = {
     materializer.shutdown()

@@ -3,7 +3,7 @@
 ################################################################################
 variables:
   CI: "true"
-  DOCKER_DRIVER: overlay
+  DOCKER_DRIVER: overlay2
   SBT_MDOCS_MODULE_DIR: '$CI_PROJECT_NAME-docs'
 
 .shared_rules:
@@ -19,7 +19,7 @@ pages:build:
   rules:
     - !reference [.shared_rules, rules]
   stage: build
-  image: registry.gitlab.com/kpmeen/docker-scala-sbt:scala_2.13_jdk11
+  image: registry.gitlab.com/kpmeen/docker-scala-sbt:scala_2.13.13_jdk21
   tags:
     - docker
   script:

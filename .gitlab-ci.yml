@@ -1,19 +1,30 @@
 ######################################################################
-# GitLab CI build script for the Kafka WebSocket Proxy               #
+# GitLab CI build script for the Kafka WebSocket Proxy                    #
 ######################################################################
-#image: registry.gitlab.com/kpmeen/docker-scala-sbt:scala_2.13_jdk11
 
+######################################################################
+# Shared environment variables for different stages of the CI pipeline #
+######################################################################
 variables:
   CI: "true"
-  DOCKER_DRIVER: overlay
+  # Shared settings for the docker processes
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: ""
   # Setting specific folder for sbt-coursier to cache artifacts
   COURSIER_CACHE: "/root/cache/coursier"
   # Container scanning properties
   CS_MAJOR_VERSION: 2
   CI_APPLICATION_REPOSITORY: $CI_REGISTRY_IMAGE/server
   CI_APPLICATION_TAG: $CI_COMMIT_SHA
+  ################################################################################
+  # The flags defined below can be triggered by passing in a git push option to set
+  # the ci.variable.
+  # Example: git push -o ci.variable="TEST_DOCKER_BUILD=true" origin <branch>
+  ################################################################################
   # Flag to trigger manual publishing of pages
   MANUAL_PUBLISH_PAGES: "false"
+  # FLag to trigger a test-run of the docker image build
+  TEST_DOCKER_BUILD: "false"
 
 cache:
   untracked: true
@@ -21,6 +32,7 @@ cache:
     - cache
 
 stages:
+  - pre-build
   - build
   - test
   - publish-docker
@@ -30,11 +42,13 @@ stages:
 include:
   - local: "/.gitlab/build_templates/gitlab-ci-scala-build.yml"
     rules:
-      - if: '$MANUAL_PUBLISH_PAGES != "true"'
+      - if: $MANUAL_PUBLISH_PAGES != "true" && $TEST_DOCKER_BUILD != "true"
   - local: "/.gitlab/build_templates/gitlab-ci-scala-docker.yml"
     rules:
-      - if: '$MANUAL_PUBLISH_PAGES != "true"'
+      - if: $MANUAL_PUBLISH_PAGES != "true"
   - local: "/.gitlab/build_templates/gitlab-ci-scala-pages.yml"
+    rules:
+      - if: $MANUAL_PUBLISH_PAGES == "true" && $TEST_DOCKER_BUILD != "true"
   - local: "/.gitlab/build_templates/gitlab-ci-project-scanning.yml"
     rules:
-      - if: '$MANUAL_PUBLISH_PAGES != "true"'
+      - if: $MANUAL_PUBLISH_PAGES != "true" && $TEST_DOCKER_BUILD != "true"

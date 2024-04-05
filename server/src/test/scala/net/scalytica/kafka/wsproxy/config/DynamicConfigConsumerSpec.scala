@@ -15,6 +15,7 @@ import net.scalytica.kafka.wsproxy.models.TopicName
 import net.scalytica.test.SharedAttributes.defaultTypesafeConfig
 import net.scalytica.test.{WsProxySpec, WsReusableProxyKafkaFixture}
 import org.apache.kafka.common.serialization.Serializer
+import org.apache.pekko.actor.typed.ActorSystem
 import org.scalatest.Inspectors.forAll
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.matchers.must.Matchers
@@ -39,8 +40,9 @@ class DynamicConfigConsumerSpec
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(1, Minute))
 
-  val atk = ActorTestKit("dyn-cfg-producer-test", defaultTypesafeConfig)
-  implicit val sys = atk.system
+  val atk: ActorTestKit =
+    ActorTestKit("dyn-cfg-producer-test", defaultTypesafeConfig)
+  implicit val sys: ActorSystem[Nothing] = atk.system
 
   val dcfgSerde = new DynamicCfgSerde()
 

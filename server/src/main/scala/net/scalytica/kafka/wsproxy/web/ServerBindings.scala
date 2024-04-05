@@ -46,7 +46,7 @@ trait ServerBindings {
          |-------------------------------------------------------------------
          |  WARNING:
          |-------------------------------------------------------------------
-         |Server starting with authentication and non-TLS binding
+         |Server starting with no authentication and non-TLS binding
          |
          |${middle("proxy", srv.bindInterface, srv.port)}
          |${if (adm.enabled) middle("admin", adm.bindInterface, adm.port)}

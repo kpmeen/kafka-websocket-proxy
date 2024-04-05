@@ -4,7 +4,10 @@ logLevel := Level.Warn
 resolvers ++= DefaultOptions.resolvers(snapshot = false)
 resolvers ++= Resolver.sonatypeOssRepos("releases")
 resolvers ++= Seq(
+  Resolver.mavenCentral,
+  Resolver.jcenterRepo,
   Resolver.typesafeRepo("releases"),
+  Resolver.sbtIvyRepo("releases"),
   // Remove below resolver once the following issues has been resolved:
   // https://issues.jboss.org/projects/JBINTER/issues/JBINTER-21
   "JBoss" at "https://repository.jboss.org/"
@@ -21,7 +24,7 @@ addSbtPlugin("org.scalameta"       % "sbt-scalafmt"   % "2.5.0")
 addSbtPlugin("com.beautiful-scala" % "sbt-scalastyle" % "1.5.1")
 
 // Code coverage
-addSbtPlugin("org.scoverage" %% "sbt-scoverage" % "2.0.7")
+addSbtPlugin("org.scoverage" %% "sbt-scoverage" % "2.0.11")
 
 // Native packaging plugin
 addSbtPlugin("com.github.sbt" %% "sbt-native-packager" % "1.9.16")

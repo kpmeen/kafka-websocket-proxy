@@ -1,11 +1,12 @@
 ################################################################################
 # GitLab CI build script for Scala applications published as docker images     #
 ################################################################################
-image: registry.gitlab.com/kpmeen/docker-scala-sbt:scala_2.13_jdk17
+image: registry.gitlab.com/kpmeen/docker-scala-sbt:scala_2.13.13_jdk21
 
 variables:
   CI: "true"
-  DOCKER_DRIVER: overlay
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: ""
   # Setting specific folder for sbt-coursier to cache artifacts
   COURSIER_CACHE: "/root/cache/coursier"
 
@@ -22,11 +23,13 @@ publish docker containers:
   tags:
     - docker
   services:
-    # FIXME: Using version 19 because GitLab CI behaviour changed when moving to v 20+.
-    - docker:19-dind
+    - docker:24.0.6-dind
+  before_script:
+    - docker info
   script:
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN registry.gitlab.com
     - docker login -u kpmeen -p $DOCKERHUB_TOKEN
+    - docker buildx create --name kwp-multiarch-builder-$CI_JOB_ID --driver docker-container --bootstrap --use
     - sbt docker:publish
   rules:
     - if: '$CI_COMMIT_BRANCH || $CI_COMMIT_TAG'

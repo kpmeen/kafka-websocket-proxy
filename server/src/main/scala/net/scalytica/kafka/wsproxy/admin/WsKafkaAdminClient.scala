@@ -42,14 +42,18 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
     val uuidSuffix = UUID.randomUUID().toString
     cfg.adminClient.kafkaClientProperties ++ Map[String, String](
       BOOTSTRAP_SERVERS_CONFIG -> cfg.kafkaClient.bootstrapHosts.mkString(),
-      CLIENT_ID_CONFIG         -> s"kafka-websocket-proxy-admin-${uuidSuffix}"
+      CLIENT_ID_CONFIG         -> s"kafka-websocket-proxy-admin-$uuidSuffix"
     )
   }
   // scalastyle:on line.size.limit
 
   private[this] val internalTopicMaxReplicas = 3
 
-  private[this] lazy val underlying = AdminClient.create(admConfig)
+  private[this] lazy val underlying = {
+    val cfg = admConfig
+    log.debug(s"Init AdminClient with configuration:\n${cfg.mkString("\n")}")
+    AdminClient.create(cfg)
+  }
 
   /** Method for creating an internal state topic. */
   private[admin] def createInternalStateTopic(ist: InternalStateTopic): Unit = {

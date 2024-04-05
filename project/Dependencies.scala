@@ -2,7 +2,7 @@ import sbt._
 
 object Versions {
 
-  val ScalaVersion = "2.13.10"
+  val ScalaVersion = "2.13.13"
 
   val LightbendConfigVersion = "1.4.2"
   val PureConfigVersion      = "0.17.4"
@@ -57,6 +57,7 @@ object Dependencies {
   val Resolvers: Seq[Resolver] =
     DefaultOptions.resolvers(snapshot = true) ++ Seq(
       Resolver.typesafeRepo("releases"),
+      Resolver.mavenCentral,
       Resolver.jcenterRepo,
       MavenRepo("Confluent", "https://packages.confluent.io/maven/"),
       MavenRepo(

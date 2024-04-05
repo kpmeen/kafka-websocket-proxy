@@ -1,11 +1,12 @@
 variables:
   CI: 'true'
-  DOCKER_DRIVER: overlay
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: ""
   # Container scanning properties
   CI_APPLICATION_REPOSITORY: $CI_REGISTRY_IMAGE/server
   CI_APPLICATION_TAG: $CI_COMMIT_SHA
   # Static Application Security Testing properties
-  SAST_JAVA_VERSION: 17
+  SAST_JAVA_VERSION: 21
   SAST_EXCLUDED_PATHS: target, */target, */src/test, website, docs
   SAST_DEFAULT_ANALYZERS: "spotbugs, kubesec"
   SAST_EXCLUDED_ANALYZERS: "eslint, nodejs-scan"
@@ -33,7 +34,7 @@ secret_detection:
 
 spotbugs-sast:
   variables:
-    ASDF_JAVA_VERSION: adoptopenjdk-17.0.2+8 #https://github.com/halcyon/asdf-java/blob/master/data/jdk-linux-x86_64.tsv
+    ASDF_JAVA_VERSION: adoptopenjdk-21.0.2+13.0.LTS #https://github.com/halcyon/asdf-java/blob/master/data/jdk-linux-x86_64.tsv
     JAVA_PATH: /opt/asdf/shims/java
   before_script:
       - /bin/bash -c "source $HOME/.bashrc && asdf install java $ASDF_JAVA_VERSION && asdf global java $ASDF_JAVA_VERSION"
