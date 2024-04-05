@@ -39,10 +39,10 @@ run test suites:
     paths:
       - target/
       - ./**/target/
-      - target/scala-2.13/scoverage-report/cobertura.xml
+      - target/scala-2.13/coverage-report/cobertura.xml
       - ./**/target/test-reports/TEST-*.xml
     reports:
       junit: ./**/target/test-reports/TEST-*.xml
       coverage_report:
         coverage_format: cobertura
-        path: target/scala-2.13/scoverage-report/cobertura.xml
+        path: target/scala-2.13/coverage-report/cobertura.xml
