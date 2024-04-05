@@ -17,7 +17,7 @@ class BlockingRetrySpec extends AnyWordSpec with Matchers with ScalaFutures {
       extends Exception("retry test exception")
       with NoStackTrace
 
-  implicit override val patienceConfig = PatienceConfig(
+  implicit override val patienceConfig: PatienceConfig = PatienceConfig(
     timeout = scaled(Span(10, Seconds)),
     interval = scaled(Span(15, Millis))
   )
@@ -25,7 +25,7 @@ class BlockingRetrySpec extends AnyWordSpec with Matchers with ScalaFutures {
   private[this] val completed = "completed"
 
   // Function for tests that should fail. For example testing retries
-  private[this] def failFastFuture = throw RetryTestException()
+  private[this] def failFastFuture: Throwable = throw RetryTestException()
 
   // Function that will run for the duration specified in the delay
   private[this] def testOp[T](

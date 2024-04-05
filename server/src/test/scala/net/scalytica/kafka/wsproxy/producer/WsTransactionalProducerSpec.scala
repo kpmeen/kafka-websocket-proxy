@@ -1,7 +1,7 @@
 package net.scalytica.kafka.wsproxy.producer
 
 import org.apache.pekko.NotUsed
-import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.{typed, ActorSystem}
 import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
 import org.apache.pekko.kafka.{ProducerMessage, ProducerSettings}
 import org.apache.pekko.stream.{KillSwitches, Materializer}
@@ -56,8 +56,8 @@ class WsTransactionalProducerSpec
   private[this] val atk =
     ActorTestKit("ws-transactional-producer-spec", defaultTypesafeConfig)
 
-  implicit private[this] val as  = atk.system
-  implicit private[this] val mat = Materializer.matFromSystem
+  implicit private[this] val as: typed.ActorSystem[Nothing] = atk.system
+  implicit private[this] val mat: Materializer = Materializer.matFromSystem
 
   override def afterAll(): Unit = {
     mat.shutdown()

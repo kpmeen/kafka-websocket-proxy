@@ -8,6 +8,7 @@ import org.apache.pekko.stream.testkit.scaladsl.{TestSink, TestSource}
 import net.scalytica.kafka.wsproxy.models.WsProducerId
 import net.scalytica.test.SharedAttributes.defaultTypesafeConfig
 import net.scalytica.test.{TestDataGenerators, WsProxySpec}
+import org.apache.pekko.actor.typed.ActorSystem
 import org.scalatest.Inspectors.forAll
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.matchers.must.Matchers
@@ -35,10 +36,11 @@ class ProducerFlowExtrasSpec
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(1, Minute))
 
-  val atk = ActorTestKit("producer-flow-extras-spec", defaultTypesafeConfig)
+  val atk: ActorTestKit =
+    ActorTestKit("producer-flow-extras-spec", defaultTypesafeConfig)
 
-  implicit val as  = atk.system
-  implicit val mat = Materializer.matFromSystem
+  implicit val as: ActorSystem[Nothing] = atk.system
+  implicit val mat: Materializer        = Materializer.matFromSystem
 
   override def afterAll(): Unit = {
     mat.shutdown()

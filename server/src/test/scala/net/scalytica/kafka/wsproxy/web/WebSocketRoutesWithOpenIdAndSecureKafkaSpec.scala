@@ -15,7 +15,7 @@ import org.apache.pekko.http.scaladsl.server._
 import org.apache.pekko.http.scaladsl.testkit.WSProbe
 import org.scalatest.wordspec.AnyWordSpec
 
-import java.net.URL
+import java.net.URI
 
 // scalastyle:off magic.number
 class WebSocketRoutesWithOpenIdAndSecureKafkaSpec
@@ -167,7 +167,7 @@ class WebSocketRoutesWithOpenIdAndSecureKafkaSpec
             implicit val prodCtx: ProducerContext = ctx
             implicit val wsClient: WSProbe        = ctx.producerProbe
 
-            val url   = new URL(oidcCfg.wellKnownUrl.value)
+            val url   = new URI(oidcCfg.wellKnownUrl.value).toURL
             val token = invalidAccessToken(url.getHost, url.getPort)
 
             val baseUri = baseProducerUri(

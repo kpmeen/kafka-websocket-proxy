@@ -11,6 +11,7 @@ import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.models.WsGroupId
 import net.scalytica.test.SharedAttributes.defaultTypesafeConfig
 import net.scalytica.test.{WsProxySpec, WsReusableProxyKafkaFixture}
+import org.apache.pekko.actor.typed.ActorSystem
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.time.{Minute, Span}
@@ -37,7 +38,7 @@ class SessionDataProducerSpec
 
   private[this] val atk =
     ActorTestKit("session-data-producer-test", defaultTypesafeConfig)
-  implicit private[this] val sys = atk.system
+  implicit private[this] val sys: ActorSystem[Nothing] = atk.system
 
   implicit val keyDes: StringBasedSerde[SessionId] =
     new SessionIdSerde().deserializer()

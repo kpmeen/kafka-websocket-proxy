@@ -3,13 +3,15 @@ package net.scalytica.kafka.wsproxy.config
 import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
 import io.github.embeddedkafka.EmbeddedKafka
 import net.scalytica.kafka.wsproxy.codecs.BasicSerdes.StringDeserializer
-import net.scalytica.kafka.wsproxy.codecs.DynamicCfgSerde
+import net.scalytica.kafka.wsproxy.codecs.{DynamicCfgSerde, StringBasedSerde}
+import net.scalytica.kafka.wsproxy.config
 import net.scalytica.kafka.wsproxy.config.Configuration.{
   DynamicCfg,
   ProducerSpecificLimitCfg
 }
 import net.scalytica.test.SharedAttributes.defaultTypesafeConfig
 import net.scalytica.test.{WsProxySpec, WsReusableProxyKafkaFixture}
+import org.apache.pekko.actor.typed.ActorSystem
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.time.{Minute, Span}
@@ -34,10 +36,12 @@ class DynamicConfigProducerSpec
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(1, Minute))
 
-  val atk = ActorTestKit("dyn-cfg-producer-test", defaultTypesafeConfig)
-  implicit val sys = atk.system
+  val atk: ActorTestKit =
+    ActorTestKit("dyn-cfg-producer-test", defaultTypesafeConfig)
+  implicit val sys: ActorSystem[Nothing] = atk.system
 
-  implicit val valDes = new DynamicCfgSerde().deserializer()
+  implicit val valDes: StringBasedSerde[config.Configuration.DynamicCfg] =
+    new DynamicCfgSerde().deserializer()
 
   override def afterAll(): Unit = {
     materializer.shutdown()

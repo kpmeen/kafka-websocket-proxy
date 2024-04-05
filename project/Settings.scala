@@ -1,6 +1,10 @@
 import com.github.sbt.git.SbtGit
 import com.typesafe.sbt.packager.Keys._
-import com.typesafe.sbt.packager.docker.DockerPlugin.autoImport.Docker
+import com.typesafe.sbt.packager.docker.DockerPlugin.autoImport.{
+  dockerBuildxPlatforms,
+  Docker
+}
+import com.typesafe.sbt.packager.docker.DockerPlugin.publishDocker
 import com.typesafe.sbt.packager.docker.{Cmd, DockerAlias, DockerStageBreak}
 import com.typesafe.sbt.packager.universal.UniversalPlugin.autoImport.Universal
 import net.scalytica.sbt.plugin.ExtLibTaskPlugin
@@ -111,17 +115,56 @@ object Settings {
     )
   }
 
+  def dockerExecutionCmd = Def.task {
+    val _       = publishLocal.value
+    val log     = streams.value.log
+    val context = (Docker / stage).value
+    val alias   = (Docker / dockerAliases).value
+    val pushOrLoad = resolvedScoped.value.key.label match {
+      case s: String if s.equalsIgnoreCase("publishLocal") => "--load"
+      case _                                               => "--push"
+    }
+    val multiplatform = (Docker / dockerBuildxPlatforms).value.nonEmpty
+    log.info(s"Building Docker multi-platform is $multiplatform")
+    val execCommand =
+      if (multiplatform)
+        (Docker / dockerExecCommand).value ++ Seq(
+          "buildx",
+          "build",
+          pushOrLoad,
+          s"--platform=${(Docker / dockerBuildxPlatforms).value.mkString(",")}"
+        ) ++ (Docker / dockerBuildOptions).value :+ "."
+      else (Docker / dockerBuildCommand).value
+
+    log.info(s"Using docker build command: ${execCommand.mkString(" ")}")
+
+    alias.foreach { aliasValue =>
+      publishDocker(
+        context,
+        execCommand,
+        aliasValue.toString,
+        log,
+        multiplatform
+      )
+    }
+  } dependsOn (Docker / stage)
+
   def dockerSettings(exposedPort: Int) =
     Seq(
-      maintainer       := "contact@scalytica.net",
-      dockerRepository := Some(s"$GitLabRegistry/$GitLabUser"),
-      dockerAlias      := gitlabDockerAlias(packageName.value, version.value),
+      dockerUpdateLatest := !isSnapshot.value,
+      maintainer         := "contact@scalytica.net",
+      dockerRepository   := Some(s"$GitLabRegistry/$GitLabUser"),
+      dockerBaseImage    := "eclipse-temurin:21-jdk",
+      dockerAlias := gitlabDockerAlias(
+        packageName.value,
+        version.value
+      ),
       dockerAliases ++= {
         val commitSha = SbtGit.git.gitHeadCommit.value
         val gitLab    = dockerAlias.value
         val dockerHub = dockerhubAlias(version.value)
 
-        if (dockerUpdateLatest.value) {
+        if ((Docker / dockerUpdateLatest).value) {
           // Push to both the GitLab and DockerHub registries.
           Seq(
             gitLab,
@@ -138,28 +181,21 @@ object Settings {
           )
         }
       },
-      dockerUpdateLatest          := !isSnapshot.value,
-      dockerBaseImage             := "azul/zulu-openjdk-debian:17",
-      Docker / dockerExposedPorts := Seq(exposedPort),
+      dockerBuildxPlatforms := Seq("linux/arm64", "linux/amd64"),
+      dockerExposedPorts    := Seq(exposedPort),
       dockerCommands := {
-        val aptCmd = Seq(
-          Cmd(
-            "RUN",
-            "apt-get update",
-            "&&",
-            "DEBIAN_FRONTEND=noninteractive",
-            "apt-get install -y apt-utils curl"
-          )
-        )
-
         val endStage = dockerCommands.value.indexOf(DockerStageBreak)
-        val (stageCmds, buildCmds) = dockerCommands.value.splitAt(endStage + 1)
+        val (stageCmds, buildCmds) =
+          dockerCommands.value.splitAt(endStage + 1)
         val usrRoot =
           buildCmds.indexWhere(_.makeContent.trim.equalsIgnoreCase("USER root"))
         val (buildStart, buildEnd) = buildCmds.splitAt(usrRoot + 1)
 
-        stageCmds ++ buildStart ++ aptCmd ++ buildEnd
+        stageCmds ++ buildStart ++ buildEnd
       },
+      // Override Docker exec command to support multi-arch builds
+      Docker / publishLocal := (dockerExecutionCmd tag (Tags.Disk, Tags.Publish)).value,
+      Docker / publish := (dockerExecutionCmd tag (Tags.Network, Tags.Publish)).value,
       // ----------------------------------------------------
       // Extra file mappings to external libs and configs
       // ----------------------------------------------------

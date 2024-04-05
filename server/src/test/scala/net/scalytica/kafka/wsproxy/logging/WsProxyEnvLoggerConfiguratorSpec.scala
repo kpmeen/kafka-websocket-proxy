@@ -21,9 +21,9 @@ class WsProxyEnvLoggerConfiguratorSpec
     with OptionValues
     with BeforeAndAfterAll {
 
-  implicit private val as =
+  implicit private val as: ActorSystem =
     ActorSystem.create("log-test-sys", ConfigFactory.empty())
-  implicit private val mat = Materializer(as)
+  implicit private val mat: Materializer = Materializer(as)
 
   private val rootLogger         = "ROOT"
   private val scalyticaLogger    = "net.scalytica"
