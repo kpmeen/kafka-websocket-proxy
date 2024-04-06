@@ -35,6 +35,7 @@ run test suites:
   script:
     - sbt coverage test coverageReport
     - sbt coverageAggregate
+  coverage: '/Statement coverage[A-Za-z\.*]\s*:\s*([^%]+)/'
   artifacts:
     paths:
       - target/
