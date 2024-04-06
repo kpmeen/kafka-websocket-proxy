@@ -42,5 +42,12 @@ you describe the issue. Please be as detailed as possible to help us understand
 your problem.
 
 
+##### The websocket connection between my client and the proxy is terminating at a regular interval
+
+If there is a firewall (like F5) between your client and the Kafka WebSocket Proxy, there may be
+some rules in place that prevent a connection to be open for more than a given amount of time.
+Usually this is because a set of rules for HTTP connections are triggered.  To address this issue,
+it is necessary to ensure the firewall allows WebSocket connections, and that they are allowed to
+remain open to prevent the firewall terminating the connection. 
 
 

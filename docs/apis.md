@@ -30,6 +30,14 @@ both inbound and outbound messages.
 
 ### Payload types
 
+> **INFO**
+>
+> Previous versions of Kafka WebSocket Proxy had support for using Avro as the wire protocol between proxy and clients.
+> However, the implementation was cumbersome and is currently removed. There is a plan to re-add avro support again,
+> with a much more sensible design.
+> 
+> Currently, however, Kafka WebSocket proxy only supports using JSON as the wire protocol between proxy and client.
+
 | Value     | description                                                                                                 |
 |:--------- |:----------------------------------------------------------------------------------------------------------- |
 | json      | The default payload type to send via the WebSockets. See the endpoint docs for examples for JSON messages   |
