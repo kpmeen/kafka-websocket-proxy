@@ -48,6 +48,7 @@ include:
       - if: $MANUAL_PUBLISH_PAGES != "true"
   - local: "/.gitlab/build_templates/gitlab-ci-scala-pages.yml"
     rules:
+      - if: $CI_COMMIT_TAG =~ /^v\d.*/ && $MANUAL_PUBLISH_PAGES != "true" && $TEST_DOCKER_BUILD != "true"
       - if: $MANUAL_PUBLISH_PAGES == "true" && $TEST_DOCKER_BUILD != "true"
   - local: "/.gitlab/build_templates/gitlab-ci-project-scanning.yml"
     rules:

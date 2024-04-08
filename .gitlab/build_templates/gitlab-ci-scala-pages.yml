@@ -9,9 +9,10 @@ variables:
 .shared_rules:
   rules:
     # Execute only when a tag is starting with v followed by a digit
-    - if: $CI_COMMIT_TAG =~ /^v\d.*/ && $MANUAL_PUBLISH_PAGES != "true"
+    - if: $CI_COMMIT_TAG =~ /^v\d.*/ && $MANUAL_PUBLISH_PAGES != "true" && $TEST_DOCKER_BUILD != "true"
+      when: on_success
       allow_failure: true
-    - if: $MANUAL_PUBLISH_PAGES == "true"
+    - if: $MANUAL_PUBLISH_PAGES == "true" && $TEST_DOCKER_BUILD != "true"
       when: manual
       allow_failure: false
 
