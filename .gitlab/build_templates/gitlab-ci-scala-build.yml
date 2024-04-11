@@ -15,11 +15,8 @@ cache:
   paths:
     - cache
 
-stages:
-  - test
-
 check style and formatting:
-  stage: test
+  stage: build
   tags:
     - docker
   script:
@@ -28,7 +25,7 @@ check style and formatting:
     - sbt clean scalastyle scalafmt
     - git diff --exit-code || (echo "ERROR Code formatting check failed, see differences above."; false)
 
-run test suites:
+compile and run test suites:
   stage: test
   tags:
     - docker

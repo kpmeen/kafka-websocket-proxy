@@ -1,0 +1,134 @@
+[options]
+# Activity will be filtered by this branch or reference name
+# branch = "master"
+
+# Return activity with activity since
+# this date or git reference. Can be any string
+# that is parsed with dateutil.parser.parse. If
+# empty, activity since the latest tag will be
+# used.
+#since = "2021-12-02"
+
+# Return activity with activity until
+# this date or git reference. Can be any string
+# that is parsed with dateutil.parser.parse. If
+# empty, today's date will be used.
+#until = "2022-01-31"
+
+# Activity to report. Currently, issues and
+# merge_requests are supported.
+# This options should be a list with
+# requested activity types. Currently,
+# "issues" and "merge_requests" are supported
+activity = ["merge_requests", "issues"]
+
+# An authentication token for GitLab. If None,
+# then the environment  variable
+# `GITLAB_ACCESS_TOKEN` will be tried. If it does
+# not exist  then attempt to infer the token from
+# `glab auth status -t`.
+# auth = "mysupersecrettoken"
+
+# Write the markdown to a file if desired.
+output = "CHANGELOG.md"
+
+# Whether to append to the existing output file.
+# If this flag is active there should be a marker
+#
+# <!-- <START NEW CHANGELOG ENTRY> -->
+#
+# in the existing changelog file. In the absence
+# of this marker an error will be raised.
+append = true
+
+# Base heading level to add when generating
+# markdown. Useful when including changelog
+# output in an existing document. By default,
+# changelog is emitted with one h1 and an h2
+# heading for each section. --heading-level=2
+# starts at h2, etc.
+heading_level = 2
+
+# Include list of opened issues/MRs in the output
+# include_opened = false
+
+# Include a list of contributors at the end of each release log
+include_contributors_list = true
+
+# If True, strip any text between brackets at the beginning of the issue/PR
+# title. E.g., [MRG], [DOC], etc.
+#
+# strip_brackets = false
+
+# Whether to include all the GitLab tags
+#
+#all = false
+
+# Whether to cache activity data in CSV files.
+# The data files can be found at
+# ~/.cache/gitlab-activity-cache folder organized
+# based on org/repo.
+#
+# cache = false
+
+# categories should be a list of dicts that define categories of issues/MRs. These categories will
+# be identified by issues/MRs labels by placing them under one group in the markdown
+# report. Users can define the metadata of the categories like labels, prefixes in titles
+# and description that will be used in markdown report
+#
+# Keys in each dict should be
+# labels: List of labels used in issues and MRs. It can be strings or regex expressions.
+# pre: List of prefixes used in isses and MRs titles, e.g., FEAT: Support new DB backend
+#      This can be a list of string or regex expressions
+# description: Description to be used in the Changelog file
+#
+# For both labels and pre elements, re.match(re.escape(repl), string) is used to match
+# labels
+[activity]
+# Users need to define list of bot_users that their projects are using to exclude
+# them in activity markdown report
+#
+# bot_users should be a list of users that repository/group uses.
+# These names can be literal strings or regex expressions
+# These users will be omitted from contributors list in the Changelog
+bot_users = [
+    "(.*)codecov(.*)",
+    "gitlab-bot",
+    "ghost1",
+]
+
+# Subsection categories inside activity can be used to define labels used by the project
+# in both issues and merge_requests. This gives flexibility for the projects that use different
+# set of labels for issues and MRs and they can be grouped appropariately in the
+# markdown report.
+#
+# If project uses same lables for issues and MRs, users can configure one of them and
+# leave out the other. By default, if one of issues or merge_requests is found, the
+# same group of labels will be used for the other
+[activity.categories]
+# Labels used in issues
+# Dicts must be inline for linters not to complain
+issues = [
+    { labels = [ "feature" ], pre = [ "NEW", "FEAT", "FEATURE" ], description = "New features added" },
+    { labels = [ "improvement" ], pre = [ "IMPROVE", "IMP" ], description = "Improvements made" },
+    { labels = [ "bug::critical", "bug::major", "bug::moderate", "bug::minor", "hotfix" ], pre = [ "FIX", "BUG" ], description = "Bugs fixed" },
+    { labels = [ "dependency update" ], pre = [ "DEP", ], description = "Dependency updates" },
+    { labels = [ "CI/CD" ], pre = [ "CI", "CICD" ], description = "CI changes" },
+    { labels = [ "infrastructure" ], pre = [ "INFRA" ], description = "Changes to the application runtime" },
+    { labels = [ "documentation" ], pre = [ "DOC", "DOCS" ], description = "Documentation improvements" },
+    { labels = [ "testing" ], pre = [ "TEST", "TESTING" ], description = "Test related changes" },
+    { labels = [ "security" ], pre = [ "SEC", "SECURITY" ], description = "Security related issues" },
+]
+# Labels used in MRs
+# Dicts must be inline for linters not to complain
+merge_requests = [
+    { labels = [ "feature" ], pre = [ "NEW", "FEAT", "FEATURE" ], description = "New features added" },
+    { labels = [ "improvement" ], pre = [ "IMPROVE", "IMP" ], description = "Improvements made" },
+    { labels = [ "bug::critical", "bug::major", "bug::moderate", "bug::minor" ], pre = [ "FIX", "BUG" ], description = "Bugs fixed" },
+    { labels = [ "dependency update" ], pre = [ "DEP", ], description = "Dependency updates" },
+    { labels = [ "CI/CD" ], pre = [ "CI", "CICD" ], description = "CI changes" },
+    { labels = [ "infrastructure" ], pre = [ "INFRA" ], description = "Changes to the application runtime" },
+    { labels = [ "documentation" ], pre = [ "DOC", "DOCS" ], description = "Documentation improvements" },
+    { labels = [ "testing" ], pre = [ "TEST", "TESTING" ], description = "Test related changes" },
+    { labels = [ "security" ], pre = [ "SEC", "SECURITY" ], description = "Security related issues" },
+]

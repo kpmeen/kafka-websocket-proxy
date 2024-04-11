@@ -15,9 +15,6 @@ cache:
   paths:
     - cache
 
-stages:
-  - publish-docker
-
 publish docker containers:
   stage: publish-docker
   tags:

@@ -17,22 +17,19 @@ variables:
   CS_DISABLE_DEPENDENCY_LIST: 'true'
   CS_SEVERITY_THRESHOLD: "CRITICAL"
 
-stages:
-  - test
-  - publish-docker
-  - scan
-
 include:
-  - template: Security/Secret-Detection.gitlab-ci.yml
-  - template: Security/Dependency-Scanning.gitlab-ci.yml
-  - template: Security/SAST.gitlab-ci.yml
-  - template: Code-Quality.gitlab-ci.yml
+  - template: Jobs/Secret-Detection.gitlab-ci.yml
+  - template: Jobs/Dependency-Scanning.gitlab-ci.yml
+  - template: Jobs/SAST.gitlab-ci.yml
+  - template: Jobs/Code-Quality.gitlab-ci.yml
 
 secret_detection:
+  stage: build
   variables:
     SECRET_DETECTION_HISTORIC_SCAN: "false"
 
 spotbugs-sast:
+  stage: build
   variables:
     ASDF_JAVA_VERSION: adoptopenjdk-21.0.2+13.0.LTS #https://github.com/halcyon/asdf-java/blob/master/data/jdk-linux-x86_64.tsv
     JAVA_PATH: /opt/asdf/shims/java
@@ -40,9 +37,16 @@ spotbugs-sast:
       - /bin/bash -c "source $HOME/.bashrc && asdf install java $ASDF_JAVA_VERSION && asdf global java $ASDF_JAVA_VERSION"
 
 code_quality:
+  stage: build
   artifacts:
     paths:
       - gl-code-quality-report.json
+  rules:
+    - if: $CODE_QUALITY_DISABLED
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" # Run code quality job in merge request pipelines
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH      # Run code quality job in pipelines on the default branch (but not in other branch pipelines)
+    - if: $CI_COMMIT_TAG                               # Run code quality job in pipelines for tags
 
 # To have the container scanning execute in the desired stage, the below is copied
 # directly from https://gitlab.com/gitlab-org/gitlab/-/blob/master/lib/gitlab/ci/templates/Security/Container-Scanning.gitlab-ci.yml

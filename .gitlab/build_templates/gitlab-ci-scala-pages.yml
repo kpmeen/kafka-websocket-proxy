@@ -6,7 +6,7 @@ variables:
   DOCKER_DRIVER: overlay2
   SBT_MDOCS_MODULE_DIR: '$CI_PROJECT_NAME-docs'
 
-.shared_rules:
+.pages_shared_rules:
   rules:
     # Execute only when a tag is starting with v followed by a digit
     - if: $CI_COMMIT_TAG =~ /^v\d.*/ && $MANUAL_PUBLISH_PAGES != "true" && $TEST_DOCKER_BUILD != "true"
@@ -18,7 +18,7 @@ variables:
 
 pages:build:
   rules:
-    - !reference [.shared_rules, rules]
+    - !reference [.pages_shared_rules, rules]
   stage: build
   image: registry.gitlab.com/kpmeen/docker-scala-sbt:scala_2.13.13_jdk21
   tags:
@@ -32,7 +32,7 @@ pages:build:
 
 pages:
   rules:
-    - !reference [.shared_rules, rules]
+    - !reference [.pages_shared_rules, rules]
   stage: deploy
   image: node:18-alpine
   needs:
