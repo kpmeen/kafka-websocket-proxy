@@ -22,8 +22,9 @@ releaseProcess := Seq[ReleaseStep](
   commitReleaseVersion,      // : ReleaseStep, performs the initial git checks
   tagRelease,                // : ReleaseStep
   setNextVersion,            // : ReleaseStep
-  commitNextVersion,         // : ReleaseStep
-  pushChanges // : ReleaseStep, also checks that an upstream branch is properly configured
+  commitNextVersion          // : ReleaseStep
+  // NOTE: For release during CI/CD we want to push manually.
+  // pushChanges // : ReleaseStep, also checks that an upstream branch is properly configured
 )
 
 Global / excludeLintKeys ++= Set(
