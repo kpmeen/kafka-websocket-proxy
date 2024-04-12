@@ -20,8 +20,9 @@ cache:
 
 update changelog:
   rules:
-    - if: $WS_RELEASE_VERSION && $MANUAL_PUBLISH_PAGES != "true" && $TEST_DOCKER_BUILD != "true"
+    - if: $DO_RELEASE == "true" && $MANUAL_PUBLISH_PAGES != "true" && $TEST_DOCKER_BUILD != "true"
 #      when: manual
+      when: on_success
       allow_failure: false
 #    - if: $CI_MERGE_REQUEST_ID
 #      when: never
@@ -56,11 +57,11 @@ update changelog:
 
 sbt release:
   rules:
-    - if: $WS_RELEASE_VERSION && $MANUAL_PUBLISH_PAGES != "true" && $TEST_DOCKER_BUILD != "true"
+    - if: $DO_RELEASE == "true" && $MANUAL_PUBLISH_PAGES != "true" && $TEST_DOCKER_BUILD != "true"
       when: on_success
       allow_failure: false
-    - if: $CI_MERGE_REQUEST_ID
-      when: never
+#    - if: $CI_MERGE_REQUEST_ID
+#      when: never
 #  only:
 #    - master
   stage:
