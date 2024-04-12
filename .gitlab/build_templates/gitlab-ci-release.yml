@@ -9,6 +9,7 @@ variables:
   DOCKER_TLS_CERTDIR: ""
   # Setting specific folder for sbt-coursier to cache artifacts
   COURSIER_CACHE: "/root/cache/coursier"
+  # Release specific variables
   NEXT_VERSION_SPECIFIER: "v$WS_RELEASE_VERSION"
   WS_NEXT_SNAPSHOT_VERSION: ""
   WS_SKIP_RELEASE_TESTS: "true"

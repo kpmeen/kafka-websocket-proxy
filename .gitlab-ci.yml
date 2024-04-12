@@ -34,10 +34,10 @@ cache:
     - cache
 
 stages:
+  - prepare-release
   - commit
   - build
   - test
-  - prepare-release
   - publish-docker
   - deploy
   - scan
