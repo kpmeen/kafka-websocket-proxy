@@ -26,6 +26,8 @@ update changelog:
       allow_failure: false
 #    - if: $CI_MERGE_REQUEST_ID
 #      when: never
+#  only:
+#    - master
   stage:
     - prepare-release
   variables:
