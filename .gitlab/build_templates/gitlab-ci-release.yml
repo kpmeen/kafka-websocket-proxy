@@ -25,10 +25,10 @@ update changelog:
 #      when: manual
       when: on_success
       allow_failure: false
-#    - if: $CI_MERGE_REQUEST_ID
-#      when: never
-#  only:
-#    - master
+    - if: $CI_MERGE_REQUEST_ID
+      when: never
+  only:
+    - master
   stage: prepare-release
   variables:
     GIT_STRATEGY: clone
@@ -47,7 +47,7 @@ update changelog:
   script:
     - echo "Creating new changelog entries for $NEXT_VERSION_SPECIFIER"
     # Generate changelog. Uses $NEXT_VERSION_SPECIFIER to inject the tag information
-    - gitlab-activity
+    - gitlab-activity -t $CI_PROJECT_PATH
     # Remove link from "Contributors" header
     - sed -i 's/#### \[Contributors to this release.*/#### Contributors to this release/g' CHANGELOG.md
     # Print the changelog to be able to manually verify the output
@@ -62,10 +62,10 @@ sbt release:
     - if: $DO_RELEASE == "true" && $MANUAL_PUBLISH_PAGES != "true" && $TEST_DOCKER_BUILD != "true"
       when: on_success
       allow_failure: false
-#    - if: $CI_MERGE_REQUEST_ID
-#      when: never
-#  only:
-#    - master
+    - if: $CI_MERGE_REQUEST_ID
+      when: never
+  only:
+    - master
   stage: prepare-release
   needs:
     - update changelog
