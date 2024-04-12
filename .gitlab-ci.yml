@@ -23,7 +23,7 @@ variables:
   ################################################################################
   # Flag to trigger manual publishing of pages
   MANUAL_PUBLISH_PAGES: "false"
-  # FLag to trigger a test-run of the docker image build
+  # Flag to trigger a test-run of the docker image build
   TEST_DOCKER_BUILD: "false"
 
 cache:
@@ -41,16 +41,19 @@ stages:
   - scan
 
 include:
+  - local: "/.gitlab/build_templates/gitlab-ci-release.yml"
+    rules:
+      - if: $WS_RELEASE_VERSION && $MANUAL_PUBLISH_PAGES != "true" && $TEST_DOCKER_BUILD != "true"
   - local: "/.gitlab/build_templates/gitlab-ci-scala-build.yml"
     rules:
-      - if: $MANUAL_PUBLISH_PAGES != "true" && $TEST_DOCKER_BUILD != "true"
+      - if: $MANUAL_PUBLISH_PAGES != "true" && $TEST_DOCKER_BUILD != "true" && ($WS_RELEASE_VERSION == null || $WS_RELEASE_VERSION == "")
   - local: "/.gitlab/build_templates/gitlab-ci-scala-docker.yml"
     rules:
-      - if: $MANUAL_PUBLISH_PAGES != "true"
+      - if: $MANUAL_PUBLISH_PAGES != "true" && ($WS_RELEASE_VERSION == null || $WS_RELEASE_VERSION == "")
   - local: "/.gitlab/build_templates/gitlab-ci-scala-pages.yml"
     rules:
-      - if: $CI_COMMIT_TAG =~ /^v\d.*/ && $MANUAL_PUBLISH_PAGES != "true" && $TEST_DOCKER_BUILD != "true"
-      - if: $MANUAL_PUBLISH_PAGES == "true" && $TEST_DOCKER_BUILD != "true"
+      - if: $CI_COMMIT_TAG =~ /^v\d.*/ && $MANUAL_PUBLISH_PAGES != "true" && $TEST_DOCKER_BUILD != "true" && ($WS_RELEASE_VERSION == null || $WS_RELEASE_VERSION == "")
+      - if: $MANUAL_PUBLISH_PAGES == "true" && $TEST_DOCKER_BUILD != "true" && ($WS_RELEASE_VERSION == null || $WS_RELEASE_VERSION == "")
   - local: "/.gitlab/build_templates/gitlab-ci-project-scanning.yml"
     rules:
-      - if: $MANUAL_PUBLISH_PAGES != "true" && $TEST_DOCKER_BUILD != "true"
+      - if: $MANUAL_PUBLISH_PAGES != "true" && $TEST_DOCKER_BUILD != "true" && ($WS_RELEASE_VERSION == null || $WS_RELEASE_VERSION == "")
