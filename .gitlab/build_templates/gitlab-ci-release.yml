@@ -28,8 +28,7 @@ update changelog:
 #      when: never
 #  only:
 #    - master
-  stage:
-    - prepare-release
+  stage: prepare-release
   variables:
     GIT_STRATEGY: clone
   before_script:
@@ -66,8 +65,7 @@ sbt release:
 #      when: never
 #  only:
 #    - master
-  stage:
-    - prepare-release
+  stage: prepare-release
   needs:
     - update changelog
   before_script:
