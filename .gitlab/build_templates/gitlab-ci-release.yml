@@ -42,7 +42,7 @@ update changelog:
     # Install gitlab-activity for generating changelogs
     - pip install gitlab-activity
   script:
-    - echo "Creating changelog entries for $NEXT_VERSION_SPECIFIER"
+    - echo "Creating new changelog entries for $NEXT_VERSION_SPECIFIER"
     # Generate changelog. Uses $NEXT_VERSION_SPECIFIER to inject the tag information
     - gitlab-activity
     # Remove link from "Contributors" header
