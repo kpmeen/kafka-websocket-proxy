@@ -60,6 +60,7 @@ include:
         when: never
       - if: $MANUAL_PUBLISH_PAGES == "true"
         when: never
+      - when: on_success
   # Building of Docker images
   - local: "/.gitlab/build_templates/gitlab-ci-scala-docker.yml"
     rules:
@@ -67,6 +68,7 @@ include:
         when: never
       - if: $MANUAL_PUBLISH_PAGES == "true"
         when: never
+      - when: on_success
   # Building and publishing documentation to GitLab Pages
   - local: "/.gitlab/build_templates/gitlab-ci-scala-pages.yml"
     rules:
@@ -85,3 +87,4 @@ include:
         when: never
       - if: $DO_RELEASE_PREP == "true"
         when: never
+      - when: on_success
