@@ -27,12 +27,17 @@ update changelog:
       allow_failure: false
     - if: $CI_MERGE_REQUEST_ID
       when: never
-  only:
-    - master
   stage: prepare-release
   variables:
     GIT_STRATEGY: clone
   before_script:
+    - echo "*********************** DEBUG ***********************"
+    - echo "WS_RELEASE_VERSION = $WS_RELEASE_VERSION"
+    - echo "WS_NEXT_SNAPSHOT_VERSION = $WS_NEXT_SNAPSHOT_VERSION"
+    - echo "WS_SKIP_RELEASE_TESTS = $WS_SKIP_RELEASE_TESTS"
+    - echo "NEXT_VERSION_SPECIFIER = $NEXT_VERSION_SPECIFIER"
+    - echo "CI_PROJECT_PATH = $CI_PROJECT_PATH"
+    - echo "*****************************************************"
     # Configure mail and name of the user who should be visible in the commit history
     - git config --global user.email 'release-bot@gitlab.com'
     - git config --global user.name 'Release Bot'
@@ -64,8 +69,6 @@ sbt release:
       allow_failure: false
     - if: $CI_MERGE_REQUEST_ID
       when: never
-  only:
-    - master
   stage: prepare-release
   needs:
     - update changelog

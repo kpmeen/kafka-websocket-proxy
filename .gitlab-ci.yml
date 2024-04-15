@@ -26,7 +26,7 @@ variables:
   # Flag to trigger a test-run of the docker image build
   TEST_DOCKER_BUILD: "false"
   # Flag to trigger release
-  DO_RELEASE: "false"
+  DO_RELEASE_PREP: "false"
 
 cache:
   untracked: true
@@ -43,19 +43,45 @@ stages:
   - scan
 
 include:
+  # Release job definitions
   - local: "/.gitlab/build_templates/gitlab-ci-release.yml"
     rules:
-      - if: $DO_RELEASE == "true" && $MANUAL_PUBLISH_PAGES != "true" && $TEST_DOCKER_BUILD != "true"
+      - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $DO_RELEASE_PREP == "true"
+      - if: $TEST_DOCKER_BUILD == "true"
+        when: never
+      - if: $MANUAL_PUBLISH_PAGES == "true"
+        when: never
+  # Building and testing of Scala project
   - local: "/.gitlab/build_templates/gitlab-ci-scala-build.yml"
     rules:
-      - if: $MANUAL_PUBLISH_PAGES != "true" && $TEST_DOCKER_BUILD != "true" && $DO_RELEASE != "true"
+      - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $DO_RELEASE_PREP == "true"
+        when: never
+      - if: $TEST_DOCKER_BUILD == "true"
+        when: never
+      - if: $MANUAL_PUBLISH_PAGES == "true"
+        when: never
+  # Building of Docker images
   - local: "/.gitlab/build_templates/gitlab-ci-scala-docker.yml"
     rules:
-      - if: $MANUAL_PUBLISH_PAGES != "true" && $DO_RELEASE != "true"
+      - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $DO_RELEASE_PREP == "true"
+        when: never
+      - if: $MANUAL_PUBLISH_PAGES == "true"
+        when: never
+  # Building and publishing documentation to GitLab Pages
   - local: "/.gitlab/build_templates/gitlab-ci-scala-pages.yml"
     rules:
-      - if: $CI_COMMIT_TAG =~ /^v\d.*/ && $MANUAL_PUBLISH_PAGES != "true" && $TEST_DOCKER_BUILD != "true" && $DO_RELEASE != "true"
-      - if: $MANUAL_PUBLISH_PAGES == "true" && $TEST_DOCKER_BUILD != "true" && $DO_RELEASE != "true"
+      - if: $CI_COMMIT_TAG =~ /^v\d.*/
+      - if: $MANUAL_PUBLISH_PAGES == "true"
+      - if: $TEST_DOCKER_BUILD == "true"
+        when: never
+      - if: $DO_RELEASE_PREP == "true"
+        when: never
+  # Various GitLab project scanning features
   - local: "/.gitlab/build_templates/gitlab-ci-project-scanning.yml"
     rules:
-      - if: $MANUAL_PUBLISH_PAGES != "true" && $TEST_DOCKER_BUILD != "true" && $DO_RELEASE != "true"
+      - if: $MANUAL_PUBLISH_PAGES == "true"
+        when: never
+      - if: $TEST_DOCKER_BUILD == "true"
+        when: never
+      - if: $DO_RELEASE_PREP == "true"
+        when: never
