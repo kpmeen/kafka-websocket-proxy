@@ -1,6 +1,28 @@
 [options]
+# The GitLab organization/repo for which you want
+# to grab recent issues/merge_requests. Can either
+# be *just* an organization (e.g., `gitlab-org`),
+# or a combination organization and repo (e.g.,
+# `gitlab-org/gitlab-docs`). If the former, all
+# repositories for that org will be used. If the
+# latter, only the specified repository will be
+# used.
+#
+# Can also be a GitLab URL to an organization or
+# repo e.g.,  https://gitlab.com/gitlab-org/gitlab-docs.
+#
+# Self-hosted gitlab instances are also supported.
+# Ensure that full URL of  the organization or
+# repository is provided when using self-hosted
+# instances. In absence of domain in the URL, gitlab.com
+# will be used.
+#
+# If empty, the org/repo will attempt to be inferred from
+# `git remote -v` in current directory.
+target = "https://gitlab.com/kpmeen/kafka-websocket-proxy"
+
 # Activity will be filtered by this branch or reference name
-# branch = "master"
+branch = "master"
 
 # Return activity with activity since
 # this date or git reference. Can be any string

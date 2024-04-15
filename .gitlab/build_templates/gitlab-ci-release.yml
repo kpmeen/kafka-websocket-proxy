@@ -59,7 +59,7 @@ update changelog:
   script:
     - echo "Creating new changelog entries for $NEXT_VERSION_SPECIFIER"
     # Generate changelog. Uses $NEXT_VERSION_SPECIFIER to inject the tag information
-    - gitlab-activity -t $CI_PROJECT_PATH
+    - gitlab-activity
     # Remove link from "Contributors" header
     - sed -i 's/#### \[Contributors to this release.*/#### Contributors to this release/g' CHANGELOG.md
     # Print the changelog to be able to manually verify the output
