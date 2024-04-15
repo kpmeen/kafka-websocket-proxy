@@ -44,9 +44,9 @@ update changelog:
     - echo "WS_SKIP_RELEASE_TESTS = $WS_SKIP_RELEASE_TESTS"
     - echo "NEXT_VERSION_SPECIFIER = $NEXT_VERSION_SPECIFIER"
     - echo "CI_PROJECT_PATH = $CI_PROJECT_PATH"
+    - echo "git remote is = `git remote -v`"
     - echo "*****************************************************"
     # Configure mail and name of the user who should be visible in the commit history
-    - git config --global user.email 'release-bot@gitlab.com'
     - git config --global user.name 'Release Bot'
     # Install python3 and pip
     - add-apt-repository ppa:deadsnakes/ppa -y
