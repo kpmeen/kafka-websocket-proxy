@@ -47,7 +47,8 @@ update changelog:
     - echo "git remote is = `git remote -v`"
     - echo "*****************************************************"
     # Configure mail and name of the user who should be visible in the commit history
-    - git config --global user.name 'Release Bot'
+#    - git config --global user.email 'project_11380121_bot_e88c32f55d170baf0a266f2683511592@gitlab.com'
+#    - git config --global user.name 'Release Bot'
     # Install python3 and pip
     - add-apt-repository ppa:deadsnakes/ppa -y
     - apt-get update
@@ -77,8 +78,8 @@ sbt release:
     - update changelog
   before_script:
     # Configure mail and name of the user who should be visible in the commit history
-    - git config --global user.email 'release-bot@gitlab.com'
-    - git config --global user.name 'Release Bot'
+#    - git config --global user.email 'project_11380121_bot_e88c32f55d170baf0a266f2683511592@gitlab.com'
+#    - git config --global user.name 'Release Bot'
   script:
     - >
       echo "Checking release version..."
