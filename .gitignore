@@ -26,3 +26,7 @@ server/src/test/resources/sasl/server/*.crt
 server/src/test/resources/sasl/server/*.csr
 server/src/test/resources/sasl/server/*.jks
 
+gl-code-quality-report.json
+gl-sast-report.json
+gl-secret-detection-report.json
+semgrep.sarif
