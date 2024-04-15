@@ -19,14 +19,21 @@ cache:
   paths:
     - cache
 
-update changelog:
+.release_prep_shared_rules:
   rules:
-    - if: $DO_RELEASE == "true" && $MANUAL_PUBLISH_PAGES != "true" && $TEST_DOCKER_BUILD != "true"
-#      when: manual
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $DO_RELEASE_PREP == "true"
       when: on_success
       allow_failure: false
+    - if: $TEST_DOCKER_BUILD == "true"
+      when: never
+    - if: $MANUAL_PUBLISH_PAGES == "true"
+      when: never
     - if: $CI_MERGE_REQUEST_ID
       when: never
+
+update changelog:
+  rules:
+    - !reference [.release_prep_shared_rules, rules]
   stage: prepare-release
   variables:
     GIT_STRATEGY: clone
@@ -64,11 +71,7 @@ update changelog:
 
 sbt release:
   rules:
-    - if: $DO_RELEASE == "true" && $MANUAL_PUBLISH_PAGES != "true" && $TEST_DOCKER_BUILD != "true"
-      when: on_success
-      allow_failure: false
-    - if: $CI_MERGE_REQUEST_ID
-      when: never
+    - !reference [.release_prep_shared_rules, rules]
   stage: prepare-release
   needs:
     - update changelog
