@@ -19,7 +19,7 @@
 #
 # If empty, the org/repo will attempt to be inferred from
 # `git remote -v` in current directory.
-target = "https://gitlab.com/kpmeen/kafka-websocket-proxy"
+target = "kpmeen/kafka-websocket-proxy"
 
 # Activity will be filtered by this branch or reference name
 branch = "master"
