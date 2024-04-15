@@ -68,7 +68,7 @@ update changelog:
     # Add, commit and push the updated CHANGELOG.md file
     - git add CHANGELOG.md
     - git commit -m "Update CHANGELOG.md"
-    - git push origin $CI_COMMIT_REF_NAME -o ci.skip # Pushes to the same branch as the trigger
+    #- git push origin $CI_COMMIT_REF_NAME -o ci.skip # Pushes to the same branch as the trigger
 
 sbt release:
   rules:
