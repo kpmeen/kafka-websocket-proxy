@@ -30,3 +30,8 @@ gl-code-quality-report.json
 gl-sast-report.json
 gl-secret-detection-report.json
 semgrep.sarif
+.csslintrc
+.eslintignore
+.eslintrc.yml
+.rubocop.yml
+coffeelint.json

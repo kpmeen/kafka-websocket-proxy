@@ -114,9 +114,8 @@ include_contributors_list = true
 # These names can be literal strings or regex expressions
 # These users will be omitted from contributors list in the Changelog
 bot_users = [
-    "(.*)codecov(.*)",
-    "gitlab-bot",
-    "ghost1",
+    "(.*)_bot_(.*)",
+    "release_bot"
 ]
 
 # Subsection categories inside activity can be used to define labels used by the project

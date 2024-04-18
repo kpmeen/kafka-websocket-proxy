@@ -19,61 +19,132 @@ cache:
   paths:
     - cache
 
-.release_prep_shared_rules:
+# Shared base rules for when to trigger a build
+.shared_release_prep_rules:
   rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $DO_RELEASE_PREP == "true"
-      when: on_success
-      allow_failure: false
+    - if: $TEST_DO_RELEASE_PREP == "true"
+      when: manual
     - if: $TEST_DOCKER_BUILD == "true"
       when: never
     - if: $MANUAL_PUBLISH_PAGES == "true"
       when: never
-    - if: $CI_MERGE_REQUEST_ID
-      when: never
+
+# Update git config to reflect commits are made from this pipeline
+.configure_git: &configure_git
+  # Configure mail and name of the user who should be visible in the commit history
+  - echo "Configuring git user..."
+  - git config --global user.email 'release_bot@gitlab.com'
+  - git config --global user.name 'Release Bot'
+
+.debug_output: &debug_output
+  - echo "*********************** DEBUG ***********************"
+  - echo "WS_RELEASE_VERSION = $WS_RELEASE_VERSION"
+  - echo "WS_NEXT_SNAPSHOT_VERSION = $WS_NEXT_SNAPSHOT_VERSION"
+  - echo "NEXT_VERSION_SPECIFIER = $NEXT_VERSION_SPECIFIER"
+  - echo "WS_SKIP_RELEASE_TESTS = $WS_SKIP_RELEASE_TESTS"
+  - echo "CI_PROJECT_PATH = $CI_PROJECT_PATH"
+  - echo "git remote is = `git remote -v`"
+  - echo "CI_API_V4_URL = $CI_API_V4_URL"
+  - echo "CI_PROJECT_ID = $CI_PROJECT_ID"
+  - echo "GITLAB_CI_USER = $GITLAB_CI_USER"
+  - echo "*****************************************************"
+
+.validate_release_vars: &validate_release_vars
+  - echo "Validating release variables..."
+  - |
+    if [[ -z $WS_RELEASE_VERSION ]]; then
+      echo "Cannot perform release since WS_RELEASE_VERSION is undefined"
+      exit 1
+    else
+      echo "WS_RELEASE_VERSION is $WS_RELEASE_VERSION"
+    fi
+  - |
+    if [[ -z $WS_NEXT_SNAPSHOT_VERSION ]]; then
+      echo "WS_NEXT_SNAPSHOT_VERSION is undefined, using default (next) version bump."
+    else
+      echo "Next snapshot version will be ${WS_NEXT_SNAPSHOT_VERSION}-SNAPSHOT"
+    fi
+  - echo "WS_SKIP_RELEASE_TESTS is $WS_SKIP_RELEASE_TESTS"
+  - version_regexp="^v(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(\\-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?(\\+[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
+  - |
+    if [[ "$NEXT_VERSION_SPECIFIER" =~ $version_regexp ]]; then
+      echo "Release version is semantically correct..."
+      echo "Release version will be $NEXT_VERSION_SPECIFIER"
+    else
+      echo "Release version does not follow semver semantics"
+      exit 1
+    fi
+  - echo "Check if git tag already exists..."
+  - |
+    the_tags=$(curl --header "PRIVATE-TOKEN: $GITLAB_ACCESS_TOKEN" --url "$CI_API_V4_URL/projects/$CI_PROJECT_ID/repository/tags")
+    echo "Found tags \n $the_tags"
+    the_tag_names=$(echo "$the_tags" | jq -r '.[].name')
+    echo "Tag names are \n $the_tag_names"
+    tag_name_lookup=$(echo "$the_tag_names" | grep "$NEXT_VERSION_SPECIFIER") || true
+    echo "Looking up tag name yielded $tag_name_lookup"
+    if [[ -n $tag_name_lookup && "$tag_name_lookup" == "$NEXT_VERSION_SPECIFIER" ]]; then
+      echo "Tag $NEXT_VERSION_SPECIFIER already exists. Aborting release preparations."
+      exit 1
+    else
+      echo "Will prepare release for tag $NEXT_VERSION_SPECIFIER" 
+    fi
+
+# Anchor with reference for add_changelog_entry job.
+.add_changelog_entry: &add_changelog_entry
+  - echo "Creating new changelog entries for $NEXT_VERSION_SPECIFIER"
+  # Generate changelog. Uses $NEXT_VERSION_SPECIFIER to inject the tag information
+  - gitlab-activity
+  # Remove link from "Contributors" header
+  - sed -i 's/#### \[Contributors to this release.*/#### Contributors to this release/g' CHANGELOG.md
+  # Print the changelog to be able to manually verify the output
+  - cat CHANGELOG.md
+  # Add, commit and push the updated CHANGELOG.md file
+  - git add CHANGELOG.md
+  - git commit -m "Updates CHANGELOG.md"
 
 # Job to update the CHANGELOG.md file. It requires the parameter DO_RELEASE_PREP to be
 # true. It will only run for the master branch, and will be ignored if one, or both, of
 # TEST_DOCKER_BUILD or MANUAL_PUBLISH_PAGES are true.
 # The updated CHANGELOG.md is then committed and pushed to the master branch with the
-#  ci.skip flag set.
+#  ci.skip flag set. This prevents a build to be executed before the "prepare_release"
+# has been completed successfully.
 update changelog:
-  rules:
-    - !reference [.release_prep_shared_rules, rules]
   stage: prepare-release
   variables:
     GIT_STRATEGY: clone
   before_script:
-    - echo "*********************** DEBUG ***********************"
-    - echo "WS_RELEASE_VERSION = $WS_RELEASE_VERSION"
-    - echo "WS_NEXT_SNAPSHOT_VERSION = $WS_NEXT_SNAPSHOT_VERSION"
-    - echo "WS_SKIP_RELEASE_TESTS = $WS_SKIP_RELEASE_TESTS"
-    - echo "NEXT_VERSION_SPECIFIER = $NEXT_VERSION_SPECIFIER"
-    - echo "CI_PROJECT_PATH = $CI_PROJECT_PATH"
-    - echo "git remote is = `git remote -v`"
-    - echo "*****************************************************"
-    # Configure mail and name of the user who should be visible in the commit history
-    - git config --global user.email 'project_11380121_bot_e88c32f55d170baf0a266f2683511592@gitlab.com'
-    - git config --global user.name 'Release Bot'
     # Install python3 and pip
     - add-apt-repository ppa:deadsnakes/ppa -y
     - apt-get update
-    - apt-get install -y python3.13 python3-pip
+    - apt-get install -y python3.13 python3-pip jq
     - update-alternatives --install /usr/bin/python python /usr/bin/python3.13 1
     - pip install -U pip
     # Install gitlab-activity for generating changelogs
     - pip install gitlab-activity
   script:
-    - echo "Creating new changelog entries for $NEXT_VERSION_SPECIFIER"
-    # Generate changelog. Uses $NEXT_VERSION_SPECIFIER to inject the tag information
-    - gitlab-activity
-    # Remove link from "Contributors" header
-    - sed -i 's/#### \[Contributors to this release.*/#### Contributors to this release/g' CHANGELOG.md
-    # Print the changelog to be able to manually verify the output
-    - cat CHANGELOG.md
-    # Add, commit and push the updated CHANGELOG.md file
-    - git add CHANGELOG.md
-    - git commit -m "Update CHANGELOG.md"
-    - git push origin $CI_COMMIT_REF_NAME -o ci.skip # Pushes to the same branch as the trigger
+    # Configure git user config
+    - *configure_git
+    # Print some debug information
+    - *debug_output
+    # Validate input variables
+    - echo "******** Validating input ********"
+    - *validate_release_vars
+    # Generate the changelog entries
+    - echo "******** Changelog entries ********"
+    - *add_changelog_entry
+    # Push changes back to the git repository
+    - echo "******** Pushing changes ********"
+    - |
+      if [[ ${TEST_DO_RELEASE_PREP} == "false" ]]; then
+        git remote set-url --push origin "https://oauth2:${GITLAB_ACCESS_TOKEN}@${CI_REPOSITORY_URL#*@}"
+        git push origin $CI_COMMIT_REF_NAME -o ci.skip
+      else
+        echo "Skipping push since TEST_DO_RELEASE_PREP is $TEST_DO_RELEASE_PREP"
+      fi
+  rules:
+    - !reference [ .shared_release_prep_rules, rules ]
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $DO_RELEASE_PREP == "true"
+      when: on_success
 
 # Job to create the release tag and update the version.sbt with the next SNAPSHOT version.
 # It requires the parameter DO_RELEASE_PREP to be true. It will only run for the master
@@ -81,33 +152,19 @@ update changelog:
 # are true.
 # This job requires the "update changelog" job to execute first.
 sbt release:
-  rules:
-    - !reference [.release_prep_shared_rules, rules]
   stage: prepare-release
   needs:
     - update changelog
   before_script:
-    # Configure mail and name of the user who should be visible in the commit history
-    - git config --global user.email 'project_11380121_bot_e88c32f55d170baf0a266f2683511592@gitlab.com'
-    - git config --global user.name 'Release Bot'
+    - apt-get update
+    - apt-get install -y jq
   script:
-    - >
-      echo "Checking release version..."
-      
-      if [[ -z $WS_RELEASE_VERSION ]]; then
-        echo "Cannot perform release since WS_RELEASE_VERSION is undefined"
-        exit 1
-      else
-        echo "Preparing release of version $WS_RELEASE_VERSION"
-      fi
-    - >
-      echo "Checking SNAPSHOT version..."
-      
-      if [[ -z $WS_NEXT_SNAPSHOT_VERSION ]]; then
-        echo "WS_NEXT_SNAPSHOT_VERSION is undefined, using default (next) version bump."
-      else
-        echo "Next snapshot version will be ${WS_NEXT_SNAPSHOT_VERSION}-SNAPSHOT"
-      fi
+    # Configure git user config
+    - *configure_git
+    # Print some debug information
+    - *debug_output
+    # Validate input variables
+    - *validate_release_vars
     - args_1="release-version $WS_RELEASE_VERSION"
     - args_2=`[[ -z ${WS_NEXT_SNAPSHOT_VERSION} ]] && echo "$args_1" || echo "$args_1 next-version ${WS_NEXT_SNAPSHOT_VERSION}-SNAPSHOT"`
     - release_args=`[[ ${WS_SKIP_RELEASE_TESTS} == "false" ]] && echo "$args_2" || echo "$args_2 skip-tests"`
@@ -115,10 +172,21 @@ sbt release:
     - sbt "release with-defaults $release_args"
     - git tag
     - cat version.sbt
-    # Push the changes to the master branch and prevent ci from starting (no real changes)
-    - git push origin $CI_COMMIT_REF_NAME -o ci.skip
-    # Push the new release tag
-    - git push origin $NEXT_VERSION_SPECIFIER
+    - |
+      if [[ ${TEST_DO_RELEASE_PREP} == "false" ]]; then
+        # Set the remote git push url to use
+        git remote set-url --push origin "https://oauth2:${GITLAB_ACCESS_TOKEN}@${CI_REPOSITORY_URL#*@}"
+        # Push the changes to the master branch and prevent ci from starting (no real changes)
+        git push origin $CI_COMMIT_REF_NAME -o ci.skip
+        # Push the new release tag
+        git push origin $NEXT_VERSION_SPECIFIER
+      else
+        echo "Skipping push since TEST_DO_RELEASE_PREP is $TEST_DO_RELEASE_PREP"
+      fi
+  rules:
+    - !reference [ .shared_release_prep_rules, rules ]
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $DO_RELEASE_PREP == "true"
+      when: on_success
 
 # When a new tag has successfully been built and deployed to the docker registries,
 # this job will create the GitLab release.
@@ -126,6 +194,9 @@ gitlab release:
   stage: deploy
   image: registry.gitlab.com/gitlab-org/release-cli:latest
   script:
+    # Print some debug information
+    - *debug_output
+    # Validate input variables
     - echo "Creating a GitLab release..."
   release:
     name: "Release $CI_COMMIT_TAG"
@@ -133,12 +204,12 @@ gitlab release:
     tag_name: $CI_COMMIT_TAG
     ref: $CI_COMMIT_TAG
   rules:
-    - if: $CI_COMMIT_TAG =~ /^v\d.*/
-      when: on_success
-    - if: $MANUAL_PUBLISH_PAGES == "true"
+    - if: $TEST_DO_RELEASE_PREP == "true" || $DO_RELEASE_PREP == "true"
       when: never
     - if: $TEST_DOCKER_BUILD == "true"
       when: never
-    - if: $DO_RELEASE_PREP == "true"
+    - if: $MANUAL_PUBLISH_PAGES == "true"
       when: never
+    - if: $CI_COMMIT_TAG =~ /^v\d.*/
+      when: on_success
 
