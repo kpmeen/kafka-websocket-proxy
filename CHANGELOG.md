@@ -2,6 +2,22 @@
 
 <!-- <START NEW CHANGELOG ENTRY> -->
 
+## v2.0.1-testing (2024-04-19)
+
+([Full Changelog](https://gitlab.com/kpmeen/kafka-websocket-proxy/-/compare/1cf63d83f4b73cfb328036ac67609b0e939ea1bb...a48bb06c9719964db11bc58c3dd8f13f36771d74?from_project_id=11380121&straight=false))
+
+### Merged MRs
+
+#### Unlabelled Merged MRs
+
+- Ci release improvements [!424](https://gitlab.com/kpmeen/kafka-websocket-proxy/-/merge_requests/424) ([@kpmeen](https://gitlab.com/kpmeen))
+
+#### Contributors to this release
+
+[@kpmeen](https://gitlab.com/kpmeen)
+
+<!-- <END NEW CHANGELOG ENTRY> -->
+
 ## v2.0.0 (2024-04-06)
 
 
@@ -390,4 +406,3 @@
 
 [@MichaelHussey](https://gitlab.com/MichaelHussey) | [@kpmeen](https://gitlab.com/kpmeen)
 
-<!-- <END NEW CHANGELOG ENTRY> -->
