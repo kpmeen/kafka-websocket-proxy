@@ -137,7 +137,7 @@ update changelog:
     - |
       if [[ ${TEST_DO_RELEASE_PREP} == "false" ]]; then
         git remote set-url --push origin "https://oauth2:${GITLAB_ACCESS_TOKEN}@${CI_REPOSITORY_URL#*@}"
-        git push origin $CI_COMMIT_BRANCH -o ci.skip
+        git push origin HEAD:${CI_COMMIT_REF_NAME} -o ci.skip
       else
         echo "Skipping push since TEST_DO_RELEASE_PREP is $TEST_DO_RELEASE_PREP"
       fi
@@ -176,8 +176,8 @@ sbt release:
       if [[ ${TEST_DO_RELEASE_PREP} == "false" ]]; then
         # Set the remote git push url to use
         git remote set-url --push origin "https://oauth2:${GITLAB_ACCESS_TOKEN}@${CI_REPOSITORY_URL#*@}"
-        # Push the changes to the master branch and prevent ci from starting (no real changes)
-        git push origin $CI_COMMIT_BRANCH -o ci.skip
+        # Push the changes to the originating branch and prevent ci from starting (no real changes)
+        git push origin HEAD:${CI_COMMIT_REF_NAME} -o ci.skip
         # Push the new release tag
         echo "Triggering new pipeline to build the release tag. Will skip publishing is $SKIP_PUBLISH"
         git push origin $NEXT_VERSION_SPECIFIER -o ci.variable="SKIP_PUBLISH=$SKIP_PUBLISH"
