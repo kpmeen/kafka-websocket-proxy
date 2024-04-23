@@ -50,13 +50,13 @@ include:
   # Release job definitions
   - local: "/.gitlab/build_templates/gitlab-ci-release.yml"
     rules:
-      - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $DO_RELEASE_PREP == "true"
-      - if: $TEST_DO_RELEASE_PREP == "true"
-      - if: $CI_COMMIT_TAG =~ /^v\d.*/
       - if: $TEST_DOCKER_BUILD == "true"
         when: never
       - if: $MANUAL_PUBLISH_PAGES == "true"
         when: never
+      - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $DO_RELEASE_PREP == "true"
+      - if: $TEST_DO_RELEASE_PREP == "true"
+      - if: $CI_COMMIT_TAG =~ /^v\d.*/
   # Building and testing of Scala project
   - local: "/.gitlab/build_templates/gitlab-ci-scala-build.yml"
     rules:

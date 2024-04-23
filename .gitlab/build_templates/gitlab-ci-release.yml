@@ -22,7 +22,7 @@ cache:
 # Shared base rules for when to trigger a build
 .shared_release_prep_rules:
   rules:
-    - if: $TEST_DO_RELEASE_PREP == "true"
+    - if: $TEST_DO_RELEASE_PREP == "true" && $CI_COMMIT_BRANCH
       when: manual
     - if: $TEST_DOCKER_BUILD == "true"
       when: never
@@ -35,6 +35,7 @@ cache:
   - echo "Configuring git user..."
   - git config --global user.email 'release_bot@gitlab.com'
   - git config --global user.name 'Release Bot'
+  - git remote set-url --push origin "https://oauth2:${GITLAB_ACCESS_TOKEN}@${CI_REPOSITORY_URL#*@}"
 
 .debug_output: &debug_output
   - echo "*********************** DEBUG ***********************"
@@ -89,7 +90,34 @@ cache:
       echo "Will prepare release for tag $NEXT_VERSION_SPECIFIER" 
     fi
 
-# Anchor with reference for add_changelog_entry job.
+.check_git_remote_and_pull: &check_git_remote_and_pull
+  # Fetch the latest remote changes
+  - git fetch origin
+  # Pull from remote if there are changes
+  # Ignore if we are already at the tip or ahead
+  # Fail if the local and remote have diverged and cannot be fast-forwarded
+  - |
+    ws_local_rev=$(git rev-parse @)
+    ws_remote_rev=$(git rev-parse "@{u}")
+    ws_base_rev=$(git merge-base @ "@{u}")
+    echo "local rev : $ws_local_rev"
+    echo "remote rev: $ws_remote_rev"
+    echo "base rev  : $ws_base_rev"
+    if [ $ws_local_rev = $ws_remote_rev ]; then
+      echo "Current branch is up to date with $CI_COMMIT_REF_NAME..."
+    elif [ $ws_local_rev = $ws_base_rev ]; then
+      echo "Current branch is behind $CI_COMMIT_REF_NAME..."
+      git pull origin $CI_COMMIT_REF_NAME
+    elif [ $ws_remote_rev = $ws_base_rev ]; then
+      echo "Current branch is ahead $CI_COMMIT_REF_NAME."
+    else
+      echo "Current branch has diverged from $CI_COMMIT_REF_NAME."
+      echo "Aborting release since this difference can't be fast-forwarded."
+      exit 1
+    fi
+
+# Anchor script to update the CHANGELOG.md file.
+# The updated CHANGELOG.md is then committed to the current branch.
 .add_changelog_entry: &add_changelog_entry
   - echo "Creating new changelog entries for $NEXT_VERSION_SPECIFIER"
   # Generate changelog. Uses $NEXT_VERSION_SPECIFIER to inject the tag information
@@ -102,16 +130,26 @@ cache:
   - git add CHANGELOG.md
   - git commit -m "Updates CHANGELOG.md"
 
-# Job to update the CHANGELOG.md file. It requires the parameter DO_RELEASE_PREP to be
-# true. It will only run for the master branch, and will be ignored if one, or both, of
-# TEST_DOCKER_BUILD or MANUAL_PUBLISH_PAGES are true.
-# The updated CHANGELOG.md is then committed and pushed to the master branch with the
-#  ci.skip flag set. This prevents a build to be executed before the "prepare_release"
-# has been completed successfully.
-update changelog:
+.run_sbt_release: &run_sbt_release
+  - args_1="release-version $WS_RELEASE_VERSION"
+  - args_2=`[[ -z ${WS_NEXT_SNAPSHOT_VERSION} ]] && echo "$args_1" || echo "$args_1 next-version ${WS_NEXT_SNAPSHOT_VERSION}-SNAPSHOT"`
+  - release_args=`[[ ${WS_SKIP_RELEASE_TESTS} == "false" ]] && echo "$args_2" || echo "$args_2 skip-tests"`
+  - echo "Executing sbt-release process..."
+  - sbt "release with-defaults $release_args"
+  - git tag
+  - cat version.sbt
+
+# Job to update the CHANGELOG.md file and create the release tag and update the version.sbt
+# with the next SNAPSHOT version.
+#
+# It requires the parameter DO_RELEASE_PREP to be true. It will only run automatically for
+# the default branch ("master"). Or manually, if TEST_DO_RELEASE_PREP == true and the changes
+# are committed to a branch.
+# It will be ignored if one, or both, of TEST_DOCKER_BUILD or MANUAL_PUBLISH_PAGES are true.
+sbt release:
   stage: prepare-release
-  variables:
-    GIT_STRATEGY: clone
+  needs:
+    - update changelog
   before_script:
     # Install python3 and pip
     - add-apt-repository ppa:deadsnakes/ppa -y
@@ -127,56 +165,19 @@ update changelog:
     # Print some debug information
     - *debug_output
     # Validate input variables
-    - echo "******** Validating input ********"
     - *validate_release_vars
+    # Pull any remote changes, if any.
+    - *check_git_remote_and_pull
     # Generate the changelog entries
     - echo "******** Changelog entries ********"
     - *add_changelog_entry
-    # Push changes back to the git repository
-    - echo "******** Pushing changes ********"
+    # Run sbt-release to update versions and create the tag...
+    - *run_sbt_release
+    # Pull any remote changes, if any have been introduced since last check.
+    - *check_git_remote_and_pull
     - |
       if [[ ${TEST_DO_RELEASE_PREP} == "false" ]]; then
-        git remote set-url --push origin "https://oauth2:${GITLAB_ACCESS_TOKEN}@${CI_REPOSITORY_URL#*@}"
-        git push origin HEAD:${CI_COMMIT_REF_NAME} -o ci.skip
-      else
-        echo "Skipping push since TEST_DO_RELEASE_PREP is $TEST_DO_RELEASE_PREP"
-      fi
-  rules:
-    - !reference [ .shared_release_prep_rules, rules ]
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $DO_RELEASE_PREP == "true"
-      when: on_success
-
-# Job to create the release tag and update the version.sbt with the next SNAPSHOT version.
-# It requires the parameter DO_RELEASE_PREP to be true. It will only run for the master
-# branch, and will be ignored if one, or both, of TEST_DOCKER_BUILD or MANUAL_PUBLISH_PAGES
-# are true.
-# This job requires the "update changelog" job to execute first.
-sbt release:
-  stage: prepare-release
-  needs:
-    - update changelog
-  before_script:
-    - apt-get update
-    - apt-get install -y jq
-  script:
-    # Configure git user config
-    - *configure_git
-    # Print some debug information
-    - *debug_output
-    # Validate input variables
-    - *validate_release_vars
-    - args_1="release-version $WS_RELEASE_VERSION"
-    - args_2=`[[ -z ${WS_NEXT_SNAPSHOT_VERSION} ]] && echo "$args_1" || echo "$args_1 next-version ${WS_NEXT_SNAPSHOT_VERSION}-SNAPSHOT"`
-    - release_args=`[[ ${WS_SKIP_RELEASE_TESTS} == "false" ]] && echo "$args_2" || echo "$args_2 skip-tests"`
-    - echo "Executing sbt-release process..."
-    - sbt "release with-defaults $release_args"
-    - git tag
-    - cat version.sbt
-    - |
-      if [[ ${TEST_DO_RELEASE_PREP} == "false" ]]; then
-        # Set the remote git push url to use
-        git remote set-url --push origin "https://oauth2:${GITLAB_ACCESS_TOKEN}@${CI_REPOSITORY_URL#*@}"
-        # Push the changes to the originating branch and prevent ci from starting (no real changes)
+        # Push the changes to the originating branch and prevent ci from starting (there are no code changes)
         git push origin HEAD:${CI_COMMIT_REF_NAME} -o ci.skip
         # Push the new release tag
         echo "Triggering new pipeline to build the release tag. Will skip publishing is $SKIP_PUBLISH"
