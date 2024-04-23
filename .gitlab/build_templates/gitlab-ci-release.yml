@@ -93,6 +93,7 @@ cache:
 .check_git_remote_and_pull: &check_git_remote_and_pull
   # Fetch the latest remote changes
   - git fetch origin
+  - git checkout $CI_COMMIT_BRANCH
   # Pull from remote if there are changes
   # Ignore if we are already at the tip or ahead
   # Fail if the local and remote have diverged and cannot be fast-forwarded
