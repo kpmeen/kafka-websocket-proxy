@@ -75,6 +75,8 @@ container_scanning:
   rules:
     - if: $CONTAINER_SCANNING_DISABLED
       when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: never
     - if: $CI_COMMIT_BRANCH &&
         $CI_GITLAB_FIPS_MODE == "true" &&
         $CS_ANALYZER_IMAGE !~ /-(fips|ubi)\z/
