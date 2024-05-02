@@ -77,10 +77,12 @@ container_scanning:
       when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       when: never
-    - if: $CI_COMMIT_BRANCH &&
+    - if: $CI_MERGE_REQUEST_ID
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && 
         $CI_GITLAB_FIPS_MODE == "true" &&
         $CS_ANALYZER_IMAGE !~ /-(fips|ubi)\z/
       variables:
         CS_IMAGE_SUFFIX: -fips
-    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
