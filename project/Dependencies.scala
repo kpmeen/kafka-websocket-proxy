@@ -29,7 +29,7 @@ object Versions {
 
   // logging
   val ScalaLoggingVersion = "3.9.5"
-  val Slf4JVersion        = "2.0.7"
+  val Slf4JVersion        = "2.0.13"
   val LogbackVersion      = "1.4.14"
   val LogbackJsVersion    = "0.1.5"
   val JaninoVersion       = "3.1.9"
