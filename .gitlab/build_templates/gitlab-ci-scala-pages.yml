@@ -1,6 +1,8 @@
 ################################################################################
-# GitLab pages pipeline
+# GitLab CI pipeline for publishing docs to pages                                      #
 ################################################################################
+# scala-steward:off
+
 variables:
   CI: "true"
   DOCKER_DRIVER: overlay2

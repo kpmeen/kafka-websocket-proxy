@@ -1,7 +1,7 @@
 ################################################################################
-# GitLab CI build script for Scala applications published as docker images     #
+# GitLab CI build script for Scala applications published as docker images        #
 ################################################################################
-image: registry.gitlab.com/kpmeen/docker-scala-sbt:scala_2.13.13_jdk21
+# scala-steward:off
 
 variables:
   CI: "true"
@@ -149,6 +149,7 @@ cache:
 # It will be ignored if one, or both, of TEST_DOCKER_BUILD or MANUAL_PUBLISH_PAGES are true.
 sbt release:
   stage: prepare-release
+  image: registry.gitlab.com/kpmeen/docker-scala-sbt:scala_2.13.13_jdk21
   before_script:
     # Install python3 and pip
     - add-apt-repository ppa:deadsnakes/ppa -y

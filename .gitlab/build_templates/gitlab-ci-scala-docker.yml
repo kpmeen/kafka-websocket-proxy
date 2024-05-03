@@ -1,7 +1,7 @@
 ################################################################################
 # GitLab CI build script for Scala applications published as docker images     #
 ################################################################################
-image: registry.gitlab.com/kpmeen/docker-scala-sbt:scala_2.13.13_jdk21
+# scala-steward:off
 
 variables:
   CI: "true"
@@ -17,6 +17,7 @@ cache:
 
 publish docker containers:
   stage: publish-docker
+  image: registry.gitlab.com/kpmeen/docker-scala-sbt:scala_2.13.13_jdk21
   tags:
     - docker
   services:

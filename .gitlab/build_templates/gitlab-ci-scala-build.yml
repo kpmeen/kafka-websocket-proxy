@@ -1,8 +1,6 @@
 ################################################################################
-# GitLab CI build script for Scala applications published as docker images     #
+# GitLab CI build script for Scala applications published as docker images        #
 ################################################################################
-image: registry.gitlab.com/kpmeen/docker-scala-sbt:scala_2.13.13_jdk21
-
 variables:
   CI: "true"
   DOCKER_DRIVER: overlay2
