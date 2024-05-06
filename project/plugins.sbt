@@ -30,7 +30,7 @@ addSbtPlugin("org.scoverage" %% "sbt-scoverage" % "2.0.11")
 addSbtPlugin("com.github.sbt" %% "sbt-native-packager" % "1.10.0")
 
 // Release plugin
-addSbtPlugin("com.github.sbt" % "sbt-release" % "1.1.0")
+addSbtPlugin("com.github.sbt" % "sbt-release" % "1.4.0")
 
 // Gatling plugin
 //addSbtPlugin("io.gatling" % "gatling-sbt" % "3.1.0")
