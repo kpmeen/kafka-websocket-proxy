@@ -1,6 +1,8 @@
 ################################################################################
 # GitLab CI build script for Scala applications published as docker images        #
 ################################################################################
+# scala-steward:off
+
 variables:
   CI: "true"
   DOCKER_DRIVER: overlay2
@@ -15,6 +17,7 @@ cache:
 
 check style and formatting:
   stage: build
+  image: registry.gitlab.com/kpmeen/docker-scala-sbt:scala_2.13.13_jdk21
   tags:
     - docker
   script:
@@ -25,6 +28,7 @@ check style and formatting:
 
 compile and run test suites:
   stage: test
+  image: registry.gitlab.com/kpmeen/docker-scala-sbt:scala_2.13.13_jdk21
   tags:
     - docker
   script:
