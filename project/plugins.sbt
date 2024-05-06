@@ -20,14 +20,14 @@ addSbtPlugin("com.github.sbt" % "sbt-git" % "2.0.1")
 addSbtPlugin("com.timushev.sbt" % "sbt-updates" % "0.6.4")
 
 // Formatting and style checking
-addSbtPlugin("org.scalameta"       % "sbt-scalafmt"   % "2.5.0")
+addSbtPlugin("org.scalameta"       % "sbt-scalafmt"   % "2.5.2")
 addSbtPlugin("com.beautiful-scala" % "sbt-scalastyle" % "1.5.1")
 
 // Code coverage
 addSbtPlugin("org.scoverage" %% "sbt-scoverage" % "2.0.11")
 
 // Native packaging plugin
-addSbtPlugin("com.github.sbt" %% "sbt-native-packager" % "1.9.16")
+addSbtPlugin("com.github.sbt" %% "sbt-native-packager" % "1.10.0")
 
 // Release plugin
 addSbtPlugin("com.github.sbt" % "sbt-release" % "1.1.0")
@@ -38,10 +38,10 @@ addSbtPlugin("com.github.sbt" % "sbt-release" % "1.1.0")
 //classpathTypes += "maven-plugin"
 
 // Scalafix for automated code re-writes when updating dependencies
-addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.10.4")
+addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.12.1")
 
 // documentation generator
-addSbtPlugin("org.scalameta" % "sbt-mdoc" % "2.3.7")
+addSbtPlugin("org.scalameta" % "sbt-mdoc" % "2.3.8")
 
 // FIXME: Workaround to get project working due to scala-xml conflicts.
 //        The culprit is a transitive dependency to scalariform_2.12 that relies
