@@ -41,7 +41,7 @@ addSbtPlugin("com.github.sbt" % "sbt-release" % "1.1.0")
 addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.12.1")
 
 // documentation generator
-addSbtPlugin("org.scalameta" % "sbt-mdoc" % "2.3.7")
+addSbtPlugin("org.scalameta" % "sbt-mdoc" % "2.3.8")
 
 // FIXME: Workaround to get project working due to scala-xml conflicts.
 //        The culprit is a transitive dependency to scalariform_2.12 that relies
