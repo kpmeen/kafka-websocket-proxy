@@ -2,7 +2,6 @@
 # GitLab CI build script for the Kafka WebSocket Proxy                    #
 ######################################################################
 # scala-steward:off
-
 image: registry.gitlab.com/kpmeen/docker-scala-sbt:scala_2.13.13_jdk21
 
 ######################################################################
