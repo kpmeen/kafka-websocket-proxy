@@ -19,7 +19,7 @@ publish docker containers:
   stage: publish-docker
   image: registry.gitlab.com/kpmeen/docker-scala-sbt:scala_2.13.13_jdk21
   tags:
-    - docker
+    - saas-linux-small-amd64
   services:
     - docker:24.0.6-dind
   before_script:

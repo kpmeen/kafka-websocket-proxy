@@ -19,7 +19,7 @@ check style and formatting:
   stage: build
   image: registry.gitlab.com/kpmeen/docker-scala-sbt:scala_2.13.13_jdk21
   tags:
-    - docker
+    - saas-linux-small-amd64
   script:
     # Ensure that the pipeline fails fast if there are issues with the
     # style or formatting
@@ -30,7 +30,7 @@ compile and run test suites:
   stage: test
   image: registry.gitlab.com/kpmeen/docker-scala-sbt:scala_2.13.13_jdk21
   tags:
-    - docker
+    - saas-linux-small-amd64
   script:
     - sbt coverage test coverageReport
     - sbt coverageAggregate
