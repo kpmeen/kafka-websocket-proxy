@@ -11,7 +11,9 @@ package object session {
 
   type SessionSource = Source[SessionProtocol, Control]
 
+  val SessionConsumerGroupIdPrefix: String = "ws-proxy-session-consumer"
+
   private[session] def sessionConsumerGroupId(implicit cfg: AppCfg): String = {
-    s"ws-proxy-session-consumer-${cfg.server.serverId.value}"
+    s"$SessionConsumerGroupIdPrefix-${cfg.server.serverId.value}"
   }
 }

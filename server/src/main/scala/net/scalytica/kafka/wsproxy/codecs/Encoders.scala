@@ -17,6 +17,9 @@ trait Encoders {
 
   implicit val brokerInfoEncoder: Encoder[BrokerInfo] = deriveConfiguredEncoder
 
+  implicit val consumerGroupEncoder: Encoder[ConsumerGroup] =
+    deriveConfiguredEncoder
+
   implicit val wsClientIdEncoder: Encoder[WsClientId] = { cid =>
     Json.fromString(cid.value)
   }
@@ -102,6 +105,9 @@ trait Encoders {
     deriveConfiguredEncoder
 
   implicit val kafkaHeaderEncoder: Encoder[KafkaHeader] =
+    deriveConfiguredEncoder
+
+  implicit val partOffMetaEncoder: Encoder[PartitionOffsetMetadata] =
     deriveConfiguredEncoder
 
   implicit def outValEncoder[T](

@@ -9,7 +9,15 @@ module.exports = {
         'configuration',
         'logging',
         'monitoring',
-        'apis',
+        {
+            type: 'category',
+            label: 'Endpoints and APIs',
+            link: {
+                type: 'doc',
+                id: 'apis'
+            },
+            items: ['http', 'websockets']
+        },
         'development',
         'faq'
       ],

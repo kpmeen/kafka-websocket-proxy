@@ -12,10 +12,9 @@ import net.scalytica.kafka.wsproxy.config.ReadableDynamicConfigHandlerRef
 import net.scalytica.kafka.wsproxy.jmx.JmxManager
 import net.scalytica.kafka.wsproxy.models._
 import net.scalytica.kafka.wsproxy.session.SessionHandlerImplicits._
-import net.scalytica.kafka.wsproxy.session.{
-  SessionHandlerProtocol,
-  SessionHandlerRef
-}
+import net.scalytica.kafka.wsproxy.session.SessionHandlerProtocol._
+import net.scalytica.kafka.wsproxy.session.SessionHandlerRef
+import net.scalytica.kafka.wsproxy.web.admin.AdminRoutes
 import net.scalytica.kafka.wsproxy.web.websockets.{
   InboundWebSocket,
   OutboundWebSocket
@@ -61,7 +60,7 @@ trait ServerRoutes
       ctx: ExecutionContext,
       jmx: Option[JmxManager] = None
   ): Route = {
-    implicit val sh = sessionHandlerRef.shRef
+    implicit val sh: ActorRef[SessionProtocol] = sessionHandlerRef.shRef
 
     // Wait for session state to be restored before continuing
     try {
@@ -85,12 +84,12 @@ trait ServerRoutes
    * @return
    *   a new [[Route]]
    */
-  def routesWith(
+  private[this] def routesWith(
       inbound: InSocketArgs => Route,
       outbound: OutSocketArgs => Route
   )(
       implicit cfg: AppCfg,
-      sh: ActorRef[SessionHandlerProtocol.SessionProtocol],
+      sh: ActorRef[SessionProtocol],
       maybeOpenIdClient: Option[OpenIdClient]
   ): Route = {
     extractMaterializer { implicit mat =>

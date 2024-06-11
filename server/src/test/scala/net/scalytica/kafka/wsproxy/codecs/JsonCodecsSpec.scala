@@ -10,7 +10,7 @@ import net.scalytica.kafka.wsproxy.config.Configuration.{
   ConsumerSpecificLimitCfg,
   DynamicCfg
 }
-import org.scalatest.{CustomEitherValues, OptionValues}
+import org.scalatest.{Assertion, CustomEitherValues, OptionValues}
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -21,12 +21,12 @@ class JsonCodecsSpec
     with OptionValues
     with CustomEitherValues {
 
-  val sessionOne  = SessionId("session1")
-  val groupOne    = WsGroupId("group1")
-  val consumerOne = WsClientId("consumer1")
-  val producerOne = WsProducerId("producer1")
-  val instanceOne = WsProducerInstanceId("instance1")
-  val serverOne   = WsServerId("server1")
+  val sessionOne: SessionId             = SessionId("session1")
+  val groupOne: WsGroupId               = WsGroupId("group1")
+  val consumerOne: WsClientId           = WsClientId("consumer1")
+  val producerOne: WsProducerId         = WsProducerId("producer1")
+  val instanceOne: WsProducerInstanceId = WsProducerInstanceId("instance1")
+  val serverOne: WsServerId             = WsServerId("server1")
 
   val consumerInstanceOne: ClientInstance = ConsumerInstance(
     id = FullConsumerId(groupOne, consumerOne),
@@ -59,6 +59,21 @@ class JsonCodecsSpec
     sessionId = sessionOne,
     instances = Set(producerInstanceOne)
   )
+
+  val partitionOffsetMetadataNoMetadata: PartitionOffsetMetadata =
+    PartitionOffsetMetadata(
+      topic = TopicName("dummy-topic"),
+      partition = Partition(1),
+      offset = Offset(12345L),
+      metadata = None
+    )
+  val partitionOffsetMetadataWithMetadata: PartitionOffsetMetadata =
+    PartitionOffsetMetadata(
+      topic = TopicName("dummy-topic"),
+      partition = Partition(1),
+      offset = Offset(12345L),
+      metadata = Some("Dummy metadata")
+    )
 
   "Working with JSON" when {
 
@@ -189,6 +204,55 @@ class JsonCodecsSpec
           case Left(err) =>
             err.message must include("Cannot convert configuration")
         }
+      }
+
+    }
+
+    "using the consumer group codecs" should {
+
+      def assertPartitionOffsetMetadata(
+          in: PartitionOffsetMetadata,
+          out: Either[io.circe.Error, PartitionOffsetMetadata]
+      ): Assertion = {
+        out match {
+          case Right(pofm) =>
+            pofm.topic mustBe in.topic
+            pofm.partition mustBe in.partition
+            pofm.offset mustBe in.offset
+            pofm.metadata mustBe in.metadata
+
+          case Left(err) =>
+            err.printStackTrace()
+            fail(s"Decoding failed with message ${err.getMessage}")
+        }
+      }
+
+      "encode and decode a PartitionOffsetMetadata object without metadata" in {
+        val expected = partitionOffsetMetadataNoMetadata
+        val js       = expected.asJson
+        val actual   = decode[PartitionOffsetMetadata](js.spaces2)
+
+        assertPartitionOffsetMetadata(expected, actual)
+      }
+
+      "encode and decode a PartitionOffsetMetadata object with metadata" in {
+        val expected = partitionOffsetMetadataWithMetadata
+        val js       = expected.asJson
+        val actual   = decode[PartitionOffsetMetadata](js.spaces2)
+
+        assertPartitionOffsetMetadata(expected, actual)
+      }
+
+      "encode and decode a list of PartitionOffsetMetadata objects" in {
+        val expected = List(
+          partitionOffsetMetadataWithMetadata,
+          partitionOffsetMetadataNoMetadata
+        )
+        val js      = expected.asJson
+        val decoded = decode[List[PartitionOffsetMetadata]](js.spaces2)
+
+        val actual = decoded.toOption.value
+        actual must contain allElementsOf expected
       }
 
     }

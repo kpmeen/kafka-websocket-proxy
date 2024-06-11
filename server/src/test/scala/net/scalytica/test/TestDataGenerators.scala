@@ -1,5 +1,19 @@
 package net.scalytica.test
 
+import net.scalytica.kafka.wsproxy.config.Configuration.{
+  ConsumerSpecificLimitCfg,
+  ProducerSpecificLimitCfg
+}
+import net.scalytica.kafka.wsproxy.models.{
+  Offset,
+  Partition,
+  PartitionOffsetMetadata,
+  TopicName,
+  WsGroupId,
+  WsProducerId
+}
+
+// scalastyle:off magic.number
 trait TestDataGenerators {
 
   def sessionJson(
@@ -83,6 +97,47 @@ trait TestDataGenerators {
          |  }
          |}""".stripMargin
     }
+  }
+
+  def createProducerCfg(
+      id: String,
+      mps: Option[Int],
+      mc: Option[Int]
+  ): ProducerSpecificLimitCfg = {
+    ProducerSpecificLimitCfg(
+      producerId = WsProducerId(id),
+      messagesPerSecond = mps,
+      maxConnections = mc
+    )
+  }
+
+  def createConsumerCfg(
+      id: String,
+      mps: Option[Int],
+      mc: Option[Int],
+      bs: Option[Int] = None
+  ): ConsumerSpecificLimitCfg = {
+    ConsumerSpecificLimitCfg(
+      groupId = WsGroupId(id),
+      messagesPerSecond = mps,
+      maxConnections = mc,
+      batchSize = bs
+    )
+  }
+
+  def createPartitionOffsetMetadataList(
+      topicName: TopicName,
+      numPartitions: Int = 3,
+      offset: Long = 10L
+  ): List[PartitionOffsetMetadata] = {
+    (0 until numPartitions).map { i =>
+      PartitionOffsetMetadata(
+        topic = topicName,
+        partition = Partition(i),
+        offset = Offset(offset),
+        metadata = None
+      )
+    }.toList
   }
 
 }

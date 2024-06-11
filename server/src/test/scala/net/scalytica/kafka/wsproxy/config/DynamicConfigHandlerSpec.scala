@@ -159,7 +159,7 @@ class DynamicConfigHandlerSpec
     "remove an existing dynamic configuration" in
       dynamicConfigHandlerCtx { implicit ctx =>
         val (remKey, _) = expectedSeq(3)
-        // Add a tombstone to the expected values
+        // Define the tombstone to expected after removal
         val remRec = remKey -> tombstoneValue
 
         addAndAssert(expectedValues: _*)
@@ -167,9 +167,10 @@ class DynamicConfigHandlerSpec
           ctx.wsCfg.dynamicConfigHandler.topicName,
           expectedSeq: _*
         )
-
-        val r1 = ctx.ref.removeConfig(remKey).futureValue
-        r1 mustBe ConfigRemoved(remKey)
+        eventually {
+          val r1 = ctx.ref.removeConfig(remKey).futureValue
+          r1 mustBe ConfigRemoved(remKey)
+        }
 
         consumeAndAssert(ctx.wsCfg.dynamicConfigHandler.topicName, remRec)
       }

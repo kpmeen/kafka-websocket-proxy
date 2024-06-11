@@ -14,8 +14,7 @@ import org.apache.kafka.clients.consumer.OffsetResetStrategy
 
 import scala.util.Try
 
-trait QueryParamParsers {
-
+trait ParamUnmarshallers {
   implicit val clientIdUnmarshaller: Unmarshaller[String, WsClientId] =
     Unmarshaller.strict[String, WsClientId] { str =>
       Option(str).map(WsClientId.apply).getOrElse {
@@ -83,6 +82,11 @@ trait QueryParamParsers {
         throw Unmarshaller.NoContentException
       }
     }
+}
+
+object ParamUnmarshallers extends ParamUnmarshallers
+
+trait QueryParamParsers extends ParamUnmarshallers {
 
   private[this] lazy val ProducerTransactionsDisabledMsg =
     "Unable to provide transactional producer. Server is not configured to " +
@@ -176,7 +180,7 @@ trait QueryParamParsers {
    *   Directive extracting query parameters for the outbound (consuming) socket
    *   communication.
    */
-  def outParams: Directive[Tuple1[OutSocketArgs]] =
+  def webSocketOutParams: Directive[Tuple1[OutSocketArgs]] =
     parameters(
       Symbol("clientId").as[WsClientId],
       Symbol("groupId").as[WsGroupId] ?,
@@ -221,7 +225,7 @@ trait QueryParamParsers {
    *   Directive extracting query parameters for the inbound (producer) socket
    *   communication.
    */
-  def inParams(appCfg: AppCfg): Directive[Tuple1[InSocketArgs]] = {
+  def webSocketInParams(appCfg: AppCfg): Directive[Tuple1[InSocketArgs]] = {
     implicit val prodCfg = appCfg.producer
 
     parameters(

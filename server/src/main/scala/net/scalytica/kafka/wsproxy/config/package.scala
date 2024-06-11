@@ -11,8 +11,11 @@ import net.scalytica.kafka.wsproxy.models.{WsGroupId, WsProducerId}
 
 package object config {
 
+  val DynCfgConsumerGroupIdPrefix: String =
+    "ws-proxy-dynamic-config-handler-consumer"
+
   private[config] def dynCfgConsumerGroupId(implicit cfg: AppCfg): String = {
-    s"ws-proxy-dynamic-config-handler-consumer-${cfg.server.serverId.value}"
+    s"$DynCfgConsumerGroupIdPrefix-${cfg.server.serverId.value}"
   }
 
   /**

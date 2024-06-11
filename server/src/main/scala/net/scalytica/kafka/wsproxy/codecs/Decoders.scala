@@ -109,6 +109,12 @@ trait Decoders {
       )
   }
 
+  implicit val consumerGroupDecoder: Decoder[ConsumerGroup] =
+    deriveConfiguredDecoder
+
+  implicit val partOffMetadataDecoder: Decoder[PartitionOffsetMetadata] =
+    deriveConfiguredDecoder
+
   implicit val wsCommitDecoder: Decoder[WsCommit] = deriveConfiguredDecoder
 
   implicit val byteArrDecoder: Decoder[Array[Byte]] = { json =>

@@ -238,8 +238,14 @@ object DynamicConfigHandlerImplicits extends WithProxyLogger {
         timeout: Timeout,
         scheduler: Scheduler
     ): Future[DynamicConfigOpResult] = {
-      doAskWithStandardRecovery(ref => Remove(key, ref)) { case (msg, t) =>
-        IncompleteOp(s"$msg ${t.getMessage}", Option(t))
+      findConfig(key).flatMap {
+        case Some(_) =>
+          doAskWithStandardRecovery(ref => Remove(key, ref)) { case (msg, t) =>
+            IncompleteOp(s"$msg ${t.getMessage}", Option(t))
+          }
+
+        case None =>
+          Future.successful(ConfigNotFound(key))
       }
     }
 

@@ -7,7 +7,7 @@ import org.apache.pekko.http.scaladsl.model.ws.{Message, TextMessage}
 import org.apache.pekko.http.scaladsl.server.Directives._
 import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.kafka.scaladsl.Consumer
-import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream._
 import org.apache.pekko.stream.scaladsl.{Flow, Keep, Sink, Source}
 import org.apache.pekko.stream.typed.scaladsl.ActorSink
 import org.apache.pekko.util.Timeout
@@ -465,7 +465,10 @@ trait OutboundWebSocket
     } else {
       // if auto-commit is disabled, we need to ensure messages are sent to a
       // commit handler so its offset can be committed manually by the client.
-      val sink = commitHandlerRef.map(manualCommitSink).getOrElse(Sink.ignore)
+      val sink: Sink[WsConsumerRecord[Key, Val], _] =
+        commitHandlerRef
+          .map[Sink[WsConsumerRecord[Key, Val], _]](manualCommitSink)
+          .getOrElse(Sink.ignore)
 
       WsConsumer
         .consumeManualCommit[Key, Val](args)

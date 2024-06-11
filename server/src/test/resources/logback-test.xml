@@ -41,7 +41,8 @@
     <!--  <logger name="net.scalytica.kafka.wsproxy.producer" level="TRACE"/>-->
     <!--  <logger name="net.scalytica.kafka.wsproxy.session" level="TRACE" />-->
     <!--  <logger name="net.scalytica.kafka.wsproxy.session.SessionHandler" level="TRACE"/>-->
-    <!--  <logger name="net.scalytica.kafka.wsproxy.utils" level="TRACE"/>-->
+    <!--  <logger name="net.scalytica.kafka.wsproxy.utils" level="TRACE"/> -->
+    <!--  <logger name="net.scalytica.kafka.wsproxy.web" level="DEBUG"/>-->
 
     <!-- Root loggers catch all other events that are not explicitly handled-->
     <root level="OFF">

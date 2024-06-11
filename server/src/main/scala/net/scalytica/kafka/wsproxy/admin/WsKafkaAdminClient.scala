@@ -5,12 +5,21 @@ import net.scalytica.kafka.wsproxy.config.Configuration.{
   InternalStateTopic
 }
 import net.scalytica.kafka.wsproxy._
+import net.scalytica.kafka.wsproxy.config.DynCfgConsumerGroupIdPrefix
 import net.scalytica.kafka.wsproxy.errors.{
   KafkaFutureErrorHandler,
   TopicNotFoundError
 }
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
-import net.scalytica.kafka.wsproxy.models.{BrokerInfo, TopicName}
+import net.scalytica.kafka.wsproxy.models.{
+  BrokerInfo,
+  ConsumerGroup,
+  PartitionOffsetMetadata,
+  SimpleTopicDescription,
+  TopicName,
+  WsGroupId
+}
+import net.scalytica.kafka.wsproxy.session.SessionConsumerGroupIdPrefix
 import net.scalytica.kafka.wsproxy.utils.BlockingRetry
 import org.apache.kafka.clients.admin.AdminClientConfig._
 import org.apache.kafka.clients.admin._
@@ -25,9 +34,10 @@ import org.apache.kafka.common.errors.UnknownTopicOrPartitionException
 import java.util.UUID
 import scala.jdk.CollectionConverters._
 import scala.concurrent.duration._
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 import scala.util.control.NonFatal
 
+// scalastyle:off magic.number
 /**
  * Simple wrapper around the Kafka AdminClient to allow for bootstrapping the
  * session state topic.
@@ -37,7 +47,6 @@ import scala.util.control.NonFatal
  */
 class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
 
-  // scalastyle:off line.size.limit
   private[this] def admConfig = {
     val uuidSuffix = UUID.randomUUID().toString
     cfg.adminClient.kafkaClientProperties ++ Map[String, String](
@@ -45,7 +54,6 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
       CLIENT_ID_CONFIG         -> s"kafka-websocket-proxy-admin-$uuidSuffix"
     )
   }
-  // scalastyle:on line.size.limit
 
   private[this] val internalTopicMaxReplicas = 3
 
@@ -55,28 +63,59 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
     AdminClient.create(cfg)
   }
 
+  private[admin] def createTopic(
+      topicName: TopicName,
+      partitions: Short = 1,
+      cleanupPolicy: String = CLEANUP_POLICY_DELETE,
+      retentionMs: Long = 120000L
+  ): Try[Unit] = {
+    findTopic(topicName) match {
+      case Some(_) =>
+        Try(log.info(s"${topicName.value} topic verified."))
+
+      case None =>
+        val replFactor = replicationFactor(
+          topicName = topicName,
+          wantedReplicas = partitions
+        )
+        val tconf = Map[String, String](
+          CLEANUP_POLICY_CONFIG -> cleanupPolicy,
+          RETENTION_MS_CONFIG   -> s"$retentionMs"
+        ).asJava
+
+        val topic = new NewTopic(topicName.value, 1, replFactor).configs(tconf)
+
+        log.info(s"Creating topic ${topicName.value}...")
+        Try[Unit] {
+          val _: Any = underlying.createTopics(Seq(topic).asJava).all().get()
+          log.info(s"Topic ${topicName.value} created.")
+        }.recover {
+          KafkaFutureErrorHandler.handle[Unit] {
+            log.info("Topic already exists")
+          } { t =>
+            log.error(
+              s"The topic ${topicName.value} could not " +
+                s"be created because: ${t.getMessage}"
+            )
+          }
+        }
+    }
+  }
+
   /** Method for creating an internal state topic. */
-  private[admin] def createInternalStateTopic(ist: InternalStateTopic): Unit = {
-    val replFactor = replicationFactor(
+  private[admin] def createInternalStateTopic(
+      ist: InternalStateTopic
+  ): Unit = {
+    createTopic(
       topicName = ist.topicName,
-      wantedReplicas = ist.topicReplicationFactor
-    )
-    val tconf = Map[String, String](
-      CLEANUP_POLICY_CONFIG -> CLEANUP_POLICY_COMPACT,
-      RETENTION_MS_CONFIG   -> s"${ist.topicRetention.toMillis}"
-    ).asJava
-
-    val topic = new NewTopic(ist.topicName.value, 1, replFactor).configs(tconf)
-
-    log.info(s"Creating topic ${ist.topicName.value}...")
-    Try[Unit] {
-      val _: Any = underlying.createTopics(Seq(topic).asJava).all().get()
-    }.recover {
-      KafkaFutureErrorHandler.handle {
-        log.info("Topic already exists")
-      }(t => log.error(s"Could not create the topic ${ist.topicName.value}", t))
-    }.getOrElse(System.exit(1))
-    log.info(s"Topic ${ist.topicName.value} created.")
+      cleanupPolicy = CLEANUP_POLICY_COMPACT,
+      retentionMs = ist.topicRetention.toMillis
+    ) match {
+      case Success(_) =>
+        log.debug(s"Topic ${ist.topicName.value} validated successfully.")
+      case Failure(e) =>
+        throw e
+    }
   }
 
   /**
@@ -116,13 +155,8 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
         timeout = cfg.topicInitTimeout,
         interval = cfg.topicInitRetryInterval,
         numRetries = cfg.topicInitRetries
-      ) {
-        findTopic(cfg.topicName) match {
-          case None    => createInternalStateTopic(cfg)
-          case Some(_) => log.info(s"${cfg.topicName.value} topic verified.")
-        }
-      } { _ =>
-        log.warn(s"${cfg.topicName.value} topic not verified, terminating")
+      )(createInternalStateTopic(cfg)) { _ =>
+        log.error(s"${cfg.topicName.value} topic not verified, terminating")
         System.exit(1)
       }
     } catch {
@@ -194,7 +228,9 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
    *   [[TopicNotFoundError]] is thrown.
    */
   @throws(classOf[TopicNotFoundError])
-  def topicPartitionInfoList(topicName: TopicName): List[TopicPartitionInfo] = {
+  private[this] def topicPartitionInfoList(
+      topicName: TopicName
+  ): List[TopicPartitionInfo] = {
     try {
       val p = underlying
         .describeTopics(Seq(topicName.value).asJava)
@@ -222,12 +258,39 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
     }
   }
 
+  def describeTopic(topicName: TopicName): Option[SimpleTopicDescription] = {
+    try {
+      underlying
+        .describeTopics(List(topicName.value).asJava)
+        .allTopicNames()
+        .get()
+        .asScala
+        .values
+        .headOption
+        .filterNot(_.isInternal)
+        .map(SimpleTopicDescription.fromKafkaTopicDescription)
+    } catch {
+      case ee: java.util.concurrent.ExecutionException =>
+        ee.getCause match {
+          case _: UnknownTopicOrPartitionException => None
+          case ke: KafkaException =>
+            log.error("Unhandled Kafka Exception", ke)
+            throw ke
+        }
+      case NonFatal(e) =>
+        log.error("Unhandled exception", e)
+        throw e
+    }
+  }
+
   /**
    * Fetch the latest offset for the given topic.
    * @return
    *   a Long indicating the latest offset at the time of calling the function.
    */
-  def lastOffsetFor(topicName: TopicName): Long = {
+  private[this] def lastOffsetForSinglePartitionTopic(
+      topicName: TopicName
+  ): Long = {
     topicPartitionInfoList(topicName).headOption
       .flatMap { tpi =>
         val partition = new TopicPartition(topicName.value, tpi.partition())
@@ -249,7 +312,7 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
    *   a Long indicating the latest offset at the time of calling the function.
    */
   def lastOffsetForDynamicConfigTopic: Long =
-    lastOffsetFor(cfg.dynamicConfigHandler.topicName)
+    lastOffsetForSinglePartitionTopic(cfg.dynamicConfigHandler.topicName)
 
   /**
    * Fetch the latest offset for the session state topic.
@@ -257,7 +320,166 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
    *   a Long indicating the latest offset at the time of calling the function.
    */
   def lastOffsetForSessionStateTopic: Long =
-    lastOffsetFor(cfg.sessionHandler.topicName)
+    lastOffsetForSinglePartitionTopic(cfg.sessionHandler.topicName)
+
+  /**
+   * Fetch a list of all consumer groups
+   *
+   * If the flag {{{activeOnly}}} is set to {{{true}}}, only consumer groups
+   * that are considered to be active will be listed.
+   *
+   * @param activeOnly
+   *   Flag to indicate if all consumer groups should be returned, or only the *
+   *   ones that are defined as active.
+   * @param includeInternals
+   *   Flag to determine if internal ws-proxy consumer groups for sessions and
+   *   config handling should be included in the response.
+   * @return
+   *   a List of [[ConsumerGroup]]
+   *
+   * @see
+   *   [[ConsumerGroup.isActive]]
+   */
+  def listConsumerGroups(
+      activeOnly: Boolean = false,
+      includeInternals: Boolean = false
+  ): List[ConsumerGroup] = {
+    val defaultOpts = new ListConsumerGroupsOptions()
+    val opts =
+      if (!activeOnly) defaultOpts
+      else defaultOpts.inStates(ConsumerGroup.ActiveStates.asJava)
+
+    val allGroups = underlying
+      .listConsumerGroups(opts)
+      .all()
+      .get()
+      .asScala
+      .toList
+      .map(ConsumerGroup.fromKafkaListing)
+
+    val groups =
+      if (includeInternals) allGroups
+      else
+        allGroups.filterNot(cg =>
+          cg.groupId.value.startsWith(DynCfgConsumerGroupIdPrefix) ||
+            cg.groupId.value.startsWith(SessionConsumerGroupIdPrefix) ||
+            cg.groupId.value.startsWith("_")
+        )
+
+    log.trace(
+      s"returning consumer groups:${groups.mkString("\n", "\n  - ", "\n")}"
+    )
+    groups
+
+  }
+
+  /**
+   * Fetch detailed description of the given consumer group.
+   *
+   * @param grpId
+   *   The [[WsGroupId]] to describe
+   * @return
+   *   An option containing [[ConsumerGroup]] information
+   */
+  def describeConsumerGroup(grpId: WsGroupId): Option[ConsumerGroup] = {
+    underlying
+      .describeConsumerGroups(Seq(grpId.value).asJava)
+      .all()
+      .get()
+      .asScala
+      .values
+      .headOption
+      .map(ConsumerGroup.fromKafkaDescription)
+  }
+
+  /**
+   * List all consumer group offsets for the given group id.
+   *
+   * @param grpId
+   *   The [[WsGroupId]] to list offsets for
+   * @return
+   *   A collection of [[PartitionOffsetMetadata]]
+   */
+  def listConsumerGroupOffsets(
+      grpId: WsGroupId
+  ): Seq[PartitionOffsetMetadata] = {
+    underlying
+      .listConsumerGroupOffsets(grpId.value)
+      .all()
+      .get()
+      .asScala
+      .values
+      .flatMap(_.asScala)
+      .map(PartitionOffsetMetadata.fromKafkaTuple)
+      .toSeq
+  }
+
+  /**
+   * Function for doing a consumer group offset reset for a given group id. If
+   * the consumer group doesn't exist, the underlying implementation in the
+   * KafkaAdminClient will create a new consumer group with the state "EMPTY".
+   *
+   * @param grpId
+   *   The [[WsGroupId]] to reset offsets for
+   * @param offsets
+   *   The [[PartitionOffsetMetadata]] information on which topics and
+   *   partitions to set a new (reset) offset for
+   */
+  def alterConsumerGroupOffsets(
+      grpId: WsGroupId,
+      offsets: List[PartitionOffsetMetadata]
+  ): Unit = {
+    try {
+      val _ = underlying
+        .alterConsumerGroupOffsets(
+          grpId.value,
+          PartitionOffsetMetadata.listToKafkaMap(offsets).asJava
+        )
+        .all()
+        .get()
+    } catch {
+      case ke: KafkaException =>
+        log.error(
+          "Kafka threw an exception trying to alter consumer group offsets",
+          ke
+        )
+        throw ke
+      case NonFatal(e) =>
+        log.error(
+          "Unhandled exception trying to alter consumer group offsets",
+          e
+        )
+        throw e
+    }
+  }
+
+  /**
+   * Function that will delete offsets for a given consumer group and topic.
+   *
+   * @param grpId
+   *   The [[WsGroupId]] to delete offsets for
+   * @param topic
+   *   The [[TopicName]] to delete offsets for
+   */
+  def deleteConsumerGroupOffsets(grpId: WsGroupId, topic: TopicName): Unit = {
+    try {
+      val off = listConsumerGroupOffsets(grpId)
+        .filter(_.topic == topic)
+        .map(_.asKafkaTopicPartition)
+        .toSet
+        .asJava
+
+      val _ =
+        underlying.deleteConsumerGroupOffsets(grpId.value, off).all().get()
+    } catch {
+      case NonFatal(e) =>
+        log.error(
+          "Unhandled exception trying to delete consumer group offsets",
+          e
+        )
+        throw e
+    }
+  }
 
   /**
    * Fetch the cluster information for the configured Kafka cluster.
@@ -266,7 +488,7 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
    *   a List of [[BrokerInfo]] data.
    */
   def clusterInfo: List[BrokerInfo] = {
-    log.trace("Fetching Kafka cluster information...")
+    log.debug("Fetching Kafka cluster information...")
     underlying
       .describeCluster()
       .nodes()
