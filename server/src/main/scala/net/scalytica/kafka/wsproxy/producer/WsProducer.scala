@@ -74,7 +74,7 @@ object WsProducer extends ProducerFlowExtras with WithProxyLogger {
   private[this] def completeProducerSettings(
       aclCredentials: Option[AclCredentials]
   )(implicit cfg: AppCfg): Map[String, String] = {
-    val saslMechanism = cfg.consumer.saslMechanism
+    val saslMechanism = cfg.producer.saslMechanism
     val kafkaLoginModule =
       KafkaLoginModules.fromSaslMechanism(saslMechanism, aclCredentials)
     val jaasProps = KafkaLoginModules.buildJaasProperty(kafkaLoginModule)

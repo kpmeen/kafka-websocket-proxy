@@ -1,4 +1,4 @@
-package net.scalytica.kafka.wsproxy.web
+package net.scalytica.kafka.wsproxy.web.admin
 
 import org.apache.pekko.actor.typed.scaladsl.adapter._
 import org.apache.pekko.http.scaladsl.model.StatusCodes._
@@ -7,111 +7,30 @@ import org.apache.pekko.http.scaladsl.server.Directives._
 import org.apache.pekko.http.scaladsl.server._
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.util.Timeout
-import io.circe.{Json, Printer}
+import io.circe.Json
 import io.circe.syntax._
 import io.circe.parser._
 import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
-import net.scalytica.kafka.wsproxy.auth.OpenIdClient
-import net.scalytica.kafka.wsproxy.codecs.Encoders.{
-  brokerInfoEncoder,
-  dynamicCfgEncoder
-}
-import net.scalytica.kafka.wsproxy.codecs.Decoders.dynamicCfgDecoder
-import net.scalytica.kafka.wsproxy.config.Configuration.{
-  AppCfg,
-  ClientSpecificLimitCfg,
-  ConsumerSpecificLimitCfg,
-  DynamicCfg,
-  ProducerSpecificLimitCfg
-}
+import net.scalytica.kafka.wsproxy.codecs.Encoders._
+import net.scalytica.kafka.wsproxy.codecs.Decoders._
+import net.scalytica.kafka.wsproxy.config.Configuration._
 import net.scalytica.kafka.wsproxy.config.{
   DynamicConfigurations,
   RunnableDynamicConfigHandlerRef
 }
 import net.scalytica.kafka.wsproxy.config.DynamicConfigHandlerImplicits._
-import net.scalytica.kafka.wsproxy.config.DynamicConfigHandlerProtocol.{
-  ConfigRemoved,
-  ConfigSaved,
-  DynamicConfigOpResult,
-  FoundActiveConfigs,
-  IncompleteOp,
-  InvalidKey,
-  RemovedAllConfigs
-}
+import net.scalytica.kafka.wsproxy.config.DynamicConfigHandlerProtocol._
 import net.scalytica.kafka.wsproxy.errors.{ImpossibleError, UnexpectedError}
-import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
-import net.scalytica.kafka.wsproxy.models.{WsGroupId, WsProducerId}
+import net.scalytica.kafka.wsproxy.models._
 import net.scalytica.kafka.wsproxy.session.{SessionHandlerRef, SessionUpdated}
-// scalastyle:off line.size.limit
-import net.scalytica.kafka.wsproxy.session.SessionHandlerProtocol.SessionProtocol
-// scalastyle:on line.size.limit
+import net.scalytica.kafka.wsproxy.web.BaseRoutes
 import net.scalytica.kafka.wsproxy.session.SessionHandlerImplicits._
-import org.apache.pekko.actor.typed.{ActorRef, Scheduler}
+import org.apache.pekko.actor.typed.Scheduler
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.concurrent.duration._
 
-trait AdminRoutesResponses extends WithProxyLogger { self: BaseRoutes =>
-  protected def emptyResponse(status: StatusCode): HttpResponse =
-    HttpResponse(
-      status = status,
-      entity = HttpEntity.empty(ContentTypes.`application/json`)
-    )
-
-  protected def okResponse(json: String): HttpResponse =
-    HttpResponse(
-      status = OK,
-      entity = HttpEntity(
-        contentType = ContentTypes.`application/json`,
-        string = json
-      )
-    )
-
-  protected lazy val timeoutResponse: HttpResponse =
-    HttpResponse(
-      status = InternalServerError,
-      entity = HttpEntity(
-        contentType = ContentTypes.`application/json`,
-        string = jsonMessageFromString(
-          "The operation to add a new dynamic config timed out."
-        )
-      )
-    )
-
-  protected def invalidRequestResponse(msg: String): HttpResponse =
-    HttpResponse(
-      status = BadRequest,
-      entity = HttpEntity(
-        contentType = ContentTypes.`application/json`,
-        string = jsonMessageFromString(msg)
-      )
-    )
-
-  /** Helper function to handler errors when fetching all dynamic configs */
-  protected def handlerResRecovery(
-      id: Option[String] = None
-  ): PartialFunction[Throwable, DynamicConfigOpResult] = { case t: Throwable =>
-    val msg = id
-      .map(str => s"An error occurred while fetching dynamic configs for $str")
-      .getOrElse("An error occurred while fetching dynamic configs.")
-    log.error(msg, t)
-    IncompleteOp(t.getMessage)
-  }
-
-  /** Helper function to handler errors when fetching specific dynamic config */
-  protected def optRecovery[U](
-      id: Option[String] = None
-  ): PartialFunction[Throwable, Option[U]] = { case t: Throwable =>
-    val msg = id
-      .map(str => s"An error occurred while fetching dynamic configs for $str")
-      .getOrElse("An error occurred while fetching dynamic configs.")
-    log.error(msg, t)
-    None
-  }
-}
-
-/** Administrative endpoints */
-trait AdminRoutes extends AdminRoutesResponses { self: BaseRoutes =>
+trait AdminRoutesOps extends AdminRoutesResponses { self: BaseRoutes =>
 
   /**
    * Fetch the Kafka cluster info and complete the request
@@ -122,13 +41,13 @@ trait AdminRoutes extends AdminRoutesResponses { self: BaseRoutes =>
    *   The [[Route]] completing the request with an HTTP response containing a
    *   JSON message.
    */
-  private[this] def serveClusterInfo(implicit cfg: AppCfg): Route = {
+  protected[this] def serveClusterInfo(implicit cfg: AppCfg): Route = {
     complete {
       val admin = new WsKafkaAdminClient(cfg)
       try {
         log.debug("Fetching Kafka cluster info...")
         val ci = admin.clusterInfo
-        okResponse(ci.asJson.printWith(Printer.spaces2))
+        okResponse(ci.asJson.spaces2)
       } finally {
         admin.close()
       }
@@ -161,10 +80,8 @@ trait AdminRoutes extends AdminRoutesResponses { self: BaseRoutes =>
    * Builds the JSON string to return when the client config endpoint needs to
    * return all configs.
    *
-   * @param staticCons
-   *   A {{{Seq[DynamicCfg]}}} with static consumer configs.
-   * @param staticProd
-   *   A {{{Seq[DynamicCfg]}}} with static producer configs.
+   * @param static
+   *   A {{{AllClientSpecifcLimits}}} containing all static configs.
    * @param dynCons
    *   A {{{Seq[DynamicCfg]}}} with dynamic consumer configs.
    * @param dynProd
@@ -173,18 +90,17 @@ trait AdminRoutes extends AdminRoutesResponses { self: BaseRoutes =>
    *   A new [[Json]] object.
    */
   private[this] def allConfigsAsJsonStr(
-      staticCons: Seq[DynamicCfg],
-      staticProd: Seq[DynamicCfg],
-      dynCons: Seq[DynamicCfg],
-      dynProd: Seq[DynamicCfg]
+      static: AllClientSpecifcLimits,
+      dynCons: Seq[DynamicCfg] = Seq.empty,
+      dynProd: Seq[DynamicCfg] = Seq.empty
   ): Json = {
     Json.obj(
       "consumers" -> Json.obj(
-        "static"  -> buildConfigListJson(staticCons),
+        "static"  -> buildConfigListJson(static.consumerLimits),
         "dynamic" -> buildConfigListJson(dynCons)
       ),
       "producers" -> Json.obj(
-        "static"  -> buildConfigListJson(staticProd),
+        "static"  -> buildConfigListJson(static.producerLimits),
         "dynamic" -> buildConfigListJson(dynProd)
       )
     )
@@ -207,7 +123,7 @@ trait AdminRoutes extends AdminRoutesResponses { self: BaseRoutes =>
    *   JSON message
    */
   // scalastyle:off method.length
-  private[this] def serveAllClientConfigs(
+  protected[this] def serveAllClientConfigs(
       implicit cfg: AppCfg,
       maybeDynamicCfgHandlerRef: Option[RunnableDynamicConfigHandlerRef],
       mat: Materializer
@@ -230,44 +146,32 @@ trait AdminRoutes extends AdminRoutesResponses { self: BaseRoutes =>
 
               case IncompleteOp(reason, _) =>
                 log.warn(
-                  "Fetching all dynamic configs could not be completed. " +
-                    s"Reason: $reason"
+                  s"Unable to retrieve all dynamic configs. Reason: $reason"
                 )
                 (Seq.empty, Seq.empty)
               case bug =>
                 log.error(
-                  "Trying to fetch all dynamic configs returned an unexpected" +
-                    s" value type: { ${bug.toString} }. This is wrong and " +
-                    "should be treated as a bug."
+                  "Fetching all dynamic configs returned an unexpected" +
+                    s" value type: { ${bug.toString} }. This is incorrect " +
+                    "and should be treated as a bug."
                 )
                 (Seq.empty, Seq.empty)
             }
             .map { case (dynCons, dynProd) =>
-              val json = allConfigsAsJsonStr(
-                staticCons = static.consumerLimits,
-                staticProd = static.producerLimits,
-                dynCons = dynCons,
-                dynProd = dynProd
-              )
-
-              okResponse(json)
+              val js = allConfigsAsJsonStr(static, dynCons, dynProd)
+              okResponse(js)
             }
         }(err => failWith(err))
       }
       .getOrElse {
-        val json = allConfigsAsJsonStr(
-          staticCons = static.consumerLimits,
-          staticProd = static.producerLimits,
-          dynCons = Seq.empty,
-          dynProd = Seq.empty
-        )
+        val json = allConfigsAsJsonStr(static)
         complete(okResponse(json))
       }
   }
   // scalastyle:on method.length
 
   /** Removes ALL dynamic client configurations */
-  private[this] def removeAllClientConfigs()(
+  protected[this] def removeAllClientConfigs()(
       implicit
       maybeDynamicCfgHandlerRef: Option[RunnableDynamicConfigHandlerRef],
       mat: Materializer
@@ -331,7 +235,7 @@ trait AdminRoutes extends AdminRoutesResponses { self: BaseRoutes =>
    * @return
    *   A pekko-http [[Route]]
    */
-  private[this] def findClientConfig(id: String, isConsumer: Boolean)(
+  protected[this] def findClientConfig(id: String, isConsumer: Boolean)(
       implicit cfg: AppCfg,
       maybeDynamicCfgHandlerRef: Option[RunnableDynamicConfigHandlerRef],
       mat: Materializer
@@ -394,7 +298,10 @@ trait AdminRoutes extends AdminRoutesResponses { self: BaseRoutes =>
   ): Route = {
     completeOrRecoverWith {
       save(dc).map {
-        case ConfigSaved(_)     => emptyResponse(OK)
+        case ConfigSaved(_) => emptyResponse(OK)
+        case ConfigNotFound(key) =>
+          log.debug(s"Dynamic config for $key could not be found")
+          emptyResponse(NotFound)
         case IncompleteOp(_, _) => timeoutResponse
         case InvalidKey(_) =>
           invalidRequestResponse("The given id is not valid.")
@@ -410,7 +317,7 @@ trait AdminRoutes extends AdminRoutesResponses { self: BaseRoutes =>
   }
 
   /** Add a new dynamic config */
-  private[this] def addDynamicConfig(dc: DynamicCfg)(
+  protected[this] def addDynamicConfig(dc: DynamicCfg)(
       implicit sessionHandlerRef: SessionHandlerRef,
       maybeDynamicCfgHandlerRef: Option[RunnableDynamicConfigHandlerRef],
       mat: Materializer
@@ -445,7 +352,7 @@ trait AdminRoutes extends AdminRoutesResponses { self: BaseRoutes =>
   }
 
   /** Update an existing dynamic config */
-  private[this] def updateDynamicConfig(dc: DynamicCfg)(
+  protected[this] def updateDynamicConfig(dc: DynamicCfg)(
       implicit sessionHandlerRef: SessionHandlerRef,
       maybeDynamicCfgHandlerRef: Option[RunnableDynamicConfigHandlerRef],
       mat: Materializer
@@ -483,7 +390,7 @@ trait AdminRoutes extends AdminRoutesResponses { self: BaseRoutes =>
    * Function for decoding a request body and save the content using the given
    * {{{save}}} function.
    */
-  private[this] def decodeAndHandleSave(isConsumer: Boolean)(
+  protected[this] def decodeAndHandleSave(isConsumer: Boolean)(
       save: DynamicCfg => Route
   ): Route = {
     decodeRequest {
@@ -517,7 +424,10 @@ trait AdminRoutes extends AdminRoutesResponses { self: BaseRoutes =>
   ): Route = {
     completeOrRecoverWith {
       remove(id).map {
-        case ConfigRemoved(_)   => emptyResponse(OK)
+        case ConfigRemoved(_) => emptyResponse(OK)
+        case ConfigNotFound(key) =>
+          log.debug(s"Dynamic config for $key could not be found")
+          emptyResponse(NotFound)
         case IncompleteOp(_, _) => timeoutResponse
         case InvalidKey(_) =>
           invalidRequestResponse("The given id is not valid.")
@@ -533,7 +443,7 @@ trait AdminRoutes extends AdminRoutesResponses { self: BaseRoutes =>
   }
 
   /** Route for removing a consumer config */
-  private[this] def removeConsumerConfig(idStr: String)(
+  protected[this] def removeConsumerConfig(idStr: String)(
       implicit
       maybeDynamicCfgHandlerRef: Option[RunnableDynamicConfigHandlerRef],
       mat: Materializer
@@ -548,7 +458,7 @@ trait AdminRoutes extends AdminRoutesResponses { self: BaseRoutes =>
   }
 
   /** Route for removing a producer config */
-  private[this] def removeProducerConfig(idStr: String)(
+  protected[this] def removeProducerConfig(idStr: String)(
       implicit
       maybeDynamicCfgHandlerRef: Option[RunnableDynamicConfigHandlerRef],
       mat: Materializer
@@ -562,6 +472,16 @@ trait AdminRoutes extends AdminRoutesResponses { self: BaseRoutes =>
       .getOrElse(complete(emptyResponse(MethodNotAllowed)))
   }
 
+  /**
+   * Function for building a specific error message indicating a badly formed
+   * JSON message.
+   *
+   * @param jsonStr
+   *   String containing the badly formed JSON message.
+   * @param isConsumer
+   *   Boolean indicating whether the message is intended for a consumer or a
+   *   producer
+   */
   private[this] def wrongTypeinJson(
       jsonStr: String,
       isConsumer: Boolean
@@ -572,78 +492,195 @@ trait AdminRoutes extends AdminRoutesResponses { self: BaseRoutes =>
     complete(invalidRequestResponse(msg))
   }
 
-  /** Routes for handling consumer/producer config related functionality */
-  private[this] def clientTypePath(clientType: String, isConsumer: Boolean)(
-      implicit cfg: AppCfg,
-      sessionHandlerRef: SessionHandlerRef,
-      maybeDynamicCfgHandlerRef: Option[RunnableDynamicConfigHandlerRef],
-      mat: Materializer
-  ): Route = {
-    pathPrefix(clientType) {
-      concat(
-        pathEnd {
-          post(decodeAndHandleSave(isConsumer)(addDynamicConfig))
-        },
-        path(Remaining) { idStr =>
-          concat(
-            get(findClientConfig(idStr, isConsumer = isConsumer)),
-            put(decodeAndHandleSave(isConsumer)(updateDynamicConfig)),
-            delete {
-              if (isConsumer) removeConsumerConfig(idStr)
-              else removeProducerConfig(idStr)
-            }
-          )
-        }
-      )
+  /**
+   * Function for fetching all consumer groups. If '''activeOnly''' is
+   * '''true''', only active consumer groups are returned.
+   *
+   * @param activeOnly
+   *   Flag to indicate if all consumer groups should be returned, or only the
+   *   ones that are active.
+   * @param includeInternals
+   *   Flag to determine if internal ws-proxy consumer groups for sessions and
+   *   config handling should be included in the response.
+   * @param cfg
+   *   The [[AppCfg]] to use.
+   * @return
+   *   A [[HttpResponse]] with the result in JSON format
+   */
+  protected[this] def listAllConsumerGroups(
+      activeOnly: Boolean,
+      includeInternals: Boolean
+  )(
+      implicit cfg: AppCfg
+  ): HttpResponse = {
+    val admin = new WsKafkaAdminClient(cfg)
+    try {
+      log.debug(s"Fetching list of consumer groups (activeOnly is $activeOnly)")
+      val cgroups = admin.listConsumerGroups(activeOnly, includeInternals)
+      okResponse(cgroups.asJson.dropEmptyValues.deepDropNullValues.spaces2)
+    } finally {
+      admin.close()
     }
   }
 
   /**
-   * Route specification for administrative endpoints and functionality.
-   *
+   * Will try to fetch the Kafka description of the given [[WsGroupId]].
+   * @param grpId
+   *   [[WsGroupId]] to describe
    * @param cfg
-   *   The [[AppCfg]] to use.
-   * @param maybeDynamicCfgHandlerRef
-   *   The [[RunnableDynamicConfigHandlerRef]] that orchestrates the dynamic
-   *   configs.
-   * @param maybeOidcClient
-   *   The [[OpenIdClient]] to use if OIDC is enabled.
+   *   Implicitly provided [[AppCfg]]
    * @return
-   *   The Route specification
+   *   A [[HttpResponse]]
    */
-  def adminRoutes(
-      implicit cfg: AppCfg,
-      sessionHandlerRef: SessionHandlerRef,
-      maybeDynamicCfgHandlerRef: Option[RunnableDynamicConfigHandlerRef],
-      maybeOidcClient: Option[OpenIdClient]
-  ): Route = {
-    extractMaterializer { implicit mat =>
-      implicit val sh: ActorRef[SessionProtocol] = sessionHandlerRef.shRef
-      handleExceptions(wsExceptionHandler) {
-        maybeAuthenticate(cfg, maybeOidcClient, mat) { _ =>
-          pathPrefix("admin") {
-            concat(
-              pathPrefix("kafka") {
-                path("info")(get(serveClusterInfo))
-              },
-              pathPrefix("client") {
-                pathPrefix("config") {
-                  concat(
-                    pathEnd {
-                      concat(
-                        get(serveAllClientConfigs),
-                        delete(removeAllClientConfigs())
-                      )
-                    },
-                    clientTypePath("consumer", isConsumer = true),
-                    clientTypePath("producer", isConsumer = false)
-                  )
-                }
-              }
-            )
-          }
-        }
-      }
+  protected[this] def describeConsumerGroup(grpId: WsGroupId)(
+      implicit cfg: AppCfg
+  ): HttpResponse = {
+    val admin = new WsKafkaAdminClient(cfg)
+    try {
+      log.debug(s"Fetching describe info for consumer group ${grpId.value}")
+      val maybeCg = admin.describeConsumerGroup(grpId)
+      val res = maybeCg
+        .map(cg => okResponse(cg.asJson.spaces2))
+        .getOrElse(emptyResponse(NotFound))
+      res
+    } finally {
+      admin.close()
     }
   }
+
+  /**
+   * Try to list the consumer offsets for the given [[WsGroupId]]
+   *
+   * @param grpId
+   *   [[WsGroupId]] to fetch offsets for
+   * @param cfg
+   *   Implicitly provided [[AppCfg]]
+   * @return
+   *   A [[HttpResponse]]
+   */
+  protected[this] def listConsumerGroupOffsets(grpId: WsGroupId)(
+      implicit cfg: AppCfg
+  ): HttpResponse = {
+    val admin = new WsKafkaAdminClient(cfg)
+    try {
+      log.debug(s"Fetching offsets for consumer group ${grpId.value}")
+      val offsets = admin.listConsumerGroupOffsets(grpId)
+      if (offsets.isEmpty) emptyResponse(NotFound)
+      else okResponse(offsets.asJson.spaces2)
+    } finally {
+      admin.close()
+    }
+  }
+
+  /**
+   * Function to modify consumer group offsets.
+   *
+   * @param grpId
+   *   The [[WsGroupId]] to modify
+   * @param operation
+   *   The function to perform on the [[ConsumerGroup]]
+   * @param admin
+   *   The [[WsKafkaAdminClient]] to use
+   * @return
+   *   A [[HttpResponse]]
+   */
+  private[this] def modifyConsumerGroupOffsets(
+      grpId: WsGroupId
+  )(
+      operation: ConsumerGroup => HttpResponse
+  )(implicit admin: WsKafkaAdminClient): HttpResponse = {
+    admin
+      .describeConsumerGroup(grpId)
+      .map { cg =>
+        if (!cg.isActive) operation(cg)
+        else
+          invalidRequestResponse(
+            msg = "Unable to modify the consumer group offsets because" +
+              " the group is still considered to be active. Please " +
+              "ensure that all consumer clients are stopped before " +
+              "trying again.",
+            statusCode = PreconditionFailed
+          )
+      }
+      .getOrElse {
+        invalidRequestResponse(
+          msg = s"Unable to locate consumer group with group.id=${grpId.value}",
+          statusCode = NotFound
+        )
+      }
+  }
+
+  /**
+   * Try to alter which offsets to the consumer group should start consuming
+   * from when starting up. For this to succeed, all consumer member instances
+   * must be stopped.
+   *
+   * @param grpId
+   *   The [[WsGroupId]] to alter offsets for.
+   * @param topic
+   *   The [[TopicName]] to alter offsets for.
+   * @param poms
+   *   A list of [[PartitionOffsetMetadata]] containing the new offsets to use.
+   * @param cfg
+   *   The [[AppCfg]] to use
+   * @return
+   *   A [[HttpResponse]]
+   */
+  protected[this] def alterConsumerGroupOffsets(
+      grpId: WsGroupId,
+      topic: TopicName,
+      poms: List[PartitionOffsetMetadata]
+  )(
+      implicit cfg: AppCfg
+  ): HttpResponse = {
+    implicit val admin: WsKafkaAdminClient = new WsKafkaAdminClient(cfg)
+    try {
+      log.debug(
+        "Trying to alter offsets for" +
+          s"consumer group ${grpId.value} on topic ${topic.value}"
+      )
+      modifyConsumerGroupOffsets(grpId) { _ =>
+        admin.alterConsumerGroupOffsets(grpId, poms)
+        val newOffsets = admin.listConsumerGroupOffsets(grpId)
+        okResponse(newOffsets.asJson.spaces2)
+      }
+    } finally {
+      admin.close()
+    }
+  }
+
+  /**
+   * Try to delete all consumer offsets for the given consumer group. For this
+   * to succeed, all consumer member instances must be stopped.
+   *
+   * @param grpId
+   *   The [[WsGroupId]] to delete offsets for.
+   * @param topic
+   *   The [[TopicName]] to delete offsets for.
+   * @param cfg
+   *   The [[AppCfg]] to use
+   * @return
+   *   A [[HttpResponse]]
+   */
+  protected[this] def deleteConsumerGroupOffsets(
+      grpId: WsGroupId,
+      topic: TopicName
+  )(
+      implicit cfg: AppCfg
+  ): HttpResponse = {
+    implicit val admin: WsKafkaAdminClient = new WsKafkaAdminClient(cfg)
+    try {
+      log.debug(
+        "Trying to delete offsets for consumer group " +
+          s"${grpId.value} on topic ${topic.value}"
+      )
+      modifyConsumerGroupOffsets(grpId) { _ =>
+        admin.deleteConsumerGroupOffsets(grpId, topic)
+        emptyResponse(OK)
+      }
+    } finally {
+      admin.close()
+    }
+  }
+
 }

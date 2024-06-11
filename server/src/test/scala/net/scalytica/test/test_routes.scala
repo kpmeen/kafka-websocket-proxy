@@ -9,6 +9,7 @@ import org.apache.pekko.stream.Materializer
 import net.scalytica.kafka.wsproxy.models.{FullClientId, WsServerId}
 import net.scalytica.kafka.wsproxy.session.{SessionHandlerProtocol, SessionId}
 import net.scalytica.kafka.wsproxy.web._
+import net.scalytica.kafka.wsproxy.web.admin.AdminRoutes
 
 trait TestAdHocRoute extends RoutesPrereqs with RouteFailureHandlers {
   override val serverId: WsServerId = WsServerId("node-1")

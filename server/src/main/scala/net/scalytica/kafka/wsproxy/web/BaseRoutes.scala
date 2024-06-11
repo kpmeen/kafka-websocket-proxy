@@ -10,6 +10,7 @@ import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.errors._
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models._
+import net.scalytica.kafka.wsproxy.web.Headers.XKafkaAuthHeader
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
@@ -22,6 +23,33 @@ trait BaseRoutes
     extends RoutesPrereqs
     with RouteFailureHandlers
     with WithProxyLogger {
+
+  protected def extractKafkaCreds(
+      authRes: WsProxyAuthResult,
+      kafkaAuthHeader: Option[XKafkaAuthHeader]
+  )(implicit cfg: AppCfg): Option[AclCredentials] = {
+    cfg.server.openidConnect
+      .map { oidcfg =>
+        if (oidcfg.isKafkaTokenAuthOnlyEnabled) {
+          log.trace("Only allowing Kafka auth through JWT token.")
+          authRes.aclCredentials
+        } else {
+          log.trace(
+            s"Allowing Kafka auth through JWT token or the" +
+              s" ${Headers.KafkaAuthHeaderName} header."
+          )
+          // Always prefer the JWT token
+          authRes.aclCredentials.orElse(kafkaAuthHeader.map(_.aclCredentials))
+        }
+      }
+      .getOrElse {
+        log.trace(
+          "OpenID Connect is not configured. Using" +
+            s" ${Headers.KafkaAuthHeaderName} header."
+        )
+        kafkaAuthHeader.map(_.aclCredentials)
+      }
+  }
 
   protected def basicAuthCredentials(
       creds: Credentials

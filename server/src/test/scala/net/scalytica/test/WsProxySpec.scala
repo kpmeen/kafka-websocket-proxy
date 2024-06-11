@@ -10,7 +10,13 @@ import scala.util.{Failure, Success}
 import io.github.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import net.scalytica.kafka.wsproxy.config._
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
-import net.scalytica.kafka.wsproxy.models.{WsProducerId, WsProducerInstanceId}
+import net.scalytica.kafka.wsproxy.models.{
+  TopicName,
+  WsGroupId,
+  WsProducerId,
+  WsProducerInstanceId,
+  WsServerId
+}
 import net.scalytica.kafka.wsproxy.session.SessionHandlerRef
 import net.scalytica.kafka.wsproxy.auth.OpenIdClient
 import net.scalytica.kafka.wsproxy.config.Configuration
@@ -23,9 +29,9 @@ import net.scalytica.kafka.wsproxy.config.Configuration.{
   SchemaRegistryCfg
 }
 import net.scalytica.kafka.wsproxy.models.Formats._
-import net.scalytica.kafka.wsproxy.models.{TopicName, WsServerId}
 import net.scalytica.test.TestDataGenerators._
 import net.scalytica.test.SharedAttributes._
+import org.apache.kafka.clients.CommonClientConfigs
 import org.scalatest.Suite
 import org.scalatest.matchers.must.Matchers
 
@@ -244,7 +250,24 @@ trait WsProxySpec
       optOidClient: Option[OpenIdClient],
       producerProbe: WSProbe,
       consumerProbe: WSProbe
-  )
+  ) {
+
+    def withConsumerGroupId(grpId: WsGroupId): ConsumerContext = {
+      val ekc = EmbeddedKafkaConfig.apply(
+        kafkaPort = embeddedKafkaConfig.kafkaPort,
+        zooKeeperPort = embeddedKafkaConfig.zooKeeperPort,
+        customBrokerProperties = embeddedKafkaConfig.customBrokerProperties,
+        customProducerProperties = embeddedKafkaConfig.customProducerProperties,
+        customConsumerProperties =
+          embeddedKafkaConfig.customConsumerProperties ++ Map(
+            CommonClientConfigs.GROUP_ID_CONFIG -> grpId.value
+          )
+      )
+
+      this.copy(embeddedKafkaConfig = ekc)
+    }
+
+  }
 
   def setupConsumerContext(
       implicit pctx: ProducerContext

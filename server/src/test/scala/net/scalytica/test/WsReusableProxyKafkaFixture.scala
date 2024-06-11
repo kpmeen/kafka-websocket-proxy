@@ -1,8 +1,10 @@
 package net.scalytica.test
 
 import io.github.embeddedkafka.{EmbeddedK, EmbeddedKafka, EmbeddedKafkaConfig}
+import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
 import net.scalytica.kafka.wsproxy.mapToProperties
 import net.scalytica.kafka.wsproxy.auth.{AccessToken, OpenIdClient}
+import net.scalytica.kafka.wsproxy.codecs.BasicSerdes.StringDeserializer
 import net.scalytica.kafka.wsproxy.config.Configuration.{
   AppCfg,
   CustomJwtCfg,
@@ -18,27 +20,48 @@ import net.scalytica.kafka.wsproxy.models.Formats.{
   JsonType,
   StringType
 }
-import net.scalytica.kafka.wsproxy.models.{ReadIsolationLevel, TopicName}
+import net.scalytica.kafka.wsproxy.models.{
+  ReadIsolationLevel,
+  TopicName,
+  WsClientId,
+  WsGroupId
+}
 import net.scalytica.kafka.wsproxy.session.{SessionHandler, SessionHandlerRef}
 import net.scalytica.test.SharedAttributes._
 import org.apache.kafka.clients.admin.AdminClientConfig.{
   BOOTSTRAP_SERVERS_CONFIG,
   CLIENT_ID_CONFIG,
   CONNECTIONS_MAX_IDLE_MS_CONFIG,
-  REQUEST_TIMEOUT_MS_CONFIG
+  REQUEST_TIMEOUT_MS_CONFIG,
+  RETRIES_CONFIG,
+  RETRY_BACKOFF_MS_CONFIG,
+  SECURITY_PROTOCOL_CONFIG
 }
 import org.apache.kafka.clients.admin.{AdminClient, NewTopic}
+import org.apache.kafka.clients.consumer.ConsumerConfig.{
+  AUTO_OFFSET_RESET_CONFIG,
+  ENABLE_AUTO_COMMIT_CONFIG,
+  GROUP_ID_CONFIG
+}
+import org.apache.kafka.clients.consumer.{
+  ConsumerRecord,
+  KafkaConsumer,
+  OffsetResetStrategy
+}
+import org.apache.kafka.clients.producer.KafkaProducer
+import org.apache.kafka.common.serialization.{Deserializer, Serializer}
 import org.apache.pekko.Done
 import org.apache.pekko.actor.typed.ActorSystem
 import org.apache.pekko.actor.typed.scaladsl.adapter._
 import org.apache.pekko.http.scaladsl.testkit.WSProbe
 import org.apache.pekko.kafka.scaladsl.Consumer
 
+import java.time.Duration
 import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.util.Try
 import scala.jdk.CollectionConverters._
 
+// scalastyle:off magic.number
 trait WsReusableProxyKafkaFixture {
   self: WsProxySpec =>
 
@@ -61,6 +84,100 @@ trait WsReusableProxyKafkaFixture {
 
   override def afterAll(): Unit = {
     kafkaContext.stop()
+  }
+
+  def kafkaConsumer[K, V](
+      groupId: WsGroupId,
+      clientId: WsClientId
+  )(
+      implicit keyDes: Deserializer[K],
+      valDes: Deserializer[V]
+  ): KafkaConsumer[K, V] = {
+    val ekcfg = kafkaContext.kafkaConfig
+    val consCfg = Map(
+      GROUP_ID_CONFIG           -> groupId.value,
+      CLIENT_ID_CONFIG          -> clientId.value,
+      BOOTSTRAP_SERVERS_CONFIG  -> s"localhost:${ekcfg.kafkaPort}",
+      ENABLE_AUTO_COMMIT_CONFIG -> false.toString,
+      AUTO_OFFSET_RESET_CONFIG ->
+        OffsetResetStrategy.EARLIEST.toString.toLowerCase
+    )
+    new KafkaConsumer[K, V](consCfg, keyDes, valDes)
+  }
+
+  def kafkaProducer[K, V]()(
+      implicit keySer: Serializer[K],
+      valSer: Serializer[V]
+  ): KafkaProducer[K, V] = {
+    val ekcfg = kafkaContext.kafkaConfig
+    val prodCfg = Map(
+      BOOTSTRAP_SERVERS_CONFIG  -> s"localhost:${ekcfg.kafkaPort}",
+      SECURITY_PROTOCOL_CONFIG  -> "PLAINTEXT",
+      REQUEST_TIMEOUT_MS_CONFIG -> "20000",
+      RETRIES_CONFIG            -> "2147483647",
+      RETRY_BACKOFF_MS_CONFIG   -> "500"
+    )
+
+    new KafkaProducer[K, V](prodCfg, keySer, valSer)
+  }
+
+  def prepConsumer[K, V](
+      gid: WsGroupId,
+      cid: WsClientId,
+      topic: TopicName,
+      active: Boolean
+  )(
+      implicit keyDes: Deserializer[K],
+      valDes: Deserializer[V]
+  ): KafkaConsumer[K, V] = {
+    val c = kafkaConsumer[K, V](gid, cid)
+    c.subscribe(List(topic.value).asJavaCollection)
+    var recs = Iterable.empty[ConsumerRecord[K, V]]
+
+    while ({
+      recs = c.poll(Duration.ofMillis(100L)).records(topic.value).asScala
+      recs.isEmpty
+    }) {
+      log.trace("Found no records, will try to poll again...")
+    }
+
+    c.commitSync()
+    if (!active) c.close()
+    c
+  }
+
+  def prepareConsumerGroups[T](
+      topicName: TopicName,
+      grpNamePrefix: String,
+      numActiveClients: Int = 1,
+      numInactiveClients: Int = 0
+  )(
+      body: (
+          Seq[KafkaConsumer[String, String]],
+          Seq[KafkaConsumer[String, String]]
+      ) => T
+  ): T = {
+    val activeConsumers = (1 to numActiveClients).map { idx =>
+      prepConsumer[String, String](
+        gid = WsGroupId(s"$grpNamePrefix-active-$idx"),
+        cid = WsClientId(s"client-active-$idx"),
+        topic = topicName,
+        active = true
+      )
+    }
+    val inactiveConsumers = (1 to numInactiveClients).map { idx =>
+      prepConsumer[String, String](
+        gid = WsGroupId(s"$grpNamePrefix-inactive-$idx"),
+        cid = WsClientId(s"client-inactive-$idx"),
+        topic = topicName,
+        active = false
+      )
+    }
+    try {
+      body(activeConsumers, inactiveConsumers)
+    } finally {
+      activeConsumers.foreach(_.close())
+    }
   }
 
   def withNoContext[T](
@@ -86,6 +203,15 @@ trait WsReusableProxyKafkaFixture {
     body(kafkaContext.kafkaConfig, wsCfg)
   }
 
+  def withWsKafkaAdminClient[T](
+      body: WsKafkaAdminClient => T
+  )(implicit appCfg: AppCfg): T = {
+    val admin = new WsKafkaAdminClient(appCfg)
+    val res   = body(admin)
+    admin.close()
+    res
+  }
+
   def withAdminContext[T](
       useServerBasicAuth: Boolean = false,
       useDynamicConfigs: Boolean = false,
@@ -97,9 +223,9 @@ trait WsReusableProxyKafkaFixture {
           AppCfg,
           SessionHandlerRef,
           Option[RunnableDynamicConfigHandlerRef],
-          AdminClient
+          WsKafkaAdminClient
       ) => T
-  ): Try[T] = {
+  ): T = {
     val proxyContext = new WsProxyContext(
       useBasicAuth = useServerBasicAuth,
       useDynamicConfigs = useDynamicConfigs,
@@ -110,7 +236,7 @@ trait WsReusableProxyKafkaFixture {
 
     proxyContext.start(kafkaContext.kafkaConfig)
 
-    withAdminClient { adminClient =>
+    withWsKafkaAdminClient { adminClient =>
       val res = body(
         kafkaContext.kafkaConfig,
         proxyContext.getAppCfg,
@@ -122,20 +248,20 @@ trait WsReusableProxyKafkaFixture {
       proxyContext.stop()
 
       res
-    }(kafkaContext.kafkaConfig).recover { case t: Throwable =>
-      fail(t)
-    }
+    }(proxyContext.getAppCfg)
   }
 
   def withProducerContext[T](
       topic: String,
+      partitions: Int = 1,
       useProducerSessions: Boolean = false,
       useDynamicConfigs: Boolean = false,
       useExactlyOnce: Boolean = false,
-      partitions: Int = 1
+      useBasicAuth: Boolean = false
   )(body: ProducerContext => T): T = {
     // initialise
     val proxyContext = new WsProxyContext(
+      useBasicAuth = useBasicAuth,
       useProducerSessions = useProducerSessions,
       useDynamicConfigs = useDynamicConfigs,
       useExactlyOnce = useExactlyOnce
@@ -160,9 +286,14 @@ trait WsReusableProxyKafkaFixture {
       numMessages: Int = 1,
       partitions: Int = 1,
       prePopulate: Boolean = true,
-      withHeaders: Boolean = false
+      withHeaders: Boolean = false,
+      useBasicAuth: Boolean = false
   )(body: ConsumerContext => T): T = {
-    withProducerContext(topic, partitions = partitions) { implicit pctx =>
+    withProducerContext(
+      topic,
+      partitions = partitions,
+      useBasicAuth = useBasicAuth
+    ) { implicit pctx =>
       if (prePopulate) {
         produceForMessageType(
           producerId = defaultProducerClientId,

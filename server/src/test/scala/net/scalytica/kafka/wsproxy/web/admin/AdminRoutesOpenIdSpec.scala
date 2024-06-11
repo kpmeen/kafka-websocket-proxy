@@ -1,9 +1,7 @@
-package net.scalytica.kafka.wsproxy.web
+package net.scalytica.kafka.wsproxy.web.admin
 
 import io.circe.parser._
 import io.circe.syntax._
-import io.circe.{ACursor, HCursor, Json}
-import net.scalytica.kafka.wsproxy.auth.AccessToken
 import net.scalytica.kafka.wsproxy.codecs.Decoders.{
   brokerInfoDecoder,
   dynamicCfgDecoder
@@ -14,7 +12,8 @@ import net.scalytica.kafka.wsproxy.config.Configuration.{
   DynamicCfg,
   ProducerSpecificLimitCfg
 }
-import net.scalytica.kafka.wsproxy.models.{BrokerInfo, WsGroupId, WsProducerId}
+import net.scalytica.kafka.wsproxy.models.BrokerInfo
+import net.scalytica.test.TestDataGenerators._
 import net.scalytica.test._
 import org.apache.pekko.http.scaladsl.model.ContentTypes._
 import org.apache.pekko.http.scaladsl.model.StatusCodes._
@@ -22,25 +21,12 @@ import org.apache.pekko.http.scaladsl.model.headers.OAuth2BearerToken
 import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity}
 import org.apache.pekko.http.scaladsl.server._
 import org.apache.pekko.http.scaladsl.testkit.RouteTestTimeout
-import org.scalatest.Inspectors.forAll
-import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Minutes, Span}
-import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.{Assertion, CustomEitherValues, OptionValues}
 
 import scala.concurrent.duration._
 
 // scalastyle:off magic.number
-class AdminRoutesOpenIdSpec
-    extends AnyWordSpec
-    with TestAdminRoutes
-    with CustomEitherValues
-    with OptionValues
-    with ScalaFutures
-    with Eventually
-    with WsProxySpec
-    with MockOpenIdServer
-    with WsReusableProxyKafkaFixture {
+class AdminRoutesOpenIdSpec extends BaseAdminRoutesSpec with MockOpenIdServer {
 
   override protected val testTopicPrefix: String = "admin-openid-test-topic"
 
@@ -48,176 +34,6 @@ class AdminRoutesOpenIdSpec
     PatienceConfig(timeout = Span(3, Minutes))
 
   implicit val timeout: RouteTestTimeout = RouteTestTimeout(20 seconds)
-
-  private[this] def createConsumerCfg(
-      id: String,
-      mps: Option[Int],
-      mc: Option[Int],
-      bs: Option[Int] = None
-  ): ConsumerSpecificLimitCfg = {
-    ConsumerSpecificLimitCfg(
-      groupId = WsGroupId(id),
-      messagesPerSecond = mps,
-      maxConnections = mc,
-      batchSize = bs
-    )
-  }
-
-  private[this] def createProducerCfg(
-      id: String,
-      mps: Option[Int],
-      mc: Option[Int]
-  ): ProducerSpecificLimitCfg = {
-    ProducerSpecificLimitCfg(
-      producerId = WsProducerId(id),
-      messagesPerSecond = mps,
-      maxConnections = mc
-    )
-  }
-
-  private[this] val expStaticCons1 = createConsumerCfg(
-    id = "__DEFAULT__",
-    mps = Some(0),
-    mc = Some(0),
-    bs = Some(0)
-  )
-
-  private[this] val expStaticCons2 =
-    createConsumerCfg(id = "dummy", mps = Some(10), mc = Some(2))
-
-  private[this] val expStaticProd1 =
-    createProducerCfg(id = "__DEFAULT__", mps = Some(0), mc = Some(0))
-
-  private[this] val expStaticProd2 = createProducerCfg(
-    id = "limit-test-producer-1",
-    mps = Some(10),
-    mc = Some(1)
-  )
-
-  private[this] val expStaticProd3 = createProducerCfg(
-    id = "limit-test-producer-2",
-    mps = Some(10),
-    mc = Some(2)
-  )
-
-  private[this] def expectedInvalidJson(isConsumer: Boolean = true) = {
-    val t   = "Invalid JSON for %s config."
-    val msg = if (isConsumer) t.format("consumer") else t.format("producer")
-    Json.obj("message" -> Json.fromString(msg)).spaces2
-  }
-
-  private[this] def assertAllStaticConfigs(cursor: HCursor): Assertion = {
-    val staticConsumers =
-      cursor.downField("consumers").downField("static")
-    val staticProducers =
-      cursor.downField("producers").downField("static")
-
-    val sc1 = staticConsumers.downN(0).as[DynamicCfg].rightValue
-    val sc2 = staticConsumers.downN(1).as[DynamicCfg].rightValue
-    sc1 mustBe expStaticCons1
-    sc2 mustBe expStaticCons2
-
-    val sp1 = staticProducers.downN(0).as[DynamicCfg].rightValue
-    val sp2 = staticProducers.downN(1).as[DynamicCfg].rightValue
-    val sp3 = staticProducers.downN(2).as[DynamicCfg].rightValue
-    sp1 mustBe expStaticProd1
-    sp2 mustBe expStaticProd2
-    sp3 mustBe expStaticProd3
-  }
-
-  private[this] def assertAllDynamicConfigs(
-      expected: Seq[DynamicCfg],
-      cursor: ACursor
-  ): Assertion = {
-    val resCfgs = cursor.values.value.map(_.as[DynamicCfg].rightValue)
-    resCfgs must have size expected.size.toLong
-    if (expected.isEmpty) resCfgs mustBe empty
-    else resCfgs must contain allElementsOf expected
-  }
-
-  private[this] def assertConsumerConfig(
-      expected: ConsumerSpecificLimitCfg,
-      actual: DynamicCfg
-  ): Assertion = {
-    actual match {
-      case c: ConsumerSpecificLimitCfg =>
-        c.groupId mustBe expected.groupId
-        c.batchSize mustBe expected.batchSize
-        c.messagesPerSecond mustBe expected.messagesPerSecond
-        c.maxConnections mustBe expected.maxConnections
-
-      case _ => fail("Got the wrong config type")
-    }
-  }
-
-  private[this] def assertProducerConfig(
-      expected: ProducerSpecificLimitCfg,
-      actual: DynamicCfg
-  ): Assertion = {
-    actual match {
-      case p: ProducerSpecificLimitCfg =>
-        p.producerId mustBe expected.producerId
-        p.messagesPerSecond mustBe expected.messagesPerSecond
-        p.maxConnections mustBe expected.maxConnections
-
-      case _ => fail("Got the wrong config type")
-    }
-  }
-
-  private[this] def postConfig(
-      uri: String,
-      token: AccessToken,
-      conf: DynamicCfg,
-      route: Route
-  ): Assertion = {
-    val json   = (conf: DynamicCfg).asJson.spaces2
-    val entity = HttpEntity(ContentTypes.`application/json`, json)
-
-    Post(uri, entity) ~> addCredentials(token.bearerToken) ~> route ~> check {
-      status mustBe OK
-      responseEntity.contentType mustBe `application/json`
-    }
-  }
-
-  private[this] def assertPostConsumerConfig(
-      token: AccessToken,
-      conf: DynamicCfg,
-      route: Route
-  ) = {
-    postConfig("/admin/client/config/consumer", token, conf, route)
-  }
-
-  private[this] def assertPostProducerConfig(
-      token: AccessToken,
-      conf: DynamicCfg,
-      route: Route
-  ) = {
-    postConfig("/admin/client/config/producer", token, conf, route)
-  }
-
-  private[this] def assertPostNConsumerConfigs(
-      num: Int,
-      token: AccessToken,
-      route: Route
-  ): Seq[DynamicCfg] = {
-    val cfgs = (1 to num).map { i =>
-      createConsumerCfg(s"test-consumer-$i", Some(num * 100), Some(num))
-    }
-    forAll(cfgs)(c => assertPostConsumerConfig(token, c, route))
-    cfgs
-  }
-
-  private[this] def assertPostNProducerConfigs(
-      num: Int,
-      token: AccessToken,
-      route: Route
-  ): Seq[DynamicCfg] = {
-    val cfgs = (1 to 10).map { i =>
-      createProducerCfg(s"test-producer-$i", Some(num * 100), Some(num))
-    }
-    forAll(cfgs)(c => assertPostProducerConfig(token, c, route))
-    cfgs
-  }
 
   "Having the proxy configured with OpenID" when {
 
@@ -319,7 +135,7 @@ class AdminRoutesOpenIdSpec
                     responseEntity.contentType mustBe `application/json`
                     val resStr = responseAs[String]
                     val res = parse(resStr).rightValue.as[DynamicCfg].rightValue
-                    assertConsumerConfig(expStaticCons2, res)
+                    assertConsumerConfig(ExpStaticCons2, res)
                   }
             }
         }
@@ -339,7 +155,7 @@ class AdminRoutesOpenIdSpec
                     responseEntity.contentType mustBe `application/json`
                     val resStr = responseAs[String]
                     val res = parse(resStr).rightValue.as[DynamicCfg].rightValue
-                    assertProducerConfig(expStaticProd3, res)
+                    assertProducerConfig(ExpStaticProd3, res)
                   }
             }
         }
@@ -416,7 +232,7 @@ class AdminRoutesOpenIdSpec
                 )
               val cconf = createConsumerCfg("my-consumer", Some(10), Some(2))
 
-              assertPostConsumerConfig(token, cconf, route)
+              assertPostConsumerConfig(cconf, route, Some(token.bearerToken))
 
               eventually {
                 Get("/admin/client/config/consumer/my-consumer") ~>
@@ -448,7 +264,7 @@ class AdminRoutesOpenIdSpec
               val pconf =
                 createProducerCfg("my-producer-1", Some(10), Some(2))
 
-              assertPostProducerConfig(token, pconf, route)
+              assertPostProducerConfig(pconf, route, Some(token.bearerToken))
 
               eventually {
                 Get("/admin/client/config/producer/my-producer-1") ~>
@@ -472,15 +288,18 @@ class AdminRoutesOpenIdSpec
           case (_, _, oidcClient, oidcCfg, token) =>
             withAdminContext(
               useDynamicConfigs = true,
-              optOpenIdCfg = Option(oidcCfg)
+              optOpenIdCfg = Option(oidcCfg),
+              useFreshStateTopics = true
             ) { case (_, cfg, sessionRef, dynCfgRef, _) =>
               val route =
                 Route.seal(
                   adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
                 )
 
-              val expDynConsCfgs = assertPostNConsumerConfigs(4, token, route)
-              val expDynProdCfgs = assertPostNProducerConfigs(4, token, route)
+              val expDynConsCfgs =
+                assertPostNConsumerConfigs(4, route, Some(token.bearerToken))
+              val expDynProdCfgs =
+                assertPostNProducerConfigs(4, route, Some(token.bearerToken))
 
               eventually {
                 Get("/admin/client/config") ~>
@@ -519,7 +338,8 @@ class AdminRoutesOpenIdSpec
                 Route.seal(
                   adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
                 )
-              val expDynConsCfgs = assertPostNConsumerConfigs(3, token, route)
+              val expDynConsCfgs =
+                assertPostNConsumerConfigs(3, route, Some(token.bearerToken))
               val exp =
                 expDynConsCfgs.tail.head.asInstanceOf[ConsumerSpecificLimitCfg]
 
@@ -556,7 +376,7 @@ class AdminRoutesOpenIdSpec
                   responseEntity.contentType mustBe `application/json`
                   val resStr = responseAs[String]
                   val res = parse(resStr).rightValue.as[DynamicCfg].rightValue
-                  assertConsumerConfig(expStaticCons2, res)
+                  assertConsumerConfig(ExpStaticCons2, res)
                 }
             }
         }
@@ -572,7 +392,8 @@ class AdminRoutesOpenIdSpec
                 Route.seal(
                   adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
                 )
-              val expDynProdCfgs = assertPostNProducerConfigs(3, token, route)
+              val expDynProdCfgs =
+                assertPostNProducerConfigs(3, route, Some(token.bearerToken))
               val exp =
                 expDynProdCfgs.tail.head.asInstanceOf[ProducerSpecificLimitCfg]
 
@@ -609,7 +430,7 @@ class AdminRoutesOpenIdSpec
                   responseEntity.contentType mustBe `application/json`
                   val resStr = responseAs[String]
                   val res = parse(resStr).rightValue.as[DynamicCfg].rightValue
-                  assertProducerConfig(expStaticProd3, res)
+                  assertProducerConfig(ExpStaticProd3, res)
                 }
             }
         }
@@ -625,7 +446,8 @@ class AdminRoutesOpenIdSpec
                 Route.seal(
                   adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
                 )
-              val expDynConsCfgs = assertPostNConsumerConfigs(3, token, route)
+              val expDynConsCfgs =
+                assertPostNConsumerConfigs(3, route, Some(token.bearerToken))
               val exp =
                 expDynConsCfgs.tail.head.asInstanceOf[ConsumerSpecificLimitCfg]
 
@@ -681,7 +503,8 @@ class AdminRoutesOpenIdSpec
                 Route.seal(
                   adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
                 )
-              val expDynProdCfgs = assertPostNProducerConfigs(3, token, route)
+              val expDynProdCfgs =
+                assertPostNProducerConfigs(3, route, Some(token.bearerToken))
               val exp =
                 expDynProdCfgs.tail.head.asInstanceOf[ProducerSpecificLimitCfg]
 
@@ -737,7 +560,8 @@ class AdminRoutesOpenIdSpec
                 Route.seal(
                   adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
                 )
-              val expDynConsCfgs = assertPostNConsumerConfigs(3, token, route)
+              val expDynConsCfgs =
+                assertPostNConsumerConfigs(3, route, Some(token.bearerToken))
               val exp =
                 expDynConsCfgs.tail.head.asInstanceOf[ConsumerSpecificLimitCfg]
 
@@ -786,7 +610,8 @@ class AdminRoutesOpenIdSpec
                 Route.seal(
                   adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
                 )
-              val expDynProdCfgs = assertPostNProducerConfigs(3, token, route)
+              val expDynProdCfgs =
+                assertPostNProducerConfigs(3, route, Some(token.bearerToken))
               val exp =
                 expDynProdCfgs.tail.head.asInstanceOf[ProducerSpecificLimitCfg]
 
@@ -829,15 +654,18 @@ class AdminRoutesOpenIdSpec
           case (_, _, oidcClient, oidcCfg, token) =>
             withAdminContext(
               useDynamicConfigs = true,
-              optOpenIdCfg = Option(oidcCfg)
+              optOpenIdCfg = Option(oidcCfg),
+              useFreshStateTopics = true
             ) { case (_, cfg, sessionRef, dynCfgRef, _) =>
               val route =
                 Route.seal(
                   adminRoutes(cfg, sessionRef, dynCfgRef, Some(oidcClient))
                 )
 
-              val expDynConsCfgs = assertPostNConsumerConfigs(4, token, route)
-              val expDynProdCfgs = assertPostNProducerConfigs(4, token, route)
+              val expDynConsCfgs =
+                assertPostNConsumerConfigs(4, route, Some(token.bearerToken))
+              val expDynProdCfgs =
+                assertPostNProducerConfigs(4, route, Some(token.bearerToken))
 
               eventually {
                 Get("/admin/client/config") ~>

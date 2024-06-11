@@ -15,7 +15,7 @@ object KafkaFutureErrorHandler {
       Option(juce.getCause)
         .map {
           case _: TopicExistsException => ok
-          case t                       => ko(t)
+          case _                       => ko(juce)
         }
         .getOrElse(ko(juce))
 

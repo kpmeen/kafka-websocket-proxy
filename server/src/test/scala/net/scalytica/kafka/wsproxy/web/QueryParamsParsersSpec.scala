@@ -52,7 +52,7 @@ class QueryParamsParsersSpec
             "keyType=string&" +
             "valType=string"
         ) ~> routeWithExceptionHandler(
-          inParams(defaultTestAppCfg)(echoComplete)
+          webSocketInParams(defaultTestAppCfg)(echoComplete)
         ) ~> check {
           status mustBe StatusCodes.OK
         }
@@ -64,7 +64,7 @@ class QueryParamsParsersSpec
             "socketPayload=json&" +
             "topic=test-topic"
         ) ~> routeWithExceptionHandler(
-          inParams(defaultTestAppCfg)(echoComplete)
+          webSocketInParams(defaultTestAppCfg)(echoComplete)
         ) ~> check {
           status mustBe StatusCodes.OK
         }
@@ -76,7 +76,7 @@ class QueryParamsParsersSpec
             "socketPayload=protobuf&" +
             "topic=test-topic"
         ) ~> routeWithExceptionHandler(
-          inParams(defaultTestAppCfg)(echoComplete)
+          webSocketInParams(defaultTestAppCfg)(echoComplete)
         ) ~> check {
           status mustBe StatusCodes.BadRequest
           contentType mustBe ContentTypes.`application/json`
@@ -91,7 +91,7 @@ class QueryParamsParsersSpec
           "/?clientId=foobar&" +
             "socketPayload=json"
         ) ~> routeWithExceptionHandler(
-          inParams(defaultTestAppCfg)(echoComplete)
+          webSocketInParams(defaultTestAppCfg)(echoComplete)
         ) ~> check {
           status mustBe StatusCodes.BadRequest
           contentType mustBe ContentTypes.`application/json`
@@ -107,7 +107,7 @@ class QueryParamsParsersSpec
             "socketPayload=json&" +
             "topic=test-topic"
         ) ~> routeWithExceptionHandler(
-          inParams(sessNoTransAppCfg)(echoComplete)
+          webSocketInParams(sessNoTransAppCfg)(echoComplete)
         ) ~> check {
           status mustBe StatusCodes.BadRequest
           contentType mustBe ContentTypes.`application/json`
@@ -126,7 +126,7 @@ class QueryParamsParsersSpec
             "instanceId=test-instance&" +
             "transactional=true"
         ) ~> routeWithExceptionHandler(
-          inParams(transAppCfg)(echoComplete)
+          webSocketInParams(transAppCfg)(echoComplete)
         ) ~> check {
           status mustBe StatusCodes.OK
         }
@@ -140,7 +140,7 @@ class QueryParamsParsersSpec
             "instanceId=test-instance&" +
             "transactional=true"
         ) ~> routeWithExceptionHandler(
-          inParams(defaultTestAppCfg)(echoComplete)
+          webSocketInParams(defaultTestAppCfg)(echoComplete)
         ) ~> check {
           status mustBe StatusCodes.BadRequest
           contentType mustBe ContentTypes.`application/json`
@@ -159,7 +159,7 @@ class QueryParamsParsersSpec
             "instanceId=test-instance&" +
             "transactional=true"
         ) ~> routeWithExceptionHandler(
-          inParams(transNoSessAppCfg)(echoComplete)
+          webSocketInParams(transNoSessAppCfg)(echoComplete)
         ) ~> check {
           status mustBe StatusCodes.BadRequest
           contentType mustBe ContentTypes.`application/json`
@@ -177,7 +177,7 @@ class QueryParamsParsersSpec
             "topic=test-topic&" +
             "transactional=true"
         ) ~> routeWithExceptionHandler(
-          inParams(transAppCfg)(echoComplete)
+          webSocketInParams(transAppCfg)(echoComplete)
         ) ~> check {
           status mustBe StatusCodes.BadRequest
           contentType mustBe ContentTypes.`application/json`
@@ -202,7 +202,9 @@ class QueryParamsParsersSpec
             "rate=100&" +
             "batchSize=100&" +
             "autoCommit=false"
-        ) ~> routeWithExceptionHandler(outParams(echoComplete)) ~> check {
+        ) ~> routeWithExceptionHandler(
+          webSocketOutParams(echoComplete)
+        ) ~> check {
           status mustBe StatusCodes.OK
         }
       }
@@ -211,7 +213,9 @@ class QueryParamsParsersSpec
         Get(
           "/?clientId=foobar&" +
             "topic=test-topic"
-        ) ~> routeWithExceptionHandler(outParams(echoComplete)) ~> check {
+        ) ~> routeWithExceptionHandler(
+          webSocketOutParams(echoComplete)
+        ) ~> check {
           status mustBe StatusCodes.OK
         }
       }
@@ -229,7 +233,9 @@ class QueryParamsParsersSpec
             "rate=100&" +
             "batchSize=100&" +
             "autoCommit=false"
-        ) ~> routeWithExceptionHandler(outParams(echoComplete)) ~> check {
+        ) ~> routeWithExceptionHandler(
+          webSocketOutParams(echoComplete)
+        ) ~> check {
           status mustBe StatusCodes.BadRequest
           contentType mustBe ContentTypes.`application/json`
           responseAs[String] must include(
@@ -251,7 +257,9 @@ class QueryParamsParsersSpec
             "rate=100&" +
             "batchSize=100&" +
             "autoCommit=false"
-        ) ~> routeWithExceptionHandler(outParams(echoComplete)) ~> check {
+        ) ~> routeWithExceptionHandler(
+          webSocketOutParams(echoComplete)
+        ) ~> check {
           status mustBe StatusCodes.BadRequest
           contentType mustBe ContentTypes.`application/json`
           responseAs[String] must include(

@@ -1,45 +1,48 @@
-package net.scalytica.kafka.wsproxy.web
+package net.scalytica.kafka.wsproxy.web.admin
 
 import org.apache.pekko.http.scaladsl.model.ContentTypes._
-import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity}
+import org.apache.pekko.http.scaladsl.model._
 import org.apache.pekko.http.scaladsl.model.StatusCodes._
 import org.apache.pekko.http.scaladsl.server._
 import org.apache.pekko.http.scaladsl.testkit.RouteTestTimeout
-import io.circe.{ACursor, HCursor, Json}
 import io.circe.parser._
 import io.circe.syntax._
+import net.scalytica.kafka.wsproxy.codecs.BasicSerdes.StringSerializer
 import net.scalytica.kafka.wsproxy.codecs.Decoders.{
   brokerInfoDecoder,
-  dynamicCfgDecoder
+  consumerGroupDecoder,
+  dynamicCfgDecoder,
+  partOffMetadataDecoder
 }
-import net.scalytica.kafka.wsproxy.codecs.Encoders.dynamicCfgEncoder
+import net.scalytica.kafka.wsproxy.codecs.Encoders._
 import net.scalytica.kafka.wsproxy.config.Configuration.{
   ConsumerSpecificLimitCfg,
   DynamicCfg,
   ProducerSpecificLimitCfg
 }
-import net.scalytica.kafka.wsproxy.models.{BrokerInfo, WsGroupId, WsProducerId}
+import net.scalytica.kafka.wsproxy.models.{
+  BrokerInfo,
+  ConsumerGroup,
+  PartitionOffsetMetadata,
+  TopicName
+}
 import net.scalytica.test.SharedAttributes.basicHttpCreds
-import net.scalytica.test._
-import org.scalatest.concurrent.{Eventually, ScalaFutures}
+import net.scalytica.test.TestDataGenerators.{
+  createConsumerCfg,
+  createPartitionOffsetMetadataList,
+  createProducerCfg
+}
+import org.apache.kafka.clients.producer.ProducerRecord
+// scalastyle:off line.size.limit
+import org.apache.kafka.coordinator.group.consumer.ConsumerGroup.ConsumerGroupState
+// scalastyle:on line.size.limit
 import org.scalatest.Inspectors.forAll
 import org.scalatest.time.{Seconds, Span}
-import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.{Assertion, CustomEitherValues, OptionValues}
 
 import scala.concurrent.duration._
 
 // scalastyle:off magic.number
-class AdminRoutesSpec
-    extends AnyWordSpec
-    with TestAdminRoutes
-    with CustomEitherValues
-    with OptionValues
-    with ScalaFutures
-    with Eventually
-    with WsProxySpec
-    with MockOpenIdServer
-    with WsReusableProxyKafkaFixture {
+class AdminRoutesSpec extends BaseAdminRoutesSpec {
 
   override protected val testTopicPrefix: String = "admin-plain-test-topic"
 
@@ -47,168 +50,6 @@ class AdminRoutesSpec
     PatienceConfig(timeout = Span(30, Seconds))
 
   implicit val timeout: RouteTestTimeout = RouteTestTimeout(20 seconds)
-
-  private[this] def createConsumerCfg(
-      id: String,
-      mps: Option[Int],
-      mc: Option[Int],
-      bs: Option[Int] = None
-  ): ConsumerSpecificLimitCfg = {
-    ConsumerSpecificLimitCfg(
-      groupId = WsGroupId(id),
-      messagesPerSecond = mps,
-      maxConnections = mc,
-      batchSize = bs
-    )
-  }
-
-  private[this] def createProducerCfg(
-      id: String,
-      mps: Option[Int],
-      mc: Option[Int]
-  ): ProducerSpecificLimitCfg = {
-    ProducerSpecificLimitCfg(
-      producerId = WsProducerId(id),
-      messagesPerSecond = mps,
-      maxConnections = mc
-    )
-  }
-
-  private[this] val expStaticCons1 = createConsumerCfg(
-    id = "__DEFAULT__",
-    mps = Some(0),
-    mc = Some(0),
-    bs = Some(0)
-  )
-
-  private[this] val expStaticCons2 =
-    createConsumerCfg(id = "dummy", mps = Some(10), mc = Some(2))
-
-  private[this] val expStaticProd1 =
-    createProducerCfg(id = "__DEFAULT__", mps = Some(0), mc = Some(0))
-
-  private[this] val expStaticProd2 = createProducerCfg(
-    id = "limit-test-producer-1",
-    mps = Some(10),
-    mc = Some(1)
-  )
-
-  private[this] val expStaticProd3 = createProducerCfg(
-    id = "limit-test-producer-2",
-    mps = Some(10),
-    mc = Some(2)
-  )
-
-  private[this] def expectedInvalidJson(isConsumer: Boolean = true) = {
-    val t   = "Invalid JSON for %s config."
-    val msg = if (isConsumer) t.format("consumer") else t.format("producer")
-    Json.obj("message" -> Json.fromString(msg)).spaces2
-  }
-
-  private[this] def assertAllStaticConfigs(cursor: HCursor): Assertion = {
-    val staticConsumers =
-      cursor.downField("consumers").downField("static")
-    val staticProducers =
-      cursor.downField("producers").downField("static")
-
-    val sc1 = staticConsumers.downN(0).as[DynamicCfg].rightValue
-    val sc2 = staticConsumers.downN(1).as[DynamicCfg].rightValue
-    sc1 mustBe expStaticCons1
-    sc2 mustBe expStaticCons2
-
-    val sp1 = staticProducers.downN(0).as[DynamicCfg].rightValue
-    val sp2 = staticProducers.downN(1).as[DynamicCfg].rightValue
-    val sp3 = staticProducers.downN(2).as[DynamicCfg].rightValue
-    sp1 mustBe expStaticProd1
-    sp2 mustBe expStaticProd2
-    sp3 mustBe expStaticProd3
-  }
-
-  private[this] def assertAllDynamicConfigs(
-      expected: Seq[DynamicCfg],
-      cursor: ACursor
-  ): Assertion = {
-    val resCfgs = cursor.values.value.map(_.as[DynamicCfg].rightValue)
-    resCfgs must have size expected.size.toLong
-    if (expected.isEmpty) resCfgs mustBe empty
-    else resCfgs must contain allElementsOf expected
-  }
-
-  private[this] def assertConsumerConfig(
-      expected: ConsumerSpecificLimitCfg,
-      actual: DynamicCfg
-  ): Assertion = {
-    actual match {
-      case c: ConsumerSpecificLimitCfg =>
-        c.groupId mustBe expected.groupId
-        c.batchSize mustBe expected.batchSize
-        c.messagesPerSecond mustBe expected.messagesPerSecond
-        c.maxConnections mustBe expected.maxConnections
-
-      case _ => fail("Got the wrong config type")
-    }
-  }
-
-  private[this] def assertProducerConfig(
-      expected: ProducerSpecificLimitCfg,
-      actual: DynamicCfg
-  ): Assertion = {
-    actual match {
-      case p: ProducerSpecificLimitCfg =>
-        p.producerId mustBe expected.producerId
-        p.messagesPerSecond mustBe expected.messagesPerSecond
-        p.maxConnections mustBe expected.maxConnections
-
-      case _ => fail("Got the wrong config type")
-    }
-  }
-
-  private[this] def postConfig(
-      uri: String,
-      conf: DynamicCfg,
-      route: Route
-  ): Assertion = {
-    val json   = (conf: DynamicCfg).asJson.spaces2
-    val entity = HttpEntity(ContentTypes.`application/json`, json)
-
-    Post(uri, entity) ~> route ~> check {
-      status mustBe OK
-      responseEntity.contentType mustBe `application/json`
-    }
-  }
-
-  private[this] def assertPostConsumerConfig(conf: DynamicCfg, route: Route) = {
-    postConfig("/admin/client/config/consumer", conf, route)
-  }
-
-  private[this] def assertPostProducerConfig(
-      conf: DynamicCfg,
-      route: Route
-  ) = {
-    postConfig("/admin/client/config/producer", conf, route)
-  }
-
-  private[this] def assertPostNConsumerConfigs(
-      num: Int,
-      route: Route
-  ): Seq[DynamicCfg] = {
-    val cfgs = (1 to num).map { i =>
-      createConsumerCfg(s"test-consumer-$i", Some(num * 100), Some(num))
-    }
-    forAll(cfgs)(c => assertPostConsumerConfig(c, route))
-    cfgs
-  }
-
-  private[this] def assertPostNProducerConfigs(
-      num: Int,
-      route: Route
-  ): Seq[DynamicCfg] = {
-    val cfgs = (1 to 10).map { i =>
-      createProducerCfg(s"test-producer-$i", Some(num * 100), Some(num))
-    }
-    forAll(cfgs)(c => assertPostProducerConfig(c, route))
-    cfgs
-  }
 
   "using the Kafka cluster info routes" when {
 
@@ -283,7 +124,7 @@ class AdminRoutesSpec
               responseEntity.contentType mustBe `application/json`
               val resStr = responseAs[String]
               val res    = parse(resStr).rightValue.as[DynamicCfg].rightValue
-              assertConsumerConfig(expStaticCons2, res)
+              assertConsumerConfig(ExpStaticCons2, res)
             }
         }
 
@@ -296,7 +137,7 @@ class AdminRoutesSpec
               responseEntity.contentType mustBe `application/json`
               val resStr = responseAs[String]
               val res    = parse(resStr).rightValue.as[DynamicCfg].rightValue
-              assertProducerConfig(expStaticProd3, res)
+              assertProducerConfig(ExpStaticProd3, res)
             }
         }
 
@@ -443,7 +284,7 @@ class AdminRoutesSpec
                 responseEntity.contentType mustBe `application/json`
                 val resStr = responseAs[String]
                 val res    = parse(resStr).rightValue.as[DynamicCfg].rightValue
-                assertConsumerConfig(expStaticCons2, res)
+                assertConsumerConfig(ExpStaticCons2, res)
               }
         }
 
@@ -479,7 +320,7 @@ class AdminRoutesSpec
                 responseEntity.contentType mustBe `application/json`
                 val resStr = responseAs[String]
                 val res    = parse(resStr).rightValue.as[DynamicCfg].rightValue
-                assertProducerConfig(expStaticProd3, res)
+                assertProducerConfig(ExpStaticProd3, res)
               }
         }
 
@@ -638,7 +479,7 @@ class AdminRoutesSpec
         }
 
       "successfully delete all existing dynamic client configs" in
-        withAdminContext(useDynamicConfigs = true) {
+        withAdminContext(useDynamicConfigs = true, useFreshStateTopics = true) {
           case (_, cfg, sessionRef, dynCfgRef, _) =>
             val route =
               Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None))
@@ -865,6 +706,315 @@ class AdminRoutesSpec
                 status mustBe NotFound
                 responseEntity.contentType mustBe `application/json`
               }
+        }
+
+    }
+
+    "using the consumer groups routes" should {
+
+      "return an empty list if there are no non-internal consumer groups" in
+        withAdminContext() { case (_, cfg, sessionRef, dynCfgRef, _) =>
+          val route =
+            Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None))
+          Get(Uri(s"/admin/consumer-group/all")) ~>
+            route ~> check {
+              status mustBe OK
+              responseEntity.contentType mustBe `application/json`
+              val resStr = responseAs[String]
+              val json   = parse(resStr).rightValue
+              val res    = json.as[List[ConsumerGroup]].rightValue
+              res mustBe empty
+            }
+        }
+
+      "return all consumer groups" in
+        withAdminContext() { case (_, cfg, sessionRef, dynCfgRef, _) =>
+          val route =
+            Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None))
+          // Create a topic to test against
+          val topicName = TopicName(s"$testTopicPrefix-cg-1")
+          kafkaContext.createTopics(Map(topicName.value -> 1))
+
+          val producer = kafkaProducer[String, String]()
+          val _ = producer
+            .send(new ProducerRecord(topicName.value, "key1", "value1"))
+            .get()
+
+          prepareConsumerGroups(
+            topicName = topicName,
+            grpNamePrefix = "test-group-a",
+            numActiveClients = 2,
+            numInactiveClients = 1
+          ) { case (_, _) =>
+            Get(
+              Uri(s"/admin/consumer-group/all").withQuery(
+                Uri.Query(Map("includeInternals" -> "true"))
+              )
+            ) ~>
+              route ~> check {
+                status mustBe OK
+                responseEntity.contentType mustBe `application/json`
+                val resStr = responseAs[String]
+                val json   = parse(resStr).rightValue
+                val res    = json.as[List[ConsumerGroup]].rightValue
+                res must not be empty
+                forAll(res.map(_.groupId.value)) { gid =>
+                  gid must startWith regex """^(?:test-group|ws-proxy)""".r
+                }
+              }
+          }
+        }
+
+      "return a list with only the active and non-internal consumer groups" in
+        withAdminContext() { case (_, cfg, sessionRef, dynCfgRef, _) =>
+          val route =
+            Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None))
+          // Create a topic to test against
+          val topicName = TopicName(s"$testTopicPrefix-cg-2")
+          kafkaContext.createTopics(Map(topicName.value -> 1))
+
+          val producer = kafkaProducer[String, String]()
+          val _ = producer
+            .send(new ProducerRecord(topicName.value, "key1", "value1"))
+            .get()
+
+          prepareConsumerGroups(
+            topicName = topicName,
+            grpNamePrefix = "test-group-b",
+            numActiveClients = 2,
+            numInactiveClients = 1
+          ) { case (_, _) =>
+            Get(
+              Uri(s"/admin/consumer-group/all").withQuery(
+                Uri.Query(
+                  Map(
+                    "activeOnly"       -> "true",
+                    "includeInternals" -> "false"
+                  )
+                )
+              )
+            ) ~>
+              route ~> check {
+                status mustBe OK
+                responseEntity.contentType mustBe `application/json`
+                val resStr = responseAs[String]
+                val json   = parse(resStr).rightValue
+                val res    = json.as[List[ConsumerGroup]].rightValue
+                res must not be empty
+                forAll(res) { r =>
+                  r.groupId.value must startWith("test-group")
+                  r.isActive mustBe true
+                }
+              }
+          }
+        }
+
+      "return a description of consumer group" in
+        withAdminContext() { case (_, cfg, sessionRef, dynCfgRef, _) =>
+          val route =
+            Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None))
+          // Create a topic to test against
+          val topicName = TopicName(s"$testTopicPrefix-cg-3")
+          kafkaContext.createTopics(Map(topicName.value -> 1))
+
+          val producer = kafkaProducer[String, String]()
+          val _ = producer
+            .send(new ProducerRecord(topicName.value, "key1", "value1"))
+            .get()
+
+          prepareConsumerGroups(
+            topicName = topicName,
+            grpNamePrefix = "test-group-c"
+          ) { case (_, _) =>
+            Get(s"/admin/consumer-group/test-group-c-active-1/describe") ~>
+              route ~> check {
+                status mustBe OK
+                responseEntity.contentType mustBe `application/json`
+                val resStr = responseAs[String]
+                val json   = parse(resStr).rightValue
+                val res    = json.as[ConsumerGroup].rightValue
+                res.groupId.value mustBe "test-group-c-active-1"
+                res.isActive mustBe true
+                res.members must have size 1
+              }
+          }
+        }
+
+      "return consumer group with state DEAD when group does not exist" in
+        withAdminContext() { case (_, cfg, sessionRef, dynCfgRef, _) =>
+          val route =
+            Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None))
+          Get(s"/admin/consumer-group/non-existing-group/describe") ~>
+            route ~> check {
+              status mustBe OK
+              responseEntity.contentType mustBe `application/json`
+              val resStr = responseAs[String]
+              val json   = parse(resStr).rightValue
+              val res    = json.as[ConsumerGroup].rightValue
+              res.groupId.value mustBe "non-existing-group"
+              res.state mustBe Some(ConsumerGroupState.DEAD.name())
+            }
+        }
+
+      "return a list of offsets for the given consumer group" in
+        withAdminContext() { case (_, cfg, sessionRef, dynCfgRef, _) =>
+          val route =
+            Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None))
+          // Create a topic to test against
+          val topicName = TopicName(s"$testTopicPrefix-cg-4")
+          kafkaContext.createTopics(Map(topicName.value -> 3))
+
+          val producer = kafkaProducer[String, String]()
+          (1 to 3).foreach { i =>
+            val _ = producer
+              .send(
+                new ProducerRecord(
+                  topicName.value,
+                  i - 1,
+                  s"key$i",
+                  s"value$i"
+                )
+              )
+              .get()
+          }
+
+          prepareConsumerGroups(
+            topicName = topicName,
+            grpNamePrefix = "test-group-d"
+          ) { case (_, _) =>
+            Get(s"/admin/consumer-group/test-group-d-active-1/offsets") ~>
+              route ~> check {
+                status mustBe OK
+                responseEntity.contentType mustBe `application/json`
+                val resStr = responseAs[String]
+                val json   = parse(resStr).rightValue
+                val res    = json.as[List[PartitionOffsetMetadata]].rightValue
+                res must have size 3
+                // Sort the result by partition, and verify
+                forAll(res.sortBy(_.partition.value).zipWithIndex) {
+                  case (pom, i) =>
+                    pom.topic mustBe topicName
+                    pom.offset.value mustBe 1L
+                    pom.partition.value mustBe i
+                }
+              }
+          }
+        }
+
+      "return 404 when listing offsets for a non-existing consumer group" in
+        withAdminContext() { case (_, cfg, sessionRef, dynCfgRef, _) =>
+          val route =
+            Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None))
+          Get(s"/admin/consumer-group/non-existing-group/offsets") ~>
+            route ~> check {
+              status mustBe NotFound
+              responseEntity.contentType mustBe `application/json`
+            }
+        }
+
+      "return the new offsets after altering consumer group offsets" in
+        withAdminContext() { case (_, cfg, sessionRef, dynCfgRef, _) =>
+          val route =
+            Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None))
+          // Create a topic to test against
+          val topicName = TopicName(s"$testTopicPrefix-cg-5")
+          kafkaContext.createTopics(Map(topicName.value -> 3))
+
+          val producer = kafkaProducer[String, String]()
+          // Add a few messages to the topic
+          (1 to 300).foreach { i =>
+            val _ = producer
+              .send(
+                new ProducerRecord(
+                  topicName.value,
+                  s"key$i",
+                  s"value$i"
+                )
+              )
+              .get()
+          }
+
+          val newPartOffsets =
+            createPartitionOffsetMetadataList(topicName, 3, 100L)
+          val jsonBody = newPartOffsets.asJson.spaces2
+
+          prepareConsumerGroups(
+            topicName = topicName,
+            grpNamePrefix = "test-group-e"
+          ) { case (_, _) => () }
+
+          Put(
+            "/admin/consumer-group/test-group-e-active-1/" +
+              s"offsets/alter/${topicName.value}",
+            jsonBody
+          ) ~>
+            route ~> check {
+              status mustBe OK
+              responseEntity.contentType mustBe `application/json`
+              val resStr = responseAs[String]
+              val json   = parse(resStr).rightValue
+              val res    = json.as[List[PartitionOffsetMetadata]].rightValue
+              res must have size 3
+              // Sort the result by partition, and verify
+              forAll(res.sortBy(_.partition.value).zipWithIndex) {
+                case (pom, i) =>
+                  pom.topic mustBe topicName
+                  pom.offset.value mustBe 100L
+                  pom.partition.value mustBe i
+              }
+            }
+        }
+
+      "not allow altering consumer group offsets when group is active" in
+        withAdminContext() { case (_, cfg, sessionRef, dynCfgRef, _) =>
+          val route =
+            Route.seal(adminRoutes(cfg, sessionRef, dynCfgRef, None))
+          // Create a topic to test against
+          val topicName = TopicName(s"$testTopicPrefix-cg-6")
+          kafkaContext.createTopics(Map(topicName.value -> 3))
+
+          val producer = kafkaProducer[String, String]()
+          // Add a few messages to the topic
+          (1 to 10).foreach { i =>
+            val _ = producer
+              .send(
+                new ProducerRecord(
+                  topicName.value,
+                  s"key$i",
+                  s"value$i"
+                )
+              )
+              .get()
+          }
+
+          val newPartOffsets =
+            createPartitionOffsetMetadataList(topicName, 3, 100L)
+          val jsonBody = newPartOffsets.asJson.spaces2
+
+          prepareConsumerGroups(
+            topicName = topicName,
+            grpNamePrefix = "test-group-f"
+          ) { case (_, _) =>
+            Put(
+              "/admin/consumer-group/test-group-f-active-1/" +
+                s"offsets/alter/${topicName.value}",
+              jsonBody
+            ) ~>
+              route ~> check {
+                status mustBe PreconditionFailed
+                responseEntity.contentType mustBe `application/json`
+                val resStr = responseAs[String]
+                val msg = parse(resStr).rightValue.hcursor
+                  .downField("message")
+                  .as[String]
+                  .rightValue
+                msg mustBe "Unable to modify the consumer group " +
+                  "offsets because the group is still considered " +
+                  "to be active. Please ensure that all consumer " +
+                  "clients are stopped before trying again."
+
+              }
+          }
         }
 
     }

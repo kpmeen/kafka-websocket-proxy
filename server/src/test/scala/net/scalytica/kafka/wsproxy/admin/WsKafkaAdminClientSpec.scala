@@ -1,16 +1,31 @@
 package net.scalytica.kafka.wsproxy.admin
 
 import io.github.embeddedkafka.EmbeddedKafka
+import net.scalytica.kafka.wsproxy.codecs.BasicSerdes.StringDeserializer
+import net.scalytica.kafka.wsproxy.models.{
+  PartitionOffsetMetadata,
+  TopicName,
+  WsClientId,
+  WsGroupId
+}
+import net.scalytica.test.TestDataGenerators.createPartitionOffsetMetadataList
 import net.scalytica.test.{WsProxySpec, WsReusableProxyKafkaFixture}
-import org.scalatest.concurrent.ScalaFutures
+import org.apache.kafka.common.ConsumerGroupState
+import org.scalatest.Inspectors.forAll
+import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Minutes, Span}
-import org.scalatest.OptionValues
+import org.scalatest.{Assertion, OptionValues}
 import org.scalatest.wordspec.AnyWordSpec
 
+import java.time.Duration
+import scala.jdk.CollectionConverters._
+
+// scalastyle:off magic.number
 class WsKafkaAdminClientSpec
     extends AnyWordSpec
     with OptionValues
     with ScalaFutures
+    with Eventually
     with WsProxySpec
     with WsReusableProxyKafkaFixture
     with EmbeddedKafka {
@@ -23,68 +38,322 @@ class WsKafkaAdminClientSpec
   "The WsKafkaAdminClient" should {
 
     "return info on brokers in the cluster" in
-      withNoContext() { case (kCfg, wsCfg) =>
-        val client = new WsKafkaAdminClient(wsCfg)
+      withNoContext() { case (kCfg, appCfg) =>
+        val admin = new WsKafkaAdminClient(appCfg)
 
-        val res = client.clusterInfo
+        val res = admin.clusterInfo
         res must have size 1
         res.headOption.value.id mustBe 0
         res.headOption.value.host mustBe "localhost"
         res.headOption.value.port mustBe kCfg.kafkaPort
         res.headOption.value.rack mustBe None
 
-        client.close()
+        admin.close()
       }
 
     "return number replicas to use for the session topic" in
-      withNoContext() { case (_, wsCfg) =>
-        val client = new WsKafkaAdminClient(wsCfg)
+      withNoContext() { case (_, appCfg) =>
+        val admin = new WsKafkaAdminClient(appCfg)
 
-        client.replicationFactor(
-          wsCfg.sessionHandler.topicName,
-          wsCfg.sessionHandler.topicReplicationFactor
+        admin.replicationFactor(
+          appCfg.sessionHandler.topicName,
+          appCfg.sessionHandler.topicReplicationFactor
         ) mustBe 1
 
-        client.close()
+        admin.close()
       }
 
     "return number replicas to use for the dynamic config topic" in
-      withNoContext() { case (_, wsCfg) =>
-        val client = new WsKafkaAdminClient(wsCfg)
+      withNoContext() { case (_, appCfg) =>
+        val admin = new WsKafkaAdminClient(appCfg)
 
-        client.replicationFactor(
-          wsCfg.dynamicConfigHandler.topicName,
-          wsCfg.dynamicConfigHandler.topicReplicationFactor
+        admin.replicationFactor(
+          appCfg.dynamicConfigHandler.topicName,
+          appCfg.dynamicConfigHandler.topicReplicationFactor
         ) mustBe 1
 
-        client.close()
+        admin.close()
       }
 
     "create and find the session state topic" in
-      withNoContext() { case (_, wsCfg) =>
-        val client = new WsKafkaAdminClient(wsCfg)
+      withNoContext() { case (_, appCfg) =>
+        val admin = new WsKafkaAdminClient(appCfg)
 
-        client.initSessionStateTopic()
+        admin.initSessionStateTopic()
 
-        val res = client.findTopic(wsCfg.sessionHandler.topicName)
+        val res = admin.findTopic(appCfg.sessionHandler.topicName)
         res must not be empty
-        res.value mustBe wsCfg.sessionHandler.topicName.value
+        res.value mustBe appCfg.sessionHandler.topicName.value
 
-        client.close()
+        admin.close()
       }
 
     "create and find the dynamic config topic" in
-      withNoContext() { case (_, wsCfg) =>
-        val client = new WsKafkaAdminClient(wsCfg)
+      withNoContext() { case (_, appCfg) =>
+        val admin = new WsKafkaAdminClient(appCfg)
 
-        client.initDynamicConfigTopic()
+        admin.initDynamicConfigTopic()
 
-        val res = client.findTopic(wsCfg.dynamicConfigHandler.topicName)
+        val res = admin.findTopic(appCfg.dynamicConfigHandler.topicName)
         res must not be empty
-        res.value mustBe wsCfg.dynamicConfigHandler.topicName.value
+        res.value mustBe appCfg.dynamicConfigHandler.topicName.value
 
-        client.close()
+        admin.close()
       }
+
+    "return None when trying to describe a non-existing topic" in
+      withNoContext() { case (_, appCfg) =>
+        val admin = new WsKafkaAdminClient(appCfg)
+
+        admin.describeTopic(TopicName("foobar")) mustBe None
+      }
+
+    "describe a topic" in withConsumerContext(
+      topic = "test-topic-0",
+      numMessages = 0,
+      partitions = 5
+    ) { cctx =>
+      val admin = new WsKafkaAdminClient(cctx.appCfg)
+
+      val desc = admin.describeTopic(cctx.topicName.value).value
+      desc.name mustBe cctx.topicName.value
+      desc.numPartitions mustBe 5
+    }
+
+    "list all consumer groups" in
+      withConsumerContext(
+        topic = nextTopic,
+        numMessages = 15,
+        partitions = 3
+      ) { cctx =>
+        val admin       = new WsKafkaAdminClient(cctx.appCfg)
+        val subscribeTo = cctx.topicName.toList.map(_.value).asJavaCollection
+
+        val c1 = kafkaConsumer(WsGroupId("test-group-a"), WsClientId("c1"))
+        val c2 = kafkaConsumer(WsGroupId("test-group-b"), WsClientId("c2"))
+
+        c1.subscribe(subscribeTo)
+        c2.subscribe(subscribeTo)
+
+        eventually {
+          val p1 = c1.poll(Duration.ofMillis(100L))
+          p1.asScala must not be empty
+          c1.commitSync()
+        }
+        eventually {
+          val p2 = c2.poll(Duration.ofMillis(100L))
+          p2.asScala must not be empty
+          c2.commitSync()
+        }
+
+        val res = admin.listConsumerGroups(includeInternals = true)
+        res must have size 3
+
+        c1.close()
+        c2.close()
+      }
+
+    "list all non-internal consumer groups" in
+      withConsumerContext(
+        topic = nextTopic,
+        numMessages = 15,
+        partitions = 3
+      ) { cctx =>
+        val admin       = new WsKafkaAdminClient(cctx.appCfg)
+        val subscribeTo = cctx.topicName.toList.map(_.value).asJavaCollection
+
+        val c1 = kafkaConsumer(WsGroupId("test-group-c"), WsClientId("c3"))
+        val c2 = kafkaConsumer(WsGroupId("test-group-d"), WsClientId("c4"))
+
+        c1.subscribe(subscribeTo)
+        c2.subscribe(subscribeTo)
+
+        eventually {
+          val p1 = c1.poll(Duration.ofMillis(100L))
+          p1.asScala must not be empty
+          c1.commitSync()
+        }
+        eventually {
+          val p2 = c2.poll(Duration.ofMillis(100L))
+          p2.asScala must not be empty
+          c2.commitSync()
+        }
+
+        val res = admin.listConsumerGroups()
+        res must have size 2
+        forAll(res) { cg =>
+          cg.groupId.value must startWith("test-group")
+        }
+
+        c1.close()
+        c2.close()
+      }
+
+    "list all active consumer groups" in
+      withConsumerContext(
+        topic = nextTopic,
+        numMessages = 15,
+        partitions = 3
+      ) { cctx =>
+        val admin       = new WsKafkaAdminClient(cctx.appCfg)
+        val subscribeTo = cctx.topicName.toList.map(_.value).asJavaCollection
+
+        val c1 = kafkaConsumer(WsGroupId("test-group-e"), WsClientId("c5"))
+        val c2 = kafkaConsumer(WsGroupId("test-group-f"), WsClientId("c6"))
+
+        c1.subscribe(subscribeTo)
+        c2.subscribe(subscribeTo)
+
+        eventually {
+          val p1 = c1.poll(Duration.ofMillis(100L))
+          p1.asScala must not be empty
+          c1.commitSync()
+        }
+        eventually {
+          val p2 = c2.poll(Duration.ofMillis(100L))
+          p2.asScala must not be empty
+          c2.commitSync()
+        }
+
+        c1.close()
+
+        val res =
+          admin.listConsumerGroups(activeOnly = true, includeInternals = true)
+        res.size mustBe 2
+
+        c2.close()
+      }
+
+    "list all active non-internal consumer groups" in
+      withConsumerContext(
+        topic = nextTopic,
+        numMessages = 15,
+        partitions = 3
+      ) { cctx =>
+        val admin       = new WsKafkaAdminClient(cctx.appCfg)
+        val subscribeTo = cctx.topicName.toList.map(_.value).asJavaCollection
+
+        val c1 = kafkaConsumer(WsGroupId("test-group-g"), WsClientId("c7"))
+        val c2 = kafkaConsumer(WsGroupId("test-group-h"), WsClientId("c8"))
+
+        c1.subscribe(subscribeTo)
+        c2.subscribe(subscribeTo)
+
+        eventually {
+          val p1 = c1.poll(Duration.ofMillis(100L))
+          p1.asScala must not be empty
+          c1.commitSync()
+        }
+        eventually {
+          val p2 = c2.poll(Duration.ofMillis(100L))
+          p2.asScala must not be empty
+          c2.commitSync()
+        }
+
+        c1.close()
+
+        val res =
+          admin.listConsumerGroups(activeOnly = true)
+
+        res.size mustBe 1
+
+        c2.close()
+      }
+
+    "describe a given consumer group" in withConsumerContext(
+      topic = nextTopic,
+      numMessages = 15,
+      partitions = 3
+    ) { cctx =>
+      implicit val admin: WsKafkaAdminClient =
+        new WsKafkaAdminClient(cctx.appCfg)
+
+      val grpId       = WsGroupId("describe-consumer-group")
+      val subscribeTo = cctx.topicName.toList.map(_.value).asJavaCollection
+
+      val c1 = kafkaConsumer(grpId, WsClientId("c9"))
+      c1.subscribe(subscribeTo)
+
+      eventually {
+        val p1 = c1.poll(Duration.ofMillis(100L))
+        p1.asScala must not be empty
+      }
+
+      getAndAssertConsumerGroup(grpId, ConsumerGroupState.STABLE)
+    }
+
+    "alter offsets for a given consumer group" in
+      withConsumerContext(
+        topic = nextTopic,
+        numMessages = 60,
+        partitions = 3
+      ) { cctx =>
+        val grpId = WsGroupId("alter-offset-group")
+        implicit val admin: WsKafkaAdminClient =
+          new WsKafkaAdminClient(cctx.appCfg)
+        val topic   = cctx.topicName.value
+        val offsets = createPartitionOffsetMetadataList(topic)
+
+        // Initial check of consumer group
+        getAndAssertConsumerGroup(grpId, ConsumerGroupState.DEAD)
+        listAndAssertOffsets(grpId)
+
+        // Change the consumer group offsets
+        admin.alterConsumerGroupOffsets(grpId, offsets)
+
+        // Re-check the consumer group
+        getAndAssertConsumerGroup(grpId, ConsumerGroupState.EMPTY)
+        // Verify that the offsets have changed
+        listAndAssertOffsets(grpId, offsets)
+      }
+
+    "delete offsets for a given consumer group" in withConsumerContext(
+      topic = nextTopic,
+      numMessages = 15,
+      partitions = 3
+    ) { cctx =>
+      implicit val admin: WsKafkaAdminClient =
+        new WsKafkaAdminClient(cctx.appCfg)
+
+      val grpId       = WsGroupId("delete-offsets-group")
+      val subscribeTo = cctx.topicName.toList.map(_.value).asJavaCollection
+
+      val c1 = kafkaConsumer(grpId, WsClientId("c10"))
+      c1.subscribe(subscribeTo)
+
+      eventually {
+        val p1 = c1.poll(Duration.ofMillis(100L))
+        p1.asScala must not be empty
+      }
+      c1.commitSync()
+      c1.close()
+
+      val o1 = admin.listConsumerGroupOffsets(grpId)
+      o1 must not be empty
+
+      admin.deleteConsumerGroupOffsets(grpId, cctx.topicName.value)
+
+      val o2 = admin.listConsumerGroupOffsets(grpId)
+      o2 mustBe empty
+    }
+  }
+
+  private[this] def listAndAssertOffsets(
+      groupId: WsGroupId,
+      expected: List[PartitionOffsetMetadata] = List.empty
+  )(implicit admin: WsKafkaAdminClient): Assertion = {
+    val offsets = admin.listConsumerGroupOffsets(groupId)
+    offsets.size mustBe expected.size
+    offsets must contain allElementsOf offsets
+  }
+
+  private[this] def getAndAssertConsumerGroup(
+      groupId: WsGroupId,
+      state: ConsumerGroupState
+  )(implicit admin: WsKafkaAdminClient): Assertion = {
+    val cg = admin.describeConsumerGroup(groupId)
+    cg.value.groupId mustBe groupId
+    cg.value.state.value mustBe state.name()
   }
 
 }

@@ -8,7 +8,7 @@ import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.models._
 import net.scalytica.kafka.wsproxy.web.Headers.XKafkaAuthHeader
 
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 trait WebSocketRoutes { self: BaseRoutes =>
 
@@ -30,9 +30,9 @@ trait WebSocketRoutes { self: BaseRoutes =>
     val admin = new WsKafkaAdminClient(cfg)
 
     try {
-      Try(admin.topicExists(topic)) match {
-        case scala.util.Success(v) => v
-        case scala.util.Failure(t) =>
+      Try[Boolean](admin.topicExists(topic)) match {
+        case Success(v) => v
+        case Failure(t) =>
           log.warn(
             s"An error occurred while checking if topic $topic exists",
             t
@@ -66,33 +66,6 @@ trait WebSocketRoutes { self: BaseRoutes =>
     else reject(ValidationRejection(s"Topic ${topic.value} does not exist"))
   }
 
-  private[this] def extractKafkaCreds(
-      authRes: WsProxyAuthResult,
-      kafkaAuthHeader: Option[XKafkaAuthHeader]
-  )(implicit cfg: AppCfg): Option[AclCredentials] = {
-    cfg.server.openidConnect
-      .map { oidcfg =>
-        if (oidcfg.isKafkaTokenAuthOnlyEnabled) {
-          log.trace("Only allowing Kafka auth through JWT token.")
-          authRes.aclCredentials
-        } else {
-          log.trace(
-            s"Allowing Kafka auth through JWT token or the" +
-              s" ${Headers.KafkaAuthHeaderName} header."
-          )
-          // Always prefer the JWT token
-          authRes.aclCredentials.orElse(kafkaAuthHeader.map(_.aclCredentials))
-        }
-      }
-      .getOrElse {
-        log.trace(
-          "OpenID Connect is not configured. Using" +
-            s" ${Headers.KafkaAuthHeaderName} header."
-        )
-        kafkaAuthHeader.map(_.aclCredentials)
-      }
-  }
-
   /**
    * @param inbound
    *   function defining the [[Route]] for the producer socket
@@ -119,7 +92,7 @@ trait WebSocketRoutes { self: BaseRoutes =>
           path("in") {
             optionalHeaderValueByType(XKafkaAuthHeader) { headerCreds =>
               val creds = extractKafkaCreds(authResult, headerCreds)
-              inParams(cfg) { inArgs =>
+              webSocketInParams(cfg) { inArgs =>
                 val args = inArgs
                   .withAclCredentials(creds)
                   .withBearerToken(authResult.maybeBearerToken)
@@ -130,7 +103,7 @@ trait WebSocketRoutes { self: BaseRoutes =>
           } ~ path("out") {
             optionalHeaderValueByType(XKafkaAuthHeader) { headerCreds =>
               val creds = extractKafkaCreds(authResult, headerCreds)
-              outParams { outArgs =>
+              webSocketOutParams { outArgs =>
                 val args = outArgs
                   .withAclCredentials(creds)
                   .withBearerToken(authResult.maybeBearerToken)
