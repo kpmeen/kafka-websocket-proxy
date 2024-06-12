@@ -2,6 +2,7 @@ package net.scalytica.kafka.wsproxy.admin
 
 import io.github.embeddedkafka.EmbeddedKafka
 import net.scalytica.kafka.wsproxy.codecs.BasicSerdes.StringDeserializer
+import net.scalytica.kafka.wsproxy.errors.TopicNotFoundError
 import net.scalytica.kafka.wsproxy.models.{
   PartitionOffsetMetadata,
   TopicName,
@@ -75,6 +76,13 @@ class WsKafkaAdminClientSpec
         admin.close()
       }
 
+    "number of replicas to use must not exceed number of brokers" in {
+      withNoContext() { case (_, appCfg) =>
+        val admin = new WsKafkaAdminClient(appCfg)
+        admin.replicationFactor(TopicName("my-cool-topic"), 3) mustBe 1
+      }
+    }
+
     "create and find the session state topic" in
       withNoContext() { case (_, appCfg) =>
         val admin = new WsKafkaAdminClient(appCfg)
@@ -99,6 +107,42 @@ class WsKafkaAdminClientSpec
         res.value mustBe appCfg.dynamicConfigHandler.topicName.value
 
         admin.close()
+      }
+
+    "return the number of partitions for the given topic" in
+      withNoContext() { case (_, appCfg) =>
+        val admin = new WsKafkaAdminClient(appCfg)
+        val topic = TopicName("fifafum")
+        admin.createTopic(topic, 3).isSuccess mustBe true
+
+        val res = admin.numTopicPartitions(topic)
+        res mustBe 3
+      }
+
+    "throw TopicNotFoundError fetching num partitions for unknown topic" in
+      withNoContext() { case (_, appCfg) =>
+        val admin = new WsKafkaAdminClient(appCfg)
+        assertThrows[TopicNotFoundError] {
+          admin.numTopicPartitions(TopicName("nobody-home"))
+        }
+      }
+
+    "return a list of topic partition info for a given topic" in
+      withNoContext() { case (_, appCfg) =>
+        val admin = new WsKafkaAdminClient(appCfg)
+        val topic = TopicName("foo")
+        admin.createTopic(topic, 3).isSuccess mustBe true
+
+        val res = admin.topicPartitionInfoList(topic)
+        res.size mustBe 3
+      }
+
+    "throw TopicNotFoundError fetching list of partitions for unkonw topic" in
+      withNoContext() { case (_, appCfg) =>
+        val admin = new WsKafkaAdminClient(appCfg)
+        assertThrows[TopicNotFoundError] {
+          admin.topicPartitionInfoList(TopicName("bar"))
+        }
       }
 
     "return None when trying to describe a non-existing topic" in

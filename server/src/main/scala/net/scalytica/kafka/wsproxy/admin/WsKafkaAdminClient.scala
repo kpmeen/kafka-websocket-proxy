@@ -55,7 +55,7 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
     )
   }
 
-  private[this] val internalTopicMaxReplicas = 3
+  private[this] val MaxTopicReplicas = 3
 
   private[this] lazy val underlying = {
     val cfg = admConfig
@@ -83,12 +83,15 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
           RETENTION_MS_CONFIG   -> s"$retentionMs"
         ).asJava
 
-        val topic = new NewTopic(topicName.value, 1, replFactor).configs(tconf)
+        val topic =
+          new NewTopic(topicName.value, partitions, replFactor).configs(tconf)
 
         log.info(s"Creating topic ${topicName.value}...")
         Try[Unit] {
           val _: Any = underlying.createTopics(Seq(topic).asJava).all().get()
-          log.info(s"Topic ${topicName.value} created.")
+          log.info(
+            s"Topic ${topicName.value} created with $partitions partitions."
+          )
         }.recover {
           KafkaFutureErrorHandler.handle[Unit] {
             log.info("Topic already exists")
@@ -228,7 +231,7 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
    *   [[TopicNotFoundError]] is thrown.
    */
   @throws(classOf[TopicNotFoundError])
-  private[this] def topicPartitionInfoList(
+  private[admin] def topicPartitionInfoList(
       topicName: TopicName
   ): List[TopicPartitionInfo] = {
     try {
@@ -512,7 +515,7 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
     val numNodes = clusterInfo.size
     log.info(s"Calculating number of replicas for ${topicName.value}...")
     val numReplicas =
-      if (numNodes >= internalTopicMaxReplicas) internalTopicMaxReplicas
+      if (numNodes >= MaxTopicReplicas) MaxTopicReplicas
       else numNodes
 
     if (wantedReplicas > numReplicas) numReplicas.toShort
