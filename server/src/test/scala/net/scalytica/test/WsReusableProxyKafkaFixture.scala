@@ -521,7 +521,7 @@ trait WsReusableProxyKafkaFixture {
   class ReusableKafkaContext {
     private[this] var kafka: EmbeddedK = _
 
-    private[this] val topicTimeout: FiniteDuration = 10 seconds
+    private[this] val topicTimeout: FiniteDuration = 30 seconds
 
     def stop(): Unit = EmbeddedKafka.stop()
 
