@@ -84,7 +84,8 @@ class WsKafkaAdminClient(cfg: AppCfg) extends WithProxyLogger {
         ).asJava
 
         val topic =
-          new NewTopic(topicName.value, partitions, replFactor).configs(tconf)
+          new NewTopic(topicName.value, partitions.toInt, replFactor)
+            .configs(tconf)
 
         log.info(s"Creating topic ${topicName.value}...")
         Try[Unit] {
