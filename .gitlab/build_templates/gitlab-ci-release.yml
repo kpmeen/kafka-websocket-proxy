@@ -150,6 +150,7 @@ cache:
 sbt release:
   stage: prepare-release
   image: registry.gitlab.com/kpmeen/docker-scala-sbt:scala_2.13.13_jdk21
+  interruptible: false
   before_script:
     # Install python3 and pip
     - add-apt-repository ppa:deadsnakes/ppa -y
@@ -195,6 +196,7 @@ sbt release:
 gitlab release:
   stage: deploy
   image: registry.gitlab.com/gitlab-org/release-cli:latest
+  interruptible: false
   script:
     # Print some debug information
     - *debug_output

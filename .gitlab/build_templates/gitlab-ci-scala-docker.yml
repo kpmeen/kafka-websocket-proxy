@@ -18,6 +18,7 @@ cache:
 publish docker containers:
   stage: publish-docker
   image: registry.gitlab.com/kpmeen/docker-scala-sbt:scala_2.13.13_jdk21
+  interruptible: false
   tags:
     - saas-linux-small-amd64
   services:

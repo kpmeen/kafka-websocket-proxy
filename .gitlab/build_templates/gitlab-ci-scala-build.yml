@@ -18,6 +18,7 @@ cache:
 check style and formatting:
   stage: build
   image: registry.gitlab.com/kpmeen/docker-scala-sbt:scala_2.13.13_jdk21
+  interruptible: true
   tags:
     - saas-linux-small-amd64
   script:
@@ -29,6 +30,7 @@ check style and formatting:
 compile and run test suites:
   stage: test
   image: registry.gitlab.com/kpmeen/docker-scala-sbt:scala_2.13.13_jdk21
+  interruptible: true
   tags:
     - saas-linux-small-amd64
   script:
