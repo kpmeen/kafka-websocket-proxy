@@ -180,7 +180,7 @@ class WsTransactionalProducerSpec
 
         kafkaContext.createTopics(Map(topic.value -> 1))
 
-        val src = Source(msgs).take(msgs.size.toLong)
+        val src = Source(msgs).take(msgs.size.toLong).throttle(1, 200 millis)
         val (killer, flow1) = src
           .viaMat(KillSwitches.single)(Keep.right)
           .via(createTestFlow(s1, topic))
@@ -188,6 +188,7 @@ class WsTransactionalProducerSpec
           .run()
         val flow2 = src.via(createTestFlow(s2, topic)).runWith(Sink.seq)
 
+        // The oldest flow should be fenced when a new one is created.
         assertCause[ProducerFencedException] {
           val _ = flow1.futureValue
         }
