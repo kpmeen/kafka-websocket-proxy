@@ -24,11 +24,20 @@ trait WsProxyEnvLoggerConfigurator {
     .asInstanceOf[LogbackLogger]
     .getLoggerContext
 
-  private[this] lazy val configurator = {
-    log.trace("Initialising logback configurator...")
+  private[this] def createJoranCfg(): JoranConfigurator = {
     val c = new JoranConfigurator
     c.setContext(ctx)
+    currentConfigurator = Some(c)
     c
+  }
+
+  private var currentConfigurator: Option[JoranConfigurator] = None
+
+  private[this] def configurator(reuse: Boolean): JoranConfigurator = {
+    log.trace("Initialising logback configurator...")
+    currentConfigurator
+      .map(curr => if (!reuse) createJoranCfg() else curr)
+      .getOrElse(createJoranCfg())
   }
 
   def load(): Unit = {
@@ -45,7 +54,7 @@ trait WsProxyEnvLoggerConfigurator {
 
   private[logging] def reset(): Unit = {
     log.trace("Resetting logback context...")
-    configurator.setContext(ctx)
+    configurator(true).setContext(ctx)
   }
 
   private[this] def loadLoggersFromEnv(): Unit = {
@@ -74,7 +83,7 @@ trait WsProxyEnvLoggerConfigurator {
     loggerFactory.synchronized {
       ctx.reset()
       val is = new ByteArrayInputStream(cfg.getBytes)
-      configurator.doConfigure(is)
+      configurator(false).doConfigure(is)
     }
 
 }
