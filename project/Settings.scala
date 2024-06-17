@@ -65,9 +65,12 @@ object Settings {
 
   val BaseSettings = Seq(
     organization := "net.scalytica",
-    licenses += ("Apache-2.0", url(
-      "http://opensource.org/licenses/https://opensource.org/licenses/Apache-2.0"
-    )),
+    licenses += (
+      "Apache-2.0",
+      url(
+        "http://opensource.org/licenses/https://opensource.org/licenses/Apache-2.0"
+      )
+    ),
     scalaVersion  := Versions.ScalaVersion,
     scalacOptions := BaseScalacOpts ++ ExperimentalScalacOpts,
     Test / scalacOptions ++= Seq("-Yrangepos"),
@@ -194,8 +197,14 @@ object Settings {
         stageCmds ++ buildStart ++ buildEnd
       },
       // Override Docker exec command to support multi-arch builds
-      Docker / publishLocal := (dockerExecutionCmd tag (Tags.Disk, Tags.Publish)).value,
-      Docker / publish := (dockerExecutionCmd tag (Tags.Network, Tags.Publish)).value,
+      Docker / publishLocal := (dockerExecutionCmd tag (
+        Tags.Disk,
+        Tags.Publish
+      )).value,
+      Docker / publish := (dockerExecutionCmd tag (
+        Tags.Network,
+        Tags.Publish
+      )).value,
       // ----------------------------------------------------
       // Extra file mappings to external libs and configs
       // ----------------------------------------------------
