@@ -1,10 +1,8 @@
 ---
 id: http
-title: HTTP endpoints and API 
+title: Admin Server API 
 slug: /apis/admin
 ---
-
-# Admin API
 
 > **Important**
 >
@@ -15,6 +13,9 @@ slug: /apis/admin
 >
 > See [Kafka Security configuration](configuration.md#kafka-security) for
 > documentation of security configurations against Kafka.
+
+By default, the Admin Server API is _not_ enabled. Please see the [Admin Server Configuration](configuration.md#admin-server-configuration)
+documentation for details on how this can be enabled.
 
 ### GET `/admin/kafka/info`
 

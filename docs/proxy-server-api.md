@@ -1,6 +1,6 @@
 ---
 id: websockets
-title: WebSockets endpoints and API 
+title: Proxy Server API 
 slug: /apis/proxy
 ---
 
@@ -163,4 +163,30 @@ both inbound and outbound messages.
 {
   "wsProxyMessageId": "foo-0-1-1554402266846"
 }
+```
+
+## HTTP endpoints
+
+### GET `/healthcheck`
+
+Simple endpoint to see if the service is up and running. It _does not_ verify
+connectivity with the Kafka brokers. If this is necessary, use the
+`/kafka/cluster/info` endpoint.
+
+**Headers**:
+
+| Name          | Type                              | Required | Description   |
+|:-------       |:-----------                       |:--------:|:------------- |
+| Authorization | Basic authentication (Base64)     |     n    | [Basic authentication](https://en.wikipedia.org/wiki/Basic_access_authentication) header. |
+
+> **Warning**
+>
+> When providing `Authorization` with basic authentication, make sure the proxy
+> is configured to use SSL/TLS. This is because header credentials are
+> transferred in plain text, as for regular HTTP basic authentication.
+
+##### Output
+
+```json
+{ "response": "I'm healthy" }
 ```
