@@ -1,24 +1,24 @@
 import com.github.sbt.git.SbtGit
-import com.typesafe.sbt.packager.Keys._
+import com.typesafe.sbt.packager.Keys.*
 import com.typesafe.sbt.packager.docker.DockerPlugin.autoImport.{
-  dockerBuildxPlatforms,
-  Docker
+  Docker,
+  dockerBuildxPlatforms
 }
 import com.typesafe.sbt.packager.docker.DockerPlugin.publishDocker
-import com.typesafe.sbt.packager.docker.{Cmd, DockerAlias, DockerStageBreak}
+import com.typesafe.sbt.packager.docker.{DockerAlias, DockerStageBreak}
 import com.typesafe.sbt.packager.universal.UniversalPlugin.autoImport.Universal
 import net.scalytica.sbt.plugin.ExtLibTaskPlugin
-import net.scalytica.sbt.plugin.ExtLibTaskPlugin.autoImport._
-import net.scalytica.sbt.plugin.PrometheusConfigPlugin.autoImport._
+import net.scalytica.sbt.plugin.ExtLibTaskPlugin.autoImport.*
+import net.scalytica.sbt.plugin.PrometheusConfigPlugin.autoImport.*
 import org.scalafmt.sbt.ScalafmtPlugin.autoImport.scalafmtOnCompile
-import sbt.Keys._
+import sbt.Keys.*
 import sbt.TestFrameworks.ScalaTest
-import sbt._
+import sbt.{Def, *}
 
 // scalastyle:off
 object Settings {
 
-  val BaseScalacOpts = Seq(
+  val BaseScalacOpts: Seq[String] = Seq(
     "-encoding",
     "utf-8", // Specify character encoding used by source files.
     "-feature", // Emit warning and location for usages of features that should be imported explicitly.
@@ -50,7 +50,7 @@ object Settings {
     "-Xsource:2.13"
   )
 
-  val ExperimentalScalacOpts = Seq(
+  val ExperimentalScalacOpts: Seq[String] = Seq(
     "-Ywarn-dead-code",     // Warn when dead code is identified.
     "-Ywarn-value-discard", // Warn when non-Unit expression results are unused.
     "-Ywarn-extra-implicit", // Warn when more than one implicit parameter section is defined.
@@ -63,7 +63,7 @@ object Settings {
     "-Ywarn-unused:privates" // Warn if a private member is unused.
   )
 
-  val BaseSettings = Seq(
+  val BaseSettings: Seq[Def.Setting[_]] = Seq(
     organization := "net.scalytica",
     licenses += (
       "Apache-2.0",
@@ -152,7 +152,7 @@ object Settings {
     }
   } dependsOn (Docker / stage)
 
-  def dockerSettings(exposedPort: Int) =
+  def dockerSettings(exposedPort: Int): Seq[Def.Setting[_]] =
     Seq(
       dockerUpdateLatest := !isSnapshot.value,
       maintainer         := "contact@scalytica.net",
@@ -310,7 +310,7 @@ object Settings {
       }
     )
 
-  val NoPublish = Seq(
+  val NoPublish: Seq[Def.Setting[Task[Unit]]] = Seq(
     publishLocal := {},
     publish      := {}
   )
