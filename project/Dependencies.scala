@@ -23,7 +23,7 @@ object Versions {
   // Circe dependencies
   val CirceVersion              = "0.14.+"
   val CirceGenericExtrasVersion = CirceVersion
-  val CirceOpticsVersion        = CirceVersion
+  val CirceOpticsVersion        = "0.15.0"
 
   val JwtScalaVersion = "10.0.1"
 
