@@ -35,7 +35,7 @@ object Versions {
   val JaninoVersion       = "3.1.12"
 
   // testing
-  val ScalaTestVersion = "3.2.18"
+  val ScalaTestVersion = "3.2.19"
   val GatlingVersion   = "3.1.1"
 
   // monitoring
