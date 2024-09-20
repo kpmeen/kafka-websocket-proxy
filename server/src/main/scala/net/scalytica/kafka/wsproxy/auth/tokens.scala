@@ -1,13 +1,11 @@
 package net.scalytica.kafka.wsproxy.auth
 
-import io.circe.syntax._
 import io.circe.generic.extras.auto._
-import org.apache.pekko.http.scaladsl.model.{
-  ContentTypes,
-  HttpEntity,
-  HttpMethods,
-  HttpRequest
-}
+import io.circe.syntax._
+import org.apache.pekko.http.scaladsl.model.ContentTypes
+import org.apache.pekko.http.scaladsl.model.HttpEntity
+import org.apache.pekko.http.scaladsl.model.HttpMethods
+import org.apache.pekko.http.scaladsl.model.HttpRequest
 import org.apache.pekko.http.scaladsl.model.headers.OAuth2BearerToken
 import org.apache.pekko.util.ByteString
 

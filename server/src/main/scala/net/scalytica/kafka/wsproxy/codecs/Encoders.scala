@@ -1,17 +1,18 @@
 package net.scalytica.kafka.wsproxy.codecs
 
-import io.circe._
-import io.circe.generic.extras.Configuration
-import io.circe.generic.extras.semiauto._
-import io.circe.syntax._
-import io.circe.parser._
+import scala.annotation.nowarn
+
 import net.scalytica.kafka.wsproxy.config.Configuration.DynamicCfg
 import net.scalytica.kafka.wsproxy.models.Formats.FormatType
 import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails
 import net.scalytica.kafka.wsproxy.models._
 import net.scalytica.kafka.wsproxy.session._
 
-import scala.annotation.nowarn
+import io.circe._
+import io.circe.generic.extras.Configuration
+import io.circe.generic.extras.semiauto._
+import io.circe.parser._
+import io.circe.syntax._
 
 trait Encoders {
 

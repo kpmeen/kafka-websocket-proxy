@@ -2,14 +2,12 @@ package net.scalytica.kafka.wsproxy.utils
 
 import java.net.InetAddress
 
-import net.scalytica.kafka.wsproxy.config.Configuration.{
-  AppCfg,
-  KafkaBootstrapHosts
-}
+import scala.util.Try
+
+import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.config.Configuration.KafkaBootstrapHosts
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.utils.BlockingRetry.retry
-
-import scala.util.Try
 
 object HostResolver extends WithProxyLogger {
 

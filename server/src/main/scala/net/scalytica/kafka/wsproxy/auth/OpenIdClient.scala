@@ -1,33 +1,37 @@
 package net.scalytica.kafka.wsproxy.auth
 
-import org.apache.pekko.http.scaladsl.Http
-import org.apache.pekko.http.scaladsl.model._
-import org.apache.pekko.http.scaladsl.model.headers.OAuth2BearerToken
-import org.apache.pekko.stream.{Materializer, StreamTcpException}
+import java.security.PublicKey
+import java.time.Clock
+
+import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.Future
+import scala.util.Failure
+import scala.util.Success
+import scala.util.Try
+
+import net.scalytica.kafka.wsproxy.OptionExtensions
+import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.config.Configuration.OpenIdConnectCfg
+import net.scalytica.kafka.wsproxy.errors.AuthenticationError
+import net.scalytica.kafka.wsproxy.errors.InvalidTokenError
+import net.scalytica.kafka.wsproxy.errors.OpenIdConnectError
+import net.scalytica.kafka.wsproxy.errors.ProxyAuthError
+import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
+
 import io.circe._
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.auto._
 import io.circe.parser._
-import net.scalytica.kafka.wsproxy.OptionExtensions
-import net.scalytica.kafka.wsproxy.config.Configuration.{
-  AppCfg,
-  OpenIdConnectCfg
-}
-import net.scalytica.kafka.wsproxy.errors.{
-  AuthenticationError,
-  InvalidTokenError,
-  OpenIdConnectError,
-  ProxyAuthError
-}
-import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.model._
+import org.apache.pekko.http.scaladsl.model.headers.OAuth2BearerToken
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.StreamTcpException
+import pdi.jwt.JwtBase64
+import pdi.jwt.JwtCirce
+import pdi.jwt.JwtClaim
 import pdi.jwt.exceptions.JwtException
-import pdi.jwt.{JwtBase64, JwtCirce, JwtClaim}
-
-import java.security.PublicKey
-import java.time.Clock
-import scala.concurrent.{ExecutionContextExecutor, Future}
-import scala.util.{Failure, Success, Try}
 
 class OpenIdClient private (
     oidcCfg: OpenIdConnectCfg,
@@ -208,7 +212,7 @@ class OpenIdClient private (
                 js.as[OpenIdConnectConfig].toOption
 
               case None =>
-                log.info(s"OpenID well-known request returned no body")
+                log.info("OpenID well-known request returned no body")
                 None
             }
 
@@ -218,14 +222,14 @@ class OpenIdClient private (
                 log.whenTraceEnabled {
                   val js = parse(bodyStr).toOption.getOrElse(Json.Null)
                   log.trace(
-                    s"OpenID well-known response returned with status" +
+                    "OpenID well-known response returned with status" +
                       s" ${status.intValue()} and body:\n${js.spaces2}"
                   )
                 }
                 None
 
               case None =>
-                log.info(s"OpenID well-known request returned no body")
+                log.info("OpenID well-known request returned no body")
                 None
             }
         }
@@ -252,7 +256,7 @@ class OpenIdClient private (
         log.trace(
           "Token response headers: [" +
             res.headers.mkString("\n  ", "\n  ", "\n") +
-            s"]"
+            "]"
         )
 
         res match {
@@ -263,7 +267,7 @@ class OpenIdClient private (
                 log.trace(s"Token response body:\n${js.spaces2}")
                 js.as[AccessToken].toOption
               }.orElse {
-                log.info(s"Token request returned no body")
+                log.info("Token request returned no body")
                 None
               }
             }
@@ -278,7 +282,7 @@ class OpenIdClient private (
                 None
 
               case None =>
-                log.info(s"Token request returned no body")
+                log.info("Token request returned no body")
                 None
             }
         }

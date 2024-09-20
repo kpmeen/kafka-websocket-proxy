@@ -1,9 +1,10 @@
 package net.scalytica.kafka.wsproxy.logging
 
-import net.scalytica.kafka.wsproxy.NiceClassNameExtensions
-import com.typesafe.scalalogging.Logger
-
 import scala.reflect.ClassTag
+
+import net.scalytica.kafka.wsproxy.NiceClassNameExtensions
+
+import com.typesafe.scalalogging.Logger
 
 /** Convenience trait for providing loggers to different objects and classes. */
 trait WithProxyLogger { self =>

@@ -1,17 +1,16 @@
 package net.scalytica.kafka.wsproxy.consumer
 
+import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.models.Partition
+import net.scalytica.kafka.wsproxy.models.WsConsumerRecord
+import net.scalytica.kafka.wsproxy.models.WsMessageId
+
+import com.typesafe.scalalogging.Logger
 import org.apache.pekko.kafka.CommitterSettings
 import org.apache.pekko.kafka.ConsumerMessage.Committable
 import org.apache.pekko.kafka.scaladsl.Committer
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.Source
-import com.typesafe.scalalogging.Logger
-import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
-import net.scalytica.kafka.wsproxy.models.{
-  Partition,
-  WsConsumerRecord,
-  WsMessageId
-}
 
 /**
  * Types that model a kind of Stack to keep track of uncommitted messages. The
@@ -98,7 +97,7 @@ private[consumer] object CommitStackTypes {
           )
           this + (partition -> SubStack(uncommitted))
         }
-      logger.debug(s"STASH: Next stack is: " + stack.mkString(","))
+      logger.debug("STASH: Next stack is: " + stack.mkString(","))
       nextStack
     }
 

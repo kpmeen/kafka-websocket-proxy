@@ -1,11 +1,12 @@
 package net.scalytica.kafka.wsproxy.web
 
+import net.scalytica.kafka.wsproxy.auth.OpenIdClient
+import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
+
 import org.apache.pekko.http.scaladsl.model.StatusCodes._
 import org.apache.pekko.http.scaladsl.model._
 import org.apache.pekko.http.scaladsl.server.Directives._
 import org.apache.pekko.http.scaladsl.server._
-import net.scalytica.kafka.wsproxy.auth.OpenIdClient
-import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 
 /** Routes for verifying status and health for the proxy */
 trait StatusRoutes { self: BaseRoutes =>

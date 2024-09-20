@@ -1,11 +1,15 @@
 package net.scalytica.kafka.wsproxy.auth
 
-import java.security.spec.{InvalidKeySpecException, RSAPublicKeySpec}
-import java.security.{KeyFactory, NoSuchAlgorithmException, PublicKey}
+import java.security.KeyFactory
+import java.security.NoSuchAlgorithmException
+import java.security.PublicKey
+import java.security.spec.InvalidKeySpecException
+import java.security.spec.RSAPublicKeySpec
+
+import scala.util.Failure
+import scala.util.Try
 
 import net.scalytica.kafka.wsproxy.errors.InvalidPublicKeyError
-
-import scala.util.{Failure, Try}
 
 /**
  * @param kty

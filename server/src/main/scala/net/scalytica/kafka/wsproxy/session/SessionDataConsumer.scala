@@ -1,18 +1,18 @@
 package net.scalytica.kafka.wsproxy.session
 
-import org.apache.pekko.actor.typed.ActorSystem
-import org.apache.pekko.actor.typed.scaladsl.adapter._
-import org.apache.pekko.kafka.scaladsl.Consumer
-import org.apache.pekko.kafka.{ConsumerSettings, Subscriptions}
 import net.scalytica.kafka.wsproxy._
-import net.scalytica.kafka.wsproxy.codecs.{BasicSerdes, SessionSerde}
+import net.scalytica.kafka.wsproxy.codecs.BasicSerdes
+import net.scalytica.kafka.wsproxy.codecs.SessionSerde
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
-import org.apache.kafka.clients.consumer.ConsumerConfig.{
-  AUTO_OFFSET_RESET_CONFIG,
-  ENABLE_AUTO_COMMIT_CONFIG
-}
+
+import org.apache.kafka.clients.consumer.ConsumerConfig._
 import org.apache.kafka.clients.consumer.OffsetResetStrategy.EARLIEST
+import org.apache.pekko.actor.typed.ActorSystem
+import org.apache.pekko.actor.typed.scaladsl.adapter._
+import org.apache.pekko.kafka.ConsumerSettings
+import org.apache.pekko.kafka.Subscriptions
+import org.apache.pekko.kafka.scaladsl.Consumer
 
 /**
  * Consumer for processing all updates to session state topic and transforming

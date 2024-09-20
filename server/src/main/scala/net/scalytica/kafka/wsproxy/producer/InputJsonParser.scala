@@ -1,11 +1,10 @@
 package net.scalytica.kafka.wsproxy.producer
 
-import io.circe.Decoder
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
-import net.scalytica.kafka.wsproxy.models.{
-  ProducerEmptyMessage,
-  WsProducerRecord
-}
+import net.scalytica.kafka.wsproxy.models.ProducerEmptyMessage
+import net.scalytica.kafka.wsproxy.models.WsProducerRecord
+
+import io.circe.Decoder
 
 trait InputJsonParser { self: WithProxyLogger =>
 

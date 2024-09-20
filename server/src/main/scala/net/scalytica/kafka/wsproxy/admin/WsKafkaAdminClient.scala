@@ -1,41 +1,37 @@
 package net.scalytica.kafka.wsproxy.admin
 
-import net.scalytica.kafka.wsproxy.config.Configuration.{
-  AppCfg,
-  InternalStateTopic
-}
+import java.util.UUID
+
+import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
+import scala.util.Failure
+import scala.util.Success
+import scala.util.Try
+import scala.util.control.NonFatal
+
 import net.scalytica.kafka.wsproxy._
+import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.config.Configuration.InternalStateTopic
 import net.scalytica.kafka.wsproxy.config.DynCfgConsumerGroupIdPrefix
-import net.scalytica.kafka.wsproxy.errors.{
-  KafkaFutureErrorHandler,
-  TopicNotFoundError
-}
+import net.scalytica.kafka.wsproxy.errors.KafkaFutureErrorHandler
+import net.scalytica.kafka.wsproxy.errors.TopicNotFoundError
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
-import net.scalytica.kafka.wsproxy.models.{
-  BrokerInfo,
-  ConsumerGroup,
-  PartitionOffsetMetadata,
-  SimpleTopicDescription,
-  TopicName,
-  WsGroupId
-}
+import net.scalytica.kafka.wsproxy.models.BrokerInfo
+import net.scalytica.kafka.wsproxy.models.ConsumerGroup
+import net.scalytica.kafka.wsproxy.models.PartitionOffsetMetadata
+import net.scalytica.kafka.wsproxy.models.SimpleTopicDescription
+import net.scalytica.kafka.wsproxy.models.TopicName
+import net.scalytica.kafka.wsproxy.models.WsGroupId
 import net.scalytica.kafka.wsproxy.session.SessionConsumerGroupIdPrefix
 import net.scalytica.kafka.wsproxy.utils.BlockingRetry
+
 import org.apache.kafka.clients.admin.AdminClientConfig._
 import org.apache.kafka.clients.admin._
-import org.apache.kafka.common.{
-  KafkaException,
-  TopicPartition,
-  TopicPartitionInfo
-}
+import org.apache.kafka.common.KafkaException
+import org.apache.kafka.common.TopicPartition
+import org.apache.kafka.common.TopicPartitionInfo
 import org.apache.kafka.common.config.TopicConfig._
 import org.apache.kafka.common.errors.UnknownTopicOrPartitionException
-
-import java.util.UUID
-import scala.jdk.CollectionConverters._
-import scala.concurrent.duration._
-import scala.util.{Failure, Success, Try}
-import scala.util.control.NonFatal
 
 // scalastyle:off magic.number
 /**

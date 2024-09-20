@@ -3,6 +3,7 @@ package net.scalytica.kafka.wsproxy.auth
 import net.scalytica.kafka.wsproxy.SaslJaasConfig
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models.AclCredentials
+
 import org.apache.kafka.clients.admin.ScramMechanism
 import org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule
 import org.apache.kafka.common.security.plain.PlainLoginModule

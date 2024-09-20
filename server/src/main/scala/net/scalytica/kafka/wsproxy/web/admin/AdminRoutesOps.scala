@@ -1,5 +1,30 @@
 package net.scalytica.kafka.wsproxy.web.admin
 
+import scala.concurrent.ExecutionContext
+import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.Future
+import scala.concurrent.duration._
+
+import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
+import net.scalytica.kafka.wsproxy.codecs.Decoders._
+import net.scalytica.kafka.wsproxy.codecs.Encoders._
+import net.scalytica.kafka.wsproxy.config.Configuration._
+import net.scalytica.kafka.wsproxy.config.DynamicConfigHandlerImplicits._
+import net.scalytica.kafka.wsproxy.config.DynamicConfigHandlerProtocol._
+import net.scalytica.kafka.wsproxy.config.DynamicConfigurations
+import net.scalytica.kafka.wsproxy.config.RunnableDynamicConfigHandlerRef
+import net.scalytica.kafka.wsproxy.errors.ImpossibleError
+import net.scalytica.kafka.wsproxy.errors.UnexpectedError
+import net.scalytica.kafka.wsproxy.models._
+import net.scalytica.kafka.wsproxy.session.SessionHandlerImplicits._
+import net.scalytica.kafka.wsproxy.session.SessionHandlerRef
+import net.scalytica.kafka.wsproxy.session.SessionUpdated
+import net.scalytica.kafka.wsproxy.web.BaseRoutes
+
+import io.circe.Json
+import io.circe.parser._
+import io.circe.syntax._
+import org.apache.pekko.actor.typed.Scheduler
 import org.apache.pekko.actor.typed.scaladsl.adapter._
 import org.apache.pekko.http.scaladsl.model.StatusCodes._
 import org.apache.pekko.http.scaladsl.model._
@@ -7,28 +32,6 @@ import org.apache.pekko.http.scaladsl.server.Directives._
 import org.apache.pekko.http.scaladsl.server._
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.util.Timeout
-import io.circe.Json
-import io.circe.syntax._
-import io.circe.parser._
-import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
-import net.scalytica.kafka.wsproxy.codecs.Encoders._
-import net.scalytica.kafka.wsproxy.codecs.Decoders._
-import net.scalytica.kafka.wsproxy.config.Configuration._
-import net.scalytica.kafka.wsproxy.config.{
-  DynamicConfigurations,
-  RunnableDynamicConfigHandlerRef
-}
-import net.scalytica.kafka.wsproxy.config.DynamicConfigHandlerImplicits._
-import net.scalytica.kafka.wsproxy.config.DynamicConfigHandlerProtocol._
-import net.scalytica.kafka.wsproxy.errors.{ImpossibleError, UnexpectedError}
-import net.scalytica.kafka.wsproxy.models._
-import net.scalytica.kafka.wsproxy.session.{SessionHandlerRef, SessionUpdated}
-import net.scalytica.kafka.wsproxy.web.BaseRoutes
-import net.scalytica.kafka.wsproxy.session.SessionHandlerImplicits._
-import org.apache.pekko.actor.typed.Scheduler
-
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
-import scala.concurrent.duration._
 
 trait AdminRoutesOps extends AdminRoutesResponses { self: BaseRoutes =>
 

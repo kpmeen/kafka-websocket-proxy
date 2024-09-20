@@ -1,11 +1,15 @@
 package net.scalytica.kafka.wsproxy.logging
 
 import java.io.ByteArrayInputStream
-import ch.qos.logback.classic.joran.JoranConfigurator
-import ch.qos.logback.classic.{Level, Logger => LogbackLogger}
+
 import net.scalytica.kafka.wsproxy.StringExtensions
 import net.scalytica.kafka.wsproxy.utils.{WsProxyEnvLoader => env}
-import org.slf4j.{ILoggerFactory, LoggerFactory}
+
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.joran.JoranConfigurator
+import ch.qos.logback.classic.{Logger => LogbackLogger}
+import org.slf4j.ILoggerFactory
+import org.slf4j.LoggerFactory
 
 trait WsProxyEnvLoggerConfigurator {
 

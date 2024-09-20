@@ -1,18 +1,23 @@
 package net.scalytica.kafka.wsproxy.web
 
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.http.scaladsl.server.Route
-import org.apache.pekko.http.scaladsl.{
-  ConnectionContext,
-  Http,
-  HttpsConnectionContext
-}
-import net.scalytica.kafka.wsproxy.config.Configuration.{AppCfg, ServerSslCfg}
+import java.nio.file.Files
+import java.nio.file.Path
+import java.security.KeyStore
+import java.security.SecureRandom
+import javax.net.ssl.KeyManagerFactory
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManagerFactory
 
-import java.nio.file.{Files, Path}
-import java.security.{KeyStore, SecureRandom}
-import javax.net.ssl.{KeyManagerFactory, SSLContext, TrustManagerFactory}
 import scala.concurrent.Future
+
+import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.config.Configuration.ServerSslCfg
+
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.ConnectionContext
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.HttpsConnectionContext
+import org.apache.pekko.http.scaladsl.server.Route
 
 trait ServerBindings {
 

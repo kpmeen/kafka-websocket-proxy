@@ -1,19 +1,19 @@
 import com.github.sbt.git.SbtGit
-import com.typesafe.sbt.packager.Keys.*
+import com.typesafe.sbt.packager.Keys._
 import com.typesafe.sbt.packager.docker.DockerPlugin.autoImport.{
-  Docker,
-  dockerBuildxPlatforms
+  dockerBuildxPlatforms,
+  Docker
 }
 import com.typesafe.sbt.packager.docker.DockerPlugin.publishDocker
 import com.typesafe.sbt.packager.docker.{DockerAlias, DockerStageBreak}
 import com.typesafe.sbt.packager.universal.UniversalPlugin.autoImport.Universal
 import net.scalytica.sbt.plugin.ExtLibTaskPlugin
-import net.scalytica.sbt.plugin.ExtLibTaskPlugin.autoImport.*
-import net.scalytica.sbt.plugin.PrometheusConfigPlugin.autoImport.*
+import net.scalytica.sbt.plugin.ExtLibTaskPlugin.autoImport._
+import net.scalytica.sbt.plugin.PrometheusConfigPlugin.autoImport._
 import org.scalafmt.sbt.ScalafmtPlugin.autoImport.scalafmtOnCompile
-import sbt.Keys.*
+import sbt.Keys._
 import sbt.TestFrameworks.ScalaTest
-import sbt.{Def, *}
+import sbt.{Def, _}
 
 // scalastyle:off
 object Settings {
@@ -73,6 +73,9 @@ object Settings {
     ),
     scalaVersion  := Versions.ScalaVersion,
     scalacOptions := BaseScalacOpts ++ ExperimentalScalacOpts,
+    // Need to manually filter out any automatically set config
+    // for Scala 3 type semantics, just in case
+    scalacOptions ~= (_.filterNot(_ == "-Xsource:3")),
     Test / scalacOptions ++= Seq("-Yrangepos"),
     // Require compilation against JDK 17.
     javacOptions ++= Seq("-source", "17", "-target", "17"),

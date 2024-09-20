@@ -1,19 +1,23 @@
 package net.scalytica.kafka.wsproxy.auth
 
-import org.apache.pekko.http.scaladsl.Http
-import org.apache.pekko.http.scaladsl.model._
-import org.apache.pekko.http.scaladsl.model.headers.Accept
-import org.apache.pekko.stream.Materializer
-import io.circe.generic.extras.auto._
-import io.circe.parser._
+import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.Future
+import scala.util.Failure
+import scala.util.Success
+import scala.util.Try
+
 import net.scalytica.kafka.wsproxy.StringExtensions
 import net.scalytica.kafka.wsproxy.errors.SigningKeyNotFoundError
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.utils.HostResolver
-import org.apache.pekko.actor.ActorSystem
 
-import scala.concurrent.{ExecutionContextExecutor, Future}
-import scala.util.{Failure, Success, Try}
+import io.circe.generic.extras.auto._
+import io.circe.parser._
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.model._
+import org.apache.pekko.http.scaladsl.model.headers.Accept
+import org.apache.pekko.stream.Materializer
 
 /**
  * JWK provider based on the {{com.auth0.jwk.UrlJwkProvider}}. Intention here is
@@ -74,7 +78,7 @@ class UrlJwkProvider private[auth] (url: String, enforceHttps: Boolean = true)
                     log.trace(s"Successfully parsed JWK object $jwk")
                     ok
                   case ko @ Left(err) =>
-                    log.error(s"Error parsing JWK object", err)
+                    log.error("Error parsing JWK object", err)
                     ko
                 }
                 .collect { case Right(jwk) => jwk }

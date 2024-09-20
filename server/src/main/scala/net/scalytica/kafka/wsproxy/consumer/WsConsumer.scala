@@ -1,29 +1,28 @@
 package net.scalytica.kafka.wsproxy.consumer
 
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.kafka.ConsumerMessage.CommittableOffset
-import org.apache.pekko.kafka.scaladsl.Consumer
-import org.apache.pekko.kafka.{ConsumerSettings, Subscriptions}
-import org.apache.pekko.stream.scaladsl.Source
+import scala.concurrent.duration._
+
+import net.scalytica.kafka.wsproxy.SaslJaasConfig
 import net.scalytica.kafka.wsproxy.auth.KafkaLoginModules
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
-import net.scalytica.kafka.wsproxy.errors.{
-  AuthenticationError,
-  AuthorisationError
-}
+import net.scalytica.kafka.wsproxy.consumerMetricsProperties
+import net.scalytica.kafka.wsproxy.errors.AuthenticationError
+import net.scalytica.kafka.wsproxy.errors.AuthorisationError
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails
 import net.scalytica.kafka.wsproxy.models._
-import net.scalytica.kafka.wsproxy.{consumerMetricsProperties, SaslJaasConfig}
+
 import org.apache.kafka.clients.consumer.ConsumerConfig._
 import org.apache.kafka.clients.consumer.ConsumerRecord
-import org.apache.kafka.common.errors.{
-  AuthenticationException,
-  AuthorizationException
-}
+import org.apache.kafka.common.errors.AuthenticationException
+import org.apache.kafka.common.errors.AuthorizationException
 import org.apache.kafka.common.serialization.Deserializer
-
-import scala.concurrent.duration._
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.kafka.ConsumerMessage.CommittableOffset
+import org.apache.pekko.kafka.ConsumerSettings
+import org.apache.pekko.kafka.Subscriptions
+import org.apache.pekko.kafka.scaladsl.Consumer
+import org.apache.pekko.stream.scaladsl.Source
 
 /** Functions for initialising Kafka consumer sources. */
 object WsConsumer extends WithProxyLogger {

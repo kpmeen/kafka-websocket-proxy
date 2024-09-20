@@ -1,13 +1,12 @@
 package net.scalytica.kafka.wsproxy
 
-import net.scalytica.kafka.wsproxy.config.Configuration.{
-  AppCfg,
-  ClientSpecificLimitCfg,
-  ConsumerSpecificLimitCfg,
-  DynamicCfg,
-  ProducerSpecificLimitCfg
-}
-import net.scalytica.kafka.wsproxy.models.{WsGroupId, WsProducerId}
+import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.config.Configuration.ClientSpecificLimitCfg
+import net.scalytica.kafka.wsproxy.config.Configuration.ConsumerSpecificLimitCfg
+import net.scalytica.kafka.wsproxy.config.Configuration.DynamicCfg
+import net.scalytica.kafka.wsproxy.config.Configuration.ProducerSpecificLimitCfg
+import net.scalytica.kafka.wsproxy.models.WsGroupId
+import net.scalytica.kafka.wsproxy.models.WsProducerId
 
 package object config {
 

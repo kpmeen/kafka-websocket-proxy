@@ -1,25 +1,23 @@
 package net.scalytica.kafka.wsproxy.producer
 
-import org.apache.pekko.NotUsed
-import org.apache.pekko.http.scaladsl.model.ws.Message
-import org.apache.pekko.stream.scaladsl.Flow
-import org.apache.pekko.stream.{Materializer, OverflowStrategy}
-import io.circe.Decoder
-import net.scalytica.kafka.wsproxy.config.Configuration.{
-  AppCfg,
-  ClientSpecificLimitCfg
-}
-import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
-import net.scalytica.kafka.wsproxy.models.{
-  InSocketArgs,
-  ProducerEmptyMessage,
-  WsProducerId,
-  WsProducerRecord
-}
-import net.scalytica.kafka.wsproxy.streams.ProxyFlowExtras
-
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
+
+import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.config.Configuration.ClientSpecificLimitCfg
+import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
+import net.scalytica.kafka.wsproxy.models.InSocketArgs
+import net.scalytica.kafka.wsproxy.models.ProducerEmptyMessage
+import net.scalytica.kafka.wsproxy.models.WsProducerId
+import net.scalytica.kafka.wsproxy.models.WsProducerRecord
+import net.scalytica.kafka.wsproxy.streams.ProxyFlowExtras
+
+import io.circe.Decoder
+import org.apache.pekko.NotUsed
+import org.apache.pekko.http.scaladsl.model.ws.Message
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.OverflowStrategy
+import org.apache.pekko.stream.scaladsl.Flow
 
 private[producer] trait ProducerFlowExtras
     extends ProxyFlowExtras
@@ -47,7 +45,7 @@ private[producer] trait ProducerFlowExtras
       }
       .map(str => parseInput[K, V](str))
       .recover { case t: Exception =>
-        logAndEmpty(s"JSON message could not be parsed", t)(
+        logAndEmpty("JSON message could not be parsed", t)(
           ProducerEmptyMessage
         )
       }

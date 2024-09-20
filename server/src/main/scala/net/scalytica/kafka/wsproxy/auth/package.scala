@@ -1,13 +1,14 @@
 package net.scalytica.kafka.wsproxy
 
+import scala.concurrent.Future
+
+import com.typesafe.scalalogging.Logger
+import io.circe.generic.extras.{Configuration => CirceConfiguration}
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.Source
 import org.apache.pekko.util.ByteString
-import com.typesafe.scalalogging.Logger
-import io.circe.generic.extras.{Configuration => CirceConfiguration}
-import pdi.jwt.{JwtBase64, JwtClaim}
-
-import scala.concurrent.Future
+import pdi.jwt.JwtBase64
+import pdi.jwt.JwtClaim
 
 package object auth {
 

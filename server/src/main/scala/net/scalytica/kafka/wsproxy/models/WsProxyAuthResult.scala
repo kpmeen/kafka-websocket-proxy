@@ -1,10 +1,11 @@
 package net.scalytica.kafka.wsproxy.models
 
-import org.apache.pekko.http.scaladsl.model.headers.OAuth2BearerToken
-import io.circe.Json
-import io.circe.parser._
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
+
+import io.circe.Json
+import io.circe.parser._
+import org.apache.pekko.http.scaladsl.model.headers.OAuth2BearerToken
 import pdi.jwt.JwtClaim
 
 sealed trait WsProxyAuthResult {

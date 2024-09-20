@@ -1,34 +1,35 @@
 package net.scalytica.kafka.wsproxy.jmx
 
-import org.apache.pekko.NotUsed
-import org.apache.pekko.actor.Cancellable
-import org.apache.pekko.actor.typed.scaladsl.adapter._
-import org.apache.pekko.actor.typed.{ActorRef, ActorSystem}
-import org.apache.pekko.http.scaladsl.model.ws.Message
-import org.apache.pekko.stream.scaladsl.{Flow, Sink}
-import org.apache.pekko.stream.typed.scaladsl.ActorSink
+import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
+import scala.util.Failure
+import scala.util.Success
+import scala.util.Try
+
 import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
-import net.scalytica.kafka.wsproxy.models.{
-  FullConsumerId,
-  FullProducerId,
-  WsCommit,
-  WsConsumerRecord,
-  WsProducerId,
-  WsProducerInstanceId
-}
-
-import scala.concurrent.ExecutionContext
-// scalastyle:off
-import net.scalytica.kafka.wsproxy.jmx.mbeans.ConsumerClientStatsProtocol.ConsumerClientStatsCommand
-import net.scalytica.kafka.wsproxy.jmx.mbeans.ProducerClientStatsProtocol.ProducerClientStatsCommand
-// scalastyle:on
+import net.scalytica.kafka.wsproxy.jmx.mbeans.ConsumerClientStatsProtocol._
+import net.scalytica.kafka.wsproxy.jmx.mbeans.ProducerClientStatsProtocol._
 import net.scalytica.kafka.wsproxy.jmx.mbeans._
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
-import net.scalytica.kafka.wsproxy.models.{WsClientId, WsGroupId}
+import net.scalytica.kafka.wsproxy.models.FullConsumerId
+import net.scalytica.kafka.wsproxy.models.FullProducerId
+import net.scalytica.kafka.wsproxy.models.WsClientId
+import net.scalytica.kafka.wsproxy.models.WsCommit
+import net.scalytica.kafka.wsproxy.models.WsConsumerRecord
+import net.scalytica.kafka.wsproxy.models.WsGroupId
+import net.scalytica.kafka.wsproxy.models.WsProducerId
+import net.scalytica.kafka.wsproxy.models.WsProducerInstanceId
 
-import scala.concurrent.duration._
-import scala.util.{Failure, Success, Try}
+import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.Cancellable
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.ActorSystem
+import org.apache.pekko.actor.typed.scaladsl.adapter._
+import org.apache.pekko.http.scaladsl.model.ws.Message
+import org.apache.pekko.stream.scaladsl.Flow
+import org.apache.pekko.stream.scaladsl.Sink
+import org.apache.pekko.stream.typed.scaladsl.ActorSink
 
 trait BaseJmxManager {
   val appCfg: AppCfg
@@ -66,7 +67,7 @@ trait JmxProxyStatusOps { self: BaseJmxManager with WithProxyLogger =>
         )
 
       case Failure(e) =>
-        log.warn(s"Failure when attempting to fetch Kafka broker info.", e)
+        log.warn("Failure when attempting to fetch Kafka broker info.", e)
         log.trace("Sending empty broker info to ProxyStatusMXBeanActor")
         proxyStatusActor.tell(ProxyStatusProtocol.ClearBrokers(ref))
     }

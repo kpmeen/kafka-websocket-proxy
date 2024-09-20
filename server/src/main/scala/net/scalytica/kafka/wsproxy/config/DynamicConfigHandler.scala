@@ -1,16 +1,21 @@
 package net.scalytica.kafka.wsproxy.config
 
-import org.apache.pekko.actor.typed.{ActorSystem, Behavior}
-import org.apache.pekko.actor.typed.scaladsl.Behaviors
-import org.apache.pekko.actor.typed.scaladsl.adapter._
-import org.apache.pekko.stream.scaladsl.Sink
+import scala.concurrent.ExecutionContext
+import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.Future
+import scala.util.Failure
+import scala.util.Success
+
 import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.config.DynamicConfigHandlerProtocol._
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
-import scala.util.{Failure, Success}
+import org.apache.pekko.actor.typed.ActorSystem
+import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.actor.typed.scaladsl.adapter._
+import org.apache.pekko.stream.scaladsl.Sink
 
 object DynamicConfigHandler extends DynamicConfigHandler
 
@@ -165,7 +170,7 @@ trait DynamicConfigHandler extends WithProxyLogger {
     Behaviors.setup { implicit ctx =>
       implicit val sys: ActorSystem[_]          = ctx.system
       implicit val ec: ExecutionContextExecutor = sys.executionContext
-      log.debug(s"Initialising dynamic config producer...")
+      log.debug("Initialising dynamic config producer...")
       implicit val producer: DynamicConfigProducer = new DynamicConfigProducer()
       behavior()
     }

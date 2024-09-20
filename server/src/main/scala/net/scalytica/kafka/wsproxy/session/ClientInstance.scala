@@ -1,15 +1,13 @@
 package net.scalytica.kafka.wsproxy.session
 
-import net.scalytica.kafka.wsproxy.models.{
-  FullClientId,
-  FullConsumerId,
-  FullProducerId,
-  WsClientId,
-  WsGroupId,
-  WsProducerId,
-  WsProducerInstanceId,
-  WsServerId
-}
+import net.scalytica.kafka.wsproxy.models.FullClientId
+import net.scalytica.kafka.wsproxy.models.FullConsumerId
+import net.scalytica.kafka.wsproxy.models.FullProducerId
+import net.scalytica.kafka.wsproxy.models.WsClientId
+import net.scalytica.kafka.wsproxy.models.WsGroupId
+import net.scalytica.kafka.wsproxy.models.WsProducerId
+import net.scalytica.kafka.wsproxy.models.WsProducerInstanceId
+import net.scalytica.kafka.wsproxy.models.WsServerId
 
 /** Helps to identify a Kafka client instance */
 sealed trait ClientInstance {

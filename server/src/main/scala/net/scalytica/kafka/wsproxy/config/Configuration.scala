@@ -1,23 +1,26 @@
 package net.scalytica.kafka.wsproxy.config
 
-import com.typesafe.config.{Config, ConfigRenderOptions}
-import net.scalytica.kafka.wsproxy.errors.ConfigurationError
-import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
-import net.scalytica.kafka.wsproxy.models.{
-  TopicName,
-  WsGroupId,
-  WsProducerId,
-  WsServerId
-}
-import org.apache.kafka.clients.CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG
-import org.apache.kafka.common.config.SaslConfigs
-import pureconfig.error.ConfigReaderFailures
-import pureconfig.generic.auto._
-import pureconfig.{ConfigReader, ConfigSource, ConfigWriter}
-
 import java.nio.file.Path
+
 import scala.concurrent.duration.FiniteDuration
 import scala.jdk.CollectionConverters._
+
+import net.scalytica.kafka.wsproxy.errors.ConfigurationError
+import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
+import net.scalytica.kafka.wsproxy.models.TopicName
+import net.scalytica.kafka.wsproxy.models.WsGroupId
+import net.scalytica.kafka.wsproxy.models.WsProducerId
+import net.scalytica.kafka.wsproxy.models.WsServerId
+
+import com.typesafe.config.Config
+import com.typesafe.config.ConfigRenderOptions
+import org.apache.kafka.clients.CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG
+import org.apache.kafka.common.config.SaslConfigs
+import pureconfig.ConfigReader
+import pureconfig.ConfigSource
+import pureconfig.ConfigWriter
+import pureconfig.error.ConfigReaderFailures
+import pureconfig.generic.auto._
 
 // scalastyle:off number.of.methods
 trait Configuration extends WithProxyLogger {

@@ -1,13 +1,18 @@
 package net.scalytica.kafka.wsproxy.utils
 
-import com.typesafe.scalalogging.Logger
-
 import java.util.concurrent.TimeUnit
+
 import scala.annotation.tailrec
-import scala.concurrent.{blocking, Await, Future}
+import scala.concurrent.Await
+import scala.concurrent.Future
+import scala.concurrent.blocking
 import scala.concurrent.duration._
 import scala.reflect.ClassTag
-import scala.util.{Failure, Success, Try}
+import scala.util.Failure
+import scala.util.Success
+import scala.util.Try
+
+import com.typesafe.scalalogging.Logger
 
 object BlockingRetry {
 

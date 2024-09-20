@@ -1,17 +1,17 @@
 package net.scalytica.kafka.wsproxy.codecs
 
-import java.util.{Map => JMap, UUID}
-import io.circe.parser._
-import io.circe.{Json, Printer}
-import org.apache.kafka.common.serialization.{
-  Deserializer,
-  Serde,
-  Serdes => KSerdes,
-  Serializer
-}
-import org.apache.kafka.common.utils.Bytes
-
 import java.nio.ByteBuffer
+import java.util.UUID
+import java.util.{Map => JMap}
+
+import io.circe.Json
+import io.circe.Printer
+import io.circe.parser._
+import org.apache.kafka.common.serialization.Deserializer
+import org.apache.kafka.common.serialization.Serde
+import org.apache.kafka.common.serialization.Serializer
+import org.apache.kafka.common.serialization.{Serdes => KSerdes}
+import org.apache.kafka.common.utils.Bytes
 
 /**
  * Definitions of most common primitive serializers and deserializers, plus a

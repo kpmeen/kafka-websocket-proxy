@@ -1,13 +1,12 @@
 package net.scalytica.kafka.wsproxy.web
 
-import org.apache.pekko.http.scaladsl.model.headers.{
-  BasicHttpCredentials,
-  ModeledCustomHeader,
-  ModeledCustomHeaderCompanion
-}
+import scala.util.Try
+
 import net.scalytica.kafka.wsproxy.models.AclCredentials
 
-import scala.util.Try
+import org.apache.pekko.http.scaladsl.model.headers.BasicHttpCredentials
+import org.apache.pekko.http.scaladsl.model.headers.ModeledCustomHeader
+import org.apache.pekko.http.scaladsl.model.headers.ModeledCustomHeaderCompanion
 
 object Headers {
 

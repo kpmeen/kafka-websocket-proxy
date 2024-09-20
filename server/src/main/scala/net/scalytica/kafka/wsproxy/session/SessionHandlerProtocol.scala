@@ -1,11 +1,10 @@
 package net.scalytica.kafka.wsproxy.session
 
-import org.apache.pekko.actor.typed.ActorRef
-import net.scalytica.kafka.wsproxy.config.Configuration.{
-  ConsumerSpecificLimitCfg,
-  ProducerSpecificLimitCfg
-}
+import net.scalytica.kafka.wsproxy.config.Configuration.ConsumerSpecificLimitCfg
+import net.scalytica.kafka.wsproxy.config.Configuration.ProducerSpecificLimitCfg
 import net.scalytica.kafka.wsproxy.models._
+
+import org.apache.pekko.actor.typed.ActorRef
 
 /**
  * Encapsulates the communication protocol to use with the [[SessionHandler]]

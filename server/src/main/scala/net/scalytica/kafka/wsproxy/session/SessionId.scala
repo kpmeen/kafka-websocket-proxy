@@ -1,6 +1,8 @@
 package net.scalytica.kafka.wsproxy.session
 
-import net.scalytica.kafka.wsproxy.models.{WsClientId, WsGroupId, WsProducerId}
+import net.scalytica.kafka.wsproxy.models.WsClientId
+import net.scalytica.kafka.wsproxy.models.WsGroupId
+import net.scalytica.kafka.wsproxy.models.WsProducerId
 
 case class SessionId(value: String)
 

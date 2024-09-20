@@ -1,5 +1,19 @@
 package net.scalytica.kafka.wsproxy.web
 
+import scala.concurrent.duration._
+import scala.util.Failure
+import scala.util.Success
+import scala.util.Try
+
+import net.scalytica.kafka.wsproxy.errors._
+import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
+import net.scalytica.kafka.wsproxy.models._
+import net.scalytica.kafka.wsproxy.session.SessionHandlerImplicits._
+import net.scalytica.kafka.wsproxy.session.SessionHandlerProtocol
+import net.scalytica.kafka.wsproxy.session.SessionId
+import net.scalytica.kafka.wsproxy.session.SessionOpResult
+
+import org.apache.kafka.common.KafkaException
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.scaladsl.adapter._
 import org.apache.pekko.http.scaladsl.marshalling.ToResponseMarshallable
@@ -9,19 +23,6 @@ import org.apache.pekko.http.scaladsl.server.Directives._
 import org.apache.pekko.http.scaladsl.server._
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.util.Timeout
-import net.scalytica.kafka.wsproxy.errors._
-import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
-import net.scalytica.kafka.wsproxy.models._
-import net.scalytica.kafka.wsproxy.session.SessionHandlerImplicits._
-import net.scalytica.kafka.wsproxy.session.{
-  SessionHandlerProtocol,
-  SessionId,
-  SessionOpResult
-}
-import org.apache.kafka.common.KafkaException
-
-import scala.concurrent.duration._
-import scala.util.{Failure, Success, Try}
 
 trait RouteFailureHandlers extends QueryParamParsers with WithProxyLogger {
   self: RoutesPrereqs =>
@@ -117,24 +118,24 @@ trait RouteFailureHandlers extends QueryParamParsers with WithProxyLogger {
         }
 
       case r: RequestValidationError =>
-        log.info(s"Request failed with RequestValidationError", r)
+        log.info("Request failed with RequestValidationError", r)
         val msg = jsonResponseMsg(BadRequest, r.msg)
         rejectAndComplete(msg)(cleanupClient)
 
       case i: InvalidPublicKeyError =>
-        log.warn(s"Request failed with an InvalidPublicKeyError.", i)
+        log.warn("Request failed with an InvalidPublicKeyError.", i)
         notAuthenticatedRejection(i, Unauthorized)
 
       case i: InvalidTokenError =>
-        log.warn(s"Request failed with an InvalidTokenError.", i)
+        log.warn("Request failed with an InvalidTokenError.", i)
         invalidTokenRejection(i)
 
       case a: AuthenticationError =>
-        log.warn(s"Request failed with an AuthenticationError.", a)
+        log.warn("Request failed with an AuthenticationError.", a)
         notAuthenticatedRejection(a, Unauthorized)
 
       case a: AuthorisationError =>
-        log.warn(s"Request failed with an AuthorizationError.", a)
+        log.warn("Request failed with an AuthorizationError.", a)
         notAuthenticatedRejection(a, Forbidden)
 
       case o: OpenIdConnectError =>

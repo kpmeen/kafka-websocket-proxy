@@ -1,18 +1,20 @@
 package net.scalytica.kafka.wsproxy.web
 
+import scala.util.Try
+
+import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.config.Configuration.ProducerCfg
+import net.scalytica.kafka.wsproxy.errors.RequestValidationError
+import net.scalytica.kafka.wsproxy.models.Formats._
+import net.scalytica.kafka.wsproxy.models._
+import net.scalytica.kafka.wsproxy.session.SessionId
+import net.scalytica.kafka.wsproxy.web.SocketProtocol._
+
+import org.apache.kafka.clients.consumer.OffsetResetStrategy
 import org.apache.pekko.http.scaladsl.model.HttpRequest
 import org.apache.pekko.http.scaladsl.server.Directives._
 import org.apache.pekko.http.scaladsl.server._
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshaller
-import net.scalytica.kafka.wsproxy.config.Configuration.{AppCfg, ProducerCfg}
-import net.scalytica.kafka.wsproxy.errors.RequestValidationError
-import net.scalytica.kafka.wsproxy.web.SocketProtocol._
-import net.scalytica.kafka.wsproxy.models.Formats._
-import net.scalytica.kafka.wsproxy.models._
-import net.scalytica.kafka.wsproxy.session.SessionId
-import org.apache.kafka.clients.consumer.OffsetResetStrategy
-
-import scala.util.Try
 
 trait ParamUnmarshallers {
   implicit val clientIdUnmarshaller: Unmarshaller[String, WsClientId] =

@@ -1,8 +1,9 @@
 package net.scalytica.kafka.wsproxy.models
 
-import org.apache.pekko.kafka.ProducerMessage
 import net.scalytica.kafka.wsproxy.errors.ImpossibleError
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
+
+import org.apache.pekko.kafka.ProducerMessage
 
 /**
  * Type that wraps metadata about messages committed to Kafka.

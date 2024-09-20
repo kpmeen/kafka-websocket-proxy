@@ -1,6 +1,7 @@
 package net.scalytica.kafka.wsproxy.config
 
-import org.apache.pekko.actor.typed.{ActorRef, ActorSystem}
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.ActorSystem
 import org.apache.pekko.kafka.scaladsl.Consumer
 import org.apache.pekko.stream.scaladsl.RunnableGraph
 

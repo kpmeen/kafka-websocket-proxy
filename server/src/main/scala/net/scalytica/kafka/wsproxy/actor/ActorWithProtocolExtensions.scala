@@ -1,13 +1,17 @@
 package net.scalytica.kafka.wsproxy.actor
 
-import org.apache.pekko.actor.typed.{ActorRef, Scheduler}
-import org.apache.pekko.actor.typed.scaladsl.AskPattern._
-import org.apache.pekko.util.Timeout
+import java.util.concurrent.TimeoutException
+
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
+
 import net.scalytica.kafka.wsproxy._
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 
-import java.util.concurrent.TimeoutException
-import scala.concurrent.{ExecutionContext, Future}
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.Scheduler
+import org.apache.pekko.actor.typed.scaladsl.AskPattern._
+import org.apache.pekko.util.Timeout
 
 trait ActorWithProtocolExtensions[Proto, Res] extends WithProxyLogger {
   val ref: ActorRef[Proto]

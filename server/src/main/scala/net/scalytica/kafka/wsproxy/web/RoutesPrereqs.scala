@@ -1,13 +1,12 @@
 package net.scalytica.kafka.wsproxy.web
 
-import org.apache.pekko.http.scaladsl.model.{
-  ContentTypes,
-  HttpEntity,
-  HttpResponse,
-  StatusCode
-}
-import io.circe.Json
 import net.scalytica.kafka.wsproxy.models.WsServerId
+
+import io.circe.Json
+import org.apache.pekko.http.scaladsl.model.ContentTypes
+import org.apache.pekko.http.scaladsl.model.HttpEntity
+import org.apache.pekko.http.scaladsl.model.HttpResponse
+import org.apache.pekko.http.scaladsl.model.StatusCode
 
 trait RoutesPrereqs {
   protected val serverId: WsServerId

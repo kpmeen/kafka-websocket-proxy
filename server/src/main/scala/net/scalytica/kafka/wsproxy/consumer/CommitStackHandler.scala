@@ -1,12 +1,15 @@
 package net.scalytica.kafka.wsproxy.consumer
 
-import org.apache.pekko.actor.typed.scaladsl.Behaviors
-import org.apache.pekko.actor.typed.{ActorRef, Behavior}
-import org.apache.pekko.kafka.CommitterSettings
-import org.apache.pekko.stream.Materializer
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.consumer.CommitStackTypes._
-import net.scalytica.kafka.wsproxy.models.{WsCommit, WsConsumerRecord}
+import net.scalytica.kafka.wsproxy.models.WsCommit
+import net.scalytica.kafka.wsproxy.models.WsConsumerRecord
+
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.kafka.CommitterSettings
+import org.apache.pekko.stream.Materializer
 
 object CommitStackHandler {
 
@@ -68,7 +71,7 @@ object CommitStackHandler {
           Behaviors.same
 
         case Stop =>
-          ctx.log.debug(s"Received stop message")
+          ctx.log.debug("Received stop message")
           Behaviors.stopped
 
         case Terminate(cause) =>

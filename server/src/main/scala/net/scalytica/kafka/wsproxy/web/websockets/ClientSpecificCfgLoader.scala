@@ -1,20 +1,20 @@
 package net.scalytica.kafka.wsproxy.web.websockets
 
-import org.apache.pekko.actor.typed.Scheduler
-import org.apache.pekko.util.Timeout
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
+import scala.concurrent.duration._
+
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.config.DynamicConfigHandlerImplicits._
 import net.scalytica.kafka.wsproxy.config.ReadableDynamicConfigHandlerRef
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
-import net.scalytica.kafka.wsproxy.models.{
-  InSocketArgs,
-  OutSocketArgs,
-  SocketArgs
-}
+import net.scalytica.kafka.wsproxy.models.InSocketArgs
+import net.scalytica.kafka.wsproxy.models.OutSocketArgs
+import net.scalytica.kafka.wsproxy.models.SocketArgs
 import net.scalytica.kafka.wsproxy.utils.BlockingRetry
 
-import scala.concurrent.{ExecutionContext, Future}
-import scala.concurrent.duration._
+import org.apache.pekko.actor.typed.Scheduler
+import org.apache.pekko.util.Timeout
 
 trait ClientSpecificCfgLoader extends WithProxyLogger {
 

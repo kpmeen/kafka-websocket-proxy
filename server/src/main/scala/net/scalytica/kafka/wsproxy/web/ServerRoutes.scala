@@ -1,11 +1,7 @@
 package net.scalytica.kafka.wsproxy.web
 
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.actor.typed.ActorRef
-import org.apache.pekko.actor.typed.scaladsl.adapter._
-import org.apache.pekko.http.scaladsl.server.Directives._
-import org.apache.pekko.http.scaladsl.server._
-import org.apache.pekko.stream.Materializer
+import scala.concurrent.ExecutionContext
+
 import net.scalytica.kafka.wsproxy.auth.OpenIdClient
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.config.ReadableDynamicConfigHandlerRef
@@ -15,12 +11,15 @@ import net.scalytica.kafka.wsproxy.session.SessionHandlerImplicits._
 import net.scalytica.kafka.wsproxy.session.SessionHandlerProtocol._
 import net.scalytica.kafka.wsproxy.session.SessionHandlerRef
 import net.scalytica.kafka.wsproxy.web.admin.AdminRoutes
-import net.scalytica.kafka.wsproxy.web.websockets.{
-  InboundWebSocket,
-  OutboundWebSocket
-}
+import net.scalytica.kafka.wsproxy.web.websockets.InboundWebSocket
+import net.scalytica.kafka.wsproxy.web.websockets.OutboundWebSocket
 
-import scala.concurrent.ExecutionContext
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.scaladsl.adapter._
+import org.apache.pekko.http.scaladsl.server.Directives._
+import org.apache.pekko.http.scaladsl.server._
+import org.apache.pekko.stream.Materializer
 
 trait ServerRoutes
     extends BaseRoutes

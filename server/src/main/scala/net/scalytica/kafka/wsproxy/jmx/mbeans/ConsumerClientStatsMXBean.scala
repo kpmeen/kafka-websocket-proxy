@@ -1,13 +1,16 @@
 package net.scalytica.kafka.wsproxy.jmx.mbeans
 
-import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
-import org.apache.pekko.actor.typed.{ActorRef, Behavior}
+import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.duration._
+
 import net.scalytica.kafka.wsproxy.jmx.MXBeanActor
 import net.scalytica.kafka.wsproxy.jmx.mbeans.ConsumerClientStatsProtocol._
 import net.scalytica.kafka.wsproxy.models.FullConsumerId
 
-import scala.concurrent.ExecutionContextExecutor
-import scala.concurrent.duration._
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.scaladsl.ActorContext
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
 
 trait ConsumerClientStatsMXBean extends WsProxyJmxBean {
 

@@ -1,27 +1,17 @@
 package net.scalytica.kafka.wsproxy.web.websockets
 
-import io.circe.Decoder
-import org.apache.pekko.Done
-import org.apache.pekko.actor.{typed, ActorSystem}
-import org.apache.pekko.actor.typed.scaladsl.adapter._
-import org.apache.pekko.actor.typed.{ActorRef, Scheduler}
-import org.apache.pekko.http.scaladsl.model.ws.{Message, TextMessage}
-import org.apache.pekko.http.scaladsl.server.Directives._
-import org.apache.pekko.http.scaladsl.server.Route
-import org.apache.pekko.stream.Materializer
-import org.apache.pekko.stream.scaladsl.Flow
-import org.apache.pekko.util.Timeout
-import io.circe.Printer.noSpaces
-import io.circe.syntax._
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
+import scala.concurrent.duration._
+
 import net.scalytica.kafka.wsproxy._
-import net.scalytica.kafka.wsproxy.auth.{JwtValidationTickerFlow, OpenIdClient}
+import net.scalytica.kafka.wsproxy.auth.JwtValidationTickerFlow
+import net.scalytica.kafka.wsproxy.auth.OpenIdClient
 import net.scalytica.kafka.wsproxy.codecs.Encoders._
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.config.ReadableDynamicConfigHandlerRef
-import net.scalytica.kafka.wsproxy.errors.{
-  RequestValidationError,
-  UnexpectedError
-}
+import net.scalytica.kafka.wsproxy.errors.RequestValidationError
+import net.scalytica.kafka.wsproxy.errors.UnexpectedError
 import net.scalytica.kafka.wsproxy.jmx.JmxManager
 import net.scalytica.kafka.wsproxy.jmx.mbeans.ProducerClientStatsProtocol._
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
@@ -30,10 +20,24 @@ import net.scalytica.kafka.wsproxy.producer.WsProducer
 import net.scalytica.kafka.wsproxy.session.SessionHandlerImplicits._
 import net.scalytica.kafka.wsproxy.session._
 import net.scalytica.kafka.wsproxy.web.SocketProtocol.JsonPayload
-import org.apache.kafka.common.serialization.Serializer
 
-import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContext, Future}
+import io.circe.Decoder
+import io.circe.Printer.noSpaces
+import io.circe.syntax._
+import org.apache.kafka.common.serialization.Serializer
+import org.apache.pekko.Done
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.Scheduler
+import org.apache.pekko.actor.typed.scaladsl.adapter._
+import org.apache.pekko.http.scaladsl.model.ws.Message
+import org.apache.pekko.http.scaladsl.model.ws.TextMessage
+import org.apache.pekko.http.scaladsl.server.Directives._
+import org.apache.pekko.http.scaladsl.server.Route
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.Flow
+import org.apache.pekko.util.Timeout
 
 trait InboundWebSocket extends ClientSpecificCfgLoader with WithProxyLogger {
 
@@ -205,7 +209,7 @@ trait InboundWebSocket extends ClientSpecificCfgLoader with WithProxyLogger {
 
       case wrong =>
         log.error(
-          s"Adding producer failed with an unexpected state." +
+          "Adding producer failed with an unexpected state." +
             s" Session:\n ${wrong.session}"
         )
         throw UnexpectedError(

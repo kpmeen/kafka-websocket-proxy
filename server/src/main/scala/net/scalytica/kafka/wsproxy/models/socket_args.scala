@@ -1,9 +1,10 @@
 package net.scalytica.kafka.wsproxy.models
 
-import org.apache.pekko.http.scaladsl.model.headers.OAuth2BearerToken
 import net.scalytica.kafka.wsproxy.models.Formats.FormatType
 import net.scalytica.kafka.wsproxy.web.SocketProtocol.SocketPayload
+
 import org.apache.kafka.clients.consumer.OffsetResetStrategy
+import org.apache.pekko.http.scaladsl.model.headers.OAuth2BearerToken
 
 sealed trait SocketArgs {
   val topic: TopicName

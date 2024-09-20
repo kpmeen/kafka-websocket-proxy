@@ -1,13 +1,16 @@
 package net.scalytica.kafka.wsproxy.jmx
 
-import org.apache.pekko.actor.typed.scaladsl.{
-  AbstractBehavior,
-  ActorContext,
-  Behaviors
-}
-import org.apache.pekko.actor.typed.{Behavior, PostStop, PreRestart, Signal}
 import javax.management.ObjectName
+
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
+
+import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.PostStop
+import org.apache.pekko.actor.typed.PreRestart
+import org.apache.pekko.actor.typed.Signal
+import org.apache.pekko.actor.typed.scaladsl.AbstractBehavior
+import org.apache.pekko.actor.typed.scaladsl.ActorContext
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
 
 abstract class MXBeanActor[T](ctx: ActorContext[T])
     extends AbstractBehavior[T](ctx)

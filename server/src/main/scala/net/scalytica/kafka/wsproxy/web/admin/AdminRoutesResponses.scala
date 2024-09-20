@@ -1,21 +1,15 @@
 package net.scalytica.kafka.wsproxy.web.admin
 
-import net.scalytica.kafka.wsproxy.config.DynamicConfigHandlerProtocol.{
-  DynamicConfigOpResult,
-  IncompleteOp
-}
+import net.scalytica.kafka.wsproxy.config.DynamicConfigHandlerProtocol._
 import net.scalytica.kafka.wsproxy.web.BaseRoutes
+
 import org.apache.pekko.http.scaladsl.model.ContentTypes.`application/json`
-import org.apache.pekko.http.scaladsl.model.{
-  HttpEntity,
-  HttpResponse,
-  StatusCode
-}
-import org.apache.pekko.http.scaladsl.model.StatusCodes.{
-  BadRequest,
-  InternalServerError,
-  OK
-}
+import org.apache.pekko.http.scaladsl.model.HttpEntity
+import org.apache.pekko.http.scaladsl.model.HttpResponse
+import org.apache.pekko.http.scaladsl.model.StatusCode
+import org.apache.pekko.http.scaladsl.model.StatusCodes.BadRequest
+import org.apache.pekko.http.scaladsl.model.StatusCodes.InternalServerError
+import org.apache.pekko.http.scaladsl.model.StatusCodes.OK
 
 /**
  * Response definitions to be used by the endpoints defined in [[AdminRoutes]]

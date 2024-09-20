@@ -1,7 +1,9 @@
 package net.scalytica.kafka.wsproxy
 
 import javax.management.ObjectName
-import net.scalytica.kafka.wsproxy.models.{FullConsumerId, FullProducerId}
+
+import net.scalytica.kafka.wsproxy.models.FullConsumerId
+import net.scalytica.kafka.wsproxy.models.FullProducerId
 
 package object jmx {
 

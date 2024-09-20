@@ -1,12 +1,12 @@
 package net.scalytica.kafka.wsproxy.session
 
+import net.scalytica.kafka.wsproxy.config.Configuration.ClientSpecificLimitCfg
+import net.scalytica.kafka.wsproxy.config.Configuration.ConsumerSpecificLimitCfg
+import net.scalytica.kafka.wsproxy.config.Configuration.ProducerSpecificLimitCfg
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
-import net.scalytica.kafka.wsproxy.config.Configuration.{
-  ClientSpecificLimitCfg,
-  ConsumerSpecificLimitCfg,
-  ProducerSpecificLimitCfg
-}
-import net.scalytica.kafka.wsproxy.models.{FullClientId, WsGroupId, WsServerId}
+import net.scalytica.kafka.wsproxy.models.FullClientId
+import net.scalytica.kafka.wsproxy.models.WsGroupId
+import net.scalytica.kafka.wsproxy.models.WsServerId
 
 /**
  * Defines the common attributes and functions for session data used to keep
