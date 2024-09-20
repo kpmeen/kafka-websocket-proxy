@@ -1,23 +1,20 @@
 package net.scalytica.kafka.wsproxy.producer
 
+import scala.annotation.unused
+import scala.util.Failure
+import scala.util.Success
+import scala.util.Try
+import scala.util.control.NonFatal
+
+import net.scalytica.kafka.wsproxy.utils.JavaDurationConverters._
+
+import org.apache.kafka.clients.producer.Producer
+import org.apache.kafka.clients.producer.ProducerConfig._
 import org.apache.pekko.Done
 import org.apache.pekko.kafka.ProducerMessage._
 import org.apache.pekko.kafka.ProducerSettings
-import org.apache.pekko.stream.stage._
 import org.apache.pekko.stream._
-
-import scala.annotation.unused
-import net.scalytica.kafka.wsproxy.utils.JavaDurationConverters._
-import org.apache.kafka.clients.producer.ProducerConfig.{
-  ACKS_CONFIG,
-  ENABLE_IDEMPOTENCE_CONFIG,
-  MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION,
-  TRANSACTIONAL_ID_CONFIG
-}
-import org.apache.kafka.clients.producer.Producer
-
-import scala.util.control.NonFatal
-import scala.util.{Failure, Success, Try}
+import org.apache.pekko.stream.stage._
 
 final private[producer] class WsTransactionalProducerStage[K, V, P](
     val settings: ProducerSettings[K, V]
@@ -157,7 +154,7 @@ private class WsTransactionalProducerStageLogic[K, V, P](
   }
 
   private[this] lazy val abortMsgTemplate =
-    s"Aborting because of an error when processing transaction for {} {}. {}."
+    "Aborting because of an error when processing transaction for {} {}. {}."
 
   private def produceInTransaction(produce: => Unit): Unit = {
     try {

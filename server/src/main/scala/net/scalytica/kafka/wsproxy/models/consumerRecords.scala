@@ -1,7 +1,8 @@
 package net.scalytica.kafka.wsproxy.models
 
-import org.apache.pekko.kafka.ConsumerMessage
 import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails
+
+import org.apache.pekko.kafka.ConsumerMessage
 
 /**
  * ADT describing any record that can be sent out from the service through the

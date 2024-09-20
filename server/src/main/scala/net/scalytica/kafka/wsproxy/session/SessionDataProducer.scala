@@ -1,17 +1,21 @@
 package net.scalytica.kafka.wsproxy.session
 
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
+import scala.util.Failure
+import scala.util.Success
+
+import net.scalytica.kafka.wsproxy._
+import net.scalytica.kafka.wsproxy.codecs.BasicSerdes
+import net.scalytica.kafka.wsproxy.codecs.SessionSerde
+import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
+
+import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.pekko.Done
 import org.apache.pekko.actor.typed.ActorSystem
 import org.apache.pekko.actor.typed.scaladsl.adapter._
 import org.apache.pekko.kafka.ProducerSettings
-import net.scalytica.kafka.wsproxy._
-import net.scalytica.kafka.wsproxy.codecs.{BasicSerdes, SessionSerde}
-import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
-import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
-import org.apache.kafka.clients.producer.ProducerRecord
-
-import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success}
 
 private[session] class SessionDataProducer(
     implicit cfg: AppCfg,

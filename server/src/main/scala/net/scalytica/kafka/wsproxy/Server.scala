@@ -1,42 +1,42 @@
 package net.scalytica.kafka.wsproxy
 
+import scala.concurrent.Await
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
+import scala.concurrent.duration._
+
+import net.scalytica.kafka.wsproxy.auth.OpenIdClient
+import net.scalytica.kafka.wsproxy.config.Configuration
+import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.config.Configuration.OpenIdConnectCfg
+import net.scalytica.kafka.wsproxy.config.DynamicConfigHandler
+import net.scalytica.kafka.wsproxy.config.DynamicConfigHandlerImplicits._
+import net.scalytica.kafka.wsproxy.config.ReadableDynamicConfigHandlerRef
+import net.scalytica.kafka.wsproxy.config.RunnableDynamicConfigHandlerRef
+import net.scalytica.kafka.wsproxy.jmx.JmxManager
+import net.scalytica.kafka.wsproxy.jmx.WsProxyJmxRegistrar
+import net.scalytica.kafka.wsproxy.logging.DefaultProxyLogger._
+import net.scalytica.kafka.wsproxy.logging.WsProxyEnvLoggerConfigurator
+import net.scalytica.kafka.wsproxy.session.SessionHandler
+import net.scalytica.kafka.wsproxy.session.SessionHandlerImplicits._
+import net.scalytica.kafka.wsproxy.session.SessionHandlerRef
+import net.scalytica.kafka.wsproxy.utils.HostResolver
+import net.scalytica.kafka.wsproxy.utils.HostResolver.HostResolutionError
+import net.scalytica.kafka.wsproxy.utils.HostResolver.resolveKafkaBootstrapHosts
+import net.scalytica.kafka.wsproxy.web.ServerBindings
+import net.scalytica.kafka.wsproxy.web.ServerRoutes
+
 import org.apache.pekko.Done
 import org.apache.pekko.actor.CoordinatedShutdown
 import org.apache.pekko.actor.CoordinatedShutdown._
+import org.apache.pekko.actor.typed.Scheduler
 import org.apache.pekko.actor.typed.scaladsl.adapter._
 import org.apache.pekko.http.scaladsl.Http
-import org.apache.pekko.stream.Materializer
-import org.apache.pekko.util.Timeout
-import net.scalytica.kafka.wsproxy.auth.OpenIdClient
-import net.scalytica.kafka.wsproxy.config.Configuration.{
-  AppCfg,
-  OpenIdConnectCfg
-}
-import net.scalytica.kafka.wsproxy.config.DynamicConfigHandlerImplicits._
-import net.scalytica.kafka.wsproxy.config.{
-  Configuration,
-  DynamicConfigHandler,
-  ReadableDynamicConfigHandlerRef,
-  RunnableDynamicConfigHandlerRef
-}
-import net.scalytica.kafka.wsproxy.jmx.{JmxManager, WsProxyJmxRegistrar}
-import net.scalytica.kafka.wsproxy.logging.DefaultProxyLogger._
-import net.scalytica.kafka.wsproxy.logging.WsProxyEnvLoggerConfigurator
-import net.scalytica.kafka.wsproxy.session.{SessionHandler, SessionHandlerRef}
-import net.scalytica.kafka.wsproxy.session.SessionHandlerImplicits._
-import net.scalytica.kafka.wsproxy.utils.HostResolver
-import net.scalytica.kafka.wsproxy.utils.HostResolver.{
-  resolveKafkaBootstrapHosts,
-  HostResolutionError
-}
-import net.scalytica.kafka.wsproxy.web.{ServerBindings, ServerRoutes}
-import org.apache.pekko.actor.typed.Scheduler
 import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.kafka.scaladsl.Consumer
+import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.RunnableGraph
-
-import scala.concurrent.duration._
-import scala.concurrent.{Await, ExecutionContext, Future}
+import org.apache.pekko.util.Timeout
 
 object Server extends App with ServerRoutes with ServerBindings {
 

@@ -1,20 +1,19 @@
 package net.scalytica.kafka.wsproxy.web.admin
 
-import org.apache.pekko.http.scaladsl.server.Directives._
-import org.apache.pekko.http.scaladsl.server._
-import org.apache.pekko.stream.Materializer
-import io.circe.parser._
 import net.scalytica.kafka.wsproxy.auth.OpenIdClient
 import net.scalytica.kafka.wsproxy.codecs.Decoders._
 import net.scalytica.kafka.wsproxy.config.Configuration._
 import net.scalytica.kafka.wsproxy.config.RunnableDynamicConfigHandlerRef
 import net.scalytica.kafka.wsproxy.models._
+import net.scalytica.kafka.wsproxy.session.SessionHandlerProtocol._
 import net.scalytica.kafka.wsproxy.session.SessionHandlerRef
 import net.scalytica.kafka.wsproxy.web.BaseRoutes
-// scalastyle:off line.size.limit
-import net.scalytica.kafka.wsproxy.session.SessionHandlerProtocol.SessionProtocol
-// scalastyle:on line.size.limit
+
+import io.circe.parser._
 import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.http.scaladsl.server.Directives._
+import org.apache.pekko.http.scaladsl.server._
+import org.apache.pekko.stream.Materializer
 
 /** Administrative endpoints */
 trait AdminRoutes extends AdminRoutesOps { self: BaseRoutes =>

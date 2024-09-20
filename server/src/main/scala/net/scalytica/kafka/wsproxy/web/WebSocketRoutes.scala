@@ -1,14 +1,17 @@
 package net.scalytica.kafka.wsproxy.web
 
-import org.apache.pekko.http.scaladsl.server.Directives._
-import org.apache.pekko.http.scaladsl.server._
+import scala.util.Failure
+import scala.util.Success
+import scala.util.Try
+
 import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
 import net.scalytica.kafka.wsproxy.auth.OpenIdClient
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.models._
 import net.scalytica.kafka.wsproxy.web.Headers.XKafkaAuthHeader
 
-import scala.util.{Failure, Success, Try}
+import org.apache.pekko.http.scaladsl.server.Directives._
+import org.apache.pekko.http.scaladsl.server._
 
 trait WebSocketRoutes { self: BaseRoutes =>
 

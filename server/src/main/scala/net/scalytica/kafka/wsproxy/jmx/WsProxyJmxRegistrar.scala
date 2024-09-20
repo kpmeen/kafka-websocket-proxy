@@ -1,19 +1,19 @@
 package net.scalytica.kafka.wsproxy.jmx
 
 import java.lang.management.ManagementFactory
-import org.apache.pekko.actor.typed.Behavior
-
 import javax.management._
-import net.scalytica.kafka.wsproxy.jmx.mbeans.{
-  ConsumerClientStatsMXBean,
-  ProducerClientStatsMXBean
-}
-import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
-import net.scalytica.kafka.wsproxy.models.{FullConsumerId, FullProducerId}
 
 import scala.jdk.CollectionConverters._
 import scala.reflect.ClassTag
 import scala.util.Try
+
+import net.scalytica.kafka.wsproxy.jmx.mbeans.ConsumerClientStatsMXBean
+import net.scalytica.kafka.wsproxy.jmx.mbeans.ProducerClientStatsMXBean
+import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
+import net.scalytica.kafka.wsproxy.models.FullConsumerId
+import net.scalytica.kafka.wsproxy.models.FullProducerId
+
+import org.apache.pekko.actor.typed.Behavior
 
 trait WsProxyJmxQueries extends WithProxyLogger {
   protected lazy val mbs: MBeanServer = ManagementFactory.getPlatformMBeanServer
@@ -37,7 +37,7 @@ trait WsProxyJmxQueries extends WithProxyLogger {
     val res: Set[ObjectName] =
       Try(mbs.queryNames(on, null)) // scalastyle:ignore
         .recoverWith { case t: Throwable =>
-          log.info(s"Error trying to fetch name of MBeans", t)
+          log.info("Error trying to fetch name of MBeans", t)
           throw t
         }
         .toOption
@@ -155,7 +155,7 @@ object WsProxyJmxRegistrar extends WsProxyJmxQueries {
   @throws[RuntimeMBeanException]
   @throws[RuntimeErrorException]
   def unregisterAllWsProxyMBeans(): Unit = {
-    log.debug(s"Unregistering all MBeans for Kafka WebSocket Proxy")
+    log.debug("Unregistering all MBeans for Kafka WebSocket Proxy")
     allWSProxyMBeanNames.foreach(unregisterFromMBeanServer)
   }
 

@@ -1,10 +1,9 @@
 package net.scalytica.kafka.wsproxy.web
 
-import org.apache.pekko.http.scaladsl.model.headers.OAuth2BearerToken
-import org.apache.pekko.http.scaladsl.server.Directives._
-import org.apache.pekko.http.scaladsl.server._
-import org.apache.pekko.http.scaladsl.server.directives.Credentials
-import org.apache.pekko.stream.Materializer
+import scala.concurrent.Future
+import scala.util.Failure
+import scala.util.Success
+
 import net.scalytica.kafka.wsproxy.auth.OpenIdClient
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.errors._
@@ -12,8 +11,11 @@ import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models._
 import net.scalytica.kafka.wsproxy.web.Headers.XKafkaAuthHeader
 
-import scala.concurrent.Future
-import scala.util.{Failure, Success}
+import org.apache.pekko.http.scaladsl.model.headers.OAuth2BearerToken
+import org.apache.pekko.http.scaladsl.server.Directives._
+import org.apache.pekko.http.scaladsl.server._
+import org.apache.pekko.http.scaladsl.server.directives.Credentials
+import org.apache.pekko.stream.Materializer
 
 /**
  * The base routing implementation. Defines authentication, error and rejection
@@ -35,7 +37,7 @@ trait BaseRoutes
           authRes.aclCredentials
         } else {
           log.trace(
-            s"Allowing Kafka auth through JWT token or the" +
+            "Allowing Kafka auth through JWT token or the" +
               s" ${Headers.KafkaAuthHeaderName} header."
           )
           // Always prefer the JWT token

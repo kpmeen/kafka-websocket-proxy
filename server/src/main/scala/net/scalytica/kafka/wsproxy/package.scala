@@ -1,24 +1,21 @@
 package net.scalytica.kafka
 
-import org.apache.pekko.util.ByteString
-import com.typesafe.scalalogging.Logger
-import io.confluent.monitoring.clients.interceptor.{
-  MonitoringConsumerInterceptor,
-  MonitoringProducerInterceptor
-}
-import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
-
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.CompletableFuture
 import java.util.{Properties => JProps}
-import scala.util.Try
-// scalastyle:off
-import org.apache.kafka.clients.consumer.ConsumerConfig.INTERCEPTOR_CLASSES_CONFIG
-// scalastyle:on
 
+import scala.concurrent.Future
 import scala.jdk.FunctionConverters
 import scala.jdk.FutureConverters._
-import scala.concurrent.Future
+import scala.util.Try
+
+import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
+
+import com.typesafe.scalalogging.Logger
+import io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor
+import io.confluent.monitoring.clients.interceptor.MonitoringProducerInterceptor
+import org.apache.kafka.clients.consumer.ConsumerConfig._
+import org.apache.pekko.util.ByteString
 
 package object wsproxy {
 

@@ -1,5 +1,6 @@
 import sbt._
 
+//noinspection TypeAnnotation
 object Versions {
 
   val ScalaVersion = "2.13.14"

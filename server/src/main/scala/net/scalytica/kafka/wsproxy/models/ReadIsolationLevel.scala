@@ -1,8 +1,8 @@
 package net.scalytica.kafka.wsproxy.models
 
-import org.apache.kafka.common.IsolationLevel
-
 import java.util.Locale
+
+import org.apache.kafka.common.IsolationLevel
 
 sealed trait ReadIsolationLevel {
   protected val level: IsolationLevel

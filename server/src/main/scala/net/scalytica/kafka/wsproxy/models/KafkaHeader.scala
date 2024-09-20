@@ -2,10 +2,10 @@ package net.scalytica.kafka.wsproxy.models
 
 import java.nio.charset.StandardCharsets
 
+import scala.jdk.CollectionConverters._
+
 import org.apache.kafka.common.header.Headers
 import org.apache.kafka.common.header.internals.RecordHeader
-
-import scala.jdk.CollectionConverters._
 
 case class KafkaHeader(key: String, value: String) {
 

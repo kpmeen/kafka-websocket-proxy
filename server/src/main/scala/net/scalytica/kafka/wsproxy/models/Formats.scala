@@ -1,9 +1,14 @@
 package net.scalytica.kafka.wsproxy.models
 
-import io.circe.{Decoder, Encoder, Json}
+import net.scalytica.kafka.wsproxy.NiceClassNameExtensions
+import net.scalytica.kafka.wsproxy.StringExtensions
 import net.scalytica.kafka.wsproxy.codecs.BasicSerdes
-import net.scalytica.kafka.wsproxy.{NiceClassNameExtensions, StringExtensions}
-import org.apache.kafka.common.serialization.{Deserializer, Serializer}
+
+import io.circe.Decoder
+import io.circe.Encoder
+import io.circe.Json
+import org.apache.kafka.common.serialization.Deserializer
+import org.apache.kafka.common.serialization.Serializer
 
 object Formats {
 

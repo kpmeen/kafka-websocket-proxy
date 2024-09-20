@@ -1,22 +1,19 @@
 package net.scalytica.kafka.wsproxy.codecs
 
-import io.circe.parser.parse
-import io.circe.syntax._
-import net.scalytica.kafka.wsproxy.codecs.Implicits.{
-  oldSessionDecoder,
-  sessionDecoder,
-  sessionEncoder
-}
+import net.scalytica.kafka.wsproxy.codecs.Implicits.oldSessionDecoder
+import net.scalytica.kafka.wsproxy.codecs.Implicits.sessionDecoder
+import net.scalytica.kafka.wsproxy.codecs.Implicits.sessionEncoder
 import net.scalytica.kafka.wsproxy.errors.InvalidSessionStateFormat
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models.FullConsumerId
-import net.scalytica.kafka.wsproxy.session.{
-  ConsumerInstance,
-  ConsumerSession,
-  OldSession,
-  Session,
-  SessionId
-}
+import net.scalytica.kafka.wsproxy.session.ConsumerInstance
+import net.scalytica.kafka.wsproxy.session.ConsumerSession
+import net.scalytica.kafka.wsproxy.session.OldSession
+import net.scalytica.kafka.wsproxy.session.Session
+import net.scalytica.kafka.wsproxy.session.SessionId
+
+import io.circe.parser.parse
+import io.circe.syntax._
 
 class SessionSerde extends StringBasedSerde[Session] with WithProxyLogger {
 

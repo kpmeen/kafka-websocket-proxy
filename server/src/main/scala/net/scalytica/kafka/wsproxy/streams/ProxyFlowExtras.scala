@@ -1,18 +1,18 @@
 package net.scalytica.kafka.wsproxy.streams
 
-import org.apache.pekko.NotUsed
-import org.apache.pekko.http.scaladsl.model.ws.{
-  BinaryMessage,
-  Message,
-  TextMessage
-}
-import org.apache.pekko.stream.Materializer
-import org.apache.pekko.stream.scaladsl.{Flow, Sink}
-import org.apache.pekko.util.ByteString
-import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
-
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
+
+import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
+
+import org.apache.pekko.NotUsed
+import org.apache.pekko.http.scaladsl.model.ws.BinaryMessage
+import org.apache.pekko.http.scaladsl.model.ws.Message
+import org.apache.pekko.http.scaladsl.model.ws.TextMessage
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.Flow
+import org.apache.pekko.stream.scaladsl.Sink
+import org.apache.pekko.util.ByteString
 
 trait ProxyFlowExtras { self: WithProxyLogger =>
 

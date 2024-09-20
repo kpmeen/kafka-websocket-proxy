@@ -1,20 +1,21 @@
 package net.scalytica.kafka.wsproxy.codecs
 
+import scala.annotation.nowarn
+import scala.util.Failure
+import scala.util.Success
+import scala.util.Try
+
+import net.scalytica.kafka.wsproxy.config.Configuration._
+import net.scalytica.kafka.wsproxy.models.Formats._
+import net.scalytica.kafka.wsproxy.models.ValueDetails.InValueDetails
+import net.scalytica.kafka.wsproxy.models.ValueDetails.OutValueDetails
+import net.scalytica.kafka.wsproxy.models._
+import net.scalytica.kafka.wsproxy.session._
+
 import io.circe.Decoder.Result
 import io.circe._
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.semiauto._
-import net.scalytica.kafka.wsproxy.config.Configuration._
-import net.scalytica.kafka.wsproxy.models.Formats._
-import net.scalytica.kafka.wsproxy.models.ValueDetails.{
-  InValueDetails,
-  OutValueDetails
-}
-import net.scalytica.kafka.wsproxy.models._
-import net.scalytica.kafka.wsproxy.session._
-
-import scala.annotation.nowarn
-import scala.util.{Failure, Success, Try}
 
 trait Decoders {
 

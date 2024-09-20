@@ -1,9 +1,12 @@
 package net.scalytica.kafka.wsproxy.jmx.mbeans
 
-import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
-import org.apache.pekko.actor.typed.{ActorRef, Behavior}
 import net.scalytica.kafka.wsproxy.jmx.MXBeanActor
 import net.scalytica.kafka.wsproxy.jmx.mbeans.ConnectionsStatsProtocol._
+
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.scaladsl.ActorContext
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
 
 trait ConnectionsStatsMXBean extends WsProxyJmxBean {
 

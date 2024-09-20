@@ -1,18 +1,23 @@
 package net.scalytica.kafka.wsproxy.session
 
-import org.apache.pekko.Done
-import org.apache.pekko.actor.typed.scaladsl.Behaviors
-import org.apache.pekko.actor.typed.scaladsl.adapter._
-import org.apache.pekko.actor.typed.{ActorSystem, Behavior}
-import org.apache.pekko.kafka.scaladsl.Consumer
-import org.apache.pekko.stream.scaladsl.{RunnableGraph, Sink}
+import scala.concurrent.ExecutionContext
+import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.Future
+
 import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models.FullClientId
 import net.scalytica.kafka.wsproxy.session.SessionHandlerProtocol._
 
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
+import org.apache.pekko.Done
+import org.apache.pekko.actor.typed.ActorSystem
+import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.actor.typed.scaladsl.adapter._
+import org.apache.pekko.kafka.scaladsl.Consumer
+import org.apache.pekko.stream.scaladsl.RunnableGraph
+import org.apache.pekko.stream.scaladsl.Sink
 
 object SessionHandler extends SessionHandler
 

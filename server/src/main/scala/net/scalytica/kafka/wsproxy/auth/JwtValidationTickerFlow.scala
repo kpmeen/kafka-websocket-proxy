@@ -1,18 +1,23 @@
 package net.scalytica.kafka.wsproxy.auth
 
-import org.apache.pekko.NotUsed
-import org.apache.pekko.http.scaladsl.model.headers.OAuth2BearerToken
-import org.apache.pekko.stream.scaladsl.Flow
-import org.apache.pekko.stream.stage._
-import org.apache.pekko.stream.{Attributes, FlowShape, Inlet, Outlet}
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
+import scala.concurrent.duration._
+
 import net.scalytica.kafka.wsproxy.auth.JwtValidationTickerFlow._
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.errors.OpenIdConnectError
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models.WsIdentifier
 
-import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContext, Future}
+import org.apache.pekko.NotUsed
+import org.apache.pekko.http.scaladsl.model.headers.OAuth2BearerToken
+import org.apache.pekko.stream.Attributes
+import org.apache.pekko.stream.FlowShape
+import org.apache.pekko.stream.Inlet
+import org.apache.pekko.stream.Outlet
+import org.apache.pekko.stream.scaladsl.Flow
+import org.apache.pekko.stream.stage._
 
 /**
  * The JwtValidationTickerFlow is intended to be plugged into an pekko-http

@@ -1,51 +1,58 @@
 package net.scalytica.kafka.wsproxy.web.websockets
 
-import org.apache.pekko.actor.{typed, ActorSystem}
-import org.apache.pekko.actor.typed.scaladsl.adapter._
-import org.apache.pekko.actor.typed.{ActorRef, Scheduler}
-import org.apache.pekko.http.scaladsl.model.ws.{Message, TextMessage}
-import org.apache.pekko.http.scaladsl.server.Directives._
-import org.apache.pekko.http.scaladsl.server.Route
-import org.apache.pekko.kafka.scaladsl.Consumer
-import org.apache.pekko.stream._
-import org.apache.pekko.stream.scaladsl.{Flow, Keep, Sink, Source}
-import org.apache.pekko.stream.typed.scaladsl.ActorSink
-import org.apache.pekko.util.Timeout
-import org.apache.pekko.{Done, NotUsed}
-import io.circe.Encoder
-import io.circe.Printer.noSpaces
-import io.circe.parser.parse
-import io.circe.syntax._
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
+import scala.concurrent.duration._
+
 import net.scalytica.kafka.wsproxy._
 import net.scalytica.kafka.wsproxy.admin.WsKafkaAdminClient
-import net.scalytica.kafka.wsproxy.auth.{JwtValidationTickerFlow, OpenIdClient}
+import net.scalytica.kafka.wsproxy.auth.JwtValidationTickerFlow
+import net.scalytica.kafka.wsproxy.auth.OpenIdClient
 import net.scalytica.kafka.wsproxy.codecs.Decoders._
 import net.scalytica.kafka.wsproxy.codecs.Encoders._
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.config.ReadableDynamicConfigHandlerRef
-import net.scalytica.kafka.wsproxy.consumer.{CommitStackHandler, WsConsumer}
-import net.scalytica.kafka.wsproxy.errors.{
-  RequestValidationError,
-  UnexpectedError
-}
+import net.scalytica.kafka.wsproxy.consumer.CommitStackHandler
+import net.scalytica.kafka.wsproxy.consumer.WsConsumer
+import net.scalytica.kafka.wsproxy.errors.RequestValidationError
+import net.scalytica.kafka.wsproxy.errors.UnexpectedError
 import net.scalytica.kafka.wsproxy.jmx.JmxManager
 import net.scalytica.kafka.wsproxy.jmx.mbeans.ConsumerClientStatsProtocol._
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
 import net.scalytica.kafka.wsproxy.models._
+import net.scalytica.kafka.wsproxy.session.InstanceAdded
+import net.scalytica.kafka.wsproxy.session.InstanceExists
+import net.scalytica.kafka.wsproxy.session.InstanceLimitReached
 import net.scalytica.kafka.wsproxy.session.SessionHandlerImplicits._
-import net.scalytica.kafka.wsproxy.session.{
-  InstanceAdded,
-  InstanceExists,
-  InstanceLimitReached,
-  SessionHandlerProtocol,
-  SessionNotFound
-}
+import net.scalytica.kafka.wsproxy.session.SessionHandlerProtocol
+import net.scalytica.kafka.wsproxy.session.SessionNotFound
 import net.scalytica.kafka.wsproxy.streams.ProxyFlowExtras
 import net.scalytica.kafka.wsproxy.web.SocketProtocol.JsonPayload
-import org.apache.kafka.common.serialization.Deserializer
 
-import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContext, Future}
+import io.circe.Encoder
+import io.circe.Printer.noSpaces
+import io.circe.parser.parse
+import io.circe.syntax._
+import org.apache.kafka.common.serialization.Deserializer
+import org.apache.pekko.Done
+import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.Scheduler
+import org.apache.pekko.actor.typed.scaladsl.adapter._
+import org.apache.pekko.http.scaladsl.model.ws.Message
+import org.apache.pekko.http.scaladsl.model.ws.TextMessage
+import org.apache.pekko.http.scaladsl.server.Directives._
+import org.apache.pekko.http.scaladsl.server.Route
+import org.apache.pekko.kafka.scaladsl.Consumer
+import org.apache.pekko.stream._
+import org.apache.pekko.stream.scaladsl.Flow
+import org.apache.pekko.stream.scaladsl.Keep
+import org.apache.pekko.stream.scaladsl.Sink
+import org.apache.pekko.stream.scaladsl.Source
+import org.apache.pekko.stream.typed.scaladsl.ActorSink
+import org.apache.pekko.util.Timeout
 
 trait OutboundWebSocket
     extends ProxyFlowExtras
@@ -232,7 +239,7 @@ trait OutboundWebSocket
 
       case wrong =>
         log.error(
-          s"Adding consumer failed with an unexpected state." +
+          "Adding consumer failed with an unexpected state." +
             s" Session:\n ${wrong.session}"
         )
         throw UnexpectedError(
@@ -401,7 +408,7 @@ trait OutboundWebSocket
       }
       .map(msg => parse(msg).flatMap(_.as[WsCommit]))
       .recover { case t: Throwable =>
-        logAndThrow(s"JSON message could not be parsed", t)
+        logAndThrow("JSON message could not be parsed", t)
       }
       .collect { case Right(res) => res }
 

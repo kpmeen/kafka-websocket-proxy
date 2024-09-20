@@ -1,17 +1,22 @@
 package net.scalytica.kafka.wsproxy.config
 
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
+import scala.util.Failure
+import scala.util.Success
+
+import net.scalytica.kafka.wsproxy._
+import net.scalytica.kafka.wsproxy.codecs.BasicSerdes
+import net.scalytica.kafka.wsproxy.codecs.DynamicCfgSerde
+import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.config.Configuration.DynamicCfg
+import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
+
+import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.pekko.Done
 import org.apache.pekko.actor.typed.ActorSystem
 import org.apache.pekko.actor.typed.scaladsl.adapter._
 import org.apache.pekko.kafka.ProducerSettings
-import net.scalytica.kafka.wsproxy._
-import net.scalytica.kafka.wsproxy.codecs.{BasicSerdes, DynamicCfgSerde}
-import net.scalytica.kafka.wsproxy.config.Configuration.{AppCfg, DynamicCfg}
-import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
-import org.apache.kafka.clients.producer.ProducerRecord
-
-import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success}
 
 /**
  * Producer implementation for producing [[DynamicCfg]] messages to Kafka.

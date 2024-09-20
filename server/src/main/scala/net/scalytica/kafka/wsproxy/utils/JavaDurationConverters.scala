@@ -2,7 +2,8 @@ package net.scalytica.kafka.wsproxy.utils
 
 import java.time.{Duration => JDuration}
 
-import scala.concurrent.duration.{Duration, FiniteDuration}
+import scala.concurrent.duration.Duration
+import scala.concurrent.duration.FiniteDuration
 
 object JavaDurationConverters {
 

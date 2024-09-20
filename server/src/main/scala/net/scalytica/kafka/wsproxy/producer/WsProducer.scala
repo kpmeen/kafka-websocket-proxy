@@ -1,30 +1,29 @@
 package net.scalytica.kafka.wsproxy.producer
 
+import scala.concurrent.ExecutionContext
+
+import net.scalytica.kafka.wsproxy.SaslJaasConfig
+import net.scalytica.kafka.wsproxy.auth.KafkaLoginModules
+import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
+import net.scalytica.kafka.wsproxy.errors.AuthenticationError
+import net.scalytica.kafka.wsproxy.errors.AuthorisationError
+import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
+import net.scalytica.kafka.wsproxy.models._
+import net.scalytica.kafka.wsproxy.producerMetricsProperties
+
+import io.circe.Decoder
+import org.apache.kafka.clients.producer.ProducerConfig._
+import org.apache.kafka.common.errors.AuthenticationException
+import org.apache.kafka.common.errors.AuthorizationException
+import org.apache.kafka.common.serialization.Serializer
 import org.apache.pekko.NotUsed
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.model.ws.Message
+import org.apache.pekko.kafka.ProducerMessage
+import org.apache.pekko.kafka.ProducerSettings
 import org.apache.pekko.kafka.scaladsl.Producer
-import org.apache.pekko.kafka.{ProducerMessage, ProducerSettings}
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl._
-import io.circe.Decoder
-import net.scalytica.kafka.wsproxy.auth.KafkaLoginModules
-import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
-import net.scalytica.kafka.wsproxy.errors.{
-  AuthenticationError,
-  AuthorisationError
-}
-import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
-import net.scalytica.kafka.wsproxy.models._
-import net.scalytica.kafka.wsproxy.{producerMetricsProperties, SaslJaasConfig}
-import org.apache.kafka.clients.producer.ProducerConfig._
-import org.apache.kafka.common.errors.{
-  AuthenticationException,
-  AuthorizationException
-}
-import org.apache.kafka.common.serialization.Serializer
-
-import scala.concurrent.ExecutionContext
 
 /** Functions for initialising Kafka producer sinks and flows. */
 object WsProducer extends ProducerFlowExtras with WithProxyLogger {

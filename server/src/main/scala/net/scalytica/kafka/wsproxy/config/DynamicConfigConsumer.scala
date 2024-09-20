@@ -1,23 +1,19 @@
 package net.scalytica.kafka.wsproxy.config
 
-import org.apache.pekko.actor.typed.ActorSystem
-import org.apache.pekko.kafka.scaladsl.Consumer
-import org.apache.pekko.kafka.{ConsumerSettings, Subscriptions}
-import org.apache.pekko.stream.scaladsl.Source
 import net.scalytica.kafka.wsproxy._
-import net.scalytica.kafka.wsproxy.codecs.{BasicSerdes, DynamicCfgSerde}
+import net.scalytica.kafka.wsproxy.codecs.BasicSerdes
+import net.scalytica.kafka.wsproxy.codecs.DynamicCfgSerde
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
-import net.scalytica.kafka.wsproxy.config.DynamicConfigHandlerProtocol.{
-  InternalCommand,
-  RemoveDynamicConfigRecord,
-  UpdateDynamicConfigRecord
-}
+import net.scalytica.kafka.wsproxy.config.DynamicConfigHandlerProtocol._
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
-import org.apache.kafka.clients.consumer.ConsumerConfig.{
-  AUTO_OFFSET_RESET_CONFIG,
-  ENABLE_AUTO_COMMIT_CONFIG
-}
+
+import org.apache.kafka.clients.consumer.ConsumerConfig._
 import org.apache.kafka.clients.consumer.OffsetResetStrategy.EARLIEST
+import org.apache.pekko.actor.typed.ActorSystem
+import org.apache.pekko.kafka.ConsumerSettings
+import org.apache.pekko.kafka.Subscriptions
+import org.apache.pekko.kafka.scaladsl.Consumer
+import org.apache.pekko.stream.scaladsl.Source
 
 /**
  * Consumer implementation for reading

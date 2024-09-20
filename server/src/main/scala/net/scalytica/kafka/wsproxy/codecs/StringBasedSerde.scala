@@ -2,12 +2,10 @@ package net.scalytica.kafka.wsproxy.codecs
 
 import java.util.{Map => JMap}
 
-import org.apache.kafka.common.serialization.{
-  Deserializer,
-  Serde,
-  Serdes => KSerdes,
-  Serializer
-}
+import org.apache.kafka.common.serialization.Deserializer
+import org.apache.kafka.common.serialization.Serde
+import org.apache.kafka.common.serialization.Serializer
+import org.apache.kafka.common.serialization.{Serdes => KSerdes}
 
 /** Scaffolding for Serdes based on the basic String Serde */
 trait StringBasedSerializer[T] extends Serializer[T] {

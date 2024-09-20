@@ -1,16 +1,20 @@
 package net.scalytica.kafka.wsproxy.jmx.mbeans
 
 import java.beans.ConstructorProperties
-import java.time.{LocalDateTime, ZoneOffset}
+import java.time.LocalDateTime
+import java.time.ZoneOffset
 
-import org.apache.pekko.actor.typed.{ActorRef, Behavior}
-import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
+import scala.beans.BeanProperty
+
 import net.scalytica.kafka.wsproxy.config.Configuration.AppCfg
 import net.scalytica.kafka.wsproxy.jmx.MXBeanActor
 import net.scalytica.kafka.wsproxy.jmx.mbeans.ProxyStatusProtocol._
 import net.scalytica.kafka.wsproxy.models.BrokerInfo
 
-import scala.beans.BeanProperty
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.scaladsl.ActorContext
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
 
 case class BrokerInfoMXView @ConstructorProperties(
   Array("id", "host", "port", "rack")

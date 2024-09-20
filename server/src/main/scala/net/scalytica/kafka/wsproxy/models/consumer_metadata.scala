@@ -1,19 +1,17 @@
 package net.scalytica.kafka.wsproxy.models
 
-import net.scalytica.kafka.wsproxy.StringExtensions
-import net.scalytica.kafka.wsproxy.models.ConsumerGroup.{
-  ActiveStates,
-  InactiveStates
-}
-import org.apache.kafka.clients.admin.{
-  ConsumerGroupDescription,
-  ConsumerGroupListing
-}
-import org.apache.kafka.clients.consumer.OffsetAndMetadata
-import org.apache.kafka.common.{ConsumerGroupState, TopicPartition}
-
-import scala.jdk.OptionConverters._
 import scala.jdk.CollectionConverters._
+import scala.jdk.OptionConverters._
+
+import net.scalytica.kafka.wsproxy.StringExtensions
+import net.scalytica.kafka.wsproxy.models.ConsumerGroup.ActiveStates
+import net.scalytica.kafka.wsproxy.models.ConsumerGroup.InactiveStates
+
+import org.apache.kafka.clients.admin.ConsumerGroupDescription
+import org.apache.kafka.clients.admin.ConsumerGroupListing
+import org.apache.kafka.clients.consumer.OffsetAndMetadata
+import org.apache.kafka.common.ConsumerGroupState
+import org.apache.kafka.common.TopicPartition
 
 case class ConsumerGroup(
     groupId: WsGroupId,

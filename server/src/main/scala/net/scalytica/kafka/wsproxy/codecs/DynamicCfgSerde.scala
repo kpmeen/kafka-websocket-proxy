@@ -1,11 +1,13 @@
 package net.scalytica.kafka.wsproxy.codecs
 
+import scala.util.Failure
+import scala.util.Success
+import scala.util.Try
+
 import net.scalytica.kafka.wsproxy.config.Configuration
 import net.scalytica.kafka.wsproxy.config.Configuration.DynamicCfg
 import net.scalytica.kafka.wsproxy.errors.InvalidDynamicCfg
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
-
-import scala.util.{Failure, Success, Try}
 
 /**
  * Serde implementation for [[DynamicCfg]] types. Since these are config objects

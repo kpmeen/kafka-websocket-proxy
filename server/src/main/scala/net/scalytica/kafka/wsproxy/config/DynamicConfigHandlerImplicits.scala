@@ -1,25 +1,26 @@
 package net.scalytica.kafka.wsproxy.config
 
-import org.apache.pekko.actor.typed.{ActorRef, Scheduler}
-import org.apache.pekko.util.Timeout
+import java.util.concurrent.TimeoutException
+
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
+import scala.concurrent.duration._
+
 import net.scalytica.kafka.wsproxy.actor.ActorWithProtocolExtensions
-import net.scalytica.kafka.wsproxy.config.Configuration.{
-  ConsumerSpecificLimitCfg,
-  DynamicCfg,
-  ProducerSpecificLimitCfg
-}
-import net.scalytica.kafka.wsproxy.errors.{
-  FatalProxyServerError,
-  RetryFailedError
-}
+import net.scalytica.kafka.wsproxy.config.Configuration.ConsumerSpecificLimitCfg
+import net.scalytica.kafka.wsproxy.config.Configuration.DynamicCfg
+import net.scalytica.kafka.wsproxy.config.Configuration.ProducerSpecificLimitCfg
 import net.scalytica.kafka.wsproxy.config.DynamicConfigHandlerProtocol._
+import net.scalytica.kafka.wsproxy.errors.FatalProxyServerError
+import net.scalytica.kafka.wsproxy.errors.RetryFailedError
 import net.scalytica.kafka.wsproxy.logging.WithProxyLogger
-import net.scalytica.kafka.wsproxy.models.{WsGroupId, WsProducerId}
+import net.scalytica.kafka.wsproxy.models.WsGroupId
+import net.scalytica.kafka.wsproxy.models.WsProducerId
 import net.scalytica.kafka.wsproxy.utils.BlockingRetry
 
-import java.util.concurrent.TimeoutException
-import scala.concurrent.{ExecutionContext, Future}
-import scala.concurrent.duration._
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.Scheduler
+import org.apache.pekko.util.Timeout
 
 object DynamicConfigHandlerImplicits extends WithProxyLogger {
 

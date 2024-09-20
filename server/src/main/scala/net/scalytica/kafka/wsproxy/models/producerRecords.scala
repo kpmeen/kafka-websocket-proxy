@@ -1,11 +1,12 @@
 package net.scalytica.kafka.wsproxy.models
 
+import scala.jdk.CollectionConverters._
+
 import net.scalytica.kafka.wsproxy.models.ValueDetails.InValueDetails
 import net.scalytica.kafka.wsproxy.producer.ExtendedProducerRecord
+
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.header.Header
-
-import scala.jdk.CollectionConverters._
 
 /**
  * ADT describing any record that can come in to the service through the
