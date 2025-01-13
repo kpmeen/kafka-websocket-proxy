@@ -14,7 +14,7 @@ resolvers ++= Seq(
 )
 
 // sbt-git plugin to get access to git commands from the build scripts
-addSbtPlugin("com.github.sbt" % "sbt-git" % "2.0.1")
+addSbtPlugin("com.github.sbt" % "sbt-git" % "2.1.0")
 
 // Dependency handling
 addSbtPlugin("com.timushev.sbt" % "sbt-updates" % "0.6.4")
