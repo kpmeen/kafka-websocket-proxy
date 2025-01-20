@@ -18,7 +18,7 @@ object Versions {
 
   // Pekko dependencies
   val PekkoVersion           = "1.1.3"
-  val PekkoConnectorsVersion = "1.0.+"
+  val PekkoConnectorsVersion = "1.1.0"
   val PekkoCirceVersion      = "1.0.0"
 
   // Circe dependencies
