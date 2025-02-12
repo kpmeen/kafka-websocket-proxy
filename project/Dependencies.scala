@@ -45,7 +45,7 @@ object Versions {
 
   // Override versions
   val AvroVersion            = "1.11.1"
-  val CommonsCompressVersion = "1.21"
+  val CommonsCompressVersion = "1.27.1"
   val JacksonDatabindVersion = "2.13.5"
   val JawnParserVersion      = "1.4.0"
 }
