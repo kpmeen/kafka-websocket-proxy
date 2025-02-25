@@ -20,7 +20,7 @@ addSbtPlugin("com.github.sbt" % "sbt-git" % "2.1.0")
 addSbtPlugin("com.timushev.sbt" % "sbt-updates" % "0.6.4")
 
 // Formatting and style checking
-addSbtPlugin("org.scalameta"       % "sbt-scalafmt"   % "2.5.2")
+addSbtPlugin("org.scalameta"       % "sbt-scalafmt"   % "2.5.4")
 addSbtPlugin("com.beautiful-scala" % "sbt-scalastyle" % "1.5.1")
 
 // Code coverage
