@@ -27,7 +27,7 @@ addSbtPlugin("com.beautiful-scala" % "sbt-scalastyle" % "1.5.1")
 addSbtPlugin("org.scoverage" %% "sbt-scoverage" % "2.2.0")
 
 // Native packaging plugin
-addSbtPlugin("com.github.sbt" %% "sbt-native-packager" % "1.11.0")
+addSbtPlugin("com.github.sbt" %% "sbt-native-packager" % "1.11.1")
 
 // Release plugin
 addSbtPlugin("com.github.sbt" % "sbt-release" % "1.4.0")
