@@ -3,7 +3,7 @@ import sbt._
 //noinspection TypeAnnotation
 object Versions {
 
-  val ScalaVersion = "2.13.14"
+  val ScalaVersion = "2.13.16"
 
   val LightbendConfigVersion = "1.4.3"
   val PureConfigVersion      = "0.17.7"

@@ -24,7 +24,7 @@ addSbtPlugin("org.scalameta"       % "sbt-scalafmt"   % "2.5.4")
 addSbtPlugin("com.beautiful-scala" % "sbt-scalastyle" % "1.5.1")
 
 // Code coverage
-addSbtPlugin("org.scoverage" %% "sbt-scoverage" % "2.2.0")
+addSbtPlugin("org.scoverage" %% "sbt-scoverage" % "2.3.0")
 
 // Native packaging plugin
 addSbtPlugin("com.github.sbt" %% "sbt-native-packager" % "1.11.1")
