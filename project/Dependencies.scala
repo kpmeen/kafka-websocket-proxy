@@ -44,7 +44,7 @@ object Versions {
   val PrometheusAgentVersion = "0.14.0"
 
   // Override versions
-  val AvroVersion            = "1.11.4"
+  val AvroVersion            = "1.12.0"
   val CommonsCompressVersion = "1.27.1"
   val JacksonDatabindVersion = "2.18.2"
   val JawnParserVersion      = "1.6.0"
