@@ -6,7 +6,7 @@ object Versions {
   val ScalaVersion = "2.13.16"
 
   val LightbendConfigVersion = "1.4.3"
-  val PureConfigVersion      = "0.17.8"
+  val PureConfigVersion      = "0.17.9"
 
   val Avro4sVersion                 = "4.1.1"
   val ApacheKafkaVersion            = "3.7.+"
