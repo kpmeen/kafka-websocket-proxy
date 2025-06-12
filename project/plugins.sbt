@@ -2,7 +2,7 @@
 logLevel := Level.Warn
 
 resolvers ++= DefaultOptions.resolvers(snapshot = false)
-resolvers ++= Resolver.sonatypeOssRepos("releases")
+resolvers += Resolver.sonatypeCentralSnapshots
 resolvers ++= Seq(
   Resolver.mavenCentral,
   Resolver.jcenterRepo,
