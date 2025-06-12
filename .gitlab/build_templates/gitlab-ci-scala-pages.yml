@@ -26,7 +26,7 @@ pages:build:
   rules:
     - !reference [.pages_shared_rules, rules]
   stage: build
-  image: registry.gitlab.com/kpmeen/docker-scala-sbt:scala_2.13.13_jdk21
+  image: registry.gitlab.com/kpmeen/docker-scala-sbt:scala_2.13.16_jdk21
   interruptible: false
   script:
     - sbt docs/mdoc
