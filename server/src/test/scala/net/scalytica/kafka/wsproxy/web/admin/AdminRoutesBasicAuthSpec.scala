@@ -33,7 +33,7 @@ import net.scalytica.test.TestDataGenerators.{
 }
 import org.apache.kafka.clients.producer.ProducerRecord
 // scalastyle:off line.size.limit
-import org.apache.kafka.coordinator.group.consumer.ConsumerGroup.ConsumerGroupState
+import org.apache.kafka.coordinator.group.modern.consumer.ConsumerGroup.ConsumerGroupState
 // scalastyle:on line.size.limit
 import org.apache.pekko.http.scaladsl.model.ContentTypes._
 import org.apache.pekko.http.scaladsl.model.StatusCodes._

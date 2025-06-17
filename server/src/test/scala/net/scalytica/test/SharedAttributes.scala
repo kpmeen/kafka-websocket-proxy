@@ -2,33 +2,22 @@ package net.scalytica.test
 
 import com.typesafe.config.Config
 import io.github.embeddedkafka.{EmbeddedKafkaConfig, EmbeddedKafkaConfigImpl}
-import kafka.server.KafkaConfig.{
-  AdvertisedListenersProp,
-  AutoCreateTopicsEnableProp,
-  InterBrokerListenerNameProp,
-  ListenersProp,
-  SaslEnabledMechanismsProp,
-  SaslMechanismInterBrokerProtocolProp,
-  SslEndpointIdentificationAlgorithmProp,
-  SslKeyPasswordProp,
-  SslKeystoreLocationProp,
-  SslKeystorePasswordProp,
-  SslTruststoreLocationProp,
-  SslTruststorePasswordProp,
-  ZkConnectProp,
-  ZkConnectionTimeoutMsProp
-}
 import net.scalytica.kafka.wsproxy.config.Configuration
 import net.scalytica.kafka.wsproxy.config.Configuration.{AppCfg, BasicAuthCfg}
 import net.scalytica.kafka.wsproxy.models.{WsProducerId, WsServerId}
 import net.scalytica.test.FileLoader._
-import org.apache.kafka.clients.CommonClientConfigs.SECURITY_PROTOCOL_CONFIG
-import org.apache.kafka.common.config.SaslConfigs.{
-  SASL_JAAS_CONFIG,
-  SASL_MECHANISM
-}
+import org.apache.kafka.clients.CommonClientConfigs._
+import org.apache.kafka.common.config.SaslConfigs._
 import org.apache.kafka.common.config.SslConfigs._
+import org.apache.kafka.common.config.internals.BrokerSecurityConfigs._
 import org.apache.kafka.common.security.auth.SecurityProtocol.SASL_SSL
+import org.apache.kafka.network.SocketServerConfigs._
+import org.apache.kafka.server.config.ReplicationConfigs._
+import org.apache.kafka.server.config.ServerLogConfigs._
+import org.apache.kafka.server.config.ZkConfigs.{
+  ZK_CONNECTION_TIMEOUT_MS_CONFIG,
+  ZK_CONNECT_CONFIG
+}
 import org.apache.pekko.http.scaladsl.model.headers.BasicHttpCredentials
 
 object SharedAttributes {
@@ -102,8 +91,8 @@ object SharedAttributes {
     zooKeeperPort = 0,
     //    schemaRegistryPort = 0,
     customBrokerProperties = Map(
-      AutoCreateTopicsEnableProp -> "false",
-      ZkConnectionTimeoutMsProp  -> "60000"
+      AUTO_CREATE_TOPICS_ENABLE_CONFIG -> "false",
+      ZK_CONNECTION_TIMEOUT_MS_CONFIG  -> "60000"
     ),
     customProducerProperties = Map.empty,
     customConsumerProperties = Map.empty
@@ -132,26 +121,26 @@ object SharedAttributes {
       zooKeeperPort = zkp,
       //      schemaRegistryPort = srp,
       customBrokerProperties = Map(
-        ZkConnectProp                          -> s"localhost:$zkp",
-        AutoCreateTopicsEnableProp             -> "false",
-        AdvertisedListenersProp                -> listeners,
-        ListenersProp                          -> listeners,
-        InterBrokerListenerNameProp            -> SASL_SSL.name,
-        SaslMechanismInterBrokerProtocolProp   -> "PLAIN",
-        SaslEnabledMechanismsProp              -> "PLAIN",
-        SslEndpointIdentificationAlgorithmProp -> "",
-        SslKeystoreLocationProp -> FileLoader
+        ZK_CONNECT_CONFIG                            -> s"localhost:$zkp",
+        AUTO_CREATE_TOPICS_ENABLE_CONFIG             -> "false",
+        ADVERTISED_LISTENERS_CONFIG                  -> listeners,
+        LISTENERS_CONFIG                             -> listeners,
+        INTER_BROKER_LISTENER_NAME_CONFIG            -> SASL_SSL.name,
+        SASL_MECHANISM_INTER_BROKER_PROTOCOL_CONFIG  -> "PLAIN",
+        SASL_ENABLED_MECHANISMS_CONFIG               -> "PLAIN",
+        SSL_ENDPOINT_IDENTIFICATION_ALGORITHM_CONFIG -> "",
+        SSL_KEYSTORE_LOCATION_CONFIG -> FileLoader
           .filePath("/sasl/kafka/broker1.keystore.jks")
           .toAbsolutePath
           .toString,
-        SslKeystorePasswordProp -> testKeyPass,
-        SslKeyPasswordProp      -> testKeyPass,
-        SslTruststoreLocationProp -> FileLoader
+        SSL_KEYSTORE_PASSWORD_CONFIG -> testKeyPass,
+        SSL_KEY_PASSWORD_CONFIG      -> testKeyPass,
+        SSL_TRUSTSTORE_LOCATION_CONFIG -> FileLoader
           .filePath("/sasl/kafka/broker1.truststore.jks")
           .toAbsolutePath
           .toString,
-        SslTruststorePasswordProp -> testKeyPass,
-        saslSslPlainJaasConfig    -> brokerSasl
+        SSL_TRUSTSTORE_PASSWORD_CONFIG -> testKeyPass,
+        saslSslPlainJaasConfig         -> brokerSasl
       ),
       customProducerProperties = secureClientProps,
       customConsumerProperties = secureClientProps
