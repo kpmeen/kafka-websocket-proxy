@@ -17,7 +17,7 @@ object Versions {
   val EmbeddedSchemaRegistryVersion = s"$ConfluentPlatformBaseVersion.+"
 
   // Pekko dependencies
-  val PekkoVersion           = "1.1.3"
+  val PekkoVersion           = "1.1.4"
   val PekkoConnectorsVersion = "1.1.0"
   val PekkoCirceVersion      = "1.0.0"
 
